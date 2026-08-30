@@ -70,6 +70,7 @@
 #include <shlobj.h>
 #elif defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
+#include <dirent.h>
 #else
 #include <unistd.h>
 #include <pwd.h>

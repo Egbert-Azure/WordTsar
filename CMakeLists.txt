@@ -305,6 +305,7 @@ if(BUILD_TUI)
         src/third-party/chillout/src/chillout/chillout.cpp
         src/third-party/chillout/src/chillout/common/common.cpp
         src/third-party/chillout/src/chillout/posix/posixcrashhandler.cpp
+        src/core/spellcheck/macspellcheck.mm
     )
 
     # Print preview (PDF via libharu) -- the printout is backend-neutral
@@ -378,6 +379,7 @@ if(BUILD_TUI)
         src/third-party/chillout/src/chillout/chillout.cpp
         src/third-party/chillout/src/chillout/common/common.cpp
         src/third-party/chillout/src/chillout/posix/posixcrashhandler.cpp
+        src/core/spellcheck/macspellcheck.mm
     )
 
     target_include_directories(WSTuiTest PRIVATE

@@ -12,8 +12,27 @@ This document covers building WordTsar on macOS.
 
 ## Build Targets
 
-- **WordTsar** — GUI application (Qt6-based, always built)
-- **ws** — TUI terminal application (FTXUI-based, opt-in with `-DBUILD_TUI=ON`, off by default)
+WordTsar builds one or both of these from the same source, depending on how you configure it:
+
+- **WordTsar** — the Qt6 GUI app. Built by default (`BUILD_GUI`, default `ON`).
+- **ws** — a terminal UI: full-screen writing in a terminal window, no window chrome, uses the wordstartui toolkit instead of Qt. Off by default; add `-DBUILD_TUI=ON` to the `cmake` configure line to build it too. Both targets share the same document engine and file formats, so which one to build (or both) is purely a matter of how you want to write — there's no functional tradeoff in file compatibility between them.
+
+```bash
+# GUI only (default)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# GUI + terminal UI
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TUI=ON
+
+# Terminal UI only, no Qt required at all
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=OFF -DBUILD_TUI=ON
+```
+
+After building with `-DBUILD_TUI=ON`, run the terminal UI directly from a real terminal window (not through `open`, which is for `.app` bundles):
+
+```bash
+./build/ws
+```
 
 ## Command Line
 

@@ -701,6 +701,7 @@ sTUITextMetrics cTUIFontCalculatorHarfBuzz::MeasureText(const std::string& text)
 int cTUIFontCalculatorHarfBuzz::MeasureCharacterWidth(char32_t codepoint) { return 0; }
 int cTUIFontCalculatorHarfBuzz::GetLineHeight(void) { return 0; }
 bool cTUIFontCalculatorHarfBuzz::SupportsCharacter(char32_t codepoint) { return false; }
+bool cTUIFontCalculatorHarfBuzz::SupportsUnicode(void) const { return false; }
 sTUITextMetrics cTUIFontCalculatorHarfBuzz::MeasureTextWithShaping(const std::string& text) { return {}; }
 bool cTUIFontCalculatorHarfBuzz::LoadFontFromFile(const std::string& fontPath) { return false; }
 bool cTUIFontCalculatorHarfBuzz::LoadFontFromMemory(const std::vector<uint8_t>& fontData) { return false; }

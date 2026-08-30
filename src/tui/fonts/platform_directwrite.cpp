@@ -421,28 +421,4 @@ void cTUIFontCalculatorDirectWrite::EnumerateSystemFonts(std::vector<std::string
     }
 }
 
-#else // !_WIN32
-
-// Stub implementation for non-Windows platforms
-cTUIFontCalculatorDirectWrite::cTUIFontCalculatorDirectWrite(void) {}
-cTUIFontCalculatorDirectWrite::~cTUIFontCalculatorDirectWrite(void) {}
-bool cTUIFontCalculatorDirectWrite::Initialize(void) { return false; }
-void cTUIFontCalculatorDirectWrite::Shutdown(void) {}
-bool cTUIFontCalculatorDirectWrite::SetFont(const sTUIFontInfo& font) { return false; }
-std::vector<std::string> cTUIFontCalculatorDirectWrite::GetAvailableFonts(void) { return {}; }
-sTUITextMetrics cTUIFontCalculatorDirectWrite::MeasureText(const std::string& text) { return {}; }
-int cTUIFontCalculatorDirectWrite::MeasureCharacterWidth(char32_t codepoint) { return 0; }
-int cTUIFontCalculatorDirectWrite::GetLineHeight(void) { return 0; }
-bool cTUIFontCalculatorDirectWrite::SupportsCharacter(char32_t codepoint) { return false; }
-float cTUIFontCalculatorDirectWrite::PointsToTWIPS(float points) const { return 0; }
-float cTUIFontCalculatorDirectWrite::TWIPSToPoints(float twips) const { return 0; }
-std::wstring cTUIFontCalculatorDirectWrite::UTF8ToWString(const std::string& utf8) { return L""; }
-bool cTUIFontCalculatorDirectWrite::CreateTextFormat(const std::string& fontFamily, float fontSize, 
-                                                    DWRITE_FONT_WEIGHT weight, DWRITE_FONT_STYLE style) { return false; }
-sTUITextMetrics cTUIFontCalculatorDirectWrite::MeasureTextWithFallback(const std::wstring& text) { return {}; }
-int cTUIFontCalculatorDirectWrite::MeasureCharacterWithFallback(char32_t codepoint) { return 0; }
-DWRITE_FONT_WEIGHT cTUIFontCalculatorDirectWrite::FontWeightFromInfo(const sTUIFontInfo& font) const { return DWRITE_FONT_WEIGHT_NORMAL; }
-DWRITE_FONT_STYLE cTUIFontCalculatorDirectWrite::FontStyleFromInfo(const sTUIFontInfo& font) const { return DWRITE_FONT_STYLE_NORMAL; }
-void cTUIFontCalculatorDirectWrite::EnumerateSystemFonts(std::vector<std::string>& fonts) {}
-
 #endif // _WIN32

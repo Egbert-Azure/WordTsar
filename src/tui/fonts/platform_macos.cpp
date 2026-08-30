@@ -140,7 +140,7 @@ std::vector<std::string> cTUIFontCalculatorMacOSNative::GetAvailableFonts(void) 
     std::vector<std::string> fonts;
     
     // Use CoreText to enumerate fonts
-    CTFontCollectionRef collection = CTFontCollectionCreateFromAvailableDescriptors(nullptr);
+    CTFontCollectionRef collection = CTFontCollectionCreateFromAvailableFonts(nullptr);
     if (!collection) return fonts;
     
     CFArrayRef descriptors = CTFontCollectionCreateMatchingFontDescriptors(collection);

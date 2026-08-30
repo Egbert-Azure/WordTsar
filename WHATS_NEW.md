@@ -3,6 +3,27 @@
 Release history for WordTsar, in reverse chronological order.
 
 
+## 0.6.1833 Alpha (2026-08-30) — macOS fork
+
+This fork trims WordTsar down to a macOS-only build. See the [README](README.md) for the full framing; the highlights:
+
+### Save As Word (.docx)
+
+WordTsar can now write `.docx` files, not just read them. File → Save As offers Word format alongside Wordstar and RTF. Tables and headers/footers aren't covered yet.
+
+### Terminal UI, buildable again
+
+The `ws` terminal UI builds alongside the GUI from the same source (`-DBUILD_TUI=ON`, off by default). See [BUILDING.md](BUILDING.md#build-targets) for how to choose between the GUI, the TUI, or both.
+
+### Fixed
+
+- A crash in the macOS spell checker when adding a word to the dictionary (wrong `NSSpellChecker` API was being called).
+
+### Removed
+
+- Windows and Linux project files, build scripts, and packaging assets. Full cross-platform support remains available from the original project at [wordtsar.ca](http://wordtsar.ca).
+
+
 ## 0.5.1804 Alpha (2026-03-01)
 
 ### New Layout and Rendering Engines
