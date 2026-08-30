@@ -65,6 +65,7 @@
 #include <stdexcept>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <deque>
 #include <iomanip>
@@ -73,6 +74,8 @@
 
 #include "src/core/include/utils.h"
 #include "src/core/document/document.h"
+#include "src/core/editor/editorbase.h"
+#include "src/core/layout/layoutbase.h"
 
 #include "zip.h"
 
@@ -261,21 +264,19 @@ bool cDOCXFile::LoadFile(std::string filename)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  filename [in] path to save to (unused)
-/// @param  length [in] document length (unused)
+/// @param  filename [in] path to save to
+/// @param  length [in] document length (unused -- walked via GetNumberofParagraphs)
 ///
-/// @return false always (saving not supported)
+/// @return true on success
 ///
 /// @brief
-/// Save file stub. DOCX saving is not implemented.
+/// Save the document as a DOCX file.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cDOCXFile::SaveFile(std::string filename, POSITION_T length)
 {
-    UNUSED_ARGUMENT(filename) ;
     UNUSED_ARGUMENT(length) ;
-    bool retval = false ;
-    return retval ;
+    return WriteDocx(filename) ;
 }
 
 
@@ -295,15 +296,15 @@ bool cDOCXFile::CanLoad(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return false
+/// @return true
 ///
 /// @brief
-/// Report that this handler cannot save files.
+/// Report that this handler can save files.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cDOCXFile::CanSave(void)
 {
-    return false ;
+    return true ;
 }
 
 
@@ -1581,6 +1582,730 @@ void cDOCXFile::EmitIndent(pugi::xml_node &node, pugi::xml_node run, sDOCXParagr
     }
 }
 
+
+//=============================================================================
+// DOCX writing (Save As Word)
+//
+// Walks the document exactly the way cRTFWriter does (see rtf/write/rtfwriter.cpp):
+// one pass over GetNumberofParagraphs()/GetParagraphText(), dot-command paragraphs
+// update running formatting state, text paragraphs are emitted as one <w:p> each
+// with that state applied to w:pPr (OOXML has no persistent state between
+// paragraphs the way RTF control words do, so it's re-applied every time).
+// Character-level formatting is scanned the same way CreateText() does: MARKER_CHAR
+// bytes trigger GetControlChar()/GetFont()/GetColor() lookups that flip the current
+// run's attributes.
+//
+// First-cut scope (see WordTsar macOS roadmap): plain paragraphs/runs, character
+// formatting (bold/italic/underline/strikethrough/super/subscript/font/color),
+// paragraph justification/indent/spacing, page size/margins, page breaks.
+// Tables, headers/footers, columns, indexing and other dot commands are not
+// translated -- unrecognized dot commands are silently skipped rather than
+// producing broken output.
+//=============================================================================
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  color [in] RGB color to format
+///
+/// @return 6-digit uppercase hex string (RRGGBB), "000000" for the default sentinel
+///
+/// @brief
+/// Formats a document color as a DOCX w:color hex value.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::ColorToHex(sSeqRGBColor &color)
+{
+    if (color.IsDefault())
+    {
+        return "000000" ;
+    }
+
+    char buf[8] ;
+    snprintf(buf, sizeof(buf), "%02X%02X%02X",
+             static_cast<unsigned char>(color.red),
+             static_cast<unsigned char>(color.green),
+             static_cast<unsigned char>(color.blue)) ;
+    return std::string(buf) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  paragraph [in] the w:p node to append the run to
+/// @param  buffer [in/out] accumulated run text; cleared after flushing
+///
+/// @return nothing
+///
+/// @brief
+/// Emits the buffered text as a single w:r run with rPr reflecting the
+/// current character-formatting state (mWBold, mWItalics, etc.), then
+/// clears the buffer. No-op if the buffer is empty.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDOCXFile::FlushRun(pugi::xml_node &paragraph, std::string &buffer)
+{
+    if (buffer.empty())
+    {
+        return ;
+    }
+
+    pugi::xml_node run = paragraph.append_child("w:r") ;
+    pugi::xml_node rPr = run.append_child("w:rPr") ;
+
+    if (mWBold)
+    {
+        rPr.append_child("w:b") ;
+    }
+    if (mWItalics)
+    {
+        rPr.append_child("w:i") ;
+    }
+    if (mWUnderline)
+    {
+        rPr.append_child("w:u").append_attribute("w:val") = "single" ;
+    }
+    if (mWStrikethrough)
+    {
+        rPr.append_child("w:strike") ;
+    }
+    if (mWSuperscript)
+    {
+        rPr.append_child("w:vertAlign").append_attribute("w:val") = "superscript" ;
+    }
+    else if (mWSubscript)
+    {
+        rPr.append_child("w:vertAlign").append_attribute("w:val") = "subscript" ;
+    }
+    if (!mWFontName.empty())
+    {
+        pugi::xml_node rFonts = rPr.append_child("w:rFonts") ;
+        rFonts.append_attribute("w:ascii") = mWFontName.c_str() ;
+        rFonts.append_attribute("w:hAnsi") = mWFontName.c_str() ;
+    }
+    if (mWFontSize > 0.0)
+    {
+        rPr.append_child("w:sz").append_attribute("w:val") = static_cast<int>(mWFontSize * 2.0) ;
+    }
+    if (!mWColor.IsDefault())
+    {
+        rPr.append_child("w:color").append_attribute("w:val") = ColorToHex(mWColor).c_str() ;
+    }
+
+    if (!rPr.first_child())
+    {
+        run.remove_child(rPr) ;
+    }
+
+    pugi::xml_node t = run.append_child("w:t") ;
+    t.append_attribute("xml:space") = "preserve" ;
+    t.text().set(buffer.c_str()) ;
+
+    buffer.clear() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  body [in] the w:body node to append the paragraph to
+/// @param  text [in] the paragraph's text (including embedded MARKER_CHAR
+///                    control bytes), trailing newline stripped in place
+///
+/// @return nothing
+///
+/// @brief
+/// Emits one text paragraph as a w:p element: paragraph properties from the
+/// current running state (justification/indent/spacing), then one or more
+/// w:r runs built by scanning the text for MARKER_CHAR-coded style toggles,
+/// tabs, font changes, and color changes -- the same control-byte protocol
+/// cRTFWriter::CreateText() reads.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDOCXFile::SaveParagraph(pugi::xml_node &body, std::string &text)
+{
+    // GetParagraphText() includes the trailing paragraph terminator; strip it
+    // so it doesn't end up as a stray run of text.
+    while (!text.empty() && (text.back() == '\n' || text.back() == static_cast<char>(HARD_RETURN)))
+    {
+        text.pop_back() ;
+    }
+
+    pugi::xml_node para = body.append_child("w:p") ;
+
+    pugi::xml_node pPr = para.append_child("w:pPr") ;
+
+    pugi::xml_node jc = pPr.append_child("w:jc") ;
+    switch (mWAlign)
+    {
+        case JUST_CENTER :
+            jc.append_attribute("w:val") = "center" ;
+            break ;
+        case JUST_RIGHT :
+            jc.append_attribute("w:val") = "right" ;
+            break ;
+        case JUST_JUST :
+            jc.append_attribute("w:val") = "both" ;
+            break ;
+        default :
+            jc.append_attribute("w:val") = "left" ;
+            break ;
+    }
+
+    if (mWLeftMargin != 0 || mWFirstLine != 0)
+    {
+        pugi::xml_node ind = pPr.append_child("w:ind") ;
+        if (mWLeftMargin != 0)
+        {
+            ind.append_attribute("w:left") = mWLeftMargin ;
+        }
+
+        // .pm is absolute from the page offset, like RTF's \fi is relative to \li:
+        // relative first-line offset = .pm - .lm.
+        int firstlineRelative = mWFirstLine - mWLeftMargin ;
+        if (firstlineRelative > 0)
+        {
+            ind.append_attribute("w:firstLine") = firstlineRelative ;
+        }
+        else if (firstlineRelative < 0)
+        {
+            ind.append_attribute("w:hanging") = -firstlineRelative ;
+        }
+    }
+
+    if (mWSpaceBefore != 0 || mWSpaceAfter != 0 || mWLineSpaceMult > 0.0)
+    {
+        pugi::xml_node spacing = pPr.append_child("w:spacing") ;
+        if (mWSpaceBefore != 0)
+        {
+            spacing.append_attribute("w:before") = mWSpaceBefore ;
+        }
+        if (mWSpaceAfter != 0)
+        {
+            spacing.append_attribute("w:after") = mWSpaceAfter ;
+        }
+        if (mWLineSpaceMult > 0.0)
+        {
+            spacing.append_attribute("w:line") = static_cast<int>(mWLineSpaceMult * 240.0) ;
+            spacing.append_attribute("w:lineRule") = "auto" ;
+        }
+    }
+
+    std::string buffer ;
+    size_t pos = 0 ;
+    while (pos < text.size())
+    {
+        unsigned char byte = static_cast<unsigned char>(text[pos]) ;
+
+        if (byte == static_cast<unsigned char>(REPLACE_CHAR) ||
+            byte == static_cast<unsigned char>(SAVE_CHAR))
+        {
+            pos++ ;
+            mWCurrentPosition++ ;
+            continue ;
+        }
+
+        if (byte == static_cast<unsigned char>(MARKER_CHAR))
+        {
+            unsigned char ch = static_cast<unsigned char>(mDocument->GetControlChar(mWCurrentPosition)) ;
+
+            switch (ch)
+            {
+                case STYLE_BOLD :
+                    FlushRun(para, buffer) ;
+                    mWBold = !mWBold ;
+                    break ;
+
+                case STYLE_ITALICS :
+                    FlushRun(para, buffer) ;
+                    mWItalics = !mWItalics ;
+                    break ;
+
+                case STYLE_UNDERLINE :
+                    FlushRun(para, buffer) ;
+                    mWUnderline = !mWUnderline ;
+                    break ;
+
+                case STYLE_STRIKETHROUGH :
+                    FlushRun(para, buffer) ;
+                    mWStrikethrough = !mWStrikethrough ;
+                    break ;
+
+                case STYLE_SUPERSCRIPT :
+                    FlushRun(para, buffer) ;
+                    mWSuperscript = !mWSuperscript ;
+                    if (mWSuperscript)
+                    {
+                        mWSubscript = false ;
+                    }
+                    break ;
+
+                case STYLE_SUBSCRIPT :
+                    FlushRun(para, buffer) ;
+                    mWSubscript = !mWSubscript ;
+                    if (mWSubscript)
+                    {
+                        mWSuperscript = false ;
+                    }
+                    break ;
+
+                case STYLE_TAB :
+                {
+                    FlushRun(para, buffer) ;
+                    pugi::xml_node tabRun = para.append_child("w:r") ;
+                    tabRun.append_child("w:tab") ;
+                    break ;
+                }
+
+                case STYLE_FONT1 :
+                {
+                    sInternalFonts font ;
+                    if (mDocument->GetFont(mWCurrentPosition, font))
+                    {
+                        FlushRun(para, buffer) ;
+                        mWFontName = font.fontname ;
+                        mWFontSize = font.size ;
+                    }
+                    break ;
+                }
+
+                case STYLE_INTERNAL_COLOR :
+                    FlushRun(para, buffer) ;
+                    mDocument->GetColor(mWCurrentPosition, mWColor) ;
+                    break ;
+
+                default :
+                    break ;
+            }
+
+            pos++ ;
+            mWCurrentPosition++ ;
+            continue ;
+        }
+
+        buffer += static_cast<char>(byte) ;
+        pos++ ;
+        mWCurrentPosition++ ;
+    }
+
+    FlushRun(para, buffer) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  body [in] the w:body node (a page break is appended here directly)
+/// @param  text [in] the dot command paragraph text
+///
+/// @return nothing
+///
+/// @brief
+/// Updates running paragraph/page formatting state from a WordStar dot
+/// command, mirroring the subset of cRTFWriter::CreateDot() this first cut
+/// supports: margins (.po/.lm/.rm/.pm/.mt/.mb), justification (.oj/.oc),
+/// spacing (.psb/.psa/.ls), and page breaks (.pa, emitted immediately since
+/// unlike the other commands it isn't paragraph state). Anything else is
+/// silently ignored -- see the file-level comment above for what's left out.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDOCXFile::SaveDotCommand(pugi::xml_node &body, std::string &text)
+{
+    std::string lowtext = text ;
+    for (auto &c : lowtext)
+    {
+        c = static_cast<char>(tolower(static_cast<unsigned char>(c))) ;
+    }
+
+    bool incdec ;
+
+    auto startsWith = [&](const char *prefix) -> bool
+    {
+        return lowtext.rfind(prefix, 0) == 0 ;
+    } ;
+
+    if (startsWith(".pa"))
+    {
+        pugi::xml_node para = body.append_child("w:p") ;
+        pugi::xml_node run = para.append_child("w:r") ;
+        run.append_child("w:br").append_attribute("w:type") = "page" ;
+    }
+    else if (startsWith(".oj"))
+    {
+        std::string rest = text.size() > 3 ? text.substr(3) : "" ;
+        char c = rest.empty() ? 0 : static_cast<char>(tolower(static_cast<unsigned char>(rest[0]))) ;
+        if (c == 'c')
+        {
+            mWAlign = JUST_CENTER ;
+        }
+        else if (c == 'r')
+        {
+            mWAlign = JUST_RIGHT ;
+        }
+        else if (c == 'j')
+        {
+            mWAlign = JUST_JUST ;
+        }
+        else
+        {
+            mWAlign = JUST_LEFT ;
+        }
+    }
+    else if (startsWith(".oc"))
+    {
+        std::string rest = text.size() > 3 ? text.substr(3) : "" ;
+        size_t start = rest.find_first_not_of(" \t") ;
+        std::string trimmed = (start == std::string::npos) ? "" : rest.substr(start) ;
+        for (auto &c : trimmed)
+        {
+            c = static_cast<char>(tolower(static_cast<unsigned char>(c))) ;
+        }
+        mWAlign = (trimmed.rfind("off", 0) == 0) ? JUST_LEFT : JUST_CENTER ;
+    }
+    else if (startsWith(".lm"))
+    {
+        double value = mDocument->GetValue(text.substr(3), incdec) ;
+        char type = mDocument->GetType(text.substr(3)) ;
+        mWLeftMargin = static_cast<int>(mDocument->ConvertToTwips(value, type)) ;
+    }
+    else if (startsWith(".rm"))
+    {
+        double value = mDocument->GetValue(text.substr(3), incdec) ;
+        char type = mDocument->GetType(text.substr(3)) ;
+        mWRightMarginPos = static_cast<int>(mDocument->ConvertToTwips(value, type)) ;
+    }
+    else if (startsWith(".pm"))
+    {
+        double value = mDocument->GetValue(text.substr(3), incdec) ;
+        char type = mDocument->GetType(text.substr(3)) ;
+        mWFirstLine = static_cast<int>(mDocument->ConvertToTwips(value, type)) ;
+    }
+    else if (startsWith(".po"))
+    {
+        std::string rest = text.substr(3) ;
+        if (!rest.empty() && (rest[0] == 'o' || rest[0] == 'e'))
+        {
+            rest = rest.substr(1) ;   // .poo/.poe (odd/even) -- treated the same as .po here
+        }
+        double value = mDocument->GetValue(rest, incdec) ;
+        char type = mDocument->GetType(rest) ;
+        mWPageOffset = static_cast<int>(mDocument->ConvertToTwips(value, type)) ;
+    }
+    else if (startsWith(".mt"))
+    {
+        double value = mDocument->GetValue(text.substr(3), incdec) ;
+        char type = mDocument->GetType(text.substr(3)) ;
+        mWTopMargin = static_cast<int>(mDocument->ConvertToTwips(value, type)) ;
+    }
+    else if (startsWith(".mb"))
+    {
+        double value = mDocument->GetValue(text.substr(3), incdec) ;
+        char type = mDocument->GetType(text.substr(3)) ;
+        mWBottomMargin = static_cast<int>(mDocument->ConvertToTwips(value, type)) ;
+    }
+    else if (startsWith(".psb"))
+    {
+        double value = mDocument->GetValue(text.substr(4), incdec) ;
+        char type = mDocument->GetType(text.substr(4)) ;
+        mWSpaceBefore = static_cast<int>(mDocument->ConvertToTwips(value, type)) ;
+    }
+    else if (startsWith(".psa"))
+    {
+        double value = mDocument->GetValue(text.substr(4), incdec) ;
+        char type = mDocument->GetType(text.substr(4)) ;
+        mWSpaceAfter = static_cast<int>(mDocument->ConvertToTwips(value, type)) ;
+    }
+    else if (startsWith(".ls"))
+    {
+        std::string rest = text.size() > 3 ? text.substr(3) : "" ;
+        try
+        {
+            mWLineSpaceMult = std::stod(rest) ;
+        }
+        catch (...)
+        {
+            mWLineSpaceMult = 0.0 ;
+        }
+    }
+    // Anything else (headers/footers, columns, tabs, indexing, page numbering,
+    // printer options, kerning, line numbering, ...) is intentionally not
+    // translated in this first cut. Left out rather than guessed at.
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the serialized word/document.xml content
+///
+/// @brief
+/// Builds word/document.xml by walking the document paragraph by paragraph
+/// (same traversal as cRTFWriter::CreateRTF()), then appends the final
+/// w:sectPr with page size and margins.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::BuildDocumentXml(void)
+{
+    pugi::xml_document doc ;
+
+    pugi::xml_node decl = doc.append_child(pugi::node_declaration) ;
+    decl.append_attribute("version") = "1.0" ;
+    decl.append_attribute("encoding") = "UTF-8" ;
+    decl.append_attribute("standalone") = "yes" ;
+
+    pugi::xml_node root = doc.append_child("w:document") ;
+    root.append_attribute("xmlns:w") = "http://schemas.openxmlformats.org/wordprocessingml/2006/main" ;
+
+    pugi::xml_node body = root.append_child("w:body") ;
+
+    size_t paras = mDocument->GetNumberofParagraphs() ;
+    for (size_t loop = 0 ; loop < paras ; loop++)
+    {
+        std::string text = mDocument->GetParagraphText(loop) ;
+        POSITION_T start, end ;
+        mDocument->GetParagraphStartandEnd(loop, start, end) ;
+        mWCurrentPosition = start ;
+
+        if (text.empty())
+        {
+            continue ;
+        }
+
+        if (text[0] == '.')
+        {
+            SaveDotCommand(body, text) ;
+        }
+        else
+        {
+            SaveParagraph(body, text) ;
+        }
+    }
+
+    pugi::xml_node sectPr = body.append_child("w:sectPr") ;
+
+    pugi::xml_node pgSz = sectPr.append_child("w:pgSz") ;
+    pgSz.append_attribute("w:w") = mWPaperWidth ;
+    pgSz.append_attribute("w:h") = mWPaperHeight ;
+
+    int marginRight = mWPaperWidth - mWPageOffset - mWRightMarginPos ;
+    if (marginRight < 0)
+    {
+        marginRight = 0 ;
+    }
+
+    pugi::xml_node pgMar = sectPr.append_child("w:pgMar") ;
+    pgMar.append_attribute("w:top") = mWTopMargin ;
+    pgMar.append_attribute("w:right") = marginRight ;
+    pgMar.append_attribute("w:bottom") = mWBottomMargin ;
+    pgMar.append_attribute("w:left") = mWPageOffset ;
+    pgMar.append_attribute("w:header") = 720 ;
+    pgMar.append_attribute("w:footer") = 720 ;
+    pgMar.append_attribute("w:gutter") = 0 ;
+
+    std::ostringstream oss ;
+    doc.save(oss) ;
+    return oss.str() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the serialized [Content_Types].xml content
+///
+/// @brief
+/// Package part declaring the content type of every part in the archive.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::BuildContentTypesXml(void)
+{
+    return
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
+        "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>"
+        "<Default Extension=\"xml\" ContentType=\"application/xml\"/>"
+        "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>"
+        "<Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/>"
+        "<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>"
+        "<Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/>"
+        "</Types>" ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the serialized _rels/.rels content
+///
+/// @brief
+/// Package-level relationships: points at the main document part and the
+/// core/app property parts.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::BuildRelsXml(void)
+{
+    return
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+        "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>"
+        "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties\" Target=\"docProps/core.xml\"/>"
+        "<Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties\" Target=\"docProps/app.xml\"/>"
+        "</Relationships>" ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the serialized word/_rels/document.xml.rels content
+///
+/// @brief
+/// Relationships local to the main document part: points at the styles part.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::BuildDocumentRelsXml(void)
+{
+    return
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+        "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>"
+        "</Relationships>" ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the serialized word/styles.xml content
+///
+/// @brief
+/// Minimal style sheet: default run properties (Times New Roman 12pt,
+/// matching WordTsar's own default) plus a Normal paragraph style. Full
+/// style definitions aren't written -- SaveParagraph/FlushRun apply
+/// formatting directly on each paragraph/run instead of referencing styles.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::BuildStylesXml(void)
+{
+    return
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+        "<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">"
+        "<w:docDefaults>"
+        "<w:rPrDefault><w:rPr><w:rFonts w:ascii=\"Times New Roman\" w:hAnsi=\"Times New Roman\"/><w:sz w:val=\"24\"/></w:rPr></w:rPrDefault>"
+        "</w:docDefaults>"
+        "<w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/></w:style>"
+        "</w:styles>" ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the serialized docProps/core.xml content
+///
+/// @brief
+/// Core document properties (Dublin Core creator metadata).
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::BuildCoreXml(void)
+{
+    return
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+        "<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">"
+        "<dc:creator>WordTsar</dc:creator>"
+        "</cp:coreProperties>" ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the serialized docProps/app.xml content
+///
+/// @brief
+/// Extended (application) document properties.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::BuildAppXml(void)
+{
+    return
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+        "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\">"
+        "<Application>WordTsar</Application>"
+        "</Properties>" ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] path to write the .docx to
+///
+/// @return true on success
+///
+/// @brief
+/// Writes the document as a DOCX (OOXML) package: builds word/document.xml
+/// from the document model, then zips it up with the fixed boilerplate
+/// parts (content types, relationships, a minimal style sheet, core/app
+/// properties) using the same kuba--/zip library cDOCXFile::LoadFile()
+/// already reads DOCX files with, in write mode.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDOCXFile::WriteDocx(const std::string &filename)
+{
+    mWPageOffset = 1440 ;           // .po 1" default
+    mWLeftMargin = 0 ;
+    mWFirstLine = 0 ;
+    mWRightMarginPos = 9360 ;       // .rm 6.5" default
+    mWTopMargin = 1440 ;
+    mWBottomMargin = 1440 ;
+    mWSpaceBefore = 0 ;
+    mWSpaceAfter = 0 ;
+    mWLineSpaceMult = 0.0 ;
+    mWAlign = JUST_LEFT ;
+
+    mWBold = false ;
+    mWItalics = false ;
+    mWUnderline = false ;
+    mWStrikethrough = false ;
+    mWSuperscript = false ;
+    mWSubscript = false ;
+    mWFontName.clear() ;
+    mWFontSize = 0.0 ;
+    mWColor.red = -1 ;
+    mWColor.green = -1 ;
+    mWColor.blue = -1 ;
+    mWColor.alpha = -1 ;
+
+    mWPaperWidth = 12240 ;          // 8.5" fallback if no editor/layout available
+    mWPaperHeight = 15840 ;         // 11" fallback
+    if (mEditor != nullptr && mEditor->GetLayout() != nullptr)
+    {
+        mWPaperWidth = static_cast<int>(mEditor->GetLayout()->GetPaperWidth()) ;
+        mWPaperHeight = static_cast<int>(mEditor->GetLayout()->GetPaperHeight()) ;
+    }
+
+    std::string documentXml = BuildDocumentXml() ;
+
+    zip_t *zip = zip_open(filename.c_str(), ZIP_DEFAULT_COMPRESSION_LEVEL, 'w') ;
+    if (zip == nullptr)
+    {
+        return false ;
+    }
+
+    auto writeEntry = [zip](const char *name, const std::string &content) -> bool
+    {
+        if (zip_entry_open(zip, name) != 0)
+        {
+            return false ;
+        }
+        bool ok = zip_entry_write(zip, content.data(), content.size()) == 0 ;
+        zip_entry_close(zip) ;
+        return ok ;
+    } ;
+
+    bool ok = true ;
+    ok = ok && writeEntry("[Content_Types].xml", BuildContentTypesXml()) ;
+    ok = ok && writeEntry("_rels/.rels", BuildRelsXml()) ;
+    ok = ok && writeEntry("word/document.xml", documentXml) ;
+    ok = ok && writeEntry("word/_rels/document.xml.rels", BuildDocumentRelsXml()) ;
+    ok = ok && writeEntry("word/styles.xml", BuildStylesXml()) ;
+    ok = ok && writeEntry("docProps/core.xml", BuildCoreXml()) ;
+    ok = ok && writeEntry("docProps/app.xml", BuildAppXml()) ;
+
+    zip_close(zip) ;
+
+    return ok ;
+}
 
 
 /// @}

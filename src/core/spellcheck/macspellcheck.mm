@@ -126,19 +126,13 @@ bool macAddWord(const char *word)
 {
     @autoreleasepool
     {
+        // macCheckSpelling() above uses the untagged checkSpellingOfString:startingAt:,
+        // which does not consult ignoreWord:inSpellDocumentWithTag: (that's scoped to a
+        // spell-document tag this code never creates). learnWord: adds to the user's
+        // system-wide personal dictionary, which the untagged check *does* consult, so
+        // it's the call that actually keeps this word from being re-flagged.
         NSString *nsWord = [NSString stringWithUTF8String:word];
-        NSSpellChecker *checker = [NSSpellChecker sharedSpellChecker];
-        // Retrieve the current list of ignored words.
-        NSMutableArray *ignoredWords = [[checker ignoredWord] mutableCopy];
-        if (!ignoredWords)
-        {
-            ignoredWords = [NSMutableArray array];
-        }
-        if (![ignoredWords containsObject:nsWord])
-        {
-            [ignoredWords addObject:nsWord];
-        }
-        [checker setIgnoredWords:ignoredWords];
+        [[NSSpellChecker sharedSpellChecker] learnWord:nsWord];
         return true;
     }
 }

@@ -6530,6 +6530,10 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
     {
         fileWriter = new cTextFile(this);
     }
+    else if (qfilename.endsWith(".docx", Qt::CaseInsensitive))
+    {
+        fileWriter = new cDOCXFile(this);
+    }
     else
     {
         // Default to WordStar 7 format

@@ -164,6 +164,21 @@ private :
     void EmitPage(void) ;
     void EmitIndent(pugi::xml_node &node, pugi::xml_node run, sDOCXParagraphStyle &style) ;
 
+    // --- DOCX writing (Save As Word) ---
+    bool WriteDocx(const std::string &filename) ;
+    std::string BuildDocumentXml(void) ;
+    static std::string BuildContentTypesXml(void) ;
+    static std::string BuildRelsXml(void) ;
+    static std::string BuildDocumentRelsXml(void) ;
+    static std::string BuildStylesXml(void) ;
+    static std::string BuildCoreXml(void) ;
+    static std::string BuildAppXml(void) ;
+
+    void SaveDotCommand(pugi::xml_node &body, std::string &text) ;
+    void SaveParagraph(pugi::xml_node &body, std::string &text) ;
+    void FlushRun(pugi::xml_node &paragraph, std::string &buffer) ;
+    static std::string ColorToHex(sSeqRGBColor &color) ;
+
 private :
     pugi::xml_document document;
     pugi::xml_document styles;
@@ -198,6 +213,35 @@ private :
     bool mSubscript ;
     bool mSmallcaps ;
     bool mShadow ;
+
+    // --- state tracked while writing (Save As Word) -- kept separate from the
+    // read-time members above since both paths run through the same object,
+    // just never at the same time.
+    int mWPageOffset ;              // .po -- section left margin (twips)
+    int mWLeftMargin ;              // .lm -- paragraph left indent (twips)
+    int mWFirstLine ;               // .pm -- paragraph first-line position, absolute from page offset (twips)
+    int mWRightMarginPos ;          // .rm -- absolute right text boundary from page offset (twips)
+    int mWTopMargin ;               // .mt (twips)
+    int mWBottomMargin ;            // .mb (twips)
+    int mWPaperWidth ;              // twips
+    int mWPaperHeight ;             // twips
+    int mWSpaceBefore ;             // .psb (twips)
+    int mWSpaceAfter ;              // .psa (twips)
+    double mWLineSpaceMult ;        // .ls -- multiplier, 0 = not set
+
+    eJustification mWAlign ;
+
+    bool mWBold ;
+    bool mWItalics ;
+    bool mWUnderline ;
+    bool mWStrikethrough ;
+    bool mWSuperscript ;
+    bool mWSubscript ;
+    std::string mWFontName ;
+    double mWFontSize ;
+    sSeqRGBColor mWColor ;
+
+    POSITION_T mWCurrentPosition ;
 };
 
 

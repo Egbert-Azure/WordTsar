@@ -94,6 +94,7 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     ../src/test/test-guiprinter.cpp
     ../src/test/test-spellcheck.cpp
     ../src/test/test-rtf.cpp
+    ../src/test/test-docxwriter.cpp
     ../src/test/test-tuifontutils.cpp
     ../src/test/test-config.cpp
     ../src/test/test-wordstarinput.cpp
@@ -335,7 +336,7 @@ install(TARGETS WSTest
 
 qt_generate_deploy_app_script(
     TARGET WSTest
-    FILENAME_VARIABLE deploy_script
+    OUTPUT_SCRIPT deploy_script
     NO_UNSUPPORTED_PLATFORM_ERROR
 )
 install(SCRIPT ${deploy_script})
