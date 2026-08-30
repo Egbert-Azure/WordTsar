@@ -666,6 +666,10 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
     if (config.mDefaultDirectory.empty() == false)
     {
         mEditor->mFileDir = config.mDefaultDirectory;
+        // The opening-menu file browser has its own directory state,
+        // seeded from the process cwd at construction -- without this it
+        // never sees the configured default directory at all.
+        mBrowser.SetDirectory(config.mDefaultDirectory);
     }
     mEditor->mShortName = config.mShortName;
     mEditor->mLongName = config.mLongName;
