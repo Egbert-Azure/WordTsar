@@ -1226,8 +1226,13 @@ void cWordTsar::WriteConfig(void)
     config.mWindowWidth = wsize.width() ;
     config.mWindowHeight = wsize.height() ;
 
-    // Help display mode
-    config.mGuiShowHelp = mEditor->mHelpDisplay ;
+    // Help display mode is NOT written here. mEditor->mHelpDisplay is a
+    // momentary UI state (which submenu, if any, is currently open) that
+    // cycles constantly during normal use -- if the app quits mid-submenu,
+    // capturing it here would permanently overwrite the user's actual
+    // preference with whatever happened to be on screen at that instant.
+    // The Preferences dialog already writes config.mGuiShowHelp directly
+    // when the user picks a value there; config.Load() above preserves it.
 
     // Measurement units
     config.mMeasurement = mEditor->GetMeasurement() ;

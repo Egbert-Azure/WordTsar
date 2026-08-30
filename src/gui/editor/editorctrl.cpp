@@ -3655,21 +3655,29 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
                 }
 
                 // --- Ctrl+Alt+letter: route to HandleKey with alt=true ---
-                if (alt && ctrl)
+                // Derived directly from the key code (same approach as the Alt+letter
+                // branch above), not from event->text(): Qt6 on macOS returns an empty
+                // text() whenever Control is held, which silently dropped every
+                // Ctrl+letter combination -- the core of WordStar's own command set.
+                if (alt && ctrl && key >= Qt::Key_A && key <= Qt::Key_Z)
                 {
-                    QString text = event->text() ;
-                    if (!text.isEmpty())
-                    {
-                        CHAR_T ch = text.at(0).unicode() ;
-                        if (ch >= 1 && ch <= 26)
-                        {
-                            handled = mInput->HandleKey(static_cast<char>(ch), shift, true) ;
-                            break ;
-                        }
-                    }
+                    char ch = static_cast<char>(key - Qt::Key_A + 1) ;   // Ctrl+A=1 .. Ctrl+Z=26
+                    handled = mInput->HandleKey(ch, shift, true) ;
+                    break ;
                 }
 
-                // --- Ctrl+letter and printable characters ---
+                // --- Ctrl+letter: route to HandleKey with alt=false ---
+                // Same reasoning as above: derive the control character from the key
+                // code, not event->text(), which Qt6 leaves empty on macOS whenever
+                // Control is held.
+                if (ctrl && !alt && key >= Qt::Key_A && key <= Qt::Key_Z)
+                {
+                    char ch = static_cast<char>(key - Qt::Key_A + 1) ;   // Ctrl+A=1 .. Ctrl+Z=26
+                    handled = mInput->HandleKey(ch, shift, false) ;
+                    break ;
+                }
+
+                // --- printable characters ---
                 QString text = event->text() ;
 
                 // Skip if no text (modifier-only keys)
