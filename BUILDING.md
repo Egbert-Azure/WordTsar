@@ -118,7 +118,48 @@ WordTsar automatically downloads dependencies using CMake FetchContent:
 
 Dependencies are downloaded to `third-party/` directory on first build.
 
-**Note**: `UPDATE_DEPENDENCIES` defaults to `ON`, which checks each dependency for a newer tag and silently replaces the pinned version on disk if one exists — without updating the version CMake then reports. If a dependency update ever breaks the build, delete its directory under `third-party/` and reconfigure with `-DUPDATE_DEPENDENCIES=OFF` to re-fetch the pinned version cleanly.
+**Note**: `UPDATE_DEPENDENCIES` defaults to `OFF`, so a normal build always uses the pinned versions above. Turning it `ON` checks each dependency for a newer tag and silently replaces the pinned version on disk if one exists — without updating the version CMake then reports — which is how a `kuba--/zip` update once broke the build on macOS mid-development. If that ever happens again, delete the affected directory under `third-party/` and reconfigure with `-DUPDATE_DEPENDENCIES=OFF` (the default) to re-fetch the pinned version cleanly.
+
+## Code Signing
+
+Every build codesigns `WordTsar.app` automatically (see `CMakeLists.txt`). With no setup, it uses an ad-hoc signature — good enough to run on your own Mac, but it gets a brand new identity every rebuild.
+
+To give it a stable local identity instead (recommended if this is your daily build), create a free self-signed "Code Signing" certificate once:
+
+```bash
+cat > /tmp/wordtsar-codesign.cnf <<'EOF'
+[req]
+distinguished_name = dn
+x509_extensions = v3
+prompt = no
+[dn]
+CN = WordTsar Local Dev
+[v3]
+keyUsage = critical, digitalSignature
+extendedKeyUsage = critical, codeSigning
+basicConstraints = critical, CA:false
+EOF
+
+openssl req -x509 -newkey rsa:2048 -keyout /tmp/wordtsar-codesign.key \
+  -out /tmp/wordtsar-codesign.crt -days 3650 -nodes \
+  -config /tmp/wordtsar-codesign.cnf -extensions v3
+
+openssl pkcs12 -export -out /tmp/wordtsar-codesign.p12 \
+  -inkey /tmp/wordtsar-codesign.key -in /tmp/wordtsar-codesign.crt \
+  -passout pass:wordtsar
+
+security import /tmp/wordtsar-codesign.p12 -k ~/Library/Keychains/login.keychain-db \
+  -P wordtsar -T /usr/bin/codesign
+
+security add-trusted-cert -r trustAsRoot -p codeSign \
+  -k ~/Library/Keychains/login.keychain-db /tmp/wordtsar-codesign.crt
+
+rm /tmp/wordtsar-codesign.key /tmp/wordtsar-codesign.crt /tmp/wordtsar-codesign.p12 /tmp/wordtsar-codesign.cnf
+```
+
+macOS will prompt once to confirm the trust-setting change (Touch ID or password) — that's expected, since it's changing your keychain's trust store. After this, every future build (no extra flags needed) is automatically signed as "WordTsar Local Dev" instead of ad-hoc.
+
+This is a local, free, self-signed identity — it does **not** remove the Gatekeeper "unidentified developer" warning for anyone else you share the app with. That requires a paid Apple Developer Program membership and a real Developer ID certificate, which is a separate, deliberate step if you ever need it.
 
 ## Testing
 

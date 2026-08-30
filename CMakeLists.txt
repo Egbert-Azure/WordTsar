@@ -41,14 +41,15 @@ option(BUILD_TUI "Build the terminal UI (ws) using the wordstartui toolkit" OFF)
 # Third-party libraries live in the third-party/ directory.
 # By default, the build uses whatever is already downloaded (no network).
 #
+# To skip update checks (default -- fastest configure, and doesn't silently
+# replace a pinned dependency with an untested newer one):
+#   cmake .. -DUPDATE_DEPENDENCIES=OFF
+#
 # To check for updates and download newer versions:
 #   cmake .. -DUPDATE_DEPENDENCIES=ON
 #
-# To skip update checks (fastest configure):
-#   cmake .. -DUPDATE_DEPENDENCIES=OFF
-#
 
-option(UPDATE_DEPENDENCIES "Check for and download newer third-party dependencies (requires network)" ON)
+option(UPDATE_DEPENDENCIES "Check for and download newer third-party dependencies (requires network)" OFF)
 
 # Third-party source directories (already downloaded)
 set(WS_THIRDPARTY_DIR "${CMAKE_SOURCE_DIR}/third-party")
@@ -479,6 +480,35 @@ if(CMAKE_BUILD_TYPE STREQUAL Release)
         NDEBUG
     )
 endif()
+
+
+# Code signing ---------------------------------------------------------
+# macOS requires every executable to carry some signature to run at all;
+# left alone, the linker applies an anonymous ad-hoc signature that gets a
+# brand new identity every rebuild. Signing explicitly with a stable local
+# identity avoids that churn. Uses a self-signed "WordTsar Local Dev"
+# certificate from the login keychain if one has been set up (one-time,
+# see BUILDING.md); otherwise falls back to the default ad-hoc signature,
+# so the build still works out of the box with zero setup.
+execute_process(
+    COMMAND security find-identity -v -p codesigning
+    OUTPUT_VARIABLE WORDTSAR_CODESIGN_IDENTITIES
+    ERROR_QUIET
+)
+if(WORDTSAR_CODESIGN_IDENTITIES MATCHES "WordTsar Local Dev")
+    set(WORDTSAR_CODESIGN_IDENTITY "WordTsar Local Dev")
+else()
+    set(WORDTSAR_CODESIGN_IDENTITY "-")
+endif()
+message(STATUS "Code signing identity: ${WORDTSAR_CODESIGN_IDENTITY}")
+
+add_custom_command(TARGET WordTsar POST_BUILD
+    COMMAND codesign --force --deep --sign "${WORDTSAR_CODESIGN_IDENTITY}"
+            --identifier com.wordtsar.WordTsar
+            "$<TARGET_BUNDLE_DIR:WordTsar>"
+    COMMENT "Code signing WordTsar.app"
+    VERBATIM
+)
 
 
 # Version configuration

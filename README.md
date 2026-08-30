@@ -21,6 +21,10 @@ There are two ways to run WordTsar, built from the same source:
 
 Both read and write the same document formats and share the same editing engine — pick whichever fits how you want to write.
 
+![WordTsar running in the terminal](docs/screenshots/ws-terminal.png)
+
+You get the best of both worlds: the classic terminal view, or the macOS GUI — install whichever you prefer, or both. Distraction-free writing, no bloat, one keystroke away.
+
 __NOTES__
 
 - A backup of your file is made every 1 minute. Backups are in Wordstar format.
