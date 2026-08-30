@@ -1,0 +1,15 @@
+build/
+third-party/
+test/build/
+test/WSTuiTest
+.qt/
+.vscode/
+.devtool/
+CMakeFiles/
+CMakeCache.txt
+WordTsar_autogen/
+WSTest_autogen/
+VisualTest_autogen/
+doxygen/
+DEV_DOCUMENTS/
+.DS_Store

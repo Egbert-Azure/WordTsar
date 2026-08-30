@@ -1,0 +1,34 @@
+#ifndef TESTS_SOURCE
+#define TESTS_SOURCE
+
+class Derived;
+
+class Base
+{
+public:
+    Base(Derived *derived): m_pDerived(derived) {}
+    ~Base(void);
+    virtual void function(void) = 0;
+
+    Derived * m_pDerived;
+};
+
+#pragma warning(disable:4355)
+class Derived : public Base
+{
+public:
+    Derived() : Base(this) {};   // C4355
+    virtual void function(void) {}
+};
+
+void AccessViolation(void);
+void InvalidParameter(void);
+void RaiseSigill(void);
+void RaiseSigsegv(void);
+void RaiseSigterm(void);
+void ThrowException(void);
+void MemoryOverflow(void);
+void StackOverflow(void);
+void RaiseSehException(void);
+
+#endif // TESTS_SOURCE

@@ -1,0 +1,845 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SystemPreferences</class>
+ <widget class="QDialog" name="SystemPreferences">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>580</width>
+    <height>850</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>System Preferences</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QTabWidget" name="mTabWidget">
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+
+     <!-- Tab 1: General -->
+     <widget class="QWidget" name="tabGeneral">
+      <attribute name="title">
+       <string>General</string>
+      </attribute>
+      <layout class="QFormLayout" name="generalLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelFont">
+         <property name="text"><string>Default Font:</string></property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QFontComboBox" name="mDefaultFont"/>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelFontSize">
+         <property name="text"><string>Default Font Size:</string></property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QDoubleSpinBox" name="mDefaultFontSize">
+         <property name="minimum"><double>4.0</double></property>
+         <property name="maximum"><double>144.0</double></property>
+         <property name="value"><double>12.0</double></property>
+         <property name="singleStep"><double>0.5</double></property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelMeasurement">
+         <property name="text"><string>Measurement:</string></property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QComboBox" name="mMeasurement">
+         <item><property name="text"><string>Inches</string></property></item>
+         <item><property name="text"><string>Centimeters</string></property></item>
+         <item><property name="text"><string>Millimeters</string></property></item>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="labelCodePage">
+         <property name="text"><string>Code Page:</string></property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QComboBox" name="mCodePage">
+         <item><property name="text"><string>CP437 (English/German)</string></property></item>
+         <item><property name="text"><string>CP737 (Greek)</string></property></item>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="labelShowControls">
+         <property name="text"><string>Show Control Codes:</string></property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QCheckBox" name="mShowControls"/>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="labelFormat">
+         <property name="text"><string>Default Format:</string></property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QComboBox" name="mDefaultFormat">
+         <item><property name="text"><string>WordStar (ws)</string></property></item>
+         <item><property name="text"><string>Rich Text (rtf)</string></property></item>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="labelDefaultDir">
+         <property name="text"><string>Default Directory:</string></property>
+        </widget>
+       </item>
+       <item row="6" column="1">
+        <layout class="QHBoxLayout" name="dirLayout">
+         <item>
+          <widget class="QLineEdit" name="mDefaultDirectory"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="mBrowseDir">
+           <property name="text"><string>Browse...</string></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- Tab 2: Editor -->
+     <widget class="QWidget" name="tabEditor">
+      <attribute name="title">
+       <string>Editor</string>
+      </attribute>
+      <layout class="QFormLayout" name="editorLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelAutoSave">
+         <property name="text"><string>Auto-save Interval (seconds):</string></property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QSpinBox" name="mAutoSaveInterval">
+         <property name="minimum"><number>0</number></property>
+         <property name="maximum"><number>3600</number></property>
+         <property name="value"><number>60</number></property>
+         <property name="specialValueText"><string>Disabled</string></property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelCaretBlink">
+         <property name="text"><string>Caret Blink Rate (ms):</string></property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QSpinBox" name="mCaretBlinkRate">
+         <property name="minimum"><number>100</number></property>
+         <property name="maximum"><number>2000</number></property>
+         <property name="value"><number>500</number></property>
+         <property name="singleStep"><number>50</number></property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelInputMode">
+         <property name="text"><string>Keyboard Mode:</string></property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QComboBox" name="mInputMode">
+         <item><property name="text"><string>WordStar</string></property></item>
+         <item><property name="text"><string>Modern (CUA)</string></property></item>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="labelSpellCheckDotCommands">
+         <property name="text"><string>Spell Check Dot Commands:</string></property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QCheckBox" name="mSpellCheckDotCommands">
+         <property name="checked"><bool>false</bool></property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="labelSpellLang">
+         <property name="text"><string>Spell Check Language:</string></property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QLineEdit" name="mSpellCheckLanguage">
+         <property name="placeholderText"><string>en_US</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- Tab 3: Page Setup -->
+     <widget class="QWidget" name="tabPageSetup">
+      <attribute name="title">
+       <string>Page Setup</string>
+      </attribute>
+      <layout class="QFormLayout" name="pageLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelPaperWidth">
+         <property name="text"><string>Paper Width:</string></property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="mPaperWidth"/>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelPaperHeight">
+         <property name="text"><string>Paper Height:</string></property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="mPaperHeight"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelLeftMargin">
+         <property name="text"><string>Left Margin:</string></property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QLineEdit" name="mLeftMargin"/>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="labelRightMargin">
+         <property name="text"><string>Right Margin:</string></property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QLineEdit" name="mRightMargin"/>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="labelTopMargin">
+         <property name="text"><string>Top Margin:</string></property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QLineEdit" name="mTopMargin"/>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="labelBottomMargin">
+         <property name="text"><string>Bottom Margin:</string></property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QLineEdit" name="mBottomMargin"/>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="labelHeaderMargin">
+         <property name="text"><string>Header Margin:</string></property>
+        </widget>
+       </item>
+       <item row="6" column="1">
+        <widget class="QLineEdit" name="mHeaderMargin"/>
+       </item>
+       <item row="7" column="0">
+        <widget class="QLabel" name="labelFooterMargin">
+         <property name="text"><string>Footer Margin:</string></property>
+        </widget>
+       </item>
+       <item row="7" column="1">
+        <widget class="QLineEdit" name="mFooterMargin"/>
+       </item>
+       <item row="8" column="0">
+        <widget class="QLabel" name="labelPageOffsetOdd">
+         <property name="text"><string>Page Offset (Odd):</string></property>
+        </widget>
+       </item>
+       <item row="8" column="1">
+        <widget class="QLineEdit" name="mPageOffsetOdd"/>
+       </item>
+       <item row="9" column="0">
+        <widget class="QLabel" name="labelPageOffsetEven">
+         <property name="text"><string>Page Offset (Even):</string></property>
+        </widget>
+       </item>
+       <item row="9" column="1">
+        <widget class="QLineEdit" name="mPageOffsetEven"/>
+       </item>
+       <item row="10" column="0">
+        <widget class="QLabel" name="labelLandscape">
+         <property name="text"><string>Landscape:</string></property>
+        </widget>
+       </item>
+       <item row="10" column="1">
+        <widget class="QCheckBox" name="mLandscape"/>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- Tab 4: Colors -->
+     <widget class="QWidget" name="tabColors">
+      <attribute name="title">
+       <string>Colors</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="colorsOuterLayout">
+
+       <!-- Palette selector row -->
+       <item>
+        <layout class="QHBoxLayout" name="paletteLayout">
+         <item>
+          <widget class="QLabel" name="labelPalette">
+           <property name="text"><string>Palette:</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="mPaletteCombo"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="mApplyPalette">
+           <property name="text"><string>Apply</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="mSaveTheme">
+           <property name="text"><string>Save Theme</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="paletteSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+
+       <!-- Scrollable color grid -->
+       <item>
+        <widget class="QScrollArea" name="colorScrollArea">
+         <property name="widgetResizable"><bool>true</bool></property>
+         <widget class="QWidget" name="colorScrollContent">
+          <layout class="QGridLayout" name="colorsGrid">
+
+           <!-- Column headers -->
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelColComponent">
+             <property name="text"><string>Component</string></property>
+             <property name="font"><font><bold>true</bold></font></property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLabel" name="labelColFg">
+             <property name="text"><string>Foreground</string></property>
+             <property name="font"><font><bold>true</bold></font></property>
+             <property name="alignment"><set>Qt::AlignHCenter</set></property>
+            </widget>
+           </item>
+           <item row="0" column="2">
+            <widget class="QLabel" name="labelColBg">
+             <property name="text"><string>Background</string></property>
+             <property name="font"><font><bold>true</bold></font></property>
+             <property name="alignment"><set>Qt::AlignHCenter</set></property>
+            </widget>
+           </item>
+           <item row="0" column="3">
+            <widget class="QLabel" name="labelColPreview">
+             <property name="text"><string>Preview</string></property>
+             <property name="font"><font><bold>true</bold></font></property>
+             <property name="alignment"><set>Qt::AlignHCenter</set></property>
+            </widget>
+           </item>
+
+           <!-- "Editor Colors" section header -->
+           <item row="1" column="0" colspan="4">
+            <widget class="QLabel" name="labelEditorColorsHeader">
+             <property name="text"><string>--- Editor Colors ---</string></property>
+             <property name="alignment"><set>Qt::AlignHCenter</set></property>
+            </widget>
+           </item>
+
+           <!-- Row 2: Normal Text -->
+           <item row="2" column="0">
+            <widget class="QLabel" name="labelNormalText">
+             <property name="text"><string>Normal Text</string></property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QPushButton" name="mColorText">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="2" column="2">
+            <widget class="QPushButton" name="mColorBackground">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 3: Control Codes -->
+           <item row="3" column="0">
+            <widget class="QLabel" name="labelHighlightColor">
+             <property name="text"><string>Control Codes</string></property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QPushButton" name="mColorHighlightFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="3" column="2">
+            <widget class="QPushButton" name="mColorHighlight">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 4: Dot Commands -->
+           <item row="4" column="0">
+            <widget class="QLabel" name="labelDotColor">
+             <property name="text"><string>Dot Commands</string></property>
+            </widget>
+           </item>
+           <item row="4" column="1">
+            <widget class="QPushButton" name="mColorDotFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="4" column="2">
+            <widget class="QPushButton" name="mColorDot">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 5: Block Selection -->
+           <item row="5" column="0">
+            <widget class="QLabel" name="labelBlockColor">
+             <property name="text"><string>Block Selection</string></property>
+            </widget>
+           </item>
+           <item row="5" column="1">
+            <widget class="QPushButton" name="mColorBlockFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="5" column="2">
+            <widget class="QPushButton" name="mColorBlock">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 6: Comments -->
+           <item row="6" column="0">
+            <widget class="QLabel" name="labelCommentColor">
+             <property name="text"><string>Comments</string></property>
+            </widget>
+           </item>
+           <item row="6" column="1">
+            <widget class="QPushButton" name="mColorCommentFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="6" column="2">
+            <widget class="QPushButton" name="mColorComment">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 7: Errors -->
+           <item row="7" column="0">
+            <widget class="QLabel" name="labelErrorColor">
+             <property name="text"><string>Errors</string></property>
+            </widget>
+           </item>
+           <item row="7" column="1">
+            <widget class="QPushButton" name="mColorErrorFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="7" column="2">
+            <widget class="QPushButton" name="mColorError">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 8: Unknown -->
+           <item row="8" column="0">
+            <widget class="QLabel" name="labelUnknownColor">
+             <property name="text"><string>Unknown</string></property>
+            </widget>
+           </item>
+           <item row="8" column="1">
+            <widget class="QPushButton" name="mColorUnknownFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="8" column="2">
+            <widget class="QPushButton" name="mColorUnknown">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 9: Not Implemented -->
+           <item row="9" column="0">
+            <widget class="QLabel" name="labelNotImplColor">
+             <property name="text"><string>Not Implemented</string></property>
+            </widget>
+           </item>
+           <item row="9" column="1">
+            <widget class="QPushButton" name="mColorNotImplementedFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="9" column="2">
+            <widget class="QPushButton" name="mColorNotImplemented">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 10: Search -->
+           <item row="10" column="0">
+            <widget class="QLabel" name="labelSearchColor">
+             <property name="text"><string>Search Results</string></property>
+            </widget>
+           </item>
+           <item row="10" column="1">
+            <widget class="QPushButton" name="mColorSearchFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="10" column="2">
+            <widget class="QPushButton" name="mColorSearch">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- "Screen Colors" section header -->
+           <item row="11" column="0" colspan="4">
+            <widget class="QLabel" name="labelScreenColorsHeader">
+             <property name="text"><string>--- Screen Colors ---</string></property>
+             <property name="alignment"><set>Qt::AlignHCenter</set></property>
+            </widget>
+           </item>
+
+           <!-- Row 12: Status Bar -->
+           <item row="12" column="0">
+            <widget class="QLabel" name="labelStatusBarColor">
+             <property name="text"><string>Status Bar</string></property>
+            </widget>
+           </item>
+           <item row="12" column="1">
+            <widget class="QPushButton" name="mColorStatusBarFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="12" column="2">
+            <widget class="QPushButton" name="mColorStatusBarBg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 13: Help Panel -->
+           <item row="13" column="0">
+            <widget class="QLabel" name="labelHelpPanelColor">
+             <property name="text"><string>Help Panel</string></property>
+            </widget>
+           </item>
+           <item row="13" column="1">
+            <widget class="QPushButton" name="mColorHelpPanelFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="13" column="2">
+            <widget class="QPushButton" name="mColorHelpPanelBg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 14: Help Keystroke -->
+           <item row="14" column="0">
+            <widget class="QLabel" name="labelHelpKeyColor">
+             <property name="text"><string>Help Keystroke</string></property>
+            </widget>
+           </item>
+           <item row="14" column="1">
+            <widget class="QPushButton" name="mColorHelpKeyFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="14" column="2">
+            <widget class="QPushButton" name="mColorHelpKeyBg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+           <!-- Row 15: Ruler -->
+           <item row="15" column="0">
+            <widget class="QLabel" name="labelRulerColor">
+             <property name="text"><string>Ruler</string></property>
+            </widget>
+           </item>
+           <item row="15" column="1">
+            <widget class="QPushButton" name="mColorRulerFg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+           <item row="15" column="2">
+            <widget class="QPushButton" name="mColorRulerBg">
+             <property name="text"><string/></property>
+             <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+            </widget>
+           </item>
+
+          </layout>
+         </widget>
+        </widget>
+       </item>
+
+       <!-- Editor preview panel -->
+       <item>
+        <widget class="QLabel" name="mColorPreview">
+         <property name="minimumSize"><size><width>0</width><height>200</height></size></property>
+         <property name="textFormat"><enum>Qt::RichText</enum></property>
+         <property name="wordWrap"><bool>true</bool></property>
+         <property name="alignment"><set>Qt::AlignTop|Qt::AlignLeft</set></property>
+         <property name="styleSheet"><string>padding: 4px; border: 1px solid #ccc;</string></property>
+        </widget>
+       </item>
+
+      </layout>
+     </widget>
+
+     <!-- Tab 5: Display -->
+     <widget class="QWidget" name="tabDisplay">
+      <attribute name="title">
+       <string>Display</string>
+      </attribute>
+      <layout class="QHBoxLayout" name="displayLayout">
+
+       <!-- Left column: radio button groups -->
+       <item>
+        <layout class="QVBoxLayout" name="displayLeftColumn">
+         <item>
+          <widget class="QGroupBox" name="mFlagColumnGroup">
+           <property name="title">
+            <string>Flag Column</string>
+           </property>
+           <layout class="QVBoxLayout" name="flagColumnLayout">
+            <item>
+             <widget class="QRadioButton" name="mFlagAlwaysOn">
+              <property name="text">
+               <string>Al&amp;ways On</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="mFlagWithTags">
+              <property name="text">
+               <string>Display with Co&amp;mmand Tags</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="mSoftSpaceDots">
+           <property name="title">
+            <string>Soft Space Dots</string>
+           </property>
+           <layout class="QVBoxLayout" name="softSpaceLayout">
+            <item>
+             <widget class="QRadioButton" name="mSoftSpaceAlwaysOn">
+              <property name="text">
+               <string>Always O&amp;n</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="mSoftSpaceAlwaysOff">
+              <property name="text">
+               <string>Always O&amp;ff</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="mSoftSpaceWithTags">
+              <property name="text">
+               <string>Display with Comman&amp;d Tags</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="mDotCommandsGroup">
+           <property name="title">
+            <string>Dot Commands</string>
+           </property>
+           <layout class="QVBoxLayout" name="dotCommandsLayout">
+            <item>
+             <widget class="QRadioButton" name="mDotAlwaysOn">
+              <property name="text">
+               <string>&amp;Always On</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="mDotWithTags">
+              <property name="text">
+               <string>Display with Command Ta&amp;gs</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="displayLeftSpacer">
+           <property name="orientation"><enum>Qt::Vertical</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+
+       <!-- Right column: help display + checkboxes -->
+       <item>
+        <layout class="QVBoxLayout" name="displayRightColumn">
+         <property name="leftMargin"><number>10</number></property>
+         <item>
+          <layout class="QHBoxLayout" name="helpDisplayRow">
+           <item>
+            <widget class="QLabel" name="labelShowHelp">
+             <property name="text"><string>Help Display:</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QComboBox" name="mShowHelp">
+             <item><property name="text"><string>None</string></property></item>
+             <item><property name="text"><string>Main Help</string></property></item>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelDisplayOnScreen">
+           <property name="text"><string>Display On Screen :</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="mShowScrollBar">
+           <property name="text"><string>&amp;Scroll Bar</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="mShowRuler">
+           <property name="text"><string>&amp;Ruler Line</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="mShowStyleBar">
+           <property name="text"><string>S&amp;tyle Bar</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="mShowStatusBar">
+           <property name="text"><string>Status Line</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="mShowMenu">
+           <property name="text"><string>&amp;Menu Bar</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="displayRightSpacer">
+           <property name="orientation"><enum>Qt::Vertical</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+
+      </layout>
+     </widget>
+
+     <!-- Tab 6: User -->
+     <widget class="QWidget" name="tabUser">
+      <attribute name="title">
+       <string>User</string>
+      </attribute>
+      <layout class="QFormLayout" name="userLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelShortName">
+         <property name="text"><string>Short Name:</string></property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="mShortName"/>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelLongName">
+         <property name="text"><string>Long Name:</string></property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="mLongName"/>
+       </item>
+      </layout>
+     </widget>
+
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>SystemPreferences</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel"><x>248</x><y>254</y></hint>
+    <hint type="destinationlabel"><x>157</x><y>274</y></hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>SystemPreferences</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel"><x>316</x><y>260</y></hint>
+    <hint type="destinationlabel"><x>286</x><y>274</y></hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>
