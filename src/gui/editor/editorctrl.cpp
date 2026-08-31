@@ -7061,7 +7061,7 @@ bool cEditorCtrl::SaveAndClose(void)
     {
         GetDocument()->Clear();
         LayoutDocument(true);
-        mFileDir = "./";
+        mFileDir = DefaultFileDir();
         mFileName = "Unknown.ws";
         mFileSet = false;
         SetTitle(mFileName);

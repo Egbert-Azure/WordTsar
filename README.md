@@ -43,5 +43,12 @@ You get the best of both worlds: the classic terminal view, or the macOS GUI —
 - A backup of your file is made every 1 minute. Backups are in Wordstar format.
 - The initial page/paper size is 8.5" x 11"
 - The 0.5.x releases use UTF8 for all in-memory storage of the document and supports Unicode version 16.
+- File → Print opens the native macOS print dialog and prints directly, separate from File → Print Preview. The TUI's `^KP` prints via CUPS.
+- Spell check dictionary language (System Preferences > Editor) is applied on macOS via `NSSpellChecker`, so any installed system dictionary (not just English) works.
+- DOCX import is partial: paragraph text, character formatting, and basic page setup come through, but tables, list numbering, images, and header/footer content do not import yet. DOCX export doesn't cover tables or headers/footers either. See `WHATS_NEW.md` for the full state.
+
+## Feedback
+
+This fork is actively developed. If you use it and run into a bug, a missing feature, or just want to share how it's working for you, please [open an issue](https://github.com/Egbert-Azure/WordTsar/issues) on this repo.
 
 **Source code [GNU Affero General Public License v3.0](LICENSE.md).**

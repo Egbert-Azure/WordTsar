@@ -101,6 +101,11 @@ public:
     cEditorBase(void);
     virtual ~cEditorBase(void);
 
+    // Default starting directory for file dialogs (user's Documents folder,
+    // falling back to "./" if it can't be determined) when no explicit
+    // "Default Directory" preference has been set.
+    static std::string DefaultFileDir(void);
+
     // Document Listener Implementation
     void OnDocumentChanged(PARAGRAPH_T fromParagraph) override ;
     void OnDocumentCleared(void) override ;

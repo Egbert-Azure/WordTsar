@@ -806,7 +806,7 @@ bool cWordStarInput::OnControlKChar(char ch)
             {
                 mEditor->GetDocument()->Clear() ;
                 mEditor->LayoutDocument(true) ;  // Resync layout with cleared document
-                mEditor->mFileDir = "./" ;
+                mEditor->mFileDir = cEditorBase::DefaultFileDir() ;
                 mEditor->mFileName = "Unknown.ws" ;
                 mEditor->mFileSet = false ;
                 mEditor->SetTitle(mEditor->mFileName) ;

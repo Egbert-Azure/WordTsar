@@ -80,9 +80,34 @@
 #include "SimpleIni.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <limits>
 #include <random>
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the user's Documents folder if it can be determined, else "./"
+///
+/// @brief
+/// Default starting directory for file dialogs when no explicit
+/// "Default Directory" preference has been set. Without this, mFileDir
+/// stays a relative "./" and silently resolves against whatever cwd the
+/// OS happened to launch the process with -- on macOS that's the user's
+/// home directory, not a place anyone expects to see file dialogs open to.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorBase::DefaultFileDir(void)
+{
+    const char* home = std::getenv("HOME");
+    if (home != nullptr && home[0] != '\0')
+    {
+        return std::string(home) + "/Documents";
+    }
+
+    return "./";
+}
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -116,7 +141,7 @@ cEditorBase::cEditorBase(void)
     , mReplaceAsk(true)
     , mReplaceScope(0)
     , mLastKeyUpOrDown(false)
-    , mFileDir("./")
+    , mFileDir(cEditorBase::DefaultFileDir())
     , mFileSet(false)
     , mCaretBlinkRate(500)
     , mAutoSaveIntervalSec(60)
@@ -296,7 +321,7 @@ void cEditorBase::AbandonFile(void)
         mDocument->mChanged = false;
     }
 
-    mFileDir = "./";
+    mFileDir = DefaultFileDir();
     mFileName = "Unknown.ws";
     mFileSet = false;
     SetTitle(mFileName);

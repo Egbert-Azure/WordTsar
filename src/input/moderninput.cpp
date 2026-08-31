@@ -354,7 +354,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
 
                 doc->Clear() ;
                 mEditor->LayoutDocument(true) ;
-                mEditor->mFileDir = "./" ;
+                mEditor->mFileDir = cEditorBase::DefaultFileDir() ;
                 mEditor->mFileName = "Unknown.ws" ;
                 mEditor->mFileSet = false ;
                 mEditor->SetTitle(mEditor->mFileName) ;

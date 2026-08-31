@@ -39,14 +39,20 @@
  * - Character formatting: bold, italic, underline, strikethrough, super/subscript
  *   via sCharacterProperties
  * - Font and color selection from style sheets and inline run properties
- * - Tables: basic table structure with cell content
  * - Section properties: page size, margins, orientation, columns
  *
  * @section docx_limitations Current Limitations
- * - Read-only: does not support saving in DOCX format
- * - Images and embedded objects are not imported
- * - Complex table layouts (merged cells, nested tables) are simplified
- * - Some advanced features (tracked changes, comments) are skipped
+ * - Images and embedded objects are not imported; a placeholder marker is
+ *   inserted in their place instead
+ * - Tables are not imported at all -- HandleTableNode() is a no-op, so a
+ *   w:tbl in the source document produces no content whatsoever, not a
+ *   simplified rendering
+ * - List numbering, paragraph borders, shading, and custom tab stops are
+ *   parsed into style structs but never emitted (EmitNumbering, EmitBorder,
+ *   EmitShading, EmitTabs are unused) -- list items lose their numbers/bullets
+ * - Header/footer text content is not imported (only the page margin
+ *   distances reserved for them are read from w:pgMar)
+ * - Advanced features (tracked changes, comments) are skipped
  *
  * @author Gerald Brandt
  * @copyright GNU Affero General Public License v3.0
