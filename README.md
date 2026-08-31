@@ -21,7 +21,13 @@ There are two ways to run WordTsar, built from the same source:
 
 Both read and write the same document formats and share the same editing engine — pick whichever fits how you want to write.
 
+TUI (terminal-based version):
+
 ![WordTsar running in the terminal](docs/screenshots/ws-terminal.png)
+
+GUI (macOS app version):
+
+![WordTsar running as a macOS app](docs/screenshots/WordTsar-gui.png)
 
 You get the best of both worlds: the classic terminal view, or the macOS GUI — install whichever you prefer, or both. Distraction-free writing, no bloat, one keystroke away.
 
