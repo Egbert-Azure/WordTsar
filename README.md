@@ -10,7 +10,7 @@ WordTsar is currently Beta. What does Beta mean? The core is solid and well-test
 
 This is version **0.6.0 Beta**, macOS only.
 
-__BUILDING__
+## Building
 
 WordTsar requires Qt6, CMake 3.16+, and a C++20 compatible compiler. See [BUILDING.md](BUILDING.md) for full macOS build instructions.
 
@@ -31,7 +31,7 @@ GUI (macOS app version):
 
 You get the best of both worlds: the classic terminal view, or the macOS GUI — install whichever you prefer, or both. Distraction-free writing, no bloat, one keystroke away.
 
-__NOTES__
+## Notes
 
 - If the on-screen command help panel (the block of Ctrl-key commands under the ruler) disappears in the terminal UI, press **Ctrl-J** then **J** to toggle it back on.
 - In the GUI, these use Mac keyboard shortcuts instead of the classic F1/F3/F11, which macOS reserves for brightness, Mission Control, and Show Desktop and won't reliably reach any app:
@@ -44,4 +44,4 @@ __NOTES__
 - The initial page/paper size is 8.5" x 11"
 - The 0.5.x releases use UTF8 for all in-memory storage of the document and supports Unicode version 16.
 
-__Source code [GNU Affero General Public License v3.0](LICENSE.md).__
+**Source code [GNU Affero General Public License v3.0](LICENSE.md).**
