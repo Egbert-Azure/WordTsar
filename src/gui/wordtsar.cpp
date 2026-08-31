@@ -2311,13 +2311,14 @@ void cWordTsar::PrintPreview(void)
 void cWordTsar::AboutWordTsar(void)
 {
     std::string abouttext ;
-    abouttext = string_sprintf("<h2>WordTsar %ld.%ld build %ld %s</h2>" \
-                    "<p>Wordstar for the 21st century.</p>" \
+    abouttext = string_sprintf("<h2>WordTsar %s %s</h2>" \
+                    "<p>Wordstar for the 21st century. This is a macOS-focused fork of "
+                    "Gerald Brandt's WordTsar.</p>" \
                     "License: GNU Affero General Public License<br>" \
-                    "https://sourceforge.net/projects/wordtsar/<br>" \
+                    "https://github.com/Egbert-Azure/WordTsar<br>" \
                     "<h4>Embedded Third-Party Code</h4>" \
                     "</p>"
-                    , MAJOR, MINOR, BUILD, STATUS) ;
+                    , FULLVERSION_STRING, STATUS) ;
 
     abouttext += "Chillout - MIT License - crash handling<br>" ;
     abouttext += "cpp-unicodelib - MIT License - Unicode text processing<br>" ;
@@ -2332,8 +2333,8 @@ void cWordTsar::AboutWordTsar(void)
     abouttext += "Qt version " ;
     abouttext += QT_VERSION_STR ;
     abouttext += "<br>" ;
-    abouttext += "HarfBuzz/FreeType - font shaping (Linux)<br>" ;
-    abouttext += "hunspell - spell checking (Linux)<br>" ;
+    abouttext += "macOS CoreText - font shaping<br>" ;
+    abouttext += "macOS NSSpellChecker - spell checking<br>" ;
 
     QMessageBox::about(this, "About WordTsar", abouttext.c_str()) ;
 }

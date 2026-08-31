@@ -138,6 +138,14 @@ int main(int argc, char *argv[])
 
     cWordTsar w(argc, argv);
 
+    // Center the window on the same screen the splash is centered on --
+    // otherwise the two are placed independently (the splash always at
+    // screen-center, the window wherever the OS/window manager defaults to)
+    // and can end up looking like they belong to two different launches.
+    QRect avail = screen->availableGeometry() ;
+    w.move(avail.x() + (avail.width() - w.width()) / 2,
+           avail.y() + (avail.height() - w.height()) / 2) ;
+
     QTimer::singleShot(5000, &splash, SLOT(close())) ;
 
     w.show();
