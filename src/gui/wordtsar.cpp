@@ -2324,7 +2324,6 @@ void cWordTsar::AboutWordTsar(void)
 
     abouttext += "Chillout - MIT License - crash handling<br>" ;
     abouttext += "cpp-unicodelib - MIT License - Unicode text processing<br>" ;
-    abouttext += "doctest - MIT License - unit testing framework<br>" ;
     abouttext += "kuba-zip - MIT License - ZIP archive handling<br>" ;
     abouttext += "libharu - zlib/libpng License - PDF generation (TUI)<br>" ;
     abouttext += "PicoMath - BSD 3-Clause License - math expression parser<br>" ;
