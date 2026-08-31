@@ -22,8 +22,8 @@
 #define VERSION_H
 
 //Software Status
-static const char STATUS[] =  "Alpha";
-static const char STATUS_SHORT[] =  "a";
+static const char STATUS[] =  "Beta";
+static const char STATUS_SHORT[] =  "b";
 
 //Standard Version Type
 static const long MAJOR  = 0;
