@@ -2707,7 +2707,7 @@ void cWSEditorCtrl::SpellCheckDocument(void)
         return;
     }
 
-    cSpellChecker checker;
+    cSpellChecker checker(mSpellCheckLanguage);
     std::set<std::string> ignored;
     PARAGRAPH_T total = mDocument->GetNumberofParagraphs();
     int misspelled = 0;
@@ -2817,7 +2817,7 @@ void cWSEditorCtrl::SpellCheckWord(void)
         return;
     }
 
-    cSpellChecker checker;
+    cSpellChecker checker(mSpellCheckLanguage);
     POSITION_T pos = GetCaretDocumentPosition();
     POSITION_T wordStart = mDocument->GetPrevWordPosition(pos + 1);
     POSITION_T wordEnd = mDocument->GetNextWordPosition(pos);
@@ -2896,7 +2896,7 @@ void cWSEditorCtrl::SpellCheckEnterWord(void)
         return;
     }
 
-    cSpellChecker checker;
+    cSpellChecker checker(mSpellCheckLanguage);
 
     if (checker.CheckWord(word) == true)
     {

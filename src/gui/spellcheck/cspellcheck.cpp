@@ -65,7 +65,7 @@
 #include "cspellcheck.h"
 
 
-cSpellCheck::cSpellCheck(cEditorCtrl *parent, eSpellMode mode) : QDialog(parent)
+cSpellCheck::cSpellCheck(cEditorCtrl *parent, eSpellMode mode) : QDialog(parent), spelling(parent->mSpellCheckLanguage)
 {
     mEditor = parent ;
     mMode = mode ;

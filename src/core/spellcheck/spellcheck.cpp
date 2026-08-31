@@ -89,6 +89,7 @@
 
   // Declare external C functions implemented in SpellCheckerMac.mm.
   extern "C" {
+      bool macSetSpellingLanguage(const char *language);
       bool macCheckSpelling(const char *word);
       char** macGetSuggestions(const char *word, int *count);
       void macFreeSuggestions(char** suggestions, int count);
@@ -159,7 +160,9 @@ cSpellChecker::cSpellChecker(const std::string& language)
 
 #elif defined(__APPLE__)
 
-    // On macOS, no initialization is needed here.
+    // Select the requested dictionary on the shared NSSpellChecker. Falls
+    // back to whatever language it already had if mLanguage isn't installed.
+    macSetSpellingLanguage(mLanguage.c_str());
 
 #else
 

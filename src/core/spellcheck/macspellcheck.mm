@@ -27,6 +27,34 @@ extern "C"
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  language [in] UTF-8 encoded language identifier (e.g. "en_US", "de_DE")
+///
+/// @return true if the shared spell checker recognized and applied the language
+///
+/// @brief
+/// Sets the language the macOS NSSpellChecker checks against. Applies to all
+/// subsequent macCheckSpelling()/macGetSuggestions() calls, since they share
+/// the same NSSpellChecker instance. If the language isn't one of
+/// NSSpellChecker's installed dictionaries, this is a no-op and the checker
+/// keeps whatever language it already had.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool macSetSpellingLanguage(const char *language)
+{
+    @autoreleasepool
+    {
+        if (language == nullptr || language[0] == '\0')
+        {
+            return false;
+        }
+        NSString *nsLanguage = [NSString stringWithUTF8String:language];
+        return [[NSSpellChecker sharedSpellChecker] setLanguage:nsLanguage];
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  word [in] UTF-8 encoded word to check
 ///
 /// @return true if the word is spelled correctly, false otherwise
