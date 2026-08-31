@@ -5,6 +5,7 @@ test/WSTuiTest
 .qt/
 .vscode/
 .devtool/
+.cache/
 CMakeFiles/
 CMakeCache.txt
 WordTsar_autogen/
