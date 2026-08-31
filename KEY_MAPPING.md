@@ -143,7 +143,7 @@ instead, with the F-key kept only as a bonus for anyone who has freed it:
 |----------|------------------|------------------------------------------|
 | Preferences | &#8984;, (Cmd+Comma) | F1 |
 | Toggle Fullscreen | &#8984;&#8963;F (Cmd+Ctrl+F) | F11 |
-| Find Again | &#8984;G (Cmd+G) | F3 |
+| Find Again | &#8984;G (Cmd+G, both input modes) | F3 (Modern mode only) |
 
 To free F3 or F11 for direct use, go to *System Settings > Keyboard >
 Keyboard Shortcuts* and disable/reassign Mission Control (F3) or Show Desktop

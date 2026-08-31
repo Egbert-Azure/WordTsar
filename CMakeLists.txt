@@ -479,6 +479,10 @@ if(CMAKE_BUILD_TYPE STREQUAL Release)
     target_compile_definitions(WordTsar PRIVATE
         NDEBUG
     )
+elseif(CMAKE_BUILD_TYPE STREQUAL Debug)
+    target_compile_definitions(WordTsar PRIVATE
+        DEBUG
+    )
 endif()
 
 

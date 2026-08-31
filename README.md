@@ -6,9 +6,9 @@ Wordstar for the 21st Century. WordTsar is a Wordstar 7.0D document mode clone. 
 
 All credit for WordTsar's design and implementation goes to Gerald Brandt — this fork simply trims the project down to a macOS-only build. The original, cross-platform project (Windows, Linux, and macOS) lives at the link above and at [wordtsar.ca](http://wordtsar.ca); go there for the full story, the forums, and the Windows/Linux builds.
 
-WordTsar is currently Alpha. What does Alpha mean? Alpha means the program works, but is feature incomplete.
+WordTsar is currently Beta. What does Beta mean? The core is solid and well-tested, but a handful of things remain unverified or incomplete — see `WHATS_NEW.md` for specifics.
 
-This is version **0.6.0 Alpha**, macOS only.
+This is version **0.6.0 Beta**, macOS only.
 
 __BUILDING__
 
