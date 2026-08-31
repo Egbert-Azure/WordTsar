@@ -258,8 +258,8 @@ Menu shortcuts shown to the user change based on the active input mode. The func
 | Save | ^KS | Ctrl+S | Save file |
 | Save As | ^KT | Ctrl+Shift+S | Save with new name |
 | Save and Close | ^KD | -- | Save, clear, reset |
-| Print | ^KP | Ctrl+P | Print (not implemented) |
-| Print Preview | ^OP | -- | Print preview (not implemented) |
+| Print | ^KP | Ctrl+P | Print to a printer (GUI: system print dialog; TUI: CUPS `lp` on macOS/Linux, print spooler on Windows) |
+| Print Preview | ^OP | -- | Print preview |
 | Preferences | -- | -- | System Preferences dialog |
 | Exit WordTsar | ^KX | Alt+F4 | Quit application |
 
@@ -307,7 +307,7 @@ Menu shortcuts shown to the user change based on the active input mode. The func
 
 | Item | WordStar Shortcut | Modern Shortcut | Action |
 |------|------------------|----------------|--------|
-| Print Preview | ^OP | -- | Print preview (not implemented) |
+| Print Preview | ^OP | -- | Print preview |
 | Command Tags | ^OD | -- | Toggle control code display |
 | Block Highlighting | ^KH | -- | Toggle block visibility |
 | Screen Settings | ^OB | -- | Screen Settings dialog |

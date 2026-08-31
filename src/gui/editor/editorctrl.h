@@ -172,6 +172,7 @@ public:
     void About(void) override;
     void PageLayout(void) override;
     void PrintPreview(void) override;
+    void Print(void);
     void SpellCheckDocument(void) override;
     void SpellCheckWord(void) override;
     void SpellCheckEnterWord(void) override;

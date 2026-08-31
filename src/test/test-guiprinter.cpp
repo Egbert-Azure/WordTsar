@@ -670,6 +670,25 @@ TEST_CASE("PrintPreview initializes correctly")
     CHECK(layout->GetNumberOfPages() >= 1);
 }
 
+TEST_CASE("PrintDocument initializes correctly")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());    layout->SetDocument(doc);
+
+    // Add some content
+    doc->Insert("Test content for print.");
+    layout->LayoutDocument(doc);
+
+    cPrintout printout(&editor);
+
+    // We can't actually test PrintDocument() as it shows a modal QPrintDialog
+    // But we can verify the object constructs correctly
+    CHECK(layout->GetNumberOfPages() >= 1);
+}
+
 TEST_CASE("printPage with Unicode content")
 {
     ensureQApplication();

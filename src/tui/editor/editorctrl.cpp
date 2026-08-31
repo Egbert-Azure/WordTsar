@@ -34,6 +34,11 @@
 
 #include "editorctrl.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -2649,14 +2654,103 @@ void cWSEditorCtrl::PrintPreview(void)
 }
 
 
+#ifndef _WIN32
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return CUPS default destination name, or empty if none is configured
+///
+/// @brief
+/// Runs `lpstat -d` and parses its output for a configured default
+/// destination. CUPS reports "no system default destination" when none
+/// has been set, which is common on a fresh macOS install even when
+/// printers are available.
+///
+/////////////////////////////////////////////////////////////////////////////
+static std::string GetCupsDefaultPrinter(void)
+{
+    FILE* pipe = popen("lpstat -d 2>/dev/null", "r");
+    if (!pipe)
+    {
+        return std::string();
+    }
+
+    std::string output;
+    char buf[256];
+    while (fgets(buf, sizeof(buf), pipe))
+    {
+        output += buf;
+    }
+    pclose(pipe);
+
+    const std::string marker = "system default destination:";
+    size_t pos = output.find(marker);
+    if (pos == std::string::npos)
+    {
+        return std::string();
+    }
+
+    std::string name = output.substr(pos + marker.size());
+    size_t start = name.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos)
+    {
+        return std::string();
+    }
+    size_t end = name.find_last_not_of(" \t\r\n");
+    return name.substr(start, end - start + 1);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return names of installed CUPS destinations (possibly empty)
+///
+/// @brief
+/// Runs `lpstat -p` and parses each "printer NAME is ..." line for the
+/// destination name.
+///
+/////////////////////////////////////////////////////////////////////////////
+static std::vector<std::string> GetCupsPrinters(void)
+{
+    std::vector<std::string> printers;
+
+    FILE* pipe = popen("lpstat -p 2>/dev/null", "r");
+    if (!pipe)
+    {
+        return printers;
+    }
+
+    char buf[256];
+    while (fgets(buf, sizeof(buf), pipe))
+    {
+        std::string line(buf);
+        if (line.rfind("printer ", 0) == 0)
+        {
+            size_t nameStart = 8;
+            size_t nameEnd = line.find(' ', nameStart);
+            if (nameEnd != std::string::npos)
+            {
+                printers.push_back(line.substr(nameStart, nameEnd - nameStart));
+            }
+        }
+    }
+    pclose(pipe);
+
+    return printers;
+}
+#endif
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @return nothing
 ///
 /// @brief
 /// Print the document by rendering it to a PDF (libharu) and handing the file
-/// to the system print spooler (lp). On failure the PDF path is reported so the
-/// user can print it manually.
+/// to the system print spooler. On non-Windows platforms this targets a CUPS
+/// destination: the configured default if there is one, the sole installed
+/// printer if there's exactly one, or a user pick from a list otherwise
+/// (mirroring the "Name of printer?" prompt in real WordStar's print flow).
+/// On failure the PDF path is reported so the user can print it manually.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSEditorCtrl::Print(void)
@@ -2674,18 +2768,54 @@ void cWSEditorCtrl::Print(void)
     }
 
 #ifdef _WIN32
-    ShowMessage("Print", "Saved to:\n" + path.string() +
-                         "\n\nOpen it in your PDF viewer to print.");
-#else
-    std::string command = "lp \"" + path.string() + "\" >/dev/null 2>&1";
-    int result = std::system(command.c_str());
-    if (result == 0)
+    HINSTANCE result = ShellExecuteA(nullptr, "print", path.string().c_str(),
+                                      nullptr, nullptr, SW_HIDE);
+    if (reinterpret_cast<INT_PTR>(result) > 32)
     {
         SetStatusMessage("Sent to printer", false, 90);
     }
     else
     {
-        ShowError("Print", "Could not send the document to a printer.\n"
+        ShowMessage("Print", "Saved to:\n" + path.string() +
+                             "\n\nOpen it in your PDF viewer to print.");
+    }
+#else
+    std::string printerName = GetCupsDefaultPrinter();
+
+    if (printerName.empty())
+    {
+        std::vector<std::string> printers = GetCupsPrinters();
+        if (printers.size() == 1)
+        {
+            printerName = printers.front();
+        }
+        else if (printers.size() > 1)
+        {
+            if (!wsdialogs::SelectPrinterDialog(mHost, printers, printerName))
+            {
+                ShowMessage("Print", "Saved to:\n" + path.string() +
+                                     "\n\nOpen it in your PDF viewer to print.");
+                return;
+            }
+        }
+    }
+
+    if (printerName.empty())
+    {
+        ShowError("Print", "No printer is configured.\n"
+                           "The PDF was written to:\n" + path.string());
+        return;
+    }
+
+    std::string command = "lp -d \"" + printerName + "\" \"" + path.string() + "\" >/dev/null 2>&1";
+    int result = std::system(command.c_str());
+    if (result == 0)
+    {
+        SetStatusMessage("Sent to " + printerName, false, 90);
+    }
+    else
+    {
+        ShowError("Print", "Could not send the document to \"" + printerName + "\".\n"
                            "The PDF was written to:\n" + path.string());
     }
 #endif

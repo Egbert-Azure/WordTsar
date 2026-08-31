@@ -6139,6 +6139,22 @@ void cEditorCtrl::PrintPreview(void)
 /// @return nothing
 ///
 /// @brief
+/// Display the system print dialog and send the document straight to a
+/// printer, bypassing preview. Uses the same cPrintout engine as
+/// PrintPreview.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::Print(void)
+{
+    cPrintout print(this);
+    print.PrintDocument();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
 /// Display font selection dialog and insert selected font into document.
 /// [REFACTORED from editorctrl.cpp::SelectFont()]
 ///

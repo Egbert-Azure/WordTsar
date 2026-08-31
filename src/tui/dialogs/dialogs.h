@@ -102,6 +102,13 @@ struct sPageLayoutValues
 sPageLayoutValues PageLayoutDialog(iWSDialogHost* host, const sPageLayoutValues& initial,
                                    const std::string& unitSuffix);
 
+// ---- Print ----
+
+// Pick a printer from a list of CUPS destination names. Returns true on OK
+// with selected set to the chosen printer name.
+bool SelectPrinterDialog(iWSDialogHost* host, const std::vector<std::string>& printers,
+                         std::string& selected);
+
 // ---- Font ----
 
 // Pick a font family + size. Returns true on OK (family/size updated).

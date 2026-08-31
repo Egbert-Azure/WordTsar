@@ -52,6 +52,7 @@ public:
     virtual ~cPrintout(void);
 
     void PrintPreview(void);
+    void PrintDocument(void);
 
 public slots:
     void printDocument(QPrinter *printer);

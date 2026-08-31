@@ -2296,7 +2296,7 @@ void cWordTsar::SaveandClose(void)
 void cWordTsar::Print(void)
 {
     mEditor->Save() ;
-    mEditor->PrintPreview() ;
+    mEditor->Print() ;
 }
 
 

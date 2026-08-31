@@ -135,6 +135,41 @@ void cPrintout::PrintPreview(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return nothing
+///
+/// @brief
+/// Opens the system print dialog and, if accepted, sends the document
+/// straight to the selected printer. Reuses the same QPrinter setup and
+/// page-rendering code (printDocument) as PrintPreview.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cPrintout::PrintDocument(void)
+{
+    QPrinter printer(QPrinter::HighResolution);
+    QPageSize pagesize(QPageSize::Letter);
+    printer.setPageSize(pagesize);
+    printer.setFullPage(true);
+    printer.setFromTo(1, mLayout->GetNumberOfPages());
+    printer.setDuplex(QPrinter::DuplexAuto);
+
+    if (mLayout->GetLandscapeMode())
+    {
+        printer.setPageOrientation(QPageLayout::Landscape);
+    }
+    else
+    {
+        printer.setPageOrientation(QPageLayout::Portrait);
+    }
+
+    QPrintDialog dialog(&printer, mEditor);
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        printDocument(&printer);
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  printer [in] - QPrinter to print to
 ///
 /// @return nothing
