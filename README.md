@@ -28,6 +28,12 @@ You get the best of both worlds: the classic terminal view, or the macOS GUI —
 __NOTES__
 
 - If the on-screen command help panel (the block of Ctrl-key commands under the ruler) disappears in the terminal UI, press **Ctrl-J** then **J** to toggle it back on.
+- In the GUI, these use Mac keyboard shortcuts instead of the classic F1/F3/F11, which macOS reserves for brightness, Mission Control, and Show Desktop and won't reliably reach any app:
+  - **⌘,** (Cmd+Comma) → Preferences
+  - **⌘⌃F** (Cmd+Ctrl+F) → Toggle Fullscreen
+  - **⌘G** (Cmd+G) → Find Again
+
+  The F-keys still work as a bonus if you free them yourself in *System Settings > Keyboard > Keyboard Shortcuts*. See `KEY_MAPPING.md` for details.
 - A backup of your file is made every 1 minute. Backups are in Wordstar format.
 - The initial page/paper size is 8.5" x 11"
 - The 0.5.x releases use UTF8 for all in-memory storage of the document and supports Unicode version 16.

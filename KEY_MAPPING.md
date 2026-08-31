@@ -126,6 +126,32 @@ Navigation and editing keys work identically in both modes.
 | F3 | -- | Find Again |
 | F11 | Toggle fullscreen | Toggle fullscreen |
 
+**On macOS, F1/F3/F11 are unreliable by design and should not be relied on.**
+macOS reserves these at the OS level: F1/F2 default to brightness (never reach
+any app unless Fn is held or *System Settings > Keyboard > "Use F1, F2, etc.
+keys as standard function keys"* is enabled), and F3/F11 are global system
+shortcuts (Mission Control / Show Desktop) that are intercepted before any
+app -- including this one -- ever sees the keypress, Fn or not. None of these
+are real WordStar bindings to begin with (see the WordStar 4.0 manual under
+`docs/`: F1-F10 each carried 4 assignments, but every one was just a shortcut
+to a command also reachable via the Ctrl-diamond).
+
+WordTsar's GUI therefore leads with macOS-native shortcuts for these three
+instead, with the F-key kept only as a bonus for anyone who has freed it:
+
+| Function | Primary (macOS) | Also works if freed in System Settings |
+|----------|------------------|------------------------------------------|
+| Preferences | &#8984;, (Cmd+Comma) | F1 |
+| Toggle Fullscreen | &#8984;&#8963;F (Cmd+Ctrl+F) | F11 |
+| Find Again | &#8984;G (Cmd+G) | F3 |
+
+To free F3 or F11 for direct use, go to *System Settings > Keyboard >
+Keyboard Shortcuts* and disable/reassign Mission Control (F3) or Show Desktop
+(F11). These Cmd-chords are GUI-only -- a terminal app has no way to receive
+Cmd-key combinations at all, since the terminal emulator (Terminal.app,
+iTerm2, etc.) consumes them for its own shortcuts before `ws` ever sees them.
+The TUI's primary path is, and remains, the Ctrl-diamond.
+
 ---
 
 ## Chord Sequences

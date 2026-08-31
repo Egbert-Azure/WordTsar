@@ -3479,7 +3479,29 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
         bool shift = (modifiers & Qt::ShiftModifier) != 0 ;
         bool ctrl = (modifiers & Qt::ControlModifier) != 0 ;
         bool alt = (modifiers & Qt::AltModifier) != 0 ;
+        bool meta = (modifiers & Qt::MetaModifier) != 0 ;   // physical Cmd key (AA_MacDontSwapCtrlAndMeta)
 
+        // macOS-idiomatic shortcuts for the three real commands this app puts on
+        // bare F-keys (F1/F3/F11). macOS reserves those for brightness, Mission
+        // Control, and Show Desktop at the OS level, so they never reliably reach
+        // any app; these Cmd-chords are the primary path here, with the F-keys
+        // kept as a bonus for anyone who has freed them in System Settings.
+        if (meta && !ctrl && !alt && key == Qt::Key_Comma)
+        {
+            SystemPreferences() ;
+            handled = true ;
+        }
+        else if (meta && ctrl && !alt && key == Qt::Key_F)
+        {
+            ToggleFullscreen() ;
+            handled = true ;
+        }
+        else if (meta && !ctrl && !alt && key == Qt::Key_G)
+        {
+            FindAgain() ;
+            handled = true ;
+        }
+        else
         switch (key)
         {
             // --- Special keys: route through HandleSpecialKey ---
@@ -3577,28 +3599,42 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
 
             case Qt::Key_F3:
             {
+#ifdef DEBUG
                 // Debug overlay toggle (temporary -- will be removed when debug keys removed)
                 SetShowViewportDebug(!GetShowViewportDebug()) ;
                 update() ;
                 handled = true ;
+#else
+                // Release builds: real command (Modern mode = Find Next; best-effort,
+                // since macOS reserves bare F3 for Mission Control system-wide).
+                handled = mInput->HandleSpecialKey(SPECIAL_F3, shift, ctrl, alt) ;
+#endif
                 break ;
             }
 
             case Qt::Key_F4:
             {
+#ifdef DEBUG
                 // Debug overlay toggle (temporary)
                 SetShowBoxStats(!GetShowBoxStats()) ;
                 update() ;
                 handled = true ;
+#else
+                handled = mInput->HandleSpecialKey(SPECIAL_F4, shift, ctrl, alt) ;
+#endif
                 break ;
             }
 
             case Qt::Key_F5:
             {
+#ifdef DEBUG
                 // Debug overlay toggle (temporary)
                 SetShowBoxOutlines(!GetShowBoxOutlines()) ;
                 update() ;
                 handled = true ;
+#else
+                handled = mInput->HandleSpecialKey(SPECIAL_F5, shift, ctrl, alt) ;
+#endif
                 break ;
             }
 
@@ -3715,8 +3751,15 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
     // SINGLE UPDATE POINT - handles visual updates for ALL keys
     if (handled)
     {
-        // Skip update for F2 (already handled) and F3/F4/F5 (already called update())
+        // Skip update for F2 (already handled) and, in debug builds only, F3/F4/F5
+        // (the debug overlay toggles above call update() themselves). In release
+        // builds F3/F4/F5 are real commands routed through HandleSpecialKey like
+        // F6-F10, so they need the normal post-command update too.
+#ifdef DEBUG
         if (key != Qt::Key_F2 && key != Qt::Key_F3 && key != Qt::Key_F4 && key != Qt::Key_F5)
+#else
+        if (key != Qt::Key_F2)
+#endif
         {
             // Incremental layout of visible range + caret + scroll + paint
             PerformPostCommandUpdate() ;

@@ -232,8 +232,8 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
         " <b>^S</b> left     <b>^R</b> up screen  <b>^Y</b> line    <b>^V</b> turn insert off     <i>^M macros</i>\n"
         " <b>^D</b> right    <b>^C</b> down      <b>Del</b> char    <b>^L</b> find/replace again  <b>^P</b> print controls\n"
         " <b>^A</b> word left   screen     <b>^U</b> unerase                        <b>^Q</b> quick functions\n"
-        " <b>^F</b> word right                        <b>F1</b> Preferences\n"
-        "                                     <b>F11</b> Full Screen"
+        " <b>^F</b> word right                   <b>&#8984;,</b> Preferences (or F1)\n"
+        "                                <b>&#8984;&#8963;F</b> Full Screen (or F11)"
         "</pre>" ;
 
     QString helpjj = "<pre style=\"margin:0\">"
@@ -1470,7 +1470,7 @@ void cWordTsar::CreateMenus(void)
     QAction *SaveandCloseAction = new QAction(mMenuProvider->GetFileSaveAndCloseLabel(), mMenuBar) ;
     QAction *PrintAction = new QAction(mMenuProvider->GetFilePrintLabel(), mMenuBar) ;
     QAction *PrintPreviewAction = new QAction(mMenuProvider->GetFilePrintPreviewLabel(), mMenuBar) ;
-    QAction *PreferencesAction = new QAction("Pr&eferences...\tF1", mMenuBar) ;
+    QAction *PreferencesAction = new QAction("Pr&eferences...\t⌘,", mMenuBar) ;
     QAction *ExitAction = new QAction(mMenuProvider->GetFileExitLabel(), mMenuBar) ;
 
     filemenu->addAction(OpenAction) ;
@@ -2240,7 +2240,7 @@ RepeatKeyAction->setEnabled(false) ;
 
     // System Preferences (separate from existing Preferences dialog)
     utilitiesmenu->addSeparator() ;
-    QAction *SystemPreferencesAction = new QAction("S&ystem Preferences...\tF1", mMenuBar) ;
+    QAction *SystemPreferencesAction = new QAction("S&ystem Preferences...\t⌘,", mMenuBar) ;
     utilitiesmenu->addAction(SystemPreferencesAction) ;
     connect(SystemPreferencesAction, &QAction::triggered, this, [this]()
     {
