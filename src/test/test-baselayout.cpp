@@ -10602,6 +10602,22 @@ TEST_CASE("Layout R2-7: Unrecognized two-letter commands hit case breaks")
     CHECK(f.parser.ParseDotCommand(".LS") == DOT_ERROR);
 }
 
+TEST_CASE("Layout: '..' comment prefix parses as DOT_GOOD like '.IG'")
+{
+    sParserFixture f;
+
+    // ".." has no letter command code for the switch to dispatch on, so
+    // without an explicit early return it used to fall through to
+    // DOT_UNKNOWN -- inconsistent with ".IG", the other comment prefix,
+    // which is explicitly handled and returns DOT_GOOD. (Below the shared
+    // minimum-length-3 guard, so a bare ".." still returns DOT_ERROR.)
+    CHECK(f.parser.ParseDotCommand("...") == DOT_GOOD);
+    CHECK(f.parser.ParseDotCommand(".. This is a comment") == DOT_GOOD);
+    CHECK(f.parser.ParseDotCommand("..") == DOT_ERROR);
+    CHECK(f.parser.ParseDotCommand(".ig") == DOT_GOOD);
+    CHECK(f.parser.ParseDotCommand(".IG some note") == DOT_GOOD);
+}
+
 // =========================================================================
 // Round 2 continued: layoutstructs.cpp IsEqualTo false branches
 // =========================================================================

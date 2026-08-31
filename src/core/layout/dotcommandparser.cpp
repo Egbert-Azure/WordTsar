@@ -176,6 +176,14 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
         return DOT_ERROR;
     }
 
+    // ".." is the other WordStar comment-line prefix, same meaning as ".IG"
+    // below. It has no letter command code for the switch to dispatch on, so
+    // it must be handled here rather than falling through to DOT_UNKNOWN.
+    if (command[1] == '.')
+    {
+        return DOT_GOOD;
+    }
+
     // Uppercase the entire command for case-insensitive parsing
     // WordStar allows both upper and lowercase unit types (i/I, c/C, m/M, etc.)
     std::string upperCmd = command;
