@@ -8,7 +8,7 @@ All credit for WordTsar's design and implementation goes to Gerald Brandt — th
 
 WordTsar is currently Alpha. What does Alpha mean? Alpha means the program works, but is feature incomplete.
 
-This is version **0.6.1833 Alpha**, macOS only.
+This is version **0.6.0 Alpha**, macOS only.
 
 __BUILDING__
 
@@ -27,6 +27,7 @@ You get the best of both worlds: the classic terminal view, or the macOS GUI —
 
 __NOTES__
 
+- If the on-screen command help panel (the block of Ctrl-key commands under the ruler) disappears in the terminal UI, press **Ctrl-J** then **J** to toggle it back on.
 - A backup of your file is made every 1 minute. Backups are in Wordstar format.
 - The initial page/paper size is 8.5" x 11"
 - The 0.5.x releases use UTF8 for all in-memory storage of the document and supports Unicode version 16.

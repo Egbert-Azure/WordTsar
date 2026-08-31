@@ -3,7 +3,7 @@
 Release history for WordTsar, in reverse chronological order.
 
 
-## 0.6.1833 Alpha (2026-08-30) — macOS fork
+## 0.6.0 Alpha (2026-08-30) — macOS fork
 
 This fork trims WordTsar down to a macOS-only build. See the [README](README.md) for the full framing; the highlights:
 
