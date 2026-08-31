@@ -1675,6 +1675,24 @@ TEST_CASE("Block Select")
         CHECK(end == 9) ;
     }
 
+    SUBCASE("Block Select, end marked before start (^KK then ^KB, order independence)")
+    {
+        // Classic WordStar lets either block boundary be marked first. Mirrors
+        // "Block Select in paragraph" above but with ^KK/^KB reversed; end position
+        // is 9 rather than 10 because that test's begin-first marker insertion
+        // shifts the buffer by one before its SetPosition(10) is issued, whereas
+        // here no marker is ever inserted (see cDocument::SetEndBlock/SetBeginBlock).
+        document.SetPosition(9) ;
+        document.SetEndBlock() ;
+        document.SetPosition(4) ;
+        document.SetBeginBlock() ;
+
+        set = document.GetBlock(start, end) ;
+        CHECK(set == true) ;
+        CHECK(start == 4) ;
+        CHECK(end == 9) ;
+    }
+
     SUBCASE("Delete Character 1")
     {
         document.SetPosition(4) ;
