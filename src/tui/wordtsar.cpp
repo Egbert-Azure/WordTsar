@@ -1493,7 +1493,7 @@ std::string cWSWordTsar::GetHelpText(eHelpDisplay help) const
                    " \001^D\001 right    \001^C\001 down      \001Del\001 char    \001^L\001 find/replace again  \001^P\001 print controls\n"
                    " \001^A\001 word left   screen     \001^U\001 unerase                        \001^Q\001 quick functions\n"
                    " \001^F\001 word right                        \001F1\001 Preferences\n"
-                   "                                     \001Alt+key\001 Menu";
+                   "                                     \001F10\001 Menu";
         }
 
         case HELP_CTRLJ:
@@ -1921,8 +1921,8 @@ void cWSWordTsar::DrawEditor(cScreen& screen, const cTheme& theme)
         mMenu.SetBounds(menuRect);
         mMenu.Draw(screen, theme);
 
-        // Right-aligned "Alt+key=Menu" hint.
-        std::string hint = "Alt+key=Menu";
+        // Right-aligned "F10=Menu" hint.
+        std::string hint = "F10=Menu";
         int hintCol = mCols - static_cast<int>(hint.size()) - 1;
         if (hintCol > 0)
         {
