@@ -2346,7 +2346,6 @@ void cWordTsar::AboutWordTsar(void)
     abouttext += "Chillout - MIT License - crash handling<br>" ;
     abouttext += "cpp-unicodelib - MIT License - Unicode text processing<br>" ;
     abouttext += "kuba-zip - MIT License - ZIP archive handling<br>" ;
-    abouttext += "libharu - zlib/libpng License - PDF generation (TUI)<br>" ;
     abouttext += "PicoMath - BSD 3-Clause License - math expression parser<br>" ;
     abouttext += "pugixml - MIT License - XML parsing<br>" ;
     abouttext += "SimpleINI - MIT License - INI file parsing<br>" ;
@@ -2356,6 +2355,7 @@ void cWordTsar::AboutWordTsar(void)
     abouttext += QT_VERSION_STR ;
     abouttext += "<br>" ;
     abouttext += "macOS CoreText - font shaping<br>" ;
+    abouttext += "macOS CoreGraphics/Quartz - PDF generation (TUI)<br>" ;
     abouttext += "macOS NSSpellChecker - spell checking<br>" ;
 
     QMessageBox::about(this, "About WordTsar", abouttext.c_str()) ;

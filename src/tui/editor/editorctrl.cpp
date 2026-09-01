@@ -65,7 +65,7 @@
 // Spell checking
 #include "src/core/spellcheck/spellcheck.h"
 
-// Print preview (PDF via libharu, backend-neutral)
+// Print preview (PDF via Quartz/Core Text, backend-neutral)
 #include "src/tui/print/tuiprintout.h"
 
 // Input handlers (Strategy Pattern)
@@ -2697,8 +2697,8 @@ void cWSEditorCtrl::PageLayout(void)
 /////////////////////////////////////////////////////////////////////////////
 void cWSEditorCtrl::PrintPreview(void)
 {
-    // Generate a PDF via libharu and open it in the system viewer, matching the
-    // The printout is backend-neutral (cEditorBase + libharu).
+    // Generate a PDF via Quartz/Core Text and open it in the system viewer.
+    // The printout is backend-neutral (cEditorBase + system frameworks).
     cTUIPrintout printout(this);
     printout.PrintPreview();
 }
@@ -2795,7 +2795,7 @@ static std::vector<std::string> GetCupsPrinters(void)
 /// @return nothing
 ///
 /// @brief
-/// Print the document by rendering it to a PDF (libharu) and handing the file
+/// Print the document by rendering it to a PDF (Quartz/Core Text) and handing the file
 /// to the system print spooler. On non-Windows platforms this targets a CUPS
 /// destination: the configured default if there is one, the sole installed
 /// printer if there's exactly one, or a user pick from a list otherwise

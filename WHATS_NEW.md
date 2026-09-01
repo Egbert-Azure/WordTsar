@@ -2,6 +2,16 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.7.6 Beta (2026-09-01)
+
+### Fixed: garbled accented characters (ü, ä, ö, „ ") in `ws` PDF printing/preview
+
+Printing or previewing a document containing German umlauts, curly quotes, or other non-ASCII characters from the terminal UI could silently corrupt them in the output PDF — e.g. "Glück" became "Glˆ…ck". Root cause: the terminal UI's PDF engine (libharu) drew one grapheme at a time through a single shared, stateful UTF-8 text encoder, and that per-character call pattern could desynchronize the encoder's internal byte-sequence tracking, splitting a multi-byte character into two bogus single-byte glyphs. Replacing the PDF engine with macOS's native Quartz/Core Text (below) draws each grapheme as a proper Unicode string with no shared encoder state to desynchronize, eliminating this entire class of bug rather than patching around it.
+
+### Terminal UI's PDF printing now uses Quartz/Core Text, not a vendored library
+
+`ws`'s `^KP`/Print Preview PDF generation no longer depends on the embedded libharu library — it now draws through the same macOS frameworks (Quartz, Core Text) the GUI already uses for its own printing. Output is unchanged in appearance (same fonts, positions, bold/italic/underline handling); see the fix above for the one behavior change this surfaced.
+
 ## 0.7.5 Beta (2026-09-01)
 
 ### Help and Level system corrected to real WordStar 7, not WordStar 4

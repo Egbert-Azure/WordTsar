@@ -89,7 +89,7 @@ file(GLOB WORDTSAR_TUI_NEUTRAL_SOURCES
 # does not separately reference WORDTSAR_TUI_NEUTRAL_SOURCES). WSTuiTest pulls
 # WORDTSAR_TUI_NEUTRAL_SOURCES directly instead, so nesting it here does not
 # create duplicates for that target. (src/tui/print/tuiprintout.cpp is added
-# separately by the caller since it also needs libharu's include dirs.)
+# separately by the caller, which links it against Quartz/Core Text.)
 # ------------------------------------------------------------------------
 file(GLOB WORDTSAR_WSTUI_SOURCES
     "${WS_SRC_DIR}/tui/main.cpp"

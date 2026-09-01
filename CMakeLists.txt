@@ -216,7 +216,9 @@ endif()
 
 
 # TUI dependencies (optional, uses FetchContent since these are large/complex)
-# libharu (PDF print) + STB fonts, used by the terminal UI (ws).
+# STB fonts, used by the terminal UI (ws). PDF print generation itself uses
+# Quartz/Core Text (system frameworks, no vendored dependency) -- see the
+# CoreGraphics/CoreText framework linking below.
 if(BUILD_TUI)
     include(FetchContent)
 
@@ -230,37 +232,6 @@ if(BUILD_TUI)
         FetchContent_Populate(stb)
     endif()
     message(STATUS "  stb: header-only (${WS_THIRDPARTY_DIR}/stb)")
-
-    # libharu: embedded PDF generation library (compiled as source, not library)
-    set(LIBHARU_VERSION "2.4.4")
-    set(WS_LIBHARU_DIR "${WS_THIRDPARTY_DIR}/libharu")
-
-    if(NOT EXISTS "${WS_LIBHARU_DIR}/src/hpdf_doc.c")
-        message(STATUS "  libharu: source not found, fetching v${LIBHARU_VERSION}...")
-        FetchContent_Declare(libharu
-            GIT_REPOSITORY https://github.com/libharu/libharu.git
-            GIT_TAG v${LIBHARU_VERSION}
-            SOURCE_DIR "${WS_LIBHARU_DIR}"
-        )
-        FetchContent_Populate(libharu)
-    endif()
-
-    # Generate hpdf_config.h for libharu (no zlib, no libpng)
-    if(NOT EXISTS "${WS_LIBHARU_DIR}/include/hpdf_config.h")
-        file(WRITE "${WS_LIBHARU_DIR}/include/hpdf_config.h"
-            "/* Auto-generated libharu config for WordTsar embedded build */\n"
-            "#define LIBHPDF_HAVE_STDINT_H\n"
-            "#define LIBHPDF_HAVE_STDLIB_H\n"
-            "#define LIBHPDF_HAVE_STRING_H\n"
-            "#define LIBHPDF_HAVE_MEMORY_H\n"
-            "#define LIBHPDF_HAVE_SYS_STAT_H\n"
-            "#define LIBHPDF_HAVE_SYS_TYPES_H\n"
-            "#define LIBHPDF_HAVE_UNISTD_H\n"
-            "#define LIBHPDF_STDC_HEADERS\n"
-        )
-    endif()
-
-    message(STATUS "  libharu: v${LIBHARU_VERSION} (embedded source)")
 endif()
 
 
@@ -293,7 +264,7 @@ endif()
 #
 # The terminal UI (ws). Renders on the self-contained wordstartui toolkit,
 # reusing the shared engine (core + input + file) and neutral TUI sources
-# (fonts, layout, crash reporting) + libharu for PDF print.
+# (fonts, layout, crash reporting) + Quartz/Core Text for PDF print.
 #
 if(BUILD_TUI)
     add_executable(ws
@@ -309,13 +280,9 @@ if(BUILD_TUI)
         src/core/spellcheck/macspellcheck.mm
     )
 
-    # Print preview (PDF via libharu) -- the printout is backend-neutral
-    # (cEditorBase + libharu).
+    # Print preview (PDF via Quartz/Core Text) -- the printout is
+    # backend-neutral (cEditorBase + system frameworks, no vendored PDF lib).
     target_sources(ws PRIVATE ${WS_SRC_DIR}/tui/print/tuiprintout.cpp)
-    file(GLOB LIBHARU_SOURCES "${WS_LIBHARU_DIR}/src/*.c")
-    target_sources(ws PRIVATE ${LIBHARU_SOURCES})
-    # Vendored third-party C: silence its compiler warnings (not our code to fix).
-    set_source_files_properties(${LIBHARU_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
 
     target_include_directories(ws PRIVATE
         ${CMAKE_SOURCE_DIR}/src
@@ -327,8 +294,6 @@ if(BUILD_TUI)
         ${WS_PICOMATH_DIR}/include
         ${WS_ZIP_DIR}/src
         ${WS_THIRDPARTY_DIR}/stb
-        ${WS_LIBHARU_DIR}/include
-        ${WS_LIBHARU_DIR}/src
     )
 
     target_compile_definitions(ws PRIVATE
@@ -340,9 +305,10 @@ if(BUILD_TUI)
 
     find_library(COREFOUNDATION_LIBRARY CoreFoundation)
     find_library(CORETEXT_LIBRARY CoreText)
+    find_library(COREGRAPHICS_LIBRARY CoreGraphics)
     target_link_libraries(ws PRIVATE
         "-framework Foundation" "-framework AppKit"
-        ${COREFOUNDATION_LIBRARY} ${CORETEXT_LIBRARY})
+        ${COREFOUNDATION_LIBRARY} ${CORETEXT_LIBRARY} ${COREGRAPHICS_LIBRARY})
 
     target_compile_options(ws PRIVATE
         -Wall -Werror=return-type -Wextra

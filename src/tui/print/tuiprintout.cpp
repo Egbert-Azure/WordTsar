@@ -20,7 +20,7 @@
 
 /**
  * @class cTUIPrintout
- * @brief TUI PDF generation and print preview via libharu (HPDF) with TrueType font embedding.
+ * @brief TUI PDF generation and print preview via Quartz (CGPDFContext) and Core Text.
  * @author Gerald Brandt
  * @copyright GNU Affero General Public License v3.0
  *
@@ -30,18 +30,32 @@
  * TUI font manager. Supports bold, italic, underline, strikethrough,
  * superscript, and subscript formatting through embedded TrueType fonts.
  * Provides print preview by writing a temporary PDF and launching an
- * external viewer (xdg-open, evince, or open on macOS).
+ * external viewer (open on macOS).
  *
  * @section tuiprint_rendering Page Rendering
  * Iterates over all pages from the layout engine, converting twips-based
  * coordinates to PDF points (1/72 inch). Each line's segments are rendered
  * with the appropriate embedded font, applying formatting attributes from
- * the layout segments.
+ * the layout segments. A Quartz PDF context is natively Y-up, matching PDF
+ * space directly, so no coordinate flip transform is applied on the context
+ * itself -- only the existing page-height-relative flip already baked into
+ * the per-glyph Y math below.
  *
  * @section tuiprint_preview Print Preview
- * Writes the generated PDF to a temporary file and shells out to xdg-open,
- * evince, or open (macOS) to display it. The temporary file is cleaned up
- * after the viewer exits.
+ * Writes the generated PDF to a temporary file and shells out to open
+ * (macOS) to display it. The temporary file is cleaned up after the
+ * viewer exits.
+ *
+ * @section tuiprint_unicode Unicode (this backend fixed a real bug)
+ * The previous libharu backend drew one grapheme per HPDF_Page_ShowText
+ * call through a single shared, stateful UTF-8 encoder attached to the
+ * whole HPDF_Doc. That per-glyph call pattern could desynchronize the
+ * encoder's byte-sequence tracking, splitting one multi-byte character
+ * (umlauts, curly quotes, etc.) into two bogus single-byte glyphs --
+ * e.g. "Glück" printed as "Glˆ…ck". DrawGrapheme() below hands Core Text
+ * a real CFString per call with no shared encoder state to desync, so
+ * this class of corruption can't recur here even though the calling
+ * pattern (one draw per grapheme) is unchanged.
  *
  * @see cTUIPrintout
  * @see cTUIEditorCtrl
@@ -81,7 +95,7 @@ cTUIPrintout::cTUIPrintout(cEditorBase* editor)
     , mLayout(nullptr)
     , mDocument(nullptr)
     , mFontManager(nullptr)
-    , mPdf(nullptr)
+    , mPdfContext(nullptr)
 {
     mLayout = mEditor->GetLayout();
     if (mLayout)
@@ -103,12 +117,13 @@ cTUIPrintout::cTUIPrintout(cEditorBase* editor)
 /// @return nothing
 ///
 /// @brief
-/// Destructor. Font cache entries are owned by the HPDF_Doc and are
-/// freed when the document is freed, so no manual cleanup needed.
+/// Destructor. Releases any cached Core Text fonts left over from an
+/// interrupted generation pass (normal completion already clears the cache).
 ///
 /////////////////////////////////////////////////////////////////////////////
 cTUIPrintout::~cTUIPrintout(void)
 {
+    ClearFontCache();
 }
 
 
@@ -131,56 +146,69 @@ bool cTUIPrintout::GeneratePDF(const std::string& filepath)
         return false;
     }
 
-    // Create libharu PDF document
-    mPdf = HPDF_New(nullptr, nullptr);
-    if (!mPdf)
-    {
-        return false;
-    }
-
-    // Use UTF-8 encoding
-    HPDF_UseUTFEncodings(mPdf);
-    HPDF_SetCurrentEncoder(mPdf, "UTF-8");
-
-    // Clear font cache for this generation pass
-    mFontCache.clear();
-
     // Get total number of pages from layout
     PAGE_T numPages = mLayout->GetNumberOfPages();
     if (numPages == 0)
     {
-        HPDF_Free(mPdf);
-        mPdf = nullptr;
         return false;
     }
+
+    // Seed the context with the first page's size; each page below supplies
+    // its own media box to CGContextBeginPage regardless, so this is only
+    // the fallback default.
+    sPageInfo firstPageInfo = mLayout->GetPageInfo(1);
+    CGRect initialBox = CGRectMake(0, 0,
+        static_cast<CGFloat>(TwipsToPoints(firstPageInfo.paperwidth)),
+        static_cast<CGFloat>(TwipsToPoints(firstPageInfo.paperheight)));
+
+    CFURLRef url = CFURLCreateFromFileSystemRepresentation(
+        kCFAllocatorDefault,
+        reinterpret_cast<const UInt8*>(filepath.c_str()),
+        static_cast<CFIndex>(filepath.length()),
+        false);
+    if (!url)
+    {
+        return false;
+    }
+
+    mPdfContext = CGPDFContextCreateWithURL(url, &initialBox, nullptr);
+    CFRelease(url);
+
+    if (!mPdfContext)
+    {
+        return false;
+    }
+
+    // Clear font cache for this generation pass
+    ClearFontCache();
 
     // Generate each page
     for (PAGE_T pageNum = 1; pageNum <= numPages; pageNum++)
     {
         // Get page dimensions from layout
         sPageInfo pageInfo = mLayout->GetPageInfo(pageNum);
-        double pageWidthPt = TwipsToPoints(pageInfo.paperwidth);
         double pageHeightPt = TwipsToPoints(pageInfo.paperheight);
+        CGRect pageBox = CGRectMake(0, 0,
+            static_cast<CGFloat>(TwipsToPoints(pageInfo.paperwidth)),
+            static_cast<CGFloat>(pageHeightPt));
 
-        // Create PDF page with document dimensions
-        HPDF_Page page = HPDF_AddPage(mPdf);
-        HPDF_Page_SetWidth(page, static_cast<HPDF_REAL>(pageWidthPt));
-        HPDF_Page_SetHeight(page, static_cast<HPDF_REAL>(pageHeightPt));
+        CGContextBeginPage(mPdfContext, &pageBox);
 
         // Render body text and headers/footers
-        RenderPage(page, pageNum);
-        RenderHeadersFooters(page, pageNum, pageHeightPt);
+        RenderPage(mPdfContext, pageNum);
+        RenderHeadersFooters(mPdfContext, pageNum, pageHeightPt);
+
+        CGContextEndPage(mPdfContext);
     }
 
-    // Save PDF to file
-    HPDF_STATUS status = HPDF_SaveToFile(mPdf, filepath.c_str());
+    // Releasing the context closes and finalizes the PDF file
+    CGContextRelease(mPdfContext);
+    mPdfContext = nullptr;
+    ClearFontCache();
 
-    // Clean up
-    HPDF_Free(mPdf);
-    mPdf = nullptr;
-    mFontCache.clear();
-
-    return (status == HPDF_OK);
+    std::error_code ec;
+    uintmax_t size = std::filesystem::file_size(filepath, ec);
+    return !ec && size > 0;
 }
 
 
@@ -310,7 +338,7 @@ double cTUIPrintout::TwipsToPoints(COORD_T twips) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  page [in] - libharu page handle
+/// @param  ctx [in] - Quartz PDF context (current page)
 /// @param  pageNum [in] - Page number (1-based)
 ///
 /// @return nothing
@@ -320,7 +348,7 @@ double cTUIPrintout::TwipsToPoints(COORD_T twips) const
 /// finds lines belonging to this page, and renders each line's segments.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cTUIPrintout::RenderPage(HPDF_Page page, PAGE_T pageNum)
+void cTUIPrintout::RenderPage(CGContextRef ctx, PAGE_T pageNum)
 {
     // Get page height for Y-axis flip (PDF Y is bottom-up)
     sPageInfo pageInfo = mLayout->GetPageInfo(pageNum);
@@ -340,7 +368,7 @@ void cTUIPrintout::RenderPage(HPDF_Page page, PAGE_T pageNum)
         {
             if (line.pagenumber == pageNum)
             {
-                RenderLine(page, line, pageHeightPt);
+                RenderLine(ctx, line, pageHeightPt);
             }
         }
     }
@@ -349,7 +377,7 @@ void cTUIPrintout::RenderPage(HPDF_Page page, PAGE_T pageNum)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  page [in] - libharu page handle
+/// @param  ctx [in] - Quartz PDF context (current page)
 /// @param  pageNum [in] - Page number (1-based)
 /// @param  pageHeightPt [in] - Page height in PDF points (for Y flip)
 ///
@@ -361,7 +389,7 @@ void cTUIPrintout::RenderPage(HPDF_Page page, PAGE_T pageNum)
 /// document model).
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cTUIPrintout::RenderHeadersFooters(HPDF_Page page, PAGE_T pageNum, double pageHeightPt)
+void cTUIPrintout::RenderHeadersFooters(CGContextRef ctx, PAGE_T pageNum, double pageHeightPt)
 {
     if (!mLayout)
     {
@@ -378,7 +406,7 @@ void cTUIPrintout::RenderHeadersFooters(HPDF_Page page, PAGE_T pageNum, double p
     {
         for (const auto& hfLine : headerIt->second)
         {
-            RenderHeaderFooterLine(page, hfLine, pageHeightPt);
+            RenderHeaderFooterLine(ctx, hfLine, pageHeightPt);
         }
     }
 
@@ -388,7 +416,7 @@ void cTUIPrintout::RenderHeadersFooters(HPDF_Page page, PAGE_T pageNum, double p
     {
         for (const auto& hfLine : footerIt->second)
         {
-            RenderHeaderFooterLine(page, hfLine, pageHeightPt);
+            RenderHeaderFooterLine(ctx, hfLine, pageHeightPt);
         }
     }
 }
@@ -396,7 +424,7 @@ void cTUIPrintout::RenderHeadersFooters(HPDF_Page page, PAGE_T pageNum, double p
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  page [in] - libharu page handle
+/// @param  ctx [in] - Quartz PDF context (current page)
 /// @param  hfLine [in] - Header/footer line with pre-rendered graphemes
 /// @param  pageHeightPt [in] - Page height in PDF points (for Y flip)
 ///
@@ -408,7 +436,7 @@ void cTUIPrintout::RenderHeadersFooters(HPDF_Page page, PAGE_T pageNum, double p
 /// segments and places each grapheme at its computed position.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cTUIPrintout::RenderHeaderFooterLine(HPDF_Page page, const sHeaderFooterLine& hfLine,
+void cTUIPrintout::RenderHeaderFooterLine(CGContextRef ctx, const sHeaderFooterLine& hfLine,
                                            double pageHeightPt)
 {
     const sLineLayout& line = hfLine.line;
@@ -435,30 +463,12 @@ void cTUIPrintout::RenderHeaderFooterLine(HPDF_Page page, const sHeaderFooterLin
 
     for (const auto& segment : line.segments)
     {
-        // Set font
-        HPDF_Font pdfFont = GetOrLoadFont(segment.font);
+        // Resolve font
+        CTFontRef ctFont = GetOrLoadFont(segment.font);
         double pointSize = TUIFontUtils::GetSizeFromDescriptor(segment.font);
         if (pointSize <= 0)
         {
             pointSize = 12.0;
-        }
-
-        if (pdfFont)
-        {
-            HPDF_Page_SetFontAndSize(page, pdfFont, static_cast<HPDF_REAL>(pointSize));
-        }
-
-        // Set text color (default sentinel prints as black)
-        if (segment.textcolor.IsDefault())
-        {
-            HPDF_Page_SetRGBFill(page, 0.0f, 0.0f, 0.0f);
-        }
-        else
-        {
-            HPDF_Page_SetRGBFill(page,
-                segment.textcolor.red / 255.0f,
-                segment.textcolor.green / 255.0f,
-                segment.textcolor.blue / 255.0f);
         }
 
         // Draw each grapheme in this segment
@@ -497,13 +507,7 @@ void cTUIPrintout::RenderHeaderFooterLine(HPDF_Page page, const sHeaderFooterLin
                     pdfY = pageHeightPt - TwipsToPoints(line.pagey + segment.segmentheight);
                 }
 
-                // Draw the grapheme
-                HPDF_Page_BeginText(page);
-                HPDF_Page_MoveTextPos(page,
-                    static_cast<HPDF_REAL>(pdfX),
-                    static_cast<HPDF_REAL>(pdfY));
-                HPDF_Page_ShowText(page, grapheme.c_str());
-                HPDF_Page_EndText(page);
+                DrawGrapheme(ctx, ctFont, segment.textcolor, grapheme, pdfX, pdfY);
             }
 
             graphemeIndex++;
@@ -539,25 +543,7 @@ void cTUIPrintout::RenderHeaderFooterLine(HPDF_Page page, const sHeaderFooterLin
             }
             double lineDrawY = baselineY - underlineOffset;
 
-            if (segment.textcolor.IsDefault())
-            {
-                HPDF_Page_SetRGBStroke(page, 0.0f, 0.0f, 0.0f);
-            }
-            else
-            {
-                HPDF_Page_SetRGBStroke(page,
-                    segment.textcolor.red / 255.0f,
-                    segment.textcolor.green / 255.0f,
-                    segment.textcolor.blue / 255.0f);
-            }
-            HPDF_Page_SetLineWidth(page, static_cast<HPDF_REAL>(underlineThickness));
-            HPDF_Page_MoveTo(page,
-                static_cast<HPDF_REAL>(startX),
-                static_cast<HPDF_REAL>(lineDrawY));
-            HPDF_Page_LineTo(page,
-                static_cast<HPDF_REAL>(endX),
-                static_cast<HPDF_REAL>(lineDrawY));
-            HPDF_Page_Stroke(page);
+            DrawUnderline(ctx, segment.textcolor, startX, endX, lineDrawY, underlineThickness);
         }
 
         // Update base X for next segment
@@ -568,7 +554,7 @@ void cTUIPrintout::RenderHeaderFooterLine(HPDF_Page page, const sHeaderFooterLin
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  page [in] - libharu page handle
+/// @param  ctx [in] - Quartz PDF context (current page)
 /// @param  line [in] - Layout line to render
 /// @param  pageHeightPt [in] - Page height in PDF points (for Y flip)
 ///
@@ -579,7 +565,7 @@ void cTUIPrintout::RenderHeaderFooterLine(HPDF_Page page, const sHeaderFooterLin
 /// each one. Skips non-printable lines (dot commands).
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cTUIPrintout::RenderLine(HPDF_Page page, const sLineLayout& line, double pageHeightPt)
+void cTUIPrintout::RenderLine(CGContextRef ctx, const sLineLayout& line, double pageHeightPt)
 {
     // Skip dot command lines
     if (!line.isPrintable)
@@ -602,14 +588,14 @@ void cTUIPrintout::RenderLine(HPDF_Page page, const sLineLayout& line, double pa
     // Render each segment in the line
     for (const auto& segment : line.segments)
     {
-        RenderSegment(page, segment, line.pagex, line.pagey, lineHeight, pageHeightPt);
+        RenderSegment(ctx, segment, line.pagex, line.pagey, lineHeight, pageHeightPt);
     }
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  page [in] - libharu page handle
+/// @param  ctx [in] - Quartz PDF context (current page)
 /// @param  segment [in] - Segment containing positions and formatting
 /// @param  lineX [in] - Line's X position on page (twips)
 /// @param  lineY [in] - Line's Y position on page (twips)
@@ -620,7 +606,7 @@ void cTUIPrintout::RenderLine(HPDF_Page page, const sLineLayout& line, double pa
 ///
 /// @brief
 /// Renders a single segment with its glyphs at pre-calculated positions.
-/// Sets font and color from segment, then draws each glyph individually
+/// Resolves font and color from segment, then draws each glyph individually
 /// at its absolute position (converted from twips to PDF points).
 ///
 /// Sub/superscript segments have reduced segmentheight (~58% of normal).
@@ -631,7 +617,7 @@ void cTUIPrintout::RenderLine(HPDF_Page page, const sLineLayout& line, double pa
 /// control characters (same logic as GUI printout).
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cTUIPrintout::RenderSegment(HPDF_Page page, const sSegmentLayout& segment,
+void cTUIPrintout::RenderSegment(CGContextRef ctx, const sSegmentLayout& segment,
                                   COORD_T lineX, COORD_T lineY, COORD_T lineHeight,
                                   double pageHeightPt)
 {
@@ -650,30 +636,12 @@ void cTUIPrintout::RenderSegment(HPDF_Page page, const sSegmentLayout& segment,
         return;
     }
 
-    // Set font from segment descriptor
-    HPDF_Font pdfFont = GetOrLoadFont(segment.font);
+    // Resolve font from segment descriptor
+    CTFontRef ctFont = GetOrLoadFont(segment.font);
     double pointSize = TUIFontUtils::GetSizeFromDescriptor(segment.font);
     if (pointSize <= 0)
     {
         pointSize = 12.0;
-    }
-
-    if (pdfFont)
-    {
-        HPDF_Page_SetFontAndSize(page, pdfFont, static_cast<HPDF_REAL>(pointSize));
-    }
-
-    // Set text color from segment (default sentinel prints as black)
-    if (segment.textcolor.IsDefault())
-    {
-        HPDF_Page_SetRGBFill(page, 0.0f, 0.0f, 0.0f);
-    }
-    else
-    {
-        HPDF_Page_SetRGBFill(page,
-            segment.textcolor.red / 255.0f,
-            segment.textcolor.green / 255.0f,
-            segment.textcolor.blue / 255.0f);
     }
 
     // Draw each grapheme at its position
@@ -705,7 +673,8 @@ void cTUIPrintout::RenderSegment(HPDF_Page page, const sSegmentLayout& segment,
         }
 
         // Skip empty graphemes and non-printable characters (CR, LF, tab, etc.)
-        // Qt's drawText() silently ignores these, but libharu renders them as boxes
+        // Qt's drawText() silently ignores these, but drawing them literally
+        // here would render tofu boxes.
         if (displayGrapheme.empty())
         {
             continue;
@@ -741,17 +710,12 @@ void cTUIPrintout::RenderSegment(HPDF_Page page, const sSegmentLayout& segment,
             pdfY = pageHeightPt - TwipsToPoints(lineY + segment.segmentheight);
         }
 
-        // Draw the grapheme using libharu text operations
-        HPDF_Page_BeginText(page);
-        HPDF_Page_MoveTextPos(page,
-            static_cast<HPDF_REAL>(pdfX),
-            static_cast<HPDF_REAL>(pdfY));
-        HPDF_Page_ShowText(page, displayGrapheme.c_str());
-        HPDF_Page_EndText(page);
+        DrawGrapheme(ctx, ctFont, segment.textcolor, displayGrapheme, pdfX, pdfY);
     }
 
     // Draw underline if the font descriptor has the underline flag set
-    // libharu does not support font-level underline (unlike Qt), so draw manually
+    // (Quartz has no per-font underline attribute akin to Qt's, so draw manually,
+    // same as the previous libharu backend did)
     if (TUIFontUtils::IsUnderlineInDescriptor(segment.font) && !segment.position.empty())
     {
         // Calculate underline geometry from font size
@@ -781,26 +745,7 @@ void cTUIPrintout::RenderSegment(HPDF_Page page, const sSegmentLayout& segment,
         }
         double lineDrawY = baselineY - underlineOffset;
 
-        // Set line color to match text color (default sentinel prints as black)
-        if (segment.textcolor.IsDefault())
-        {
-            HPDF_Page_SetRGBStroke(page, 0.0f, 0.0f, 0.0f);
-        }
-        else
-        {
-            HPDF_Page_SetRGBStroke(page,
-                segment.textcolor.red / 255.0f,
-                segment.textcolor.green / 255.0f,
-                segment.textcolor.blue / 255.0f);
-        }
-        HPDF_Page_SetLineWidth(page, static_cast<HPDF_REAL>(underlineThickness));
-        HPDF_Page_MoveTo(page,
-            static_cast<HPDF_REAL>(startX),
-            static_cast<HPDF_REAL>(lineDrawY));
-        HPDF_Page_LineTo(page,
-            static_cast<HPDF_REAL>(endX),
-            static_cast<HPDF_REAL>(lineDrawY));
-        HPDF_Page_Stroke(page);
+        DrawUnderline(ctx, segment.textcolor, startX, endX, lineDrawY, underlineThickness);
     }
 }
 
@@ -809,20 +754,21 @@ void cTUIPrintout::RenderSegment(HPDF_Page page, const sSegmentLayout& segment,
 ///
 /// @param  descriptor [in] - Font descriptor string (pipe-delimited)
 ///
-/// @return HPDF_Font handle, or nullptr if font could not be loaded
+/// @return CTFontRef, sized and ready to draw, or nullptr if it could not be loaded
 ///
 /// @brief
-/// Loads a TrueType font into the PDF document and caches it by
-/// descriptor string. Uses the TUI font manager to resolve the font
-/// family name to a file path, then embeds the font via libharu.
+/// Loads a TrueType font and caches it by descriptor string (which already
+/// encodes point size, so each cache entry is a distinct family+size+style
+/// combination). Uses the TUI font manager to resolve the font family name
+/// to a file path, then wraps it as a CGFont and sizes it via Core Text.
 ///
-/// Falls back to Helvetica (built-in PDF font) if the TrueType file
-/// cannot be loaded.
+/// Falls back to a system font substitute for one of the standard 14 PDF
+/// font names if the TrueType file cannot be resolved or loaded.
 ///
 /////////////////////////////////////////////////////////////////////////////
-HPDF_Font cTUIPrintout::GetOrLoadFont(const std::string& descriptor)
+CTFontRef cTUIPrintout::GetOrLoadFont(const std::string& descriptor)
 {
-    if (!mPdf || descriptor.empty())
+    if (!mPdfContext || descriptor.empty())
     {
         return nullptr;
     }
@@ -838,9 +784,13 @@ HPDF_Font cTUIPrintout::GetOrLoadFont(const std::string& descriptor)
     std::string family = TUIFontUtils::GetFamilyFromDescriptor(descriptor);
     bool bold = TUIFontUtils::IsBoldInDescriptor(descriptor);
     bool italic = TUIFontUtils::IsItalicInDescriptor(descriptor);
+    double pointSize = TUIFontUtils::GetSizeFromDescriptor(descriptor);
+    if (pointSize <= 0)
+    {
+        pointSize = 12.0;
+    }
 
-    // Try to resolve font to a file path via font manager
-    HPDF_Font pdfFont = nullptr;
+    CTFontRef ctFont = nullptr;
 
     if (mFontManager)
     {
@@ -884,28 +834,44 @@ HPDF_Font cTUIPrintout::GetOrLoadFont(const std::string& descriptor)
             }
         }
 
-        if (bestMatch && !bestMatch->fullName.empty())
+        if (bestMatch && !bestMatch->fullName.empty() && std::filesystem::exists(bestMatch->fullName))
         {
-            // fullName contains the file path to the TrueType font
-            std::string fontPath = bestMatch->fullName;
+            // fullName contains the file path to the TrueType font. Quartz
+            // automatically subsets and embeds any font actually drawn into
+            // a PDF context, so unlike libharu's HPDF_LoadTTFontFromFile
+            // there's no separate "embed" flag to pass here.
+            CFURLRef fontUrl = CFURLCreateFromFileSystemRepresentation(
+                kCFAllocatorDefault,
+                reinterpret_cast<const UInt8*>(bestMatch->fullName.c_str()),
+                static_cast<CFIndex>(bestMatch->fullName.length()),
+                false);
 
-            // Check if the file exists and is a TTF/OTF file
-            if (std::filesystem::exists(fontPath))
+            if (fontUrl)
             {
-                // Load TrueType font into PDF with embedding enabled
-                const char* fontName = HPDF_LoadTTFontFromFile(mPdf, fontPath.c_str(), HPDF_TRUE);
-                if (fontName)
+                CGDataProviderRef provider = CGDataProviderCreateWithURL(fontUrl);
+                CFRelease(fontUrl);
+
+                if (provider)
                 {
-                    pdfFont = HPDF_GetFont(mPdf, fontName, "UTF-8");
+                    CGFontRef cgFont = CGFontCreateWithDataProvider(provider);
+                    CGDataProviderRelease(provider);
+
+                    if (cgFont)
+                    {
+                        ctFont = CTFontCreateWithGraphicsFont(cgFont, static_cast<CGFloat>(pointSize),
+                                                               nullptr, nullptr);
+                        CGFontRelease(cgFont);
+                    }
                 }
             }
         }
     }
 
-    // Fall back to built-in PDF font if TrueType loading failed
-    if (!pdfFont)
+    // Fall back to a system font substitute if TrueType loading failed
+    if (!ctFont)
     {
-        // Map common font families to built-in PDF fonts
+        // Map common font families to the standard 14 PDF font names --
+        // macOS resolves these PostScript names to real system fonts.
         const char* fallbackName = "Helvetica";
 
         if (family.find("Courier") != std::string::npos || family.find("Mono") != std::string::npos)
@@ -967,13 +933,142 @@ HPDF_Font cTUIPrintout::GetOrLoadFont(const std::string& descriptor)
             }
         }
 
-        pdfFont = HPDF_GetFont(mPdf, fallbackName, nullptr);
+        CFStringRef nameStr = CFStringCreateWithCString(kCFAllocatorDefault, fallbackName, kCFStringEncodingUTF8);
+        if (nameStr)
+        {
+            ctFont = CTFontCreateWithName(nameStr, static_cast<CGFloat>(pointSize), nullptr);
+            CFRelease(nameStr);
+        }
     }
 
     // Cache the result (even nullptr to avoid repeated failed loads)
-    mFontCache[descriptor] = pdfFont;
+    mFontCache[descriptor] = ctFont;
 
-    return pdfFont;
+    return ctFont;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Releases every cached CTFontRef and empties the font cache. CTFontRefs
+/// are Core Foundation objects with manual reference counting -- each entry
+/// created by GetOrLoadFont() holds exactly one reference this class owns.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cTUIPrintout::ClearFontCache(void)
+{
+    for (auto& entry : mFontCache)
+    {
+        if (entry.second)
+        {
+            CFRelease(entry.second);
+        }
+    }
+    mFontCache.clear();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  color [in] - Layout color (the "default" sentinel prints as black)
+///
+/// @return An owned CGColorRef -- caller must CGColorRelease() it
+///
+/// @brief
+/// Builds a Quartz color from a layout color value.
+///
+/////////////////////////////////////////////////////////////////////////////
+CGColorRef cTUIPrintout::MakeCGColor(const sSeqRGBColor& color)
+{
+    if (color.IsDefault())
+    {
+        return CGColorCreateGenericRGB(0.0, 0.0, 0.0, 1.0);
+    }
+    return CGColorCreateGenericRGB(color.red / 255.0, color.green / 255.0, color.blue / 255.0, 1.0);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  ctx [in] - Quartz PDF context (current page)
+/// @param  font [in] - Sized Core Text font to draw with
+/// @param  color [in] - Text color
+/// @param  text [in] - UTF-8 grapheme to draw
+/// @param  x [in] - PDF X position (points)
+/// @param  y [in] - PDF Y position (points, baseline)
+///
+/// @return nothing
+///
+/// @brief
+/// Draws one grapheme at an absolute PDF position via Core Text, which
+/// handles Unicode shaping directly (no encoder setup needed, unlike
+/// libharu's explicit HPDF_UseUTFEncodings/SetCurrentEncoder).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cTUIPrintout::DrawGrapheme(CGContextRef ctx, CTFontRef font, const sSeqRGBColor& color,
+                                 const std::string& text, double x, double y)
+{
+    if (!font || text.empty())
+    {
+        return;
+    }
+
+    CFStringRef cfText = CFStringCreateWithCString(kCFAllocatorDefault, text.c_str(), kCFStringEncodingUTF8);
+    if (!cfText)
+    {
+        return;
+    }
+
+    CGColorRef cgColor = MakeCGColor(color);
+
+    const void* keys[] = { kCTFontAttributeName, kCTForegroundColorAttributeName };
+    const void* values[] = { font, cgColor };
+    CFDictionaryRef attrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 2,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+    CFAttributedStringRef attrString = CFAttributedStringCreate(kCFAllocatorDefault, cfText, attrs);
+    CTLineRef line = CTLineCreateWithAttributedString(attrString);
+
+    CGContextSetTextPosition(ctx, static_cast<CGFloat>(x), static_cast<CGFloat>(y));
+    CTLineDraw(line, ctx);
+
+    CFRelease(line);
+    CFRelease(attrString);
+    CFRelease(attrs);
+    CGColorRelease(cgColor);
+    CFRelease(cfText);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  ctx [in] - Quartz PDF context (current page)
+/// @param  color [in] - Line color
+/// @param  startX [in] - Start X position (points)
+/// @param  endX [in] - End X position (points)
+/// @param  y [in] - Y position (points)
+/// @param  thickness [in] - Line thickness (points)
+///
+/// @return nothing
+///
+/// @brief
+/// Strokes a straight horizontal underline segment.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cTUIPrintout::DrawUnderline(CGContextRef ctx, const sSeqRGBColor& color,
+                                  double startX, double endX, double y, double thickness)
+{
+    CGColorRef strokeColor = MakeCGColor(color);
+    CGContextSetStrokeColorWithColor(ctx, strokeColor);
+    CGColorRelease(strokeColor);
+
+    CGContextSetLineWidth(ctx, static_cast<CGFloat>(thickness));
+    CGContextMoveToPoint(ctx, static_cast<CGFloat>(startX), static_cast<CGFloat>(y));
+    CGContextAddLineToPoint(ctx, static_cast<CGFloat>(endX), static_cast<CGFloat>(y));
+    CGContextStrokePath(ctx);
 }
 
 

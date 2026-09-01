@@ -24,7 +24,8 @@
 #include <string>
 #include <map>
 
-#include "hpdf.h"
+#include <CoreGraphics/CoreGraphics.h>
+#include <CoreText/CoreText.h>
 
 #include "src/core/layout/layoutstructs.h"
 #include "src/core/layout/headerfootermanager.h"
@@ -41,9 +42,12 @@ class cTUIFontManager;
 ///
 /// @brief
 /// TUI PDF generation engine. Takes the fully laid-out document from
-/// the editor's layout and writes a PDF file using libharu. Each page,
-/// line, and segment is converted from twips to PDF points and rendered
-/// with embedded TrueType fonts.
+/// the editor's layout and writes a PDF file via Quartz (CGPDFContext),
+/// with glyphs shaped and drawn through Core Text. Each page, line, and
+/// segment is converted from twips to PDF points and rendered with
+/// embedded TrueType fonts -- Quartz embeds/subsets any font actually
+/// drawn into a PDF context automatically, so no explicit "embed" step
+/// is needed the way libharu required one.
 ///
 /// Used for both Print Preview (temp file + viewer) and Print (save to
 /// user-specified path).
@@ -72,25 +76,39 @@ private:
     double TwipsToPoints(COORD_T twips) const;
 
     // Render a single page
-    void RenderPage(HPDF_Page page, PAGE_T pageNum);
+    void RenderPage(CGContextRef ctx, PAGE_T pageNum);
 
     // Render headers and footers for a page
-    void RenderHeadersFooters(HPDF_Page page, PAGE_T pageNum, double pageHeightPt);
+    void RenderHeadersFooters(CGContextRef ctx, PAGE_T pageNum, double pageHeightPt);
 
     // Render a header/footer line
-    void RenderHeaderFooterLine(HPDF_Page page, const sHeaderFooterLine& hfLine,
+    void RenderHeaderFooterLine(CGContextRef ctx, const sHeaderFooterLine& hfLine,
                                  double pageHeightPt);
 
     // Render a single line
-    void RenderLine(HPDF_Page page, const sLineLayout& line, double pageHeightPt);
+    void RenderLine(CGContextRef ctx, const sLineLayout& line, double pageHeightPt);
 
     // Render a single segment (lineHeight = max segment height in the line, for baseline alignment)
-    void RenderSegment(HPDF_Page page, const sSegmentLayout& segment,
+    void RenderSegment(CGContextRef ctx, const sSegmentLayout& segment,
                         COORD_T lineX, COORD_T lineY, COORD_T lineHeight,
                         double pageHeightPt);
 
-    // Load and cache a font from its descriptor string
-    HPDF_Font GetOrLoadFont(const std::string& descriptor);
+    // Load and cache a sized Core Text font from its descriptor string
+    CTFontRef GetOrLoadFont(const std::string& descriptor);
+
+    // Release every cached font and empty the cache
+    void ClearFontCache(void);
+
+    // Build an owned CGColorRef from a layout color (black for the "default" sentinel)
+    static CGColorRef MakeCGColor(const sSeqRGBColor& color);
+
+    // Draw one grapheme via Core Text at an absolute PDF position
+    static void DrawGrapheme(CGContextRef ctx, CTFontRef font, const sSeqRGBColor& color,
+                              const std::string& text, double x, double y);
+
+    // Stroke an underline segment
+    static void DrawUnderline(CGContextRef ctx, const sSeqRGBColor& color,
+                               double startX, double endX, double y, double thickness);
 
     // Launch the system PDF viewer
     static void LaunchPDFViewer(const std::string& filepath);
@@ -107,11 +125,12 @@ private:
     cDocument* mDocument;                  // Document from layout (not owned)
     cTUIFontManager* mFontManager;         // Font manager for file path resolution (not owned)
 
-    // libharu PDF document handle
-    HPDF_Doc mPdf;
+    // Quartz PDF context, one per GeneratePDF() call
+    CGContextRef mPdfContext;
 
-    // Font cache: maps font descriptor string to loaded HPDF_Font
-    std::map<std::string, HPDF_Font> mFontCache;
+    // Font cache: maps font descriptor string (already encodes size) to a
+    // retained, sized CTFontRef. Released via ClearFontCache().
+    std::map<std::string, CTFontRef> mFontCache;
 };
 
 #endif // TUI_PRINTOUT_H
