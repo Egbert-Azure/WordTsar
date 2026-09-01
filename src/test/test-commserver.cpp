@@ -88,6 +88,7 @@ struct MqttClient
         {
             return false;
         }
+        socket_set_nosigpipe(sock);
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_port   = htons(port);
@@ -1296,7 +1297,11 @@ TEST_CASE("Comm: QoS-1 retransmit works and broker stays responsive under a stuc
     // Subscriber on QoS 1 that reads its first PUBLISH but never PUBACKs.
     MqttClientEx sub;
     REQUIRE(sub.connectTo("127.0.0.1", port));
-    setRecvTimeoutSeconds(sub.sock, 8);
+    // Retransmit fires on a 5s RETRY_INTERVAL checked every 1s, so the retry
+    // can legitimately land up to ~6s after the first delivery. 8s left only
+    // ~2s of margin against CI/scheduler jitter, which is what made this test
+    // flaky; 15s gives a comfortable margin without changing server behavior.
+    setRecvTimeoutSeconds(sub.sock, 15);
     REQUIRE(sub.sendConnect("retrySub"));
     REQUIRE(sub.readConnAck(sp, rc));
     REQUIRE(sub.sendSubscribe(0x0001, "retry/topic", QOS1));
@@ -3202,6 +3207,10 @@ TEST_CASE("Comm Q5: System topic ($SYS) not matched by # subscriber")
     // Subscriber subscribes to '#' (all topics)
     MqttClientEx sub;
     REQUIRE(sub.connectTo("127.0.0.1", port));
+    // Without a timeout, readPublish() below blocks forever on a transient
+    // miss instead of failing cleanly -- this is what turned a passing test
+    // into an indefinite CI hang.
+    setRecvTimeoutSeconds(sub.sock, 5);
     REQUIRE(sub.sendConnect("sysTopicSub"));
     uint8_t sp, rc;
     REQUIRE(sub.readConnAck(sp, rc));

@@ -1907,9 +1907,10 @@ void cDOCXFile::SaveParagraph(pugi::xml_node &body, std::string &text)
 /// Updates running paragraph/page formatting state from a WordStar dot
 /// command, mirroring the subset of cRTFWriter::CreateDot() this first cut
 /// supports: margins (.po/.lm/.rm/.pm/.mt/.mb), justification (.oj/.oc),
-/// spacing (.psb/.psa/.ls), and page breaks (.pa, emitted immediately since
-/// unlike the other commands it isn't paragraph state). Anything else is
-/// silently ignored -- see the file-level comment above for what's left out.
+/// spacing (.psb/.psa/.ls), page breaks (.pa, emitted immediately since
+/// unlike the other commands it isn't paragraph state), and comment lines
+/// (../.ig, emitted immediately as hidden text). Anything else is silently
+/// ignored -- see the file-level comment above for what's left out.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDOCXFile::SaveDotCommand(pugi::xml_node &body, std::string &text)
@@ -2029,6 +2030,22 @@ void cDOCXFile::SaveDotCommand(pugi::xml_node &body, std::string &text)
         {
             mWLineSpaceMult = 0.0 ;
         }
+    }
+    else if (startsWith("..") || startsWith(".ig"))
+    {
+        // Preserve the comment text losslessly as hidden (non-printing) run
+        // text rather than a real Word review comment -- that would need a
+        // whole extra word/comments.xml part; w:vanish needs nothing but this
+        // run. Visible only if the reader turns on Word's hidden-text display.
+        size_t prefixLen = startsWith("..") ? 2 : 3 ;
+        std::string rest = text.size() > prefixLen ? text.substr(prefixLen) : "" ;
+
+        pugi::xml_node para = body.append_child("w:p") ;
+        pugi::xml_node run = para.append_child("w:r") ;
+        run.append_child("w:rPr").append_child("w:vanish") ;
+        pugi::xml_node t = run.append_child("w:t") ;
+        t.append_attribute("xml:space") = "preserve" ;
+        t.text().set(rest.c_str()) ;
     }
     // Anything else (headers/footers, columns, tabs, indexing, page numbering,
     // printer options, kerning, line numbering, ...) is intentionally not

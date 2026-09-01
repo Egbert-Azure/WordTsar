@@ -28,6 +28,7 @@
 #include "src/gui/editor/editorctrl.h"
 #include "src/files/docxfile.h"
 #include <QApplication>
+#include "zip.h"
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -60,6 +61,31 @@ void ensureQApplication()
 /// real Word/Pages install to cross-validate against.
 ///
 /////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+///
+/// Helper: pull word/document.xml back out of a saved .docx as a raw string,
+/// for checks that need to see the actual markup (e.g. w:vanish) rather than
+/// what LoadFile() reconstructs into paragraph text.
+///
+/////////////////////////////////////////////////////////////////////////////
+static std::string ExtractDocumentXml(const std::string &path)
+{
+    zip_t *zip = zip_open(path.c_str(), ZIP_DEFAULT_COMPRESSION_LEVEL, 'r') ;
+    REQUIRE(zip != nullptr) ;
+
+    void *docbuf = nullptr ;
+    size_t bufsize = 0 ;
+    zip_entry_open(zip, "word/document.xml") ;
+    zip_entry_read(zip, &docbuf, &bufsize) ;
+    zip_entry_close(zip) ;
+    zip_close(zip) ;
+
+    std::string xml(static_cast<char *>(docbuf), bufsize) ;
+    free(docbuf) ;
+    return xml ;
+}
+
+
 static std::vector<std::string> RoundTripDOCX(cEditorCtrl &sourceEditor, const std::string &path)
 {
     cDOCXFile writer(&sourceEditor) ;
@@ -158,4 +184,36 @@ TEST_CASE("DOCX writer - centered paragraph round-trips as .oj/.oc dot command")
         }
     }
     CHECK(sawCenterDotCommand) ;
+}
+
+
+TEST_CASE("DOCX writer - .. comment line is preserved as hidden text, not dropped")
+{
+    ensureQApplication() ;
+    cEditorCtrl editor ;
+    editor.GetDocument()->Clear() ;
+    editor.GetDocument()->Insert(".. This is a comment\r") ;
+    editor.GetDocument()->Insert("Visible paragraph") ;
+
+    std::string path = "/tmp/wordtsar_docxtest_comment.docx" ;
+    cDOCXFile writer(&editor) ;
+    REQUIRE(writer.SaveFile(path, editor.GetDocument()->GetTextSize())) ;
+
+    // Check the raw document.xml directly: the comment text must appear
+    // inside a hidden (w:vanish) run, since the reader doesn't parse hidden
+    // runs back into ".." lines -- this checks the writer side only.
+    std::string xml = ExtractDocumentXml(path) ;
+    CHECK(xml.find("This is a comment") != std::string::npos) ;
+    CHECK(xml.find("w:vanish") != std::string::npos) ;
+
+    std::vector<std::string> paragraphs = RoundTripDOCX(editor, path) ;
+    bool sawVisible = false ;
+    for (auto &p : paragraphs)
+    {
+        if (p.find("Visible paragraph") != std::string::npos)
+        {
+            sawVisible = true ;
+        }
+    }
+    CHECK(sawVisible) ;
 }
