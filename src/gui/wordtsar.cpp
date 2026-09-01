@@ -2316,7 +2316,7 @@ void cWordTsar::AboutWordTsar(void)
                     "Gerald Brandt's WordTsar &mdash; the Wordstar-clone editing engine, "
                     "document formats, and original design are his work; this fork adds "
                     "macOS-specific packaging and features on top.</p>" \
-                    "License: GNU Affero General Public License<br>" \
+                    "Licensed under the GNU Affero General Public License v3.0<br>" \
                     "https://github.com/Egbert-Azure/WordTsar<br>" \
                     "<h4>Embedded Third-Party Code</h4>" \
                     "</p>"
