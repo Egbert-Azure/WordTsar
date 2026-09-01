@@ -2349,12 +2349,11 @@ void cWordTsar::AboutWordTsar(void)
     abouttext += "PicoMath - BSD 3-Clause License - math expression parser<br>" ;
     abouttext += "pugixml - MIT License - XML parsing<br>" ;
     abouttext += "SimpleINI - MIT License - INI file parsing<br>" ;
-    abouttext += "STB TrueType - MIT/Public Domain - font metrics (TUI)<br>" ;
     abouttext += "<h4>System Libraries</h4>" ;
     abouttext += "Qt version " ;
     abouttext += QT_VERSION_STR ;
     abouttext += "<br>" ;
-    abouttext += "macOS CoreText - font shaping<br>" ;
+    abouttext += "macOS CoreText - font shaping, discovery, and metrics (TUI)<br>" ;
     abouttext += "macOS CoreGraphics/Quartz - PDF generation (TUI)<br>" ;
     abouttext += "macOS NSSpellChecker - spell checking<br>" ;
 

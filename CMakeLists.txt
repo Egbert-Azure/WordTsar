@@ -66,7 +66,6 @@ set(SIMPLEINI_VERSION "4.22")
 set(EXPRTK_VERSION "0.0.3")
 set(PICOMATH_VERSION "1.1.0")
 set(KUBAZIP_VERSION "0.3.5")
-set(STB_VERSION "master")
 
 # Always ensure all dependencies are present (downloads missing ones using pinned versions)
 include(FetchContent)
@@ -215,25 +214,10 @@ else()
 endif()
 
 
-# TUI dependencies (optional, uses FetchContent since these are large/complex)
-# STB fonts, used by the terminal UI (ws). PDF print generation itself uses
-# Quartz/Core Text (system frameworks, no vendored dependency) -- see the
-# CoreGraphics/CoreText framework linking below.
-if(BUILD_TUI)
-    include(FetchContent)
-
-    # STB: header-only, only download if not already present
-    if(NOT EXISTS "${WS_THIRDPARTY_DIR}/stb/stb_truetype.h")
-        FetchContent_Declare(stb
-            GIT_REPOSITORY https://github.com/nothings/stb.git
-            GIT_TAG ${STB_VERSION}
-            SOURCE_DIR "${WS_THIRDPARTY_DIR}/stb"
-        )
-        FetchContent_Populate(stb)
-    endif()
-    message(STATUS "  stb: header-only (${WS_THIRDPARTY_DIR}/stb)")
-endif()
-
+# The terminal UI (ws) has no TUI-only third-party dependencies left: PDF
+# print generation and font discovery/classification all use system
+# frameworks (Quartz, Core Text) -- see the CoreGraphics/CoreText framework
+# linking below.
 
 
 #======================= SOURCE FILES =======================#
@@ -293,7 +277,6 @@ if(BUILD_TUI)
         ${WS_SIMPLEINI_DIR}
         ${WS_PICOMATH_DIR}/include
         ${WS_ZIP_DIR}/src
-        ${WS_THIRDPARTY_DIR}/stb
     )
 
     target_compile_definitions(ws PRIVATE
@@ -358,7 +341,6 @@ if(BUILD_TUI)
         ${WS_SIMPLEINI_DIR}
         ${WS_PICOMATH_DIR}/include
         ${WS_ZIP_DIR}/src
-        ${WS_THIRDPARTY_DIR}/stb
     )
 
     target_compile_definitions(WSTuiTest PRIVATE

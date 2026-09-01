@@ -43,7 +43,6 @@
 
 #include "tuifontcalc.h"
 #include "builtinmetrics.h"
-#include "stbtruetype.h"
 #include "platform_windows.h"
 #include "platform_directwrite.h"
 #include "platform_macos.h"
@@ -252,18 +251,12 @@ std::unique_ptr<cTUIFontCalculator> cTUIFontMeasurementManager::CreateFontCalcul
             calculator.reset();
         }
 #endif
-        
-        // Try STB TrueType as fallback (should always be available)
-        calculator = std::make_unique<cTUISTBTrueTypeFontCalculator>();
+
+        // Final fallback to built-in metrics (guaranteed to succeed)
+        calculator = std::make_unique<cTUIBuiltInMetricsFontCalculator>();
         if (!calculator->Initialize()) {
-            calculator.reset();
-            
-            // Final fallback to built-in metrics (guaranteed to succeed)
-            calculator = std::make_unique<cTUIBuiltInMetricsFontCalculator>();
-            if (!calculator->Initialize()) {
-                // This should never happen - built-in metrics must always work
-                return nullptr;
-            }
+            // This should never happen - built-in metrics must always work
+            return nullptr;
         }
     }
     

@@ -715,13 +715,17 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
     mEditor->mCaretBlinkRate = config.mCaretBlinkRate;
     mEditor->mAutoSaveIntervalSec = config.mAutoSaveInterval;
     mEditor->mDefaultFormat = config.mDefaultFormat;
-    if (config.mDefaultDirectory.empty() == false)
     {
-        mEditor->mFileDir = config.mDefaultDirectory;
-        // The opening-menu file browser has its own directory state,
-        // seeded from the process cwd at construction -- without this it
-        // never sees the configured default directory at all.
-        mBrowser.SetDirectory(config.mDefaultDirectory);
+        // Default to ~/Documents when the user hasn't set a custom default
+        // directory in Preferences -- without this fallback, the opening-menu
+        // file browser (seeded from the process cwd at construction) lands
+        // wherever the shell happened to be when ws was launched, not
+        // anywhere predictable.
+        std::string startDir = config.mDefaultDirectory.empty() == false
+            ? config.mDefaultDirectory
+            : cEditorBase::DefaultFileDir();
+        mEditor->mFileDir = startDir;
+        mBrowser.SetDirectory(startDir);
     }
     mEditor->mShortName = config.mShortName;
     mEditor->mLongName = config.mLongName;
@@ -1711,47 +1715,35 @@ void cWSWordTsar::DrawSplash(cScreen& screen)
     full.cols = mCols;
     screen.FillRect(full, " ", back);
 
-    std::vector<std::string> art =
-    {
-        "\xe2\x94\x8c\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x90",
-        "\xe2\x94\x82 MM    MM \xe2\x94\x82",
-        "\xe2\x94\x82 MM    MM \xe2\x94\x82",
-        "\xe2\x94\x82 MM    MM \xe2\x94\x82",
-        "\xe2\x94\x82 MM MM MM \xe2\x94\x82",
-        "\xe2\x94\x82 MMM  MMM \xe2\x94\x82",
-        "\xe2\x94\x82 MM    MM \xe2\x94\x82",
-        "\xe2\x94\x82 M      M \xe2\x94\x82",
-        "\xe2\x94\x94\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x98",
-    };
-
-    int startRow = (mRows / 2) - 6;
-    if (startRow < 0)
-    {
-        startRow = 0;
-    }
-
     sStyle bold = back;
     bold.attrs = wordstartui::CELL_ATTR_BOLD;
 
-    for (size_t index = 0; index < art.size(); ++index)
+    // Echoes the GUI splash's own cover-page layout (letter-spaced wordmark,
+    // thin rule, "FOR MACOS" subtitle) rather than the old boxed "MM" logo --
+    // a terminal has no way to show that cover's actual gear photo (no
+    // inline-image protocol in a plain terminal), but the same spaced-caps
+    // title treatment already used for the Opening Menu banner gets close.
+    std::string wordmark = "W O R D T S A R";
+    std::string subtitle = "F O R   M A C O S";
+
+    std::string rule;
+    for (size_t i = 0; i < wordmark.size(); ++i)
     {
-        int col = (mCols - 12) / 2;
-        if (col < 0)
-        {
-            col = 0;
-        }
-        screen.PutText(startRow + static_cast<int>(index), col, art[index], bold);
+        rule += "\xe2\x94\x80"; // U+2500 BOX DRAWINGS LIGHT HORIZONTAL
     }
 
-    int titleRow = startRow + static_cast<int>(art.size()) + 1;
-    std::string title = "WordTsar";
-    screen.PutText(titleRow, (mCols - static_cast<int>(title.size())) / 2, title, bold);
+    int titleRow = (mRows / 2) - 3;
+    if (titleRow < 0)
+    {
+        titleRow = 0;
+    }
+
+    screen.PutText(titleRow, (mCols - static_cast<int>(wordmark.size())) / 2, wordmark, bold);
+    screen.PutText(titleRow + 1, (mCols - static_cast<int>(wordmark.size())) / 2, rule, back);
+    screen.PutText(titleRow + 3, (mCols - static_cast<int>(subtitle.size())) / 2, subtitle, back);
 
     std::string version = std::string(FULLVERSION_STRING) + " " + std::string(STATUS);
-    screen.PutText(titleRow + 1, (mCols - static_cast<int>(version.size())) / 2, version, back);
-
-    // std::string prompt = "press any key";
-    // screen.PutText(titleRow + 3, (mCols - static_cast<int>(prompt.size())) / 2, prompt, back);
+    screen.PutText(titleRow + 5, (mCols - static_cast<int>(version.size())) / 2, version, back);
 }
 
 /////////////////////////////////////////////////////////////////////////////

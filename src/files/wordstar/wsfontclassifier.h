@@ -70,6 +70,9 @@ class cWSFontClassifier
     // =================================================================
 
 public:
+    cWSFontClassifier(void);
+    ~cWSFontClassifier(void);
+
     // Classify a font by name. Resolves to file, reads OS/2 table,
     // measures glyph widths, and produces a complete typestyle bitfield.
     sWSFontClassification Classify(const std::string& fontName);
@@ -87,8 +90,9 @@ private:
     // Layer 2: Font container loader
     bool LoadFont(const unsigned char* data, size_t dataSize);
 
-    // Layer 3: Raw SFNT table reader
-    uint32_t FindTable(const char* tag) const;
+    // Layer 3: OS/2 table reader (bytes already extracted via
+    // CTFontCopyTable in LoadFont(); offsets here are relative to the
+    // start of that table, not the whole font file)
     uint16_t ReadU16BE(uint32_t offset) const;
     uint8_t ReadU8(uint32_t offset) const;
 
@@ -116,15 +120,12 @@ private:
     // =================================================================
 
 private:
-    const unsigned char* mData;    // raw font file bytes (not owned)
-    size_t mDataSize;              // size of font data
-    uint32_t mFontStart;           // offset to start of font in data (for TTC)
-    bool mFontLoaded;              // true if stb_truetype init succeeded
-    uint32_t mOS2Offset;           // offset to OS/2 table (0 = not found)
-    uint32_t mOS2Length;           // length of OS/2 table
+    bool mFontLoaded;              // true if Core Text font creation succeeded
+    std::vector<uint8_t> mOS2Table; // raw OS/2 table bytes (empty if not found)
 
-    // stb_truetype font info (stored as opaque bytes to avoid header dependency)
-    // Actual stbtt_fontinfo is allocated in the .cpp file
+    // Core Text font (stored as an opaque pointer to avoid a CoreText.h
+    // dependency in this header). Actually a CTFontRef, retained in
+    // LoadFont() and released in Classify()/the destructor.
     void* mFontInfo;
 };
 

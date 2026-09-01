@@ -131,6 +131,37 @@ TEST_CASE("TUI font manager - font discovery")
 }
 
 
+#ifdef __APPLE__
+TEST_CASE("TUI font manager - macOS system font discovery finds real files")
+{
+    // Regression test for a real gap: DiscoverSystemFonts() had no macOS
+    // branch and fell through to a Linux-only directory scan (/usr/share/fonts,
+    // etc.), which never finds anything on a Mac. Print then only "worked" via
+    // tuiprintout.cpp's own standard-14 PostScript-name fallback -- any other
+    // real installed font never resolved to a real file for embedding. This
+    // confirms the CoreText-based discovery actually populates real paths.
+    cTUIFontManager mgr;
+    REQUIRE(mgr.Initialize(true));
+    mgr.WaitForFontEnumeration();
+
+    auto allFonts = mgr.GetAvailableFonts();
+
+    bool foundRealFilePath = false;
+    for (const auto& font : allFonts)
+    {
+        if (!font.fullName.empty() && font.fullName.find('/') != std::string::npos)
+        {
+            foundRealFilePath = true;
+            break;
+        }
+    }
+    CHECK(foundRealFilePath);
+
+    mgr.Shutdown();
+}
+#endif
+
+
 TEST_CASE("TUI font manager - set font")
 {
     cTUIFontManager mgr;

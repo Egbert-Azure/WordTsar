@@ -292,6 +292,70 @@ TEST_CASE("WSFontClassifier - ClassifyFromData with system fonts")
 }
 
 
+#ifdef __APPLE__
+// =========================================================================
+// 3b. ClassifyFromData with real macOS fonts (Core Text backend)
+// =========================================================================
+//
+// The subcases above (DejaVu/Liberation/Free*) always skip on macOS -- none
+// of those fonts ship with the OS, so the real font-file classification
+// path (OS/2 table, PANOSE, glyph-coverage probing) had no coverage on this
+// platform at all before this test existed. These use fonts guaranteed
+// present under /System/Library/Fonts/Supplemental on any real macOS
+// install, exercising the Core Text rewrite of LoadFont/ClassifyPitch/
+// ClassifyStyle/ClassifySymbol for real.
+
+TEST_CASE("WSFontClassifier - ClassifyFromData with real macOS fonts")
+{
+    cWSFontClassifier classifier;
+
+    SUBCASE("Arial resolves to a real file and classifies as sans-serif proportional")
+    {
+        std::string path = cWSFontClassifier::FindFontFile("Arial");
+        REQUIRE(path.empty() == false);
+        CHECK(path.find('/') != std::string::npos);
+
+        std::vector<unsigned char> data = LoadFontFile(path);
+        REQUIRE(data.empty() == false);
+
+        sWSFontClassification result = classifier.ClassifyFromData(data.data(), data.size(), "Arial");
+
+        CHECK(result.proportional == true);
+        CHECK(result.pitchSource == "metrics");
+        CHECK(result.genericStyle == WS_STYLE_SANS);
+    }
+
+    SUBCASE("Times New Roman resolves to a real file and classifies as serif proportional")
+    {
+        std::string path = cWSFontClassifier::FindFontFile("Times New Roman");
+        REQUIRE(path.empty() == false);
+
+        std::vector<unsigned char> data = LoadFontFile(path);
+        REQUIRE(data.empty() == false);
+
+        sWSFontClassification result = classifier.ClassifyFromData(data.data(), data.size(), "Times New Roman");
+
+        CHECK(result.proportional == true);
+        CHECK(result.genericStyle == WS_STYLE_SERIF);
+    }
+
+    SUBCASE("Courier New resolves to a real file and classifies as monospace via real glyph metrics")
+    {
+        std::string path = cWSFontClassifier::FindFontFile("Courier New");
+        REQUIRE(path.empty() == false);
+
+        std::vector<unsigned char> data = LoadFontFile(path);
+        REQUIRE(data.empty() == false);
+
+        sWSFontClassification result = classifier.ClassifyFromData(data.data(), data.size(), "Courier New");
+
+        CHECK(result.proportional == false);
+        CHECK(result.pitchSource == "metrics");
+    }
+}
+#endif
+
+
 // =========================================================================
 // 4. Edge Cases
 // =========================================================================

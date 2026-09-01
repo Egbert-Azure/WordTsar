@@ -22,16 +22,10 @@
 #include "fontclassifier.h"
 #include "wordstarfile.h"
 
-// Include stb_truetype implementation. The TUI's copy in stbtruetype.cpp
-// uses STBTT_STATIC (file-local), so there is no symbol conflict.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "third-party/stb/stb_truetype.h"
-#pragma GCC diagnostic pop
-
 #include <algorithm>
 #include <cctype>
+#include <climits>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -47,8 +41,8 @@
 #endif
 
 #ifdef __APPLE__
-#include <dirent.h>
-#include <sys/stat.h>
+#include <CoreText/CoreText.h>
+#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 
@@ -57,17 +51,52 @@
 /// @class cWSFontClassifier
 ///
 /// @brief
-/// Full font classifier for WordStar typestyle bitfields. Uses
-/// stb_truetype to read OS/2, PANOSE, and cmap data from font files.
-/// Falls back to keyword-based classification when font file is not
-/// available. See DEV_DOCUMENTS/Design/ws-font-classifier.md for the
-/// complete design.
+/// Full font classifier for WordStar typestyle bitfields. Uses Core Text
+/// to read OS/2, PANOSE, and glyph-coverage data from font files. Falls
+/// back to keyword-based classification when font file is not available.
+/// See DEV_DOCUMENTS/Design/ws-font-classifier.md for the complete design.
 ///
 /////////////////////////////////////////////////////////////////////////////
 
 
 // Access the global font table from wordstarfile.cpp
 extern std::vector<sOrgFont> gOrgFonts;
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Constructor. No font is loaded until Classify()/ClassifyFromData() runs.
+///
+/////////////////////////////////////////////////////////////////////////////
+cWSFontClassifier::cWSFontClassifier(void)
+    : mFontLoaded(false), mFontInfo(nullptr)
+{
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Destructor. Releases the retained CTFontRef, if one is still held --
+/// covers ClassifyFromData() being called directly without an intervening
+/// Classify() call to do the cleanup.
+///
+/////////////////////////////////////////////////////////////////////////////
+cWSFontClassifier::~cWSFontClassifier(void)
+{
+#ifdef __APPLE__
+    if (mFontInfo != nullptr)
+    {
+        CFRelease(static_cast<CFTypeRef>(mFontInfo));
+        mFontInfo = nullptr;
+    }
+#endif
+}
 
 
 // =========================================================================
@@ -216,47 +245,38 @@ std::string cWSFontClassifier::FindFontFile(const std::string& fontName)
     return "";
 
 #elif defined(__APPLE__)
-    // Search macOS font directories
-    std::vector<std::string> fontDirs = {
-        "/System/Library/Fonts/",
-        "/Library/Fonts/",
-    };
-
-    // Build lowercase name for matching
-    std::string lowerName = fontName;
-    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
-        [](unsigned char c) { return std::tolower(c); });
-
-    for (const auto& dir : fontDirs)
+    // Resolve via Core Text's own name matching, which honors real font
+    // aliasing/substitution and correctly picks a face out of a TTC --
+    // a directory-substring search can't do either of those reliably.
+    CFStringRef nameRef = CFStringCreateWithCString(
+        kCFAllocatorDefault, fontName.c_str(), kCFStringEncodingUTF8);
+    if (nameRef == nullptr)
     {
-        DIR* d = opendir(dir.c_str());
-        if (d == nullptr)
-        {
-            continue;
-        }
-        struct dirent* entry;
-        while ((entry = readdir(d)) != nullptr)
-        {
-            std::string fname = entry->d_name;
-            std::string lowerFname = fname;
-            std::transform(lowerFname.begin(), lowerFname.end(),
-                lowerFname.begin(),
-                [](unsigned char c) { return std::tolower(c); });
-
-            if (lowerFname.find(lowerName) != std::string::npos)
-            {
-                if (lowerFname.find(".ttf") != std::string::npos ||
-                    lowerFname.find(".otf") != std::string::npos ||
-                    lowerFname.find(".ttc") != std::string::npos)
-                {
-                    closedir(d);
-                    return dir + fname;
-                }
-            }
-        }
-        closedir(d);
+        return "";
     }
-    return "";
+
+    CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithNameAndSize(nameRef, 12.0);
+    CFRelease(nameRef);
+    if (descriptor == nullptr)
+    {
+        return "";
+    }
+
+    CFURLRef urlRef = (CFURLRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
+    CFRelease(descriptor);
+    if (urlRef == nullptr)
+    {
+        return "";
+    }
+
+    std::string result;
+    UInt8 pathBuffer[PATH_MAX];
+    if (CFURLGetFileSystemRepresentation(urlRef, true, pathBuffer, sizeof(pathBuffer)))
+    {
+        result = reinterpret_cast<char*>(pathBuffer);
+    }
+    CFRelease(urlRef);
+    return result;
 
 #else
     return "";
@@ -276,17 +296,24 @@ std::string cWSFontClassifier::FindFontFile(const std::string& fontName)
 /// @return bool - true if font was loaded successfully
 ///
 /// @brief
-/// Initialize stb_truetype with the font data. Handles TTF, OTF, and
-/// TTC (collection) formats.
+/// Wraps the font bytes as CFData and asks Core Text to parse them.
+/// Handles TTF, OTF, and TTC (collection) formats uniformly -- for a TTC,
+/// Core Text returns one descriptor per face, and the first is used,
+/// matching the previous stb_truetype behavior of using face index 0.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWSFontClassifier::LoadFont(const unsigned char* data, size_t dataSize)
 {
-    mData = data;
-    mDataSize = dataSize;
+    // Release any font retained by a previous call
+    if (mFontInfo != nullptr)
+    {
+#ifdef __APPLE__
+        CFRelease(static_cast<CFTypeRef>(mFontInfo));
+#endif
+        mFontInfo = nullptr;
+    }
     mFontLoaded = false;
-    mOS2Offset = 0;
-    mOS2Length = 0;
+    mOS2Table.clear();
 
     if (data == nullptr || dataSize < 64)
     {
@@ -294,7 +321,7 @@ bool cWSFontClassifier::LoadFont(const unsigned char* data, size_t dataSize)
         return false;
     }
 
-    // Validate SFNT magic number before passing to stb_truetype.
+    // Validate SFNT magic number before handing off to Core Text.
     // Valid signatures: 00010000 (TrueType), 4F54544F (OTTO/OpenType),
     // 74727565 (true), 74797031 (typ1), 74746366 (ttcf collection)
     uint32_t sig = (static_cast<uint32_t>(data[0]) << 24) |
@@ -320,150 +347,112 @@ bool cWSFontClassifier::LoadFont(const unsigned char* data, size_t dataSize)
         return false;
     }
 
-    // Allocate stbtt_fontinfo
-    stbtt_fontinfo* info = new stbtt_fontinfo();
-    mFontInfo = info;
-
-    // Detect TTC and get font offset
-    int numFonts = stbtt_GetNumberOfFonts(data);
-    if (numFonts > 1)
+#ifdef __APPLE__
+    CFDataRef cfData = CFDataCreate(kCFAllocatorDefault, data, static_cast<CFIndex>(dataSize));
+    if (cfData == nullptr)
     {
-        // TTC collection: use first face
-        mFontStart = static_cast<uint32_t>(
-            stbtt_GetFontOffsetForIndex(data, 0));
-    }
-    else
-    {
-        mFontStart = 0;
-    }
-
-    // Initialize stb_truetype
-    if (!stbtt_InitFont(info, data, static_cast<int>(mFontStart)))
-    {
-        delete info;
-        mFontInfo = nullptr;
         return false;
     }
 
-    // Validate that stb produced sane offsets (protects against garbage data).
-    // Check required tables: head, hhea, hmtx, and numGlyphs.
-    if (info->numGlyphs <= 0 ||
-        static_cast<uint32_t>(info->head) >= dataSize ||
-        static_cast<uint32_t>(info->hhea) >= dataSize ||
-        static_cast<uint32_t>(info->hmtx) >= dataSize ||
-        info->loca <= 0)
+    CFArrayRef descriptors = CTFontManagerCreateFontDescriptorsFromData(cfData);
+    CFRelease(cfData);
+
+    if (descriptors == nullptr)
     {
-        delete info;
-        mFontInfo = nullptr;
+        return false;
+    }
+    if (CFArrayGetCount(descriptors) == 0)
+    {
+        CFRelease(descriptors);
         return false;
     }
 
-    // Find OS/2 table
-    mOS2Offset = FindTable("OS/2");
-    // Validate OS/2 offset is within data bounds
-    if (mOS2Offset > 0 && mOS2Offset + 42 > mDataSize)
+    CTFontDescriptorRef descriptor =
+        (CTFontDescriptorRef)CFArrayGetValueAtIndex(descriptors, 0);
+    CTFontRef font = CTFontCreateWithFontDescriptor(descriptor, 0.0, nullptr);
+    CFRelease(descriptors);
+
+    if (font == nullptr)
     {
-        mOS2Offset = 0;  // invalid, treat as missing
+        return false;
+    }
+
+    // Sanity check against garbage data that happened to pass the
+    // signature check
+    if (CTFontGetGlyphCount(font) <= 0)
+    {
+        CFRelease(font);
+        return false;
+    }
+
+    mFontInfo = (void*)font;
+
+    // Read the OS/2 table (if present) for PANOSE/sFamilyClass classification.
+    // Offsets used against this buffer elsewhere are relative to its own
+    // start, not the whole font file.
+    CFDataRef os2Data = CTFontCopyTable(font, kCTFontTableOS2, kCTFontTableOptionNoOptions);
+    if (os2Data != nullptr)
+    {
+        CFIndex length = CFDataGetLength(os2Data);
+        if (length >= 42) // through sFamilyClass(2 bytes) + PANOSE(10 bytes) at offset 30
+        {
+            const UInt8* bytes = CFDataGetBytePtr(os2Data);
+            mOS2Table.assign(bytes, bytes + length);
+        }
+        CFRelease(os2Data);
     }
 
     mFontLoaded = true;
     return true;
+#else
+    (void)dataSize;
+    return false;
+#endif
 }
 
 
 // =========================================================================
-// Layer 3: Raw SFNT Table Reader
+// Layer 3: OS/2 Table Reader
 // =========================================================================
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  const char* tag [in] 4-character table tag (e.g. "OS/2")
-///
-/// @return uint32_t - offset to table data, or 0 if not found
-///
-/// @brief
-/// Searches the SFNT table directory for the given tag. Parses the
-/// table directory header and entries manually since stbtt__find_table
-/// is internal to stb_truetype.
-///
-/////////////////////////////////////////////////////////////////////////////
-uint32_t cWSFontClassifier::FindTable(const char* tag) const
-{
-    if (mData == nullptr || mDataSize < mFontStart + 12)
-    {
-        return 0;
-    }
-
-    const unsigned char* data = mData + mFontStart;
-
-    // Read number of tables from the SFNT header (offset 4, uint16 BE)
-    uint16_t numTables = static_cast<uint16_t>((data[4] << 8) | data[5]);
-
-    // Table directory starts at offset 12
-    for (uint16_t i = 0; i < numTables; i++)
-    {
-        uint32_t entryOffset = 12 + i * 16;
-        if (mFontStart + entryOffset + 16 > mDataSize)
-        {
-            break;
-        }
-
-        // Compare 4-byte tag
-        if (data[entryOffset + 0] == static_cast<unsigned char>(tag[0]) &&
-            data[entryOffset + 1] == static_cast<unsigned char>(tag[1]) &&
-            data[entryOffset + 2] == static_cast<unsigned char>(tag[2]) &&
-            data[entryOffset + 3] == static_cast<unsigned char>(tag[3]))
-        {
-            // Table offset is at entry + 8 (uint32 BE)
-            uint32_t tableOffset =
-                (static_cast<uint32_t>(data[entryOffset + 8]) << 24) |
-                (static_cast<uint32_t>(data[entryOffset + 9]) << 16) |
-                (static_cast<uint32_t>(data[entryOffset + 10]) << 8) |
-                static_cast<uint32_t>(data[entryOffset + 11]);
-            return tableOffset;
-        }
-    }
-    return 0;
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @param  uint32_t offset [in] byte offset into font data
+/// @param  uint32_t offset [in] byte offset into the OS/2 table
 ///
 /// @return uint16_t - big-endian 16-bit value at offset
 ///
 /// @brief
-/// Read a big-endian uint16 from the font data with bounds checking.
+/// Read a big-endian uint16 from the extracted OS/2 table with bounds
+/// checking.
 ///
 /////////////////////////////////////////////////////////////////////////////
 uint16_t cWSFontClassifier::ReadU16BE(uint32_t offset) const
 {
-    if (offset + 2 > mDataSize)
+    if (offset + 2 > mOS2Table.size())
     {
         return 0;
     }
-    return static_cast<uint16_t>((mData[offset] << 8) | mData[offset + 1]);
+    return static_cast<uint16_t>((mOS2Table[offset] << 8) | mOS2Table[offset + 1]);
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  uint32_t offset [in] byte offset into font data
+/// @param  uint32_t offset [in] byte offset into the OS/2 table
 ///
 /// @return uint8_t - byte value at offset
 ///
 /// @brief
-/// Read a single byte from the font data with bounds checking.
+/// Read a single byte from the extracted OS/2 table with bounds checking.
 ///
 /////////////////////////////////////////////////////////////////////////////
 uint8_t cWSFontClassifier::ReadU8(uint32_t offset) const
 {
-    if (offset >= mDataSize)
+    if (offset >= mOS2Table.size())
     {
         return 0;
     }
-    return mData[offset];
+    return mOS2Table[offset];
 }
 
 
@@ -491,30 +480,32 @@ bool cWSFontClassifier::ClassifyPitch(std::string& source)
         return true;  // default proportional
     }
 
-    stbtt_fontinfo* info = static_cast<stbtt_fontinfo*>(mFontInfo);
+#ifdef __APPLE__
+    CTFontRef font = (CTFontRef)mFontInfo;
 
     // Sample set: space, i, m, W, 0, 1, A, -, .
-    int sampleCodes[] = { ' ', 'i', 'm', 'W', '0', '1', 'A', '-', '.' };
-    int sampleCount = 9;
+    UniChar sampleChars[] = { ' ', 'i', 'm', 'W', '0', '1', 'A', '-', '.' };
+    const CFIndex sampleCount = 9;
 
-    int firstAdvance = -1;
+    CGGlyph glyphs[sampleCount];
+    CTFontGetGlyphsForCharacters(font, sampleChars, glyphs, sampleCount);
+
+    double firstAdvance = -1.0;
     int validSamples = 0;
     bool allEqual = true;
 
-    for (int s = 0; s < sampleCount; s++)
+    for (CFIndex s = 0; s < sampleCount; s++)
     {
-        int glyphIndex = stbtt_FindGlyphIndex(info, sampleCodes[s]);
-        if (glyphIndex == 0)
+        if (glyphs[s] == 0)
         {
             // Glyph not in font
             continue;
         }
 
-        int advance = 0;
-        int lsb = 0;
-        stbtt_GetCodepointHMetrics(info, sampleCodes[s], &advance, &lsb);
+        CGSize advance;
+        CTFontGetAdvancesForGlyphs(font, kCTFontOrientationDefault, &glyphs[s], &advance, 1);
 
-        if (advance <= 0)
+        if (advance.width <= 0)
         {
             continue;
         }
@@ -522,9 +513,9 @@ bool cWSFontClassifier::ClassifyPitch(std::string& source)
         validSamples++;
         if (firstAdvance < 0)
         {
-            firstAdvance = advance;
+            firstAdvance = advance.width;
         }
-        else if (advance != firstAdvance)
+        else if (std::fabs(advance.width - firstAdvance) > 0.01)
         {
             allEqual = false;
         }
@@ -545,6 +536,10 @@ bool cWSFontClassifier::ClassifyPitch(std::string& source)
 
     source = "metrics";
     return true;  // proportional
+#else
+    source = "default";
+    return true;
+#endif
 }
 
 
@@ -567,33 +562,25 @@ bool cWSFontClassifier::ClassifyPitch(std::string& source)
 eWSGenericStyle cWSFontClassifier::ClassifyStyle(const std::string& fontName,
                                                   std::string& source)
 {
-    if (mFontLoaded && mOS2Offset > 0)
+    if (mFontLoaded && !mOS2Table.empty())
     {
         // Try PANOSE first
         eWSGenericStyle panoseResult = ClassifyStyleFromPANOSE();
-        if (panoseResult != WS_STYLE_SANS || mOS2Offset == 0)
-        {
-            // PANOSE gave a non-default answer, trust it
-            // (Sans is also valid, but we check familyClass to confirm)
-        }
 
         // Check if PANOSE was meaningful (not all zeros)
-        if (mOS2Offset > 0)
+        bool allZero = true;
+        for (int i = 0; i < 10; i++)
         {
-            bool allZero = true;
-            for (int i = 0; i < 10; i++)
+            if (ReadU8(32 + i) != 0)
             {
-                if (ReadU8(mOS2Offset + 32 + i) != 0)
-                {
-                    allZero = false;
-                    break;
-                }
+                allZero = false;
+                break;
             }
-            if (!allZero)
-            {
-                source = "panose";
-                return panoseResult;
-            }
+        }
+        if (!allZero)
+        {
+            source = "panose";
+            return panoseResult;
         }
 
         // Try sFamilyClass
@@ -607,7 +594,7 @@ eWSGenericStyle cWSFontClassifier::ClassifyStyle(const std::string& fontName,
 
         // sFamilyClass was 0 (unclassified) or Sans
         // Check if sFamilyClass actually had a value
-        uint16_t familyClass = ReadU16BE(mOS2Offset + 30);
+        uint16_t familyClass = ReadU16BE(30);
         if ((familyClass >> 8) != 0)
         {
             // sFamilyClass had a real value (8 = Sans), use it
@@ -634,13 +621,13 @@ eWSGenericStyle cWSFontClassifier::ClassifyStyle(const std::string& fontName,
 /////////////////////////////////////////////////////////////////////////////
 eWSGenericStyle cWSFontClassifier::ClassifyStyleFromPANOSE(void)
 {
-    if (mOS2Offset == 0)
+    if (mOS2Table.empty())
     {
         return WS_STYLE_SANS;
     }
 
-    uint8_t familyType = ReadU8(mOS2Offset + 32);
-    uint8_t serifStyle = ReadU8(mOS2Offset + 33);
+    uint8_t familyType = ReadU8(32);
+    uint8_t serifStyle = ReadU8(33);
 
     if (familyType == 2)
     {
@@ -685,12 +672,12 @@ eWSGenericStyle cWSFontClassifier::ClassifyStyleFromPANOSE(void)
 /////////////////////////////////////////////////////////////////////////////
 eWSGenericStyle cWSFontClassifier::ClassifyStyleFromFamilyClass(void)
 {
-    if (mOS2Offset == 0)
+    if (mOS2Table.empty())
     {
         return WS_STYLE_SANS;
     }
 
-    uint16_t familyClass = ReadU16BE(mOS2Offset + 30);
+    uint16_t familyClass = ReadU16BE(30);
     int classID = familyClass >> 8;
 
     switch (classID)
@@ -813,10 +800,11 @@ eWSSymbolMapping cWSFontClassifier::ClassifySymbol(const std::string& fontName,
 {
     if (mFontLoaded && mFontInfo != nullptr)
     {
-        stbtt_fontinfo* info = static_cast<stbtt_fontinfo*>(mFontInfo);
+#ifdef __APPLE__
+        CTFontRef font = (CTFontRef)mFontInfo;
 
         // Probe for math symbols
-        int mathProbes[] = {
+        UniChar mathProbes[] = {
             0x00B1,  // plus-minus
             0x00D7,  // multiplication
             0x00F7,  // division
@@ -824,17 +812,19 @@ eWSSymbolMapping cWSFontClassifier::ClassifySymbol(const std::string& fontName,
             0x222B,  // integral
             0x221A   // square root
         };
+        CGGlyph mathGlyphs[6];
+        CTFontGetGlyphsForCharacters(font, mathProbes, mathGlyphs, 6);
         int mathHits = 0;
         for (int i = 0; i < 6; i++)
         {
-            if (stbtt_FindGlyphIndex(info, mathProbes[i]) != 0)
+            if (mathGlyphs[i] != 0)
             {
                 mathHits++;
             }
         }
 
         // Probe for symbol glyphs
-        int symbolProbes[] = {
+        UniChar symbolProbes[] = {
             0x2190,  // left arrow
             0x2191,  // up arrow
             0x2192,  // right arrow
@@ -844,20 +834,29 @@ eWSSymbolMapping cWSFontClassifier::ClassifySymbol(const std::string& fontName,
             0x2702,  // scissors
             0x2714   // check mark
         };
+        CGGlyph symbolGlyphs[8];
+        CTFontGetGlyphsForCharacters(font, symbolProbes, symbolGlyphs, 8);
         int symbolHits = 0;
         for (int i = 0; i < 8; i++)
         {
-            if (stbtt_FindGlyphIndex(info, symbolProbes[i]) != 0)
+            if (symbolGlyphs[i] != 0)
             {
                 symbolHits++;
             }
         }
 
         // Probe for basic Latin (A-Z)
-        int latinHits = 0;
-        for (int c = 'A'; c <= 'Z'; c++)
+        UniChar latinProbes[26];
+        for (int c = 0; c < 26; c++)
         {
-            if (stbtt_FindGlyphIndex(info, c) != 0)
+            latinProbes[c] = static_cast<UniChar>('A' + c);
+        }
+        CGGlyph latinGlyphs[26];
+        CTFontGetGlyphsForCharacters(font, latinProbes, latinGlyphs, 26);
+        int latinHits = 0;
+        for (int c = 0; c < 26; c++)
+        {
+            if (latinGlyphs[c] != 0)
             {
                 latinHits++;
             }
@@ -876,6 +875,7 @@ eWSSymbolMapping cWSFontClassifier::ClassifySymbol(const std::string& fontName,
             source = "cmap";
             return WS_SYMBOL_SYMBOLS;
         }
+#endif
     }
 
     // Fall back to name keywords
@@ -1072,20 +1072,15 @@ sWSFontClassification cWSFontClassifier::ClassifyByKeywords(const std::string& f
 ///
 /// @brief
 /// Main entry point. Resolves font name to file, loads it with
-/// stb_truetype, runs all classifiers, and assembles the bitfield.
+/// Core Text, runs all classifiers, and assembles the bitfield.
 /// Falls back to keyword classification if font file not available.
 ///
 /////////////////////////////////////////////////////////////////////////////
 sWSFontClassification cWSFontClassifier::Classify(const std::string& fontName)
 {
-    // Initialize
-    mData = nullptr;
-    mDataSize = 0;
-    mFontStart = 0;
+    // Initialize (LoadFont() releases mFontInfo itself if one is already held)
     mFontLoaded = false;
-    mOS2Offset = 0;
-    mOS2Length = 0;
-    mFontInfo = nullptr;
+    mOS2Table.clear();
 
     // Try to find and load the font file
     std::string filePath = FindFontFile(fontName);
@@ -1116,10 +1111,12 @@ sWSFontClassification cWSFontClassifier::Classify(const std::string& fontName)
     sWSFontClassification result = ClassifyFromData(
         fontData.data(), fontData.size(), fontName);
 
-    // Clean up stbtt_fontinfo
+    // Release the Core Text font retained by LoadFont()
     if (mFontInfo != nullptr)
     {
-        delete static_cast<stbtt_fontinfo*>(mFontInfo);
+#ifdef __APPLE__
+        CFRelease(static_cast<CFTypeRef>(mFontInfo));
+#endif
         mFontInfo = nullptr;
     }
 

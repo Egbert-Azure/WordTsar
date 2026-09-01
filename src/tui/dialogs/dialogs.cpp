@@ -813,7 +813,11 @@ bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
     fieldRect.cols = rect.cols - 10;
     cTextField nameField(fieldRect, "");
 
-    int focus = 0;
+    // In save mode, start with the Name field focused -- the whole point of
+    // Save As is typing a filename, and requiring Tab first (with no visible
+    // hint that it's needed) made typing look like it silently did nothing:
+    // keystrokes were jumping the file list instead of reaching the field.
+    int focus = (saveMode == true) ? 1 : 0;
     bool accepted = false;
 
     sStyle dialogStyle = host->HostTheme().GetStyle(THEME_ROLE_DIALOG);

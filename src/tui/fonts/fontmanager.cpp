@@ -50,7 +50,6 @@
 
 #include "fontmanager.h"
 #include "builtinmetrics.h"
-#include "stbtruetype.h"
 #ifdef _WIN32
 #include "platform_windows.h"
 #elif defined(__APPLE__)
@@ -1065,6 +1064,104 @@ std::vector<cTUIFontManager::FontInfo> cTUIFontManager::DiscoverSystemFonts(void
         FcObjectSetDestroy(os);
         FcPatternDestroy(pat);
         FcFini();
+    }
+#elif defined(__APPLE__)
+    // CoreText enumerates every installed font with a real file URL directly --
+    // no directory list to keep in sync with macOS's actual font locations
+    // (the Linux-oriented DiscoverSystemFontsByScanning() fallback below only
+    // knows about paths like /usr/share/fonts, which don't exist here).
+    std::cout << "Using CoreText for font discovery...\n";
+
+    CTFontCollectionRef collection = CTFontCollectionCreateFromAvailableFonts(nullptr);
+    if (collection)
+    {
+        CFArrayRef descriptors = CTFontCollectionCreateMatchingFontDescriptors(collection);
+        if (descriptors)
+        {
+            CFIndex count = CFArrayGetCount(descriptors);
+            for (CFIndex i = 0; i < count; i++)
+            {
+                CTFontDescriptorRef descriptor =
+                    (CTFontDescriptorRef)CFArrayGetValueAtIndex(descriptors, i);
+
+                CFURLRef urlRef = (CFURLRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
+                if (!urlRef)
+                {
+                    continue;
+                }
+
+                UInt8 pathBuffer[PATH_MAX];
+                bool gotPath = CFURLGetFileSystemRepresentation(urlRef, true, pathBuffer, sizeof(pathBuffer));
+                CFRelease(urlRef);
+                if (!gotPath)
+                {
+                    continue;
+                }
+
+                std::string filePath(reinterpret_cast<char*>(pathBuffer));
+
+                // Only TTF/OTF/TTC, matching the filter every other backend applies
+                std::string extension;
+                size_t dotPos = filePath.find_last_of('.');
+                if (dotPos != std::string::npos)
+                {
+                    extension = filePath.substr(dotPos + 1);
+                    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+                }
+                if (extension != "ttf" && extension != "otf" && extension != "ttc")
+                {
+                    continue;
+                }
+
+                CFStringRef familyRef = (CFStringRef)CTFontDescriptorCopyAttribute(
+                    descriptor, kCTFontFamilyNameAttribute);
+                if (!familyRef)
+                {
+                    continue;
+                }
+
+                CFIndex nameLen = CFStringGetLength(familyRef);
+                CFIndex nameMax = CFStringGetMaximumSizeForEncoding(nameLen, kCFStringEncodingUTF8) + 1;
+                std::vector<char> nameBuffer(static_cast<size_t>(nameMax));
+                CFStringGetCString(familyRef, nameBuffer.data(), nameMax, kCFStringEncodingUTF8);
+                CFRelease(familyRef);
+
+                // Symbolic traits give bold/italic/monospace without loading the font
+                CFDictionaryRef traitsDict = (CFDictionaryRef)CTFontDescriptorCopyAttribute(
+                    descriptor, kCTFontTraitsAttribute);
+                bool bold = false;
+                bool italic = false;
+                bool monospace = false;
+                if (traitsDict)
+                {
+                    CFNumberRef symbolicRef = (CFNumberRef)CFDictionaryGetValue(
+                        traitsDict, kCTFontSymbolicTrait);
+                    if (symbolicRef)
+                    {
+                        int32_t symbolicTraits = 0;
+                        CFNumberGetValue(symbolicRef, kCFNumberSInt32Type, &symbolicTraits);
+                        bold = (symbolicTraits & kCTFontBoldTrait) != 0;
+                        italic = (symbolicTraits & kCTFontItalicTrait) != 0;
+                        monospace = (symbolicTraits & kCTFontMonoSpaceTrait) != 0;
+                    }
+                    CFRelease(traitsDict);
+                }
+
+                FontInfo font;
+                font.family = nameBuffer.data();
+                font.style = std::string(bold ? "Bold" : "") + (italic ? "Italic" : "");
+                if (font.style.empty())
+                {
+                    font.style = "Regular";
+                }
+                font.filepath = filePath;
+                font.spacing = monospace ? 100 : 0; // matches fontconfig's FC_MONO/FC_PROPORTIONAL scale
+
+                fonts.push_back(std::move(font));
+            }
+            CFRelease(descriptors);
+        }
+        CFRelease(collection);
     }
 #else
     // Fallback to directory scanning if fontconfig is not available

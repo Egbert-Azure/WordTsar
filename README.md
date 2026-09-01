@@ -1,5 +1,9 @@
 # WordTsar
 
+<p align="center">
+  <img src="docs/screenshots/wordtsar start.png" width="220" alt="WordTsar for macOS splash cover">
+</p>
+
 ## This is a macOS-focused fork of [WordTsar](https://sourceforge.net/p/wordtsar/mercurial/ci/default/tree/), created by Gerald Brandt.
 
 Wordstar for the 21st Century. WordTsar is a Wordstar 7.0D document mode clone. It loads Wordstar 4, Wordstar 7, RTF (partial), and DOCX (partial) files, and saves in Wordstar 7, RTF, and Word (.docx) format.
@@ -13,7 +17,7 @@ All credit for WordTsar's design and implementation goes to Gerald Brandt — th
 
 WordTsar is currently Beta. What does Beta mean? The core is solid and well-tested, but a handful of things remain unverified or incomplete — see `WHATS_NEW.md` for specifics.
 
-This is version **0.7.6 Beta**, macOS only.
+This is version **0.8.0 Beta**, macOS only.
 
 ## Building
 

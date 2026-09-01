@@ -2,6 +2,20 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.8.0 Beta (2026-09-01)
+
+### Terminal UI font discovery now finds real installed fonts on macOS
+
+`ws` had no macOS-specific font discovery at all — it silently fell back to a Linux-only directory scan (`/usr/share/fonts`, etc.) that finds nothing on a Mac. This meant printing or classifying anything other than the three built-in fallback font families (Courier, Times, Helvetica) never resolved to the font's actual installed file. Now backed by Core Text's own font collection, so print embeds the real installed file — e.g. a genuine `CourierNewPSMT` from `Courier New.ttf`, not a generic substitute.
+
+### Removed the last of the STB TrueType dependency
+
+The terminal UI's TrueType-metrics backend (`stbtruetype.cpp`) turned out to already be dead code on macOS — Core Text has handled real text-layout metrics here for a while. The one genuinely live use left was WordStar-format font classification (reading a font's OS/2/PANOSE data and glyph coverage to pick the right typestyle when saving a `.ws` file), shared by both the GUI and the terminal UI. That's now Core Text too, so the vendored STB TrueType library is gone from the build entirely — nothing left in WordTsar depends on it.
+
+### New splash screen artwork
+
+Both the GUI and the terminal UI now open with an updated splash based on the original WordTsar cover art. The terminal UI's version reworks it as a letter-spaced title and rule, since a plain terminal can't display an actual image.
+
 ## 0.7.6 Beta (2026-09-01)
 
 ### Fixed: garbled accented characters (ü, ä, ö, „ ") in `ws` PDF printing/preview

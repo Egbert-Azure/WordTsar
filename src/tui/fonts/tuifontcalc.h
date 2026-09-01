@@ -162,7 +162,6 @@ class cTUIFontCalculatorWindowsNative;
 class cTUIFontCalculatorMacOSNative;
 class cTUIFontCalculatorQtHeadless;
 class cTUIFontCalculatorHarfBuzz;
-class cTUISTBTrueTypeFontCalculator;
 class cTUIBuiltInMetricsFontCalculator;
 
 #endif // TUIFONTCALC_H
