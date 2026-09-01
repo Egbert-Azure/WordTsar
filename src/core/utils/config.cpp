@@ -130,7 +130,13 @@ cConfig::cConfig(void)
     mWindowHeight = 900;
 
     // [gui.display] defaults
-    mGuiShowHelp = 3;                   // WS4 default: all menus and prompts displayed
+    // WordStar 7's own real default is level 4 (pull-down bar). WordTsar's
+    // pull-down bar is always shown regardless of level though, so level 4
+    // would only subtract the classic Edit Menu panel without adding
+    // anything level 3 doesn't already have -- level 3 (classic menu +
+    // submenus, matching what's actually useful for relearning WordStar)
+    // is the more sensible default for this shell.
+    mGuiShowHelp = 3;
     mGuiShowRuler = true;
     mGuiShowScrollBar = true;
     mGuiShowStatusBar = true;
@@ -171,7 +177,7 @@ cConfig::cConfig(void)
 
     // [tui.display] defaults
     mTuiShowTitleBar = true;
-    mTuiShowHelp = 3;                   // WS4 default: all menus and prompts displayed
+    mTuiShowHelp = 3;                   // see the matching mGuiShowHelp comment above
     mTuiShowRuler = true;
     mTuiShowScrollBar = true;
     mTuiShowStatusBar = true;

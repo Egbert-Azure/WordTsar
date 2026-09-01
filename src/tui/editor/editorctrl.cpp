@@ -2370,12 +2370,16 @@ void cWSEditorCtrl::GotoPage(void)
 /// @return nothing
 ///
 /// @brief
-/// Prompt for and apply a new WS4 help level (^J^J). Per the WordStar 4.0
-/// manual's "Help levels" reference:
-///   3 - Edit Menu and submenus (^K/^Q/^O/^P) both displayed.
-///   2 - Edit Menu hidden; submenus still displayed after a pause.
-///   1 - No menus displayed.
-///   0 - No menus displayed; status line also hidden.
+/// Prompt for and apply a new WordStar 7 help level (F1 F1). Per the real
+/// manual's "Change Help Level" reference:
+///   4 - Pull-down menu bar shown; all prompts displayed. Looks the same
+///       as 0/1 here since the TUI's menu bar is always shown regardless
+///       of level -- no classic Edit Menu or submenus either way.
+///   3 - Classic Edit Menu and submenus (^K/^Q/^O/^P/^M) both displayed.
+///   2 - Classic Edit Menu hidden; submenus still displayed after a pause.
+///   1 - No classic menus displayed.
+///   0 - Same as 1 here (unlike the GUI, the TUI doesn't also hide the
+///       status line at level 0).
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSEditorCtrl::ChangeHelpLevel(void)
@@ -2386,7 +2390,7 @@ void cWSEditorCtrl::ChangeHelpLevel(void)
     }
 
     std::string levelStr;
-    if (!wsdialogs::InputBox(mHost, "Help Level", "What help level do you want? (0-3)", levelStr))
+    if (!wsdialogs::InputBox(mHost, "Help Level", "What help level do you want? (0-4)", levelStr))
     {
         return;
     }
@@ -2401,7 +2405,7 @@ void cWSEditorCtrl::ChangeHelpLevel(void)
         return;
     }
 
-    if (level < 0 || level > 3)
+    if (level < 0 || level > 4)
     {
         return;
     }

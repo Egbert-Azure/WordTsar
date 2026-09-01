@@ -79,11 +79,12 @@ public:
     eHelpDisplay GetHelpStatus(void) override ;
 
 //private:
-    void OnControlJChar(char key) ;
+    void OnControlMChar(char key) ;
     void OnControlOChar(char key) ;
     void OnControlPChar(char key) ;
     bool OnControlKChar(char key) ;
     void OnControlQChar(char key) ;
+    void OnHelpTargetChar(char key) ;
 
     // =================================================================
     // MEMBER VARIABLES
@@ -91,11 +92,12 @@ public:
 private:
     cEditorBase *mEditor ;
 
-    bool mControlJMode ;
+    bool mControlMMode ;
     bool mControlKMode ;                    ///> modes for key sequences
     bool mControlQMode ;
     bool mControlPMode ;
     bool mControlOMode ;
+    bool mWaitingForHelpTarget ;             ///> true after F1, before the command key it describes
 
     eHelpDisplay mOldHelpStatus ;
 

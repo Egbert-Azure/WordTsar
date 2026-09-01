@@ -73,15 +73,16 @@
 namespace {
 
 /////////////////////////////////////////////////////////////////////////////
-/// Per-command help text for ^J's "press ^J, then any command" contextual
-/// help (WordStar 4.0 manual, p.339-342: "^J Enters the help system. Press
-/// any command to see help for that command."). Text is paraphrased from
-/// the manual's own per-key reference (Appendix G, "Commands from the Edit
-/// Menu"), not copied verbatim. Only covers the single control keys
-/// OnControlJChar's own switch doesn't already claim for something else
-/// (d/e/o/p/r/s/y are the Jiffy chord's macro-control letters; j itself
-/// changes the help level) -- see KEY_MAPPING.md's "Single Control Keys"
-/// table for how these map onto what WordTsar actually implements today.
+/// Per-command help text for WordStar 7's real F1 key: "press F1, then press
+/// the command you want help with" (manual, "Onscreen Help"). Text is
+/// paraphrased from the WS4 manual's per-key reference (Appendix G,
+/// "Commands from the Edit Menu") -- the content is the same across both
+/// versions for these basic cursor/editing keys; only the trigger key
+/// (^J vs. F1) and the ^M/Macro Menu content differ between them. F1's
+/// lookup is independent of OnControlMChar's own switch, so every single
+/// control key can have an entry here regardless of what a chord's own
+/// sub-letters mean -- see KEY_MAPPING.md's "Single Control Keys" table for
+/// how these map onto what WordTsar actually implements today.
 /////////////////////////////////////////////////////////////////////////////
 const char *LookupControlKeyHelp(char lower)
 {
@@ -99,6 +100,13 @@ const char *LookupControlKeyHelp(char lower)
         case 'c' :
             return "^C - Move cursor down one page\n\n"
                    "Scrolls down one screen (same as Page Down)." ;
+        case 'd' :
+            return "^D - Move cursor right\n\n"
+                   "Moves the cursor one character to the right." ;
+        case 'e' :
+            return "^E - Move cursor up one line\n\n"
+                   "Moves the cursor up one line, keeping its column until it reaches "
+                   "a shorter line." ;
         case 'f' :
             return "^F - Move cursor right one word\n\n"
                    "Moves the cursor right to the first character of the next word." ;
@@ -123,19 +131,32 @@ const char *LookupControlKeyHelp(char lower)
             return "^L - Find next match (Find Again)\n\n"
                    "Repeats the last Find or Find & Replace." ;
         case 'm' :
-            return "^M - Macros (not yet supported)\n\n"
-                   "In WordStar 4.0: ^M is the Enter/Return key itself -- inserts a hard "
-                   "carriage return, or (with Insert off) just moves to the next line. "
-                   "WordTsar instead reserves ^M as a Macros chord prefix, which is not "
-                   "yet implemented; plain Enter/Return still inserts a line break." ;
+            return "^M - Enter Macro Menu chord\n\n"
+                   "Opens the Macro menu -- date/time/filename/path insertion, and "
+                   "keyboard macro record/play/edit (macro playback not yet implemented). "
+                   "Press a second key to choose." ;
         case 'n' :
             return "^N - Insert line break\n\n"
                    "Inserts a blank line without moving the cursor, pushing any text to "
                    "the right of the cursor down onto it." ;
+        case 'o' :
+            return "^O - Enter Onscreen Format chord\n\n"
+                   "Opens the Onscreen Format menu -- margins, tabs, alignment, and "
+                   "display settings. Press a second key to choose." ;
+        case 'p' :
+            return "^P - Enter Print Controls chord\n\n"
+                   "Opens the Print Controls menu -- bold/underline/italic and other "
+                   "print-time styles. Press a second key to choose." ;
         case 'q' :
             return "^Q - Enter Quick Functions chord\n\n"
                    "Opens the Quick menu -- fast cursor jumps, find/replace, spell "
                    "check, and deletion shortcuts. Press a second key to choose." ;
+        case 'r' :
+            return "^R - Move cursor up one page\n\n"
+                   "Scrolls up one screen (same as Page Up)." ;
+        case 's' :
+            return "^S - Move cursor left\n\n"
+                   "Moves the cursor one character to the left." ;
         case 't' :
             return "^T - Delete word to the right\n\n"
                    "Deletes from the cursor to the next space or punctuation mark. At "
@@ -155,6 +176,9 @@ const char *LookupControlKeyHelp(char lower)
             return "^X - Move cursor down one line\n\n"
                    "Moves the cursor down one line, keeping its column until it reaches "
                    "a shorter line." ;
+        case 'y' :
+            return "^Y - Delete line\n\n"
+                   "Deletes the current line, including its line break." ;
         case 'z' :
             return "^Z - Scroll down one line\n\n"
                    "Scrolls the view down by one line, so the text on screen shifts up; "
@@ -172,25 +196,26 @@ cWordStarInput::cWordStarInput(cEditorBase *editor)
 {
     mEditor = editor ;
     
-    mControlJMode = false ;
+    mControlMMode = false ;
     mControlKMode = false ;
     mControlOMode = false ;
     mControlPMode = false ;
     mControlQMode = false ;
+    mWaitingForHelpTarget = false ;
 
     mOldHelpStatus = HELP_NONE ;
 }
-    
+
 
 cWordStarInput::~cWordStarInput(void)
 {
-    
+
 }
 
 
 bool cWordStarInput::CheckControlMode(void)
 {
-    return mControlJMode || mControlKMode || mControlOMode || mControlPMode || mControlQMode ;
+    return mControlMMode || mControlKMode || mControlOMode || mControlPMode || mControlQMode ;
 }
 
 
@@ -200,6 +225,16 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
     UNUSED_ARGUMENT(shift) ;
 
     bool handled = false ;
+
+    // F1 (WordStar 7's real help key -- see OnHelpTargetChar) is waiting for
+    // the command it should describe. Takes priority over everything else,
+    // including chord entry, so "F1, K" describes ^K rather than entering it.
+    if (mWaitingForHelpTarget == true)
+    {
+        mWaitingForHelpTarget = false ;
+        OnHelpTargetChar(ch) ;
+        return true ;
+    }
 
     // Alt+letter in WordStar mode: enter chord mode as alternative to Ctrl+letter
     // This allows TUI users to use Alt+K/Q/O/P as equivalent to Ctrl+K/Q/O/P
@@ -235,11 +270,11 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
             mEditor->mHelpDisplay = HELP_CTRLP ;
             return true ;
         }
-        if (lower == 'j')
+        if (lower == 'm')
         {
-            mControlJMode = true ;
+            mControlMMode = true ;
             mOldHelpStatus = mEditor->mHelpDisplay ;
-            mEditor->mHelpDisplay = HELP_CTRLJ ;
+            mEditor->mHelpDisplay = HELP_CTRLM ;
             return true ;
         }
 
@@ -256,7 +291,7 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
 
     if(ch == 27)                    // escape key
     {
-        mControlJMode = false ;
+        mControlMMode = false ;
         mControlKMode = false ;
         mControlOMode = false ;
         mControlPMode = false ;
@@ -266,10 +301,10 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
     }
 
     // handle special modes
-    if(mControlJMode == true)
+    if(mControlMMode == true)
     {
         mEditor->mHelpDisplay = mOldHelpStatus ;
-        OnControlJChar(ch) ;
+        OnControlMChar(ch) ;
         handled = true ;
     }
     else if(mControlKMode == true)
@@ -305,10 +340,10 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
         switch(ch)
         {
             // deal with menus
-            case CTRL_J :
-                mControlJMode = true ;
+            case CTRL_M :
+                mControlMMode = true ;
                 mOldHelpStatus = mEditor->mHelpDisplay ;
-                mEditor->mHelpDisplay = HELP_CTRLJ ;
+                mEditor->mHelpDisplay = HELP_CTRLM ;
                 handled = true ;
                 break ;
 
@@ -446,11 +481,6 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
 
             case CTRL_L :
                 mEditor->FindAgain() ;  // Stub - P1 operation
-                handled = true ;
-                break ;
-
-            case CTRL_M :
-                mEditor->NotImplemented(std::string("^M")) ;
                 handled = true ;
                 break ;
 
@@ -646,19 +676,32 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
         case SPECIAL_ESCAPE:
         {
             // Cancel any active chord mode
-            mControlJMode = false ;
+            mControlMMode = false ;
             mControlKMode = false ;
             mControlOMode = false ;
             mControlPMode = false ;
             mControlQMode = false ;
+            mWaitingForHelpTarget = false ;
             mEditor->mHelpDisplay = mOldHelpStatus ;
             break ;
         }
 
         // --- Function keys ---
+        // WordStar 7's real F1: "press F1, then press the command you want
+        // help with" (manual, "Onscreen Help"); F1 F1 changes the help level
+        // (manual, "Change Help Level"). System Preferences moved fully to
+        // Cmd+, (see cEditorCtrl::keyPressEvent) now that F1 has a real job.
         case SPECIAL_F1:
         {
-            mEditor->SystemPreferences() ;
+            if (mWaitingForHelpTarget == true)
+            {
+                mWaitingForHelpTarget = false ;
+                mEditor->ChangeHelpLevel() ;
+            }
+            else
+            {
+                mWaitingForHelpTarget = true ;
+            }
             break ;
         }
 
@@ -696,9 +739,9 @@ eHelpDisplay cWordStarInput::GetHelpStatus(void)
 
 
 
-void cWordStarInput::OnControlJChar(char ch)
+void cWordStarInput::OnControlMChar(char ch)
 {
-    mControlJMode = false ;
+    mControlMMode = false ;
 
     // if it's a control key, change it to  character
     if(ch < ' ')
@@ -709,13 +752,6 @@ void cWordStarInput::OnControlJChar(char ch)
 
     switch(ch)
     {
-        case 'j' :
-            // WordStar 4.0 manual, "Help levels": ^J^J changes the help level
-            // (0-3), prompting "What help level do you want?".
-            mEditor->ChangeHelpLevel() ;
-            mOldHelpStatus = mEditor->mHelpDisplay ;
-            break ;
-
         case '@' :
             {
                 std::time_t now = std::time(nullptr);
@@ -784,28 +820,48 @@ void cWordStarInput::OnControlJChar(char ch)
         case 'o' :
         case 'y' :
             {
-                std::string t = string_sprintf("^J-%c", ch) ;
+                std::string t = string_sprintf("^M-%c", ch) ;
                 mEditor->NotImplemented(t) ;
             }
             break ;
 
         default :
             {
-                const char *help = LookupControlKeyHelp(ch) ;
-                if(help != nullptr)
-                {
-                    mEditor->ShowMessage("Help", help) ;
-                }
-                else
-                {
-                    std::string t = string_sprintf("^J-%c", ch).c_str() ;
-                    mEditor->InvalidCommand(t) ;
-                }
+                std::string t = string_sprintf("^M-%c", ch).c_str() ;
+                mEditor->InvalidCommand(t) ;
             }
             break ;
 
     }
 
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// WordStar 7's real F1 behavior: "press F1, then press the command you want
+/// help with" (manual, "Onscreen Help"). Handles the key immediately after a
+/// single F1 press (F1 F1 is handled separately, in HandleSpecialKey, since
+/// it's two special-key presses rather than F1 followed by a character).
+/////////////////////////////////////////////////////////////////////////////
+void cWordStarInput::OnHelpTargetChar(char ch)
+{
+    // if it's a control key, change it to a character
+    if(ch < ' ')
+    {
+        ch += '@' ;
+    }
+    ch = tolower(ch) ;
+
+    const char *help = LookupControlKeyHelp(ch) ;
+    if(help != nullptr)
+    {
+        mEditor->ShowMessage("Help", help) ;
+    }
+    else
+    {
+        std::string t = string_sprintf("F1-%c", ch).c_str() ;
+        mEditor->InvalidCommand(t) ;
+    }
 }
 
 

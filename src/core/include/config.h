@@ -293,7 +293,7 @@ enum eHelpDisplay
     HELP_UNKNOWN,
     HELP_NONE,
     HELP_MAIN,
-    HELP_CTRLJ,
+    HELP_CTRLM,
     HELP_CTRLK,
     HELP_CTRLP,
     HELP_CTRLQ,

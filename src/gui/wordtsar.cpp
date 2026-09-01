@@ -228,19 +228,19 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
     QString helpj = "<pre style=\"margin:0\">"
         "                        <b>----- E D I T   M E N U -----</b>\n"
         "  <u>CURSOR</u>      <u>SCROLL</u>        <u>DELETE</u>      <u>OTHER</u>                 <u>MENUS</u>\n"
-        " <b>^E</b> up       <b>^W</b> up         <b>^G</b> char    <b>^J</b> help                <b>^O</b> onscreen format\n"
+        " <b>^E</b> up       <b>^W</b> up         <b>^G</b> char    <b>F1</b> help                <b>^O</b> onscreen format\n"
         " <b>^X</b> down     <b>^Z</b> down       <b>^T</b> word    <b>^I</b> tab                 <b>^K</b> block &amp; save\n"
-        " <b>^S</b> left     <b>^R</b> up screen  <b>^Y</b> line    <b>^V</b> turn insert off     <i>^M macros</i>\n"
+        " <b>^S</b> left     <b>^R</b> up screen  <b>^Y</b> line    <b>^V</b> turn insert off     <b>^M</b> macros\n"
         " <b>^D</b> right    <b>^C</b> down      <b>Del</b> char    <b>^L</b> find/replace again  <b>^P</b> print controls\n"
         " <b>^A</b> word left   screen     <b>^U</b> unerase                        <b>^Q</b> quick functions\n"
-        " <b>^F</b> word right                   <b>&#8984;,</b> Preferences (or F1)\n"
+        " <b>^F</b> word right                   <b>&#8984;,</b> Preferences\n"
         "                                <b>&#8984;&#8963;F</b> Full Screen (or F11)"
         "</pre>" ;
 
-    QString helpjj = "<pre style=\"margin:0\">"
-        "                  <b>----- JIFFY MENU -----</b>\n"
+    QString helpmm = "<pre style=\"margin:0\">"
+        "                  <b>----- MACRO MENU -----</b>\n"
         " "
-        "    <u>JIFFY FUNCTIONS</u>                   <u>INSERT</u>\n"
+        "    <u>MACRO FUNCTIONS</u>                   <u>INSERT</u>\n"
         " <i>P play</i>          <i>E rename</i>        <b>@</b> today's date         <b>*</b> current filename\n"
         " <i>R record</i>        <i>O copy</i>          <b>!</b> current time         <b>:</b> current drive\n"
         " <i>D edit/create</i>   <i>Y delete</i>        <i>= last math result</i>     <b>.</b> current directory\n"
@@ -314,7 +314,7 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
 
     // Save original help text strings (plain <b> tags) for color re-application
     mHelpTextMain = helpj ;
-    mHelpTextJ = helpjj ;
+    mHelpTextM = helpmm ;
     mHelpTextK = helpk ;
     mHelpTextO = helpo ;
     mHelpTextP = helpp ;
@@ -329,14 +329,14 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
     mHelpCtrl->setFocusPolicy(Qt::NoFocus) ;
     mLayout->addWidget(mHelpCtrl) ;
 
-    mHelpJCtrl = new QLabel(mBaseWidget) ;
-    mHelpJCtrl->setObjectName(QStringLiteral("mHelpJCtrl")) ;
-    mHelpJCtrl->setTextFormat(Qt::RichText) ;
-    mHelpJCtrl->setFont(helpFont) ;
-    mHelpJCtrl->setText(helpjj) ;
-    mHelpJCtrl->setFocusPolicy(Qt::NoFocus) ;
-    mLayout->addWidget(mHelpJCtrl) ;
-    mHelpJCtrl->hide() ;
+    mHelpMCtrl = new QLabel(mBaseWidget) ;
+    mHelpMCtrl->setObjectName(QStringLiteral("mHelpMCtrl")) ;
+    mHelpMCtrl->setTextFormat(Qt::RichText) ;
+    mHelpMCtrl->setFont(helpFont) ;
+    mHelpMCtrl->setText(helpmm) ;
+    mHelpMCtrl->setFocusPolicy(Qt::NoFocus) ;
+    mLayout->addWidget(mHelpMCtrl) ;
+    mHelpMCtrl->hide() ;
 
     mHelpKCtrl = new QLabel(mBaseWidget) ;
     mHelpKCtrl->setObjectName(QStringLiteral("mHelpKCtrl")) ;
@@ -781,14 +781,16 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
     sStatus cstatus ;
     editor->GetStatus(cstatus) ;
 
-    // Help level gates whether the delayed ^K/^Q/^O/^P/^J submenus ever
-    // appear (WordStar 4.0 manual, "Help levels": submenus need level 2+).
-    // The main Edit Menu's own level-3-only gating already happens in
-    // ChangeHelpLevel(), which only ever sets the idle mHelpDisplay to
-    // HELP_MAIN or HELP_NONE -- this only needs to catch the transient
-    // HELP_CTRLx states a chord prefix sets regardless of level.
-    if(editor->mHelpLevel < 2 &&
-       (cstatus.help == HELP_CTRLJ || cstatus.help == HELP_CTRLK ||
+    // Help level gates whether the delayed ^K/^Q/^O/^P/^M submenus ever
+    // appear (WordStar 7 manual, "Change Help Level": submenus show only at
+    // levels 2-3 -- level 4 relies on the pull-down bar instead, and 0-1
+    // show no classic panels at all). The main Edit Menu's own level-3-only
+    // gating already happens in ChangeHelpLevel(), which only ever sets the
+    // idle mHelpDisplay to HELP_MAIN or HELP_NONE -- this only needs to
+    // catch the transient HELP_CTRLx states a chord prefix sets regardless
+    // of level.
+    if((editor->mHelpLevel < 2 || editor->mHelpLevel > 3) &&
+       (cstatus.help == HELP_CTRLM || cstatus.help == HELP_CTRLK ||
         cstatus.help == HELP_CTRLO || cstatus.help == HELP_CTRLP ||
         cstatus.help == HELP_CTRLQ))
     {
@@ -922,7 +924,7 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
         if(cstatus.help == HELP_NONE && mStatusLastHelp != HELP_NONE)
         {
             mHelpCtrl->hide(); ;
-            mHelpJCtrl->hide() ;
+            mHelpMCtrl->hide() ;
             mHelpKCtrl->hide() ;
             mHelpPCtrl->hide(); ;
             mHelpQCtrl->hide() ;
@@ -932,7 +934,7 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
         else if(cstatus.help == HELP_MAIN && mStatusLastHelp != HELP_MAIN)
         {
             mHelpCtrl->show() ;
-            mHelpJCtrl->hide() ;
+            mHelpMCtrl->hide() ;
             mHelpKCtrl->hide() ;
             mHelpPCtrl->hide() ;
             mHelpQCtrl->hide() ;
@@ -940,21 +942,21 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
             mStatusLastHelp = HELP_MAIN ;
         }
 
-        if(cstatus.help == HELP_CTRLJ && mStatusLastHelp != HELP_CTRLJ)
+        if(cstatus.help == HELP_CTRLM && mStatusLastHelp != HELP_CTRLM)
         {
             mStatusHelpCounter = 0 ;
-            mStatusLastHelp = HELP_CTRLJ ;
+            mStatusLastHelp = HELP_CTRLM ;
         }
 
-        if(cstatus.help == HELP_CTRLJ && mStatusHelpCounter >= HELPDELAY)
+        if(cstatus.help == HELP_CTRLM && mStatusHelpCounter >= HELPDELAY)
         {
             mHelpCtrl->hide() ;
-            mHelpJCtrl->show() ;
+            mHelpMCtrl->show() ;
             mHelpKCtrl->hide() ;
             mHelpPCtrl->hide() ;
             mHelpQCtrl->hide() ;
             mHelpOCtrl->hide() ;
-            mStatusLastHelp = HELP_CTRLJ ;
+            mStatusLastHelp = HELP_CTRLM ;
         }
 
         if(cstatus.help == HELP_CTRLK && mStatusLastHelp != HELP_CTRLK)
@@ -966,7 +968,7 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
         if(cstatus.help == HELP_CTRLK && mStatusHelpCounter >= HELPDELAY)
         {
             mHelpCtrl->hide() ;
-            mHelpJCtrl->hide() ;
+            mHelpMCtrl->hide() ;
             mHelpKCtrl->show() ;
             mHelpPCtrl->hide() ;
             mHelpQCtrl->hide() ;
@@ -983,7 +985,7 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
         if(cstatus.help == HELP_CTRLP && mStatusHelpCounter >= HELPDELAY)
         {
             mHelpCtrl->hide() ;
-            mHelpJCtrl->hide() ;
+            mHelpMCtrl->hide() ;
             mHelpKCtrl->hide() ;
             mHelpPCtrl->show() ;
             mHelpQCtrl->hide() ;
@@ -1000,7 +1002,7 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
         if(cstatus.help == HELP_CTRLQ && mStatusHelpCounter >= HELPDELAY)
         {
             mHelpCtrl->hide() ;
-            mHelpJCtrl->hide() ;
+            mHelpMCtrl->hide() ;
             mHelpKCtrl->hide() ;
             mHelpPCtrl->hide() ;
             mHelpQCtrl->show() ;
@@ -1017,7 +1019,7 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
         if(cstatus.help == HELP_CTRLO && mStatusHelpCounter >= HELPDELAY)
         {
             mHelpCtrl->hide() ;
-            mHelpJCtrl->hide() ;
+            mHelpMCtrl->hide() ;
             mHelpKCtrl->hide() ;
             mHelpPCtrl->hide() ;
             mHelpQCtrl->hide() ;
@@ -1174,8 +1176,8 @@ void cWordTsar::ReadConfig(void)
     // Window size
     resize(config.mWindowWidth, config.mWindowHeight) ;
 
-    // Help level (WS4 manual's "Help levels", 0-3)
-    mEditor->mHelpLevel = std::clamp(config.mGuiShowHelp, 0, 3) ;
+    // Help level (WordStar 7 manual's "Change Help Level", 0-4)
+    mEditor->mHelpLevel = std::clamp(config.mGuiShowHelp, 0, 4) ;
     mEditor->mHelpDisplay = (mEditor->mHelpLevel == 3) ? HELP_MAIN : HELP_NONE ;
 
     // Measurement units
@@ -1251,10 +1253,11 @@ void cWordTsar::WriteConfig(void)
     config.mWindowWidth = wsize.width() ;
     config.mWindowHeight = wsize.height() ;
 
-    // Help level (WS4 manual's "Help levels", 0-3): unlike mHelpDisplay,
-    // which also carries momentary chord-submenu state (HELP_CTRLJ/K/P/Q/O),
-    // mHelpLevel only ever changes via ChangeHelpLevel() (^J^J or the
-    // Preferences dialog), so it's always safe to persist directly.
+    // Help level (WordStar 7 manual's "Change Help Level", 0-4): unlike
+    // mHelpDisplay, which also carries momentary chord-submenu state
+    // (HELP_CTRLM/K/P/Q/O), mHelpLevel only ever changes via
+    // ChangeHelpLevel() (F1 F1 or the Preferences dialog), so it's always
+    // safe to persist directly.
     config.mGuiShowHelp = mEditor->mHelpLevel ;
 
     // Measurement units
@@ -1377,7 +1380,7 @@ void cWordTsar::ApplyHelpColors(const QColor& helpBg, const QColor& helpFg, cons
 
     HelpPanel panels[] = {
         { mHelpCtrl,  &mHelpTextMain },
-        { mHelpJCtrl, &mHelpTextJ },
+        { mHelpMCtrl, &mHelpTextM },
         { mHelpKCtrl, &mHelpTextK },
         { mHelpOCtrl, &mHelpTextO },
         { mHelpPCtrl, &mHelpTextP },

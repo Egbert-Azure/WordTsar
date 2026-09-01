@@ -737,7 +737,8 @@
              <item><property name="text"><string>Off (hide status line too)</string></property></item>
              <item><property name="text"><string>Menus Off</string></property></item>
              <item><property name="text"><string>Compact (submenus only)</string></property></item>
-             <item><property name="text"><string>Full</string></property></item>
+             <item><property name="text"><string>Full (classic menus)</string></property></item>
+             <item><property name="text"><string>Full (pull-down menu bar)</string></property></item>
             </widget>
            </item>
           </layout>

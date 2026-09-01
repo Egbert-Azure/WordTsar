@@ -20,7 +20,7 @@ WordTsar supports two input modes, selectable in **System Preferences > Editor >
   - [Q Chord -- Quick Navigation and Deletion](#q-chord----quick-navigation-and-deletion)
   - [O Chord -- Onscreen Formatting and Display](#o-chord----onscreen-formatting-and-display)
   - [P Chord -- Style and Print Formatting](#p-chord----style-and-print-formatting)
-  - [J Chord -- Help and Insertion (WordStar Only)](#j-chord----help-and-insertion-wordstar-only)
+  - [M Chord -- Macros and Insertion (WordStar Only)](#m-chord----macros-and-insertion-wordstar-only)
   - [Additional Alt Shortcuts](#additional-alt-shortcuts)
 - [Menu Mapping](#menu-mapping)
   - [File Menu](#file-menu)
@@ -40,7 +40,7 @@ WordTsar supports two input modes, selectable in **System Preferences > Editor >
   - [Single Control Keys (^A-^Z)](#single-control-keys-a-z)
   - [Alt Shortcuts (WordStar Mode)](#alt-shortcuts-wordstar-mode)
   - [Special / Navigation Keys](#special--navigation-keys)
-  - [^J Chord -- Help and Insertion](#j-chord----help-and-insertion)
+  - [^M Chord -- Macros and Insertion](#m-chord----macros-and-insertion)
   - [^K Chord -- Block and File](#k-chord----block-and-file)
   - [^O Chord -- Onscreen Format](#o-chord----onscreen-format)
   - [^Q Chord -- Quick Functions](#q-chord----quick-functions)
@@ -122,26 +122,34 @@ Navigation and editing keys work identically in both modes.
 
 | Key | WordStar | Modern |
 |-----|----------|--------|
-| F1 | System Preferences | System Preferences |
+| F1 | Contextual help ("press F1, then the command you want help with"); F1 F1 changes the help level | System Preferences |
 | F3 | -- | Find Again |
 | F11 | Toggle fullscreen | Toggle fullscreen |
+
+F1 is WordStar 7's own real Help key (confirmed against `docs/WordStar 7
+Manual.pdf`, "Onscreen Help" and "Change Help Level"), unlike F1/F3/F11's
+other jobs here, none of which are real WordStar bindings (see the WordStar
+4.0 manual: F1-F10 each carried 4 assignments, but every one was just a
+shortcut to a command also reachable via the Ctrl-diamond). WordStar mode's
+F1 and Modern mode's F1 now differ deliberately -- Modern/CUA mode isn't
+trying to emulate WordStar 7 and keeps System Preferences on F1 unchanged.
 
 **On macOS, F1/F3/F11 are unreliable by design and should not be relied on.**
 macOS reserves these at the OS level: F1/F2 default to brightness (never reach
 any app unless Fn is held or *System Settings > Keyboard > "Use F1, F2, etc.
 keys as standard function keys"* is enabled), and F3/F11 are global system
 shortcuts (Mission Control / Show Desktop) that are intercepted before any
-app -- including this one -- ever sees the keypress, Fn or not. None of these
-are real WordStar bindings to begin with (see the WordStar 4.0 manual under
-`docs/`: F1-F10 each carried 4 assignments, but every one was just a shortcut
-to a command also reachable via the Ctrl-diamond).
+app -- including this one -- ever sees the keypress, Fn or not.
 
 WordTsar's GUI therefore leads with macOS-native shortcuts for these three
-instead, with the F-key kept only as a bonus for anyone who has freed it:
+instead, with the F-key kept only as a bonus for anyone who has freed it
+(except Preferences, which moved fully to &#8984;, now that F1 has a real
+WordStar job of its own):
 
 | Function | Primary (macOS) | Also works if freed in System Settings |
 |----------|------------------|------------------------------------------|
-| Preferences | &#8984;, (Cmd+Comma) | F1 |
+| Preferences | &#8984;, (Cmd+Comma) | -- (F1 no longer does this in WordStar mode) |
+| Help | &#8984;/ (Cmd+Slash) | F1 |
 | Toggle Fullscreen | &#8984;&#8963;F (Cmd+Ctrl+F) | F11 |
 | Find Again | &#8984;G (Cmd+G, both input modes) | F3 (Modern mode only) |
 
@@ -150,7 +158,9 @@ Keyboard Shortcuts* and disable/reassign Mission Control (F3) or Show Desktop
 (F11). These Cmd-chords are GUI-only -- a terminal app has no way to receive
 Cmd-key combinations at all, since the terminal emulator (Terminal.app,
 iTerm2, etc.) consumes them for its own shortcuts before `ws` ever sees them.
-The TUI's primary path is, and remains, the Ctrl-diamond.
+The TUI's primary path for Help is the real F1 (which does reach `ws`, unlike
+Cmd-chords); Preferences in the TUI is now menu-only (File or Utilities menu),
+since it no longer has a keyboard shortcut of its own.
 
 ---
 
@@ -245,23 +255,19 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | =/+ | ^P,= | -- | Open font selection dialog (WS only; Modern uses Ctrl+D) |
 | - | ^P,- | Alt+P,- | Open color selection dialog |
 
-### J Chord -- Help and Insertion (WordStar Only)
+### M Chord -- Macros and Insertion (WordStar Only)
 
-The J chord has no Alt equivalent in Modern mode. These bindings are only available in WordStar mode.
-
-Pressing ^J followed by any command key not listed below (e.g. ^J,X) shows a
-one-line description of what that command does -- the WordStar 4.0 manual's
-"press ^J, then any command, to see help for that command."
+The M chord has no Alt+letter equivalent in Modern mode, but Alt+M does work as a terminal-safe alternate entry (see Additional Alt Shortcuts below). These bindings are only available in WordStar mode. `^J` itself is unassigned, matching real WordStar 7 -- its contextual help moved to `F1` (see Function Keys above).
 
 | Key | WordStar | Description |
 |-----|----------|-------------|
-| J | ^J,J | Change help level (0-3); prompts "What help level do you want?" |
-| @ | ^J,@ | Insert current date |
-| ! | ^J,! | Insert current time |
-| * | ^J,* | Insert current filename |
-| : | ^J,: | Insert drive letter (Windows) |
-| . | ^J,. | Insert current directory path |
-| \ | ^J,\ | Insert full path + filename |
+| @ | ^M,@ | Insert current date |
+| ! | ^M,! | Insert current time |
+| * | ^M,* | Insert current filename |
+| : | ^M,: | Insert drive letter (Windows) |
+| . | ^M,. | Insert current directory path |
+| \ | ^M,\ | Insert full path + filename |
+| P/R/D/S/E/O/Y | ^M,&lt;letter&gt; | Macro play/record/edit/single-step/rename/copy/delete (not yet implemented) |
 
 ### Additional Alt Shortcuts
 
@@ -271,7 +277,7 @@ one-line description of what that command does -- the WordStar 4.0 manual's
 | Alt+Q | Enter ^Q chord mode | Enter Alt+Q chord mode |
 | Alt+O | Enter ^O chord mode | Enter Alt+O chord mode |
 | Alt+P | Enter ^P chord mode | Enter Alt+P chord mode |
-| Alt+J | Enter ^J chord mode | -- |
+| Alt+M | Enter ^M chord mode | -- |
 | Alt+U | Redo | -- (Modern uses Ctrl+Y) |
 
 ---
@@ -347,13 +353,13 @@ Menu shortcuts shown to the user change based on the active input mode. The func
 | Item | WordStar Shortcut | Modern Shortcut | Action |
 |------|------------------|----------------|--------|
 | Page Break | .pa | -- | Insert page break |
-| Today's Date | ^J@ | -- | Insert current date |
+| Today's Date | ^M@ | -- | Insert current date |
 | **Other Value submenu** | | | |
-| -- Current Time | ^J! | -- | Insert current time |
-| -- Current Filename | ^J* | -- | Insert filename |
-| -- Current Drive | ^J: | -- | Insert drive letter |
-| -- Current Directory | ^J. | -- | Insert directory path |
-| -- Current Path | ^J\ | -- | Insert full path |
+| -- Current Time | ^M! | -- | Insert current time |
+| -- Current Filename | ^M* | -- | Insert filename |
+| -- Current Drive | ^M: | -- | Insert drive letter |
+| -- Current Directory | ^M. | -- | Insert directory path |
+| -- Current Path | ^M\ | -- | Insert full path |
 | **Variable submenu** | | | |
 | -- Date/Time/Page/etc. | &&@&&, &&!&&, etc. | -- | Insert variable placeholders |
 | File | ^KR | -- | Insert file at cursor |
@@ -411,6 +417,8 @@ Menu shortcuts shown to the user change based on the active input mode. The func
 |------|------------------|----------------|--------|
 | About WordTsar | -- | -- | Version and license info |
 
+Contextual per-command help isn't a menu item -- it's `F1` (WordStar mode only), matching real WordStar 7. Press `F1`, then any command key, to see a description of that command; press `F1` twice to change the help level. See Function Keys above.
+
 ---
 
 ## Detailed Binding Reference
@@ -462,8 +470,10 @@ Some Ctrl+letter keys have no binding in Modern mode:
 The following bindings are identical in both modes:
 - All special keys (arrows, Home/End, Page Up/Down, Delete, Backspace, Tab, Enter, Escape)
 - Ctrl+modifier variants of special keys (Ctrl+Left, Ctrl+Right, Ctrl+Home, etc.)
-- F1 (System Preferences), F11 (Toggle fullscreen)
+- F11 (Toggle fullscreen)
 - Direct character input (typing regular text)
+
+F1 is **not** shared: it's contextual help in WordStar mode (matching real WordStar 7) and System Preferences in Modern mode (Modern/CUA mode isn't trying to emulate WordStar 7's key layout). See Function Keys above.
 
 ---
 
@@ -484,10 +494,10 @@ Every key recognized by the WordStar input handler. Status column: **Yes** = fun
 | ^G | Delete character | Delete character at cursor | Yes |
 | ^H | Backspace | Delete character before cursor | Yes |
 | ^I | Insert tab | Insert tab | Yes |
-| ^J | Help/Jiffy prefix | Enter ^J chord mode | Yes |
+| ^J | (unassigned in WordStar 7) | -- | -- |
 | ^K | Block/File prefix | Enter ^K chord mode | Yes |
 | ^L | Find again | Find next match | Yes |
-| ^M | Macros prefix | Macros (not yet supported) | No |
+| ^M | Macro Menu prefix | Enter ^M chord mode | Yes |
 | ^N | Line break | Insert line break | Yes |
 | ^O | Format prefix | Enter ^O chord mode | Yes |
 | ^P | Style prefix | Enter ^P chord mode | Yes |
@@ -513,7 +523,7 @@ These provide alternative entry to chord modes (useful in terminals where Ctrl i
 | Alt+Q | Enter ^Q chord mode | Yes |
 | Alt+O | Enter ^O chord mode | Yes |
 | Alt+P | Enter ^P chord mode | Yes |
-| Alt+J | Enter ^J chord mode | Yes |
+| Alt+M | Enter ^M chord mode | Yes |
 | Alt+U | Redo last action | Yes |
 
 ### Special / Navigation Keys
@@ -540,7 +550,7 @@ These provide alternative entry to chord modes (useful in terminals where Ctrl i
 | Backspace | Ctrl | Delete word left | Delete word to the left | Yes |
 | Tab | -- | Insert tab | Insert tab | Yes |
 | Enter | -- | Line break | Insert line break | Yes |
-| F1 | -- | System Preferences | Open System Preferences | Yes |
+| F1 | -- | Contextual help | Press F1, then a command, for a description of it; F1 F1 changes the help level | Yes |
 | F2 | -- | -- | -- | -- |
 | F3 | -- | -- | -- | -- |
 | F4 | -- | -- | -- | -- |
@@ -553,28 +563,30 @@ These provide alternative entry to chord modes (useful in terminals where Ctrl i
 | F11 | -- | Toggle fullscreen | Toggle fullscreen | Yes |
 | F12 | -- | -- | -- | -- |
 
-### ^J Chord -- Help and Insertion
+### F1 Contextual Help
+
+Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar 7's real per-command help and help-level toggle live now -- see Function Keys above. `F1<letter>` shows a one-line description of that command; `F1 F1` prompts for and applies a new help level (0-4).
+
+### ^M Chord -- Macros and Insertion
 
 | Key | WS7 Function | WordTsar Action | Implemented |
 |-----|-------------|-----------------|-------------|
-| ^JJ | Change help level | Prompt for and apply a new help level (0-3) | Yes |
-| ^J&lt;letter&gt; | Contextual help | Show a one-line description of that command (single control keys not already claimed below) | Yes |
-| ^J@ | Insert date | Insert current date | Yes |
-| ^J! | Insert time | Insert current time | Yes |
-| ^J* | Insert filename | Insert current filename | Yes |
-| ^J: | Insert drive letter | Insert drive letter (Windows only) | Yes |
-| ^J. | Insert directory | Insert current directory | Yes |
-| ^J\ | Insert full path | Insert full file path | Yes |
-| ^J= | Insert math result | -- | No |
-| ^J# | Insert math expression | -- | No |
-| ^J$ | Insert math as dollar | -- | No |
-| ^JP | Play macro | -- | No |
-| ^JR | Record macro | -- | No |
-| ^JD | Edit/create macro | -- | No |
-| ^JS | Single-step macro | -- | No |
-| ^JE | Rename macro | -- | No |
-| ^JO | Copy macro | -- | No |
-| ^JY | Delete macro | -- | No |
+| ^M@ | Insert date | Insert current date | Yes |
+| ^M! | Insert time | Insert current time | Yes |
+| ^M* | Insert filename | Insert current filename | Yes |
+| ^M: | Insert drive letter | Insert drive letter (Windows only) | Yes |
+| ^M. | Insert directory | Insert current directory | Yes |
+| ^M\ | Insert full path | Insert full file path | Yes |
+| ^M= | Insert math result | -- | No |
+| ^M# | Insert math expression | -- | No |
+| ^M$ | Insert math as dollar | -- | No |
+| ^MP | Play macro | -- | No |
+| ^MR | Record macro | -- | No |
+| ^MD | Edit/create macro | -- | No |
+| ^MS | Single-step macro | -- | No |
+| ^ME | Rename macro | -- | No |
+| ^MO | Copy macro | -- | No |
+| ^MY | Delete macro | -- | No |
 
 ### ^K Chord -- Block and File
 

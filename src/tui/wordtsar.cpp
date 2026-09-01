@@ -656,7 +656,7 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
         mEditor->SetShowControls(SHOW_NONE);
     }
     mEditor->mAlwaysFlag = config.mTuiAlwaysFlagColumn;
-    mEditor->mHelpLevel = std::clamp(config.mTuiShowHelp, 0, 3);
+    mEditor->mHelpLevel = std::clamp(config.mTuiShowHelp, 0, 4);
     mEditor->SetHelpDisplay((mEditor->mHelpLevel == 3) ? HELP_MAIN : HELP_NONE);
 
     // Shared [editor]/[user] settings (match the GUI's ReadConfig).
@@ -996,7 +996,7 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(file, std::string("Print Pre&view") + SC("^OP", ""), [this](void) { mEditor->PrintPreview(); });
     mMenu.AddSeparator(file);
     mMenu.AddSubItem(file, std::string("&Recent Files..."), [this](void) { OpenRecentFiles(); });
-    mMenu.AddSubItem(file, std::string("Pr&eferences...") + SC("F1", "F1"), [this](void) { OpenSystemPreferences(); });
+    mMenu.AddSubItem(file, std::string("Pr&eferences..."), [this](void) { OpenSystemPreferences(); });
     mMenu.AddSeparator(file);
     mMenu.AddSubItem(file, std::string("E&xit WordTsar") + SC("^KX", "Alt+F4"), [this](void) { InjectChord(CTRL_K, 'x'); });
 
@@ -1255,7 +1255,7 @@ void cWSWordTsar::BuildMenus(void)
 
     mMenu.AddSubItem(util, std::string("Repeat Keystroke") + SC("^QQ", ""), none, false);
     mMenu.AddSeparator(util);
-    mMenu.AddSubItem(util, std::string("System Preferences") + SC("F1", "F1"), [this](void) { OpenSystemPreferences(); });
+    mMenu.AddSubItem(util, std::string("System Preferences"), [this](void) { OpenSystemPreferences(); });
 
     // ------------------------------- Help -------------------------------
     int help = mMenu.AddMenu("Help", 'H');
@@ -1338,9 +1338,10 @@ bool cWSWordTsar::IsHelpVisible(void)
         return true;
     }
 
-    // mode is one of the HELP_CTRLx submenus here. Per the WS4 manual's
-    // "Help levels", submenus only appear at help level 2 or above.
-    if (mEditor->mHelpLevel < 2)
+    // mode is one of the HELP_CTRLx submenus here. Per the WS7 manual's
+    // "Change Help Level", submenus only appear at levels 2-3 -- level 4
+    // relies on the pull-down bar instead.
+    if (mEditor->mHelpLevel < 2 || mEditor->mHelpLevel > 3)
     {
         return false;
     }
@@ -1496,19 +1497,19 @@ std::string cWSWordTsar::GetHelpText(eHelpDisplay help) const
         {
             return "                        ----- E D I T   M E N U -----\n"
                    "  CURSOR      SCROLL        DELETE      OTHER                 MENUS\n"
-                   " \001^E\001 up       \001^W\001 up         \001^G\001 char    \001^J\001 help                \001^O\001 onscreen format\n"
+                   " \001^E\001 up       \001^W\001 up         \001^G\001 char    \001F1\001 help                \001^O\001 onscreen format\n"
                    " \001^X\001 down     \001^Z\001 down       \001^T\001 word    \001^I\001 tab                 \001^K\001 block & save\n"
-                   " \001^S\001 left     \001^R\001 up screen  \001^Y\001 line    \001^V\001 turn insert off     ^M macros\n"
+                   " \001^S\001 left     \001^R\001 up screen  \001^Y\001 line    \001^V\001 turn insert off     \001^M\001 macros\n"
                    " \001^D\001 right    \001^C\001 down      \001Del\001 char    \001^L\001 find/replace again  \001^P\001 print controls\n"
                    " \001^A\001 word left   screen     \001^U\001 unerase                        \001^Q\001 quick functions\n"
-                   " \001^F\001 word right                        \001F1\001 Preferences\n"
+                   " \001^F\001 word right\n"
                    "                                     \001F10\001 Menu";
         }
 
-        case HELP_CTRLJ:
+        case HELP_CTRLM:
         {
-            return "                  ----- JIFFY MENU -----\n"
-                   "     JIFFY FUNCTIONS                   INSERT\n"
+            return "                  ----- MACRO MENU -----\n"
+                   "     MACRO FUNCTIONS                   INSERT\n"
                    " \001P\001 play          \001E\001 rename        \001@\001 today's date         \001*\001 current filename\n"
                    " \001R\001 record        \001O\001 copy          \001!\001 current time         \001:\001 current drive\n"
                    " \001D\001 edit/create   \001Y\001 delete        \001=\001 last math result     \001.\001 current directory\n"
@@ -2533,12 +2534,9 @@ bool cWSWordTsar::HandleEvent(const sInputEvent& event)
         return HandleOpeningKey(event);
     }
 
-    // F1 opens System Preferences.
-    if ((event.type == wordstartui::INPUT_TYPE_FUNCTION) && (event.functionKey == 1))
-    {
-        OpenSystemPreferences();
-        return true;
-    }
+    // F1 is WordStar 7's real Help key now (see cWordStarInput::HandleSpecialKey);
+    // it used to open System Preferences here, ahead of the normal input
+    // pipeline -- now it falls through so mView/mInput can handle it.
 
     if (mMenu.HandleEvent(event) == true)
     {

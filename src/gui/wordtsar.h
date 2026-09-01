@@ -343,7 +343,7 @@ private:
 
     // Help panel labels
     QLabel *mHelpCtrl;
-    QLabel *mHelpJCtrl;
+    QLabel *mHelpMCtrl;
     QLabel *mHelpPCtrl;
     QLabel *mHelpKCtrl;
     QLabel *mHelpQCtrl;
@@ -351,7 +351,7 @@ private:
 
     // Original help text strings (plain <b> tags, before color styling)
     QString mHelpTextMain;
-    QString mHelpTextJ;
+    QString mHelpTextM;
     QString mHelpTextK;
     QString mHelpTextO;
     QString mHelpTextP;

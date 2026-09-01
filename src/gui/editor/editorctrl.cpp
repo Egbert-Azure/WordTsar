@@ -3482,15 +3482,23 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
         bool alt = (modifiers & Qt::AltModifier) != 0 ;
         bool meta = (modifiers & Qt::MetaModifier) != 0 ;   // physical Cmd key (AA_MacDontSwapCtrlAndMeta)
 
-        // macOS-idiomatic shortcuts for the three real commands this app puts on
-        // bare F-keys (F1/F3/F11). macOS reserves those for brightness, Mission
-        // Control, and Show Desktop at the OS level, so they never reliably reach
-        // any app; these Cmd-chords are the primary path here, with the F-keys
-        // kept as a bonus for anyone who has freed them in System Settings.
+        // macOS-idiomatic shortcuts for commands this app also puts on bare
+        // F-keys (F1/F3/F11). macOS reserves those for brightness, Mission
+        // Control, and Show Desktop at the OS level, so they never reliably
+        // reach any app; these Cmd-chords are the primary path here. F1 is
+        // WordStar 7's own real Help key (see cWordStarInput::HandleSpecialKey),
+        // so Preferences moved fully to Cmd+, rather than sharing F1 with it.
         if (meta && !ctrl && !alt && key == Qt::Key_Comma)
         {
             SystemPreferences() ;
             handled = true ;
+        }
+        else if (meta && !ctrl && !alt && key == Qt::Key_Slash)
+        {
+            // Cmd+/ mirrors F1: "press it, then press the command you want
+            // help with" -- route through the same shared-handler state
+            // machine rather than duplicating it here.
+            handled = mInput->HandleSpecialKey(SPECIAL_F1, shift, ctrl, alt) ;
         }
         else if (meta && ctrl && !alt && key == Qt::Key_F)
         {
@@ -5619,12 +5627,19 @@ void cEditorCtrl::GotoPage(void)
 /// @return nothing
 ///
 /// @brief
-/// Prompt for and apply a new WS4 help level (^J^J). Per the WordStar 4.0
-/// manual's "Help levels" reference:
-///   3 - Edit Menu and submenus (^K/^Q/^O/^P) both displayed.
-///   2 - Edit Menu hidden; submenus still displayed after a pause.
-///   1 - No menus displayed.
-///   0 - No menus displayed; status line also hidden.
+/// Prompt for and apply a new WordStar 7 help level (F1 F1). Per the real
+/// manual's "Change Help Level" reference:
+///   4 - Pull-down menu bar shown (Alt+letter opens a menu); all prompts
+///       displayed. WordTsar's menu bar is always shown regardless of
+///       level, so this looks the same as 0/1 here -- no classic Edit
+///       Menu or submenus, since the pull-down bar is the access point.
+///   3 - Classic Edit Menu and submenus (^K/^Q/^O/^P/^M) both displayed.
+///   2 - Classic Edit Menu hidden; submenus still displayed after a pause.
+///   1 - No classic menus displayed.
+///   0 - Same as 1, plus the status line is hidden too -- WordTsar's own
+///       choice for "as minimal as it gets," not from the manual, which
+///       instead distinguishes 0 by letting you operate on hidden blocks
+///       without confirmation (not modeled here).
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::ChangeHelpLevel(void)
@@ -5636,8 +5651,8 @@ void cEditorCtrl::ChangeHelpLevel(void)
     }
 
     bool ok = false ;
-    int level = QInputDialog::getInt(this, "Help Level", "What help level do you want? (0-3)",
-                                      mHelpLevel, 0, 3, 1, &ok) ;
+    int level = QInputDialog::getInt(this, "Help Level", "What help level do you want? (0-4)",
+                                      mHelpLevel, 0, 4, 1, &ok) ;
     if(ok == false)
     {
         return ;
@@ -8162,7 +8177,7 @@ void cEditorCtrl::SystemPreferences(void)
 
     // --- Populate Tab 5: Display ---
     // Help level 0-3 (WS4 manual's "Help levels"); combo index == level.
-    ui.mShowHelp->setCurrentIndex(std::clamp(config.mGuiShowHelp, 0, 3));
+    ui.mShowHelp->setCurrentIndex(std::clamp(config.mGuiShowHelp, 0, 4));
 
     ui.mShowRuler->setChecked(config.mGuiShowRuler);
     ui.mShowScrollBar->setChecked(config.mGuiShowScrollBar);
@@ -8418,7 +8433,7 @@ void cEditorCtrl::SystemPreferences(void)
             SetShowControls(SHOW_NONE);
         }
 
-        mHelpLevel = std::clamp(config.mGuiShowHelp, 0, 3);
+        mHelpLevel = std::clamp(config.mGuiShowHelp, 0, 4);
         mHelpDisplay = (mHelpLevel == 3) ? HELP_MAIN : HELP_NONE;
         SetMeasurement(config.mMeasurement);
         SetCodePage(static_cast<eCodePage>(config.mCodePage));

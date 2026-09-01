@@ -8793,19 +8793,20 @@ TEST_CASE("P3.5: WordStar Input - Help Display State")
 
     layout->SetDocument(doc);
 
-    SUBCASE("Ctrl+J toggles help display")
+    SUBCASE("Ctrl+M enters Macro Menu chord, then exits on next key")
     {
         eHelpDisplay original = editor.mHelpDisplay;
 
-        // Enter Ctrl+J mode
-        editor.mInput->HandleKey(CTRL_J, false);
-        CHECK(editor.mHelpDisplay == HELP_CTRLJ);
+        // Enter Ctrl+M mode
+        editor.mInput->HandleKey(CTRL_M, false);
+        CHECK(editor.mHelpDisplay == HELP_CTRLM);
 
-        // Press J to toggle help
-        editor.mInput->HandleKey('J', false);
+        // Press @ (insert today's date) to complete the chord
+        editor.mInput->HandleKey('@', false);
 
-        // Help should be toggled
-        CHECK(editor.mHelpDisplay != HELP_CTRLJ);
+        // Chord display should be gone, restored to what it was before
+        CHECK(editor.mHelpDisplay != HELP_CTRLM);
+        CHECK(editor.mHelpDisplay == original);
     }
 
     SUBCASE("Command mode changes help display")
@@ -12106,39 +12107,58 @@ TEST_CASE("WordStar Input - Miscellaneous Single Keys")
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief
-/// WordStar Input - Ctrl+J Help Sequences
-/// Tests all Ctrl+J two-key sequences for help panel management.
+/// WordStar Input - Ctrl+M Macro Menu / F1 Help Sequences
+/// Tests the WordStar 7 Macro Menu chord (^M, replacing the old ^J-based
+/// Jiffy menu) and the F1 contextual-help entry point (replacing ^J's old
+/// role as a help prefix).
 ///
 /////////////////////////////////////////////////////////////////////////////
-TEST_CASE("WordStar Input - Ctrl+J Help Sequences")
+TEST_CASE("WordStar Input - Ctrl+M Macro Menu / F1 Help Sequences")
 {
     ensureQApplication();
 
     cEditorCtrl editor;
 
-    SUBCASE("Ctrl+J,J toggles help display")
+    SUBCASE("Ctrl+M,@ inserts today's date and exits the chord")
     {
         editor.mHelpDisplay = HELP_MAIN;
 
-        editor.mInput->HandleKey(CTRL_J, false);
-        CHECK(editor.mHelpDisplay == HELP_CTRLJ);
+        editor.mInput->HandleKey(CTRL_M, false);
+        CHECK(editor.mHelpDisplay == HELP_CTRLM);
 
-        editor.mInput->HandleKey('J', false);
+        editor.mInput->HandleKey('@', false);
 
-        // Help display toggled
-        CHECK(editor.mHelpDisplay != HELP_CTRLJ);
+        // Chord exited, display restored
+        CHECK(editor.mHelpDisplay != HELP_CTRLM);
     }
 
-    // NOTE: Ctrl+J,K / Ctrl+J,Q / Ctrl+J,O / Ctrl+J,P subcases removed.
-    // In the WS handler, OnControlJChar uses Ctrl+J as a prefix for
-    // date/time/filename insertion, NOT help panel switching. Follow-up
-    // keys like 'k', 'q' fall to default which calls InvalidCommand()
-    // or NotImplemented(), both showing modal QMessageBox dialogs that
-    // hang in test mode.
+    // NOTE: Ctrl+M,K / Ctrl+M,Q / Ctrl+M,O / Ctrl+M,P subcases not covered.
+    // Those letters aren't part of the real Macro Menu, so OnControlMChar's
+    // default: falls to InvalidCommand(), which is QT_TESTING-safe -- but
+    // covering all of them here isn't the point of this test.
 
-    SUBCASE("Escape cancels Ctrl+J mode")
+    SUBCASE("F1 then F1 attempts a help-level change (no-op under QT_TESTING)")
     {
-        editor.mInput->HandleKey(CTRL_J, false);
+        bool handled1 = editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        CHECK(handled1 == true);
+
+        bool handled2 = editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        CHECK(handled2 == true);
+    }
+
+    SUBCASE("F1 then an unmapped key reports invalid command")
+    {
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+
+        // 'j' has no per-command help entry (^J is unbound in WordStar 7),
+        // so this hits InvalidCommand() -- QT_TESTING-safe, no dialog shown.
+        bool handled = editor.mInput->HandleKey('j', false);
+        CHECK(handled == true);
+    }
+
+    SUBCASE("Escape cancels Ctrl+M mode")
+    {
+        editor.mInput->HandleKey(CTRL_M, false);
         CHECK(editor.mInput->CheckControlMode() == true);
 
         editor.mInput->HandleKey(27, false);  // ESC
@@ -12196,9 +12216,9 @@ TEST_CASE("WordStar Input - Escape Cancels All Modes")
         CHECK(editor.mInput->CheckControlMode() == false);
     }
 
-    SUBCASE("Escape cancels Ctrl+J mode")
+    SUBCASE("Escape cancels Ctrl+M mode")
     {
-        editor.mInput->HandleKey(CTRL_J, false);
+        editor.mInput->HandleKey(CTRL_M, false);
         CHECK(editor.mInput->CheckControlMode() == true);
 
         editor.mInput->HandleKey(27, false);
