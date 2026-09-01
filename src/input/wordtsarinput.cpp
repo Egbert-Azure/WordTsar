@@ -74,35 +74,91 @@ namespace {
 
 /////////////////////////////////////////////////////////////////////////////
 /// Per-command help text for ^J's "press ^J, then any command" contextual
-/// help (WordStar 4.0 manual: "^J Enters the help system. Press any command
-/// to see help for that command."). Only covers the single control keys
+/// help (WordStar 4.0 manual, p.339-342: "^J Enters the help system. Press
+/// any command to see help for that command."). Text is paraphrased from
+/// the manual's own per-key reference (Appendix G, "Commands from the Edit
+/// Menu"), not copied verbatim. Only covers the single control keys
 /// OnControlJChar's own switch doesn't already claim for something else
 /// (d/e/o/p/r/s/y are the Jiffy chord's macro-control letters; j itself
 /// changes the help level) -- see KEY_MAPPING.md's "Single Control Keys"
-/// table for the source of these descriptions.
+/// table for how these map onto what WordTsar actually implements today.
 /////////////////////////////////////////////////////////////////////////////
 const char *LookupControlKeyHelp(char lower)
 {
     switch(lower)
     {
-        case 'a' : return "^A - Move cursor left one word" ;
-        case 'b' : return "^B - Reformat paragraph (not yet implemented)" ;
-        case 'c' : return "^C - Move cursor down one page" ;
-        case 'f' : return "^F - Move cursor right one word" ;
-        case 'g' : return "^G - Delete character at cursor" ;
-        case 'h' : return "^H - Delete character before cursor (Backspace)" ;
-        case 'i' : return "^I - Insert tab" ;
-        case 'k' : return "^K - Enter Block and File chord" ;
-        case 'l' : return "^L - Find next match (Find Again)" ;
-        case 'm' : return "^M - Macros (not yet supported)" ;
-        case 'n' : return "^N - Insert line break" ;
-        case 'q' : return "^Q - Enter Quick Functions chord" ;
-        case 't' : return "^T - Delete word to the right" ;
-        case 'u' : return "^U - Undo last action" ;
-        case 'v' : return "^V - Toggle insert/overwrite mode" ;
-        case 'w' : return "^W - Scroll up one line" ;
-        case 'x' : return "^X - Move cursor down one line" ;
-        case 'z' : return "^Z - Scroll down one line" ;
+        case 'a' :
+            return "^A - Move cursor left one word\n\n"
+                   "Moves the cursor left to the first character of the previous word." ;
+        case 'b' :
+            return "^B - Reformat paragraph (not yet implemented)\n\n"
+                   "In WordStar 4.0: aligns the current paragraph between the current "
+                   "margins (including any temporary margin set with ^OG), stopping at "
+                   "the first hard return. If hyphen help is on, ^B continues aligning "
+                   "without hyphenating the current word." ;
+        case 'c' :
+            return "^C - Move cursor down one page\n\n"
+                   "Scrolls down one screen (same as Page Down)." ;
+        case 'f' :
+            return "^F - Move cursor right one word\n\n"
+                   "Moves the cursor right to the first character of the next word." ;
+        case 'g' :
+            return "^G - Delete character at cursor\n\n"
+                   "Deletes the character at the cursor. At the end of a line, deletes "
+                   "the line break instead, joining the next line onto this one." ;
+        case 'h' :
+            return "^H - Delete character before cursor (Backspace)\n\n"
+                   "Deletes the character to the left of the cursor. At the start of a "
+                   "line, deletes the previous line break, joining this line onto the one above." ;
+        case 'i' :
+            return "^I - Insert tab\n\n"
+                   "Moves the cursor to the next tab stop. With Insert on, inserts space "
+                   "and shifts existing text along; with Insert off, moves past existing "
+                   "text without shifting it. Does nothing if the line has no more tabs." ;
+        case 'k' :
+            return "^K - Enter Block and File chord\n\n"
+                   "Opens the Block and Save menu -- block marking, copy/move/delete, "
+                   "save/save as/quit, and file operations. Press a second key to choose." ;
+        case 'l' :
+            return "^L - Find next match (Find Again)\n\n"
+                   "Repeats the last Find or Find & Replace." ;
+        case 'm' :
+            return "^M - Macros (not yet supported)\n\n"
+                   "In WordStar 4.0: ^M is the Enter/Return key itself -- inserts a hard "
+                   "carriage return, or (with Insert off) just moves to the next line. "
+                   "WordTsar instead reserves ^M as a Macros chord prefix, which is not "
+                   "yet implemented; plain Enter/Return still inserts a line break." ;
+        case 'n' :
+            return "^N - Insert line break\n\n"
+                   "Inserts a blank line without moving the cursor, pushing any text to "
+                   "the right of the cursor down onto it." ;
+        case 'q' :
+            return "^Q - Enter Quick Functions chord\n\n"
+                   "Opens the Quick menu -- fast cursor jumps, find/replace, spell "
+                   "check, and deletion shortcuts. Press a second key to choose." ;
+        case 't' :
+            return "^T - Delete word to the right\n\n"
+                   "Deletes from the cursor to the next space or punctuation mark. At "
+                   "the end of a line, deletes the line break instead." ;
+        case 'u' :
+            return "^U - Undo last action\n\n"
+                   "Restores (unerases) the most recently deleted text, except single "
+                   "characters deleted with ^H, ^G, or Delete. Also interrupts a command in progress." ;
+        case 'v' :
+            return "^V - Toggle insert/overwrite mode\n\n"
+                   "Switches between Insert and Overwrite. The status line shows which is active." ;
+        case 'w' :
+            return "^W - Scroll up one line\n\n"
+                   "Scrolls the view up by one line, so the text on screen shifts down; "
+                   "the cursor moves with the text." ;
+        case 'x' :
+            return "^X - Move cursor down one line\n\n"
+                   "Moves the cursor down one line, keeping its column until it reaches "
+                   "a shorter line." ;
+        case 'z' :
+            return "^Z - Scroll down one line\n\n"
+                   "Scrolls the view down by one line, so the text on screen shifts up; "
+                   "the cursor moves with the text." ;
         default  : return nullptr ;
     }
 }

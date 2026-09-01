@@ -95,6 +95,73 @@ std::vector<std::string> SplitLines(const std::string& text)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  const std::string& text [in] text to wrap, paragraphs separated
+///         by blank lines (a "\n\n" run)
+/// @param  int maxWidth [in] maximum line width in columns
+///
+/// @return the text re-flowed to maxWidth, paragraph breaks preserved
+///
+/// @brief
+/// Unlike MessageBox's QMessageBox counterpart on the GUI side, the TUI's
+/// dialog widgets don't wrap long lines themselves -- CenteredRect just
+/// clamps to the terminal width, silently overflowing or truncating a long
+/// unwrapped line. Callers with prose longer than a short status line
+/// (e.g. the ^J contextual-help text) need to wrap it first.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string WrapText(const std::string& text, int maxWidth)
+{
+    std::vector<std::string> paragraphs = SplitLines(text);
+    std::vector<std::string> outLines;
+
+    for (const std::string& paragraph : paragraphs)
+    {
+        if (paragraph.empty())
+        {
+            outLines.push_back("");
+            continue;
+        }
+
+        std::istringstream words(paragraph);
+        std::string word;
+        std::string current;
+
+        while (words >> word)
+        {
+            if (current.empty())
+            {
+                current = word;
+            }
+            else if (static_cast<int>(current.size() + 1 + word.size()) <= maxWidth)
+            {
+                current += " ";
+                current += word;
+            }
+            else
+            {
+                outLines.push_back(current);
+                current = word;
+            }
+        }
+
+        outLines.push_back(current);
+    }
+
+    std::string result;
+    for (size_t i = 0; i < outLines.size(); i++)
+    {
+        if (i > 0)
+        {
+            result += "\n";
+        }
+        result += outLines[i];
+    }
+
+    return result;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  iWSDialogHost* host [in] dialog host
 /// @param  int rows [in] desired dialog height
 /// @param  int cols [in] desired dialog width
@@ -356,7 +423,7 @@ short ClampChannel(int value)
 /////////////////////////////////////////////////////////////////////////////
 void MessageBox(iWSDialogHost* host, const std::string& title, const std::string& message)
 {
-    std::vector<std::string> lines = SplitLines(message);
+    std::vector<std::string> lines = SplitLines(WrapText(message, 60));
 
     int contentWidth = WidestLine(lines);
     int titleWidth = static_cast<int>(title.size());
