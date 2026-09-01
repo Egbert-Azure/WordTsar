@@ -567,7 +567,12 @@ void cDOCXFile::HandleParagraphNode(pugi::xml_node node, int depth)
     while(run)
     {
         std::string text = run.child("w:t").text().get() ;
-        if(!text.empty())
+        // Hidden runs (w:vanish) are how comment lines get preserved on
+        // export (SaveDotCommand) -- bringing them back as ordinary visible
+        // text on import would surface hidden content instead of keeping it
+        // hidden, so skip their text entirely.
+        bool hidden = !run.child("w:rPr").child("w:vanish").empty() ;
+        if(!text.empty() && !hidden)
         {
             // see if we have a style associated with this run
             std::string stylename = run.child("w:rPr").child("w:rStyle").attribute("w:val").value() ;
@@ -2037,15 +2042,42 @@ void cDOCXFile::SaveDotCommand(pugi::xml_node &body, std::string &text)
         // text rather than a real Word review comment -- that would need a
         // whole extra word/comments.xml part; w:vanish needs nothing but this
         // run. Visible only if the reader turns on Word's hidden-text display.
-        size_t prefixLen = startsWith("..") ? 2 : 3 ;
-        std::string rest = text.size() > prefixLen ? text.substr(prefixLen) : "" ;
+        bool isDotDot = startsWith("..") ;
+        size_t prefixLen = isDotDot ? 2 : 3 ;
+
+        // GetParagraphText() includes the trailing paragraph terminator, same
+        // as SaveParagraph() strips before use.
+        while (!text.empty() && (text.back() == '\n' || text.back() == static_cast<char>(HARD_RETURN)))
+        {
+            text.pop_back() ;
+        }
+        std::string rest = text.substr(prefixLen) ;
+
+        // Drop (rather than interpret) any in-band control bytes -- style
+        // toggles are resolved via mWCurrentPosition/GetControlChar(), which
+        // this branch never advances, so passing them through raw would leak
+        // literal control characters into the hidden run instead of styling.
+        std::string clean ;
+        clean.reserve(rest.size()) ;
+        for (unsigned char byte : rest)
+        {
+            if (byte != static_cast<unsigned char>(MARKER_CHAR) &&
+               byte != static_cast<unsigned char>(REPLACE_CHAR) &&
+               byte != static_cast<unsigned char>(SAVE_CHAR))
+            {
+                clean += static_cast<char>(byte) ;
+            }
+        }
 
         pugi::xml_node para = body.append_child("w:p") ;
+        // Hide the paragraph mark itself too, not just the run -- otherwise
+        // the paragraph still occupies a blank line with hidden text off.
+        para.append_child("w:pPr").append_child("w:rPr").append_child("w:vanish") ;
         pugi::xml_node run = para.append_child("w:r") ;
         run.append_child("w:rPr").append_child("w:vanish") ;
         pugi::xml_node t = run.append_child("w:t") ;
         t.append_attribute("xml:space") = "preserve" ;
-        t.text().set(rest.c_str()) ;
+        t.text().set(clean.c_str()) ;
     }
     // Anything else (headers/footers, columns, tabs, indexing, page numbering,
     // printer options, kerning, line numbering, ...) is intentionally not

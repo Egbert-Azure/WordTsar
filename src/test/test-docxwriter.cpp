@@ -54,15 +54,6 @@ void ensureQApplication()
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// Helper: save sourceEditor's document as a .docx at path, then load that
-/// file back into a fresh editor's document and return its paragraph texts
-/// for inspection. This exercises cDOCXFile::SaveFile() and LoadFile()
-/// against each other -- the most meaningful check available without a
-/// real Word/Pages install to cross-validate against.
-///
-/////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////
-///
 /// Helper: pull word/document.xml back out of a saved .docx as a raw string,
 /// for checks that need to see the actual markup (e.g. w:vanish) rather than
 /// what LoadFile() reconstructs into paragraph text.
@@ -75,10 +66,13 @@ static std::string ExtractDocumentXml(const std::string &path)
 
     void *docbuf = nullptr ;
     size_t bufsize = 0 ;
-    zip_entry_open(zip, "word/document.xml") ;
-    zip_entry_read(zip, &docbuf, &bufsize) ;
+    REQUIRE(zip_entry_open(zip, "word/document.xml") == 0) ;
+    ssize_t bytesRead = zip_entry_read(zip, &docbuf, &bufsize) ;
     zip_entry_close(zip) ;
     zip_close(zip) ;
+
+    REQUIRE(bytesRead >= 0) ;
+    REQUIRE(docbuf != nullptr) ;
 
     std::string xml(static_cast<char *>(docbuf), bufsize) ;
     free(docbuf) ;
@@ -86,6 +80,15 @@ static std::string ExtractDocumentXml(const std::string &path)
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// Helper: save sourceEditor's document as a .docx at path, then load that
+/// file back into a fresh editor's document and return its paragraph texts
+/// for inspection. This exercises cDOCXFile::SaveFile() and LoadFile()
+/// against each other -- the most meaningful check available without a
+/// real Word/Pages install to cross-validate against.
+///
+/////////////////////////////////////////////////////////////////////////////
 static std::vector<std::string> RoundTripDOCX(cEditorCtrl &sourceEditor, const std::string &path)
 {
     cDOCXFile writer(&sourceEditor) ;
@@ -196,24 +199,32 @@ TEST_CASE("DOCX writer - .. comment line is preserved as hidden text, not droppe
     editor.GetDocument()->Insert("Visible paragraph") ;
 
     std::string path = "/tmp/wordtsar_docxtest_comment.docx" ;
-    cDOCXFile writer(&editor) ;
-    REQUIRE(writer.SaveFile(path, editor.GetDocument()->GetTextSize())) ;
+    std::vector<std::string> paragraphs = RoundTripDOCX(editor, path) ;
 
     // Check the raw document.xml directly: the comment text must appear
-    // inside a hidden (w:vanish) run, since the reader doesn't parse hidden
-    // runs back into ".." lines -- this checks the writer side only.
+    // inside a hidden (w:vanish) run, with no stray trailing '\r' leaking in
+    // from the paragraph terminator GetParagraphText() includes.
     std::string xml = ExtractDocumentXml(path) ;
     CHECK(xml.find("This is a comment") != std::string::npos) ;
+    CHECK(xml.find("This is a comment\r") == std::string::npos) ;
     CHECK(xml.find("w:vanish") != std::string::npos) ;
 
-    std::vector<std::string> paragraphs = RoundTripDOCX(editor, path) ;
+    // On the read-back side: the visible paragraph must survive, and the
+    // hidden comment text must NOT reappear as ordinary visible text --
+    // that would turn "silently dropped" into "silently surfaced instead".
     bool sawVisible = false ;
+    bool sawCommentText = false ;
     for (auto &p : paragraphs)
     {
         if (p.find("Visible paragraph") != std::string::npos)
         {
             sawVisible = true ;
         }
+        if (p.find("This is a comment") != std::string::npos)
+        {
+            sawCommentText = true ;
+        }
     }
     CHECK(sawVisible) ;
+    CHECK_FALSE(sawCommentText) ;
 }
