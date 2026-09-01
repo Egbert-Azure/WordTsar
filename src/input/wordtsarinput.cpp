@@ -70,6 +70,45 @@
 
 // #include "src/files/file.h"  // OLD - temporarily removed (depends on old editor)
 
+namespace {
+
+/////////////////////////////////////////////////////////////////////////////
+/// Per-command help text for ^J's "press ^J, then any command" contextual
+/// help (WordStar 4.0 manual: "^J Enters the help system. Press any command
+/// to see help for that command."). Only covers the single control keys
+/// OnControlJChar's own switch doesn't already claim for something else
+/// (d/e/o/p/r/s/y are the Jiffy chord's macro-control letters; j itself
+/// changes the help level) -- see KEY_MAPPING.md's "Single Control Keys"
+/// table for the source of these descriptions.
+/////////////////////////////////////////////////////////////////////////////
+const char *LookupControlKeyHelp(char lower)
+{
+    switch(lower)
+    {
+        case 'a' : return "^A - Move cursor left one word" ;
+        case 'b' : return "^B - Reformat paragraph (not yet implemented)" ;
+        case 'c' : return "^C - Move cursor down one page" ;
+        case 'f' : return "^F - Move cursor right one word" ;
+        case 'g' : return "^G - Delete character at cursor" ;
+        case 'h' : return "^H - Delete character before cursor (Backspace)" ;
+        case 'i' : return "^I - Insert tab" ;
+        case 'k' : return "^K - Enter Block and File chord" ;
+        case 'l' : return "^L - Find next match (Find Again)" ;
+        case 'm' : return "^M - Macros (not yet supported)" ;
+        case 'n' : return "^N - Insert line break" ;
+        case 'q' : return "^Q - Enter Quick Functions chord" ;
+        case 't' : return "^T - Delete word to the right" ;
+        case 'u' : return "^U - Undo last action" ;
+        case 'v' : return "^V - Toggle insert/overwrite mode" ;
+        case 'w' : return "^W - Scroll up one line" ;
+        case 'x' : return "^X - Move cursor down one line" ;
+        case 'z' : return "^Z - Scroll down one line" ;
+        default  : return nullptr ;
+    }
+}
+
+} // namespace
+
 /// @ingroup Keyboard
 /// @{
 
@@ -615,16 +654,10 @@ void cWordStarInput::OnControlJChar(char ch)
     switch(ch)
     {
         case 'j' :
-            if(mEditor->mHelpDisplay == HELP_MAIN )
-            {
-                mEditor->mHelpDisplay = HELP_NONE ;
-                mOldHelpStatus = mEditor->mHelpDisplay ;
-            }
-            else
-            {
-                mEditor->mHelpDisplay = HELP_MAIN ;
-                mOldHelpStatus = mEditor->mHelpDisplay ;
-            }
+            // WordStar 4.0 manual, "Help levels": ^J^J changes the help level
+            // (0-3), prompting "What help level do you want?".
+            mEditor->ChangeHelpLevel() ;
+            mOldHelpStatus = mEditor->mHelpDisplay ;
             break ;
 
         case '@' :
@@ -702,8 +735,16 @@ void cWordStarInput::OnControlJChar(char ch)
 
         default :
             {
-                std::string t = string_sprintf("^J-%c", ch).c_str() ;
-                mEditor->InvalidCommand(t) ;
+                const char *help = LookupControlKeyHelp(ch) ;
+                if(help != nullptr)
+                {
+                    mEditor->ShowMessage("Help", help) ;
+                }
+                else
+                {
+                    std::string t = string_sprintf("^J-%c", ch).c_str() ;
+                    mEditor->InvalidCommand(t) ;
+                }
             }
             break ;
 

@@ -389,6 +389,7 @@ private:
     bool         mStatusPrevUnderline = false ;
     int          mStatusPrevJust = -1 ;
     bool         mStatusPrevInit = false ;
+    bool         mStatusBottomPrevVisible = true ;  // tracks mEditor->mDispStatusBar for ChangeHelpLevel(0)
 };
 
 

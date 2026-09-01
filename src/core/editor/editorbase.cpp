@@ -125,6 +125,7 @@ cEditorBase::cEditorBase(void)
     , mLongName("")
     , mAlwaysDot(true)
     , mHelpDisplay(HELP_NONE)
+    , mHelpLevel(3)                  // WS4 default: all menus and prompts displayed
     , mRevealCodesVisible(false)
     , mSearchText("")
     , mReplaceText("")

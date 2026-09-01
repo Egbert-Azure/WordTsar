@@ -89,6 +89,7 @@ public:
     void GotoCharacterBackward(void) override;
     void GotoPage(void) override;
     void DeleteToChar(void) override;
+    void ChangeHelpLevel(void) override;
 
     // ---- Pure virtual: formatting and layout dialogs ----
     void SelectFont(void) override;

@@ -281,6 +281,7 @@ void cEditorCtrl::Init(void)
     mDispScrollBar = true;                          // Display scrollbar by default
     mDispStyleBar = true;                           // Display style bar by default
     mDispStatusBar = true;                          // Display status bar by default
+    mDispStatusBarBeforeHelpLevel0 = true;          // Restored when leaving help level 0
     mDispRuler = true;                              // Display ruler by default
     mDispMenu = true;                               // Display menu bar by default
 
@@ -5614,6 +5615,50 @@ void cEditorCtrl::GotoPage(void)
 
 
 /////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Prompt for and apply a new WS4 help level (^J^J). Per the WordStar 4.0
+/// manual's "Help levels" reference:
+///   3 - Edit Menu and submenus (^K/^Q/^O/^P) both displayed.
+///   2 - Edit Menu hidden; submenus still displayed after a pause.
+///   1 - No menus displayed.
+///   0 - No menus displayed; status line also hidden.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::ChangeHelpLevel(void)
+{
+    const char* qtTesting = std::getenv("QT_TESTING");
+    if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
+    {
+        return;
+    }
+
+    bool ok = false ;
+    int level = QInputDialog::getInt(this, "Help Level", "What help level do you want? (0-3)",
+                                      mHelpLevel, 0, 3, 1, &ok) ;
+    if(ok == false)
+    {
+        return ;
+    }
+
+    mHelpLevel = level ;
+    mHelpDisplay = (level == 3) ? HELP_MAIN : HELP_NONE ;
+
+    if(level == 0)
+    {
+        mDispStatusBarBeforeHelpLevel0 = mDispStatusBar ;
+        mDispStatusBar = false ;
+    }
+    else if(mDispStatusBar == false && mDispStatusBarBeforeHelpLevel0 == true)
+    {
+        mDispStatusBar = true ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
 // SPELL CHECKING
 /////////////////////////////////////////////////////////////////////////////
 
@@ -8116,15 +8161,8 @@ void cEditorCtrl::SystemPreferences(void)
         [&](int) { applySelectedPalette(); });
 
     // --- Populate Tab 5: Display ---
-    // Help display: 0=HELP_NONE, 1=HELP_MAIN (map from eHelpDisplay)
-    if (config.mGuiShowHelp == HELP_NONE)
-    {
-        ui.mShowHelp->setCurrentIndex(0);
-    }
-    else
-    {
-        ui.mShowHelp->setCurrentIndex(1);
-    }
+    // Help level 0-3 (WS4 manual's "Help levels"); combo index == level.
+    ui.mShowHelp->setCurrentIndex(std::clamp(config.mGuiShowHelp, 0, 3));
 
     ui.mShowRuler->setChecked(config.mGuiShowRuler);
     ui.mShowScrollBar->setChecked(config.mGuiShowScrollBar);
@@ -8346,14 +8384,7 @@ void cEditorCtrl::SystemPreferences(void)
         config.mGuiRulerBackground = readButtonColor(ui.mColorRulerBg);
 
         // --- Read back Tab 5: Display ---
-        if (ui.mShowHelp->currentIndex() == 0)
-        {
-            config.mGuiShowHelp = HELP_NONE;
-        }
-        else
-        {
-            config.mGuiShowHelp = HELP_MAIN;
-        }
+        config.mGuiShowHelp = ui.mShowHelp->currentIndex();
 
         config.mGuiShowRuler = ui.mShowRuler->isChecked();
         config.mGuiShowScrollBar = ui.mShowScrollBar->isChecked();
@@ -8387,7 +8418,8 @@ void cEditorCtrl::SystemPreferences(void)
             SetShowControls(SHOW_NONE);
         }
 
-        mHelpDisplay = static_cast<eHelpDisplay>(config.mGuiShowHelp);
+        mHelpLevel = std::clamp(config.mGuiShowHelp, 0, 3);
+        mHelpDisplay = (mHelpLevel == 3) ? HELP_MAIN : HELP_NONE;
         SetMeasurement(config.mMeasurement);
         SetCodePage(static_cast<eCodePage>(config.mCodePage));
         mSpellCheckLanguage = config.mSpellCheckLanguage;

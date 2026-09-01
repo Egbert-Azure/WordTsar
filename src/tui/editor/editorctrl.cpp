@@ -2370,6 +2370,52 @@ void cWSEditorCtrl::GotoPage(void)
 /// @return nothing
 ///
 /// @brief
+/// Prompt for and apply a new WS4 help level (^J^J). Per the WordStar 4.0
+/// manual's "Help levels" reference:
+///   3 - Edit Menu and submenus (^K/^Q/^O/^P) both displayed.
+///   2 - Edit Menu hidden; submenus still displayed after a pause.
+///   1 - No menus displayed.
+///   0 - No menus displayed; status line also hidden.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::ChangeHelpLevel(void)
+{
+    if (!mHost)
+    {
+        return;
+    }
+
+    std::string levelStr;
+    if (!wsdialogs::InputBox(mHost, "Help Level", "What help level do you want? (0-3)", levelStr))
+    {
+        return;
+    }
+
+    int level = 0;
+    try
+    {
+        level = std::stoi(levelStr);
+    }
+    catch (...)
+    {
+        return;
+    }
+
+    if (level < 0 || level > 3)
+    {
+        return;
+    }
+
+    mHelpLevel = level;
+    mHelpDisplay = (level == 3) ? HELP_MAIN : HELP_NONE;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
 /// Delete text from the current position to the next occurrence of a
 /// user-specified character.
 ///

@@ -66,6 +66,7 @@
  * @see cConfig Application configuration manager
  */
 
+#include <algorithm>
 #include <string>
 
 #include <QtGlobal>
@@ -780,6 +781,20 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
     sStatus cstatus ;
     editor->GetStatus(cstatus) ;
 
+    // Help level gates whether the delayed ^K/^Q/^O/^P/^J submenus ever
+    // appear (WordStar 4.0 manual, "Help levels": submenus need level 2+).
+    // The main Edit Menu's own level-3-only gating already happens in
+    // ChangeHelpLevel(), which only ever sets the idle mHelpDisplay to
+    // HELP_MAIN or HELP_NONE -- this only needs to catch the transient
+    // HELP_CTRLx states a chord prefix sets regardless of level.
+    if(editor->mHelpLevel < 2 &&
+       (cstatus.help == HELP_CTRLJ || cstatus.help == HELP_CTRLK ||
+        cstatus.help == HELP_CTRLO || cstatus.help == HELP_CTRLP ||
+        cstatus.help == HELP_CTRLQ))
+    {
+        cstatus.help = HELP_NONE ;
+    }
+
     std::string str ;
 
     // Build block markers string
@@ -1010,6 +1025,15 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
             mStatusLastHelp = HELP_CTRLO ;
         }
     }
+
+    // ChangeHelpLevel(0) hides the status line at runtime (not just at
+    // startup/Preferences-OK, unlike the other mDisp* flags applied via
+    // ApplyDisplaySettings()), so react to it here every tick.
+    if(editor->mDispStatusBar != mStatusBottomPrevVisible)
+    {
+        mStatusBottom->setVisible(editor->mDispStatusBar) ;
+        mStatusBottomPrevVisible = editor->mDispStatusBar ;
+    }
 }
 
 
@@ -1150,8 +1174,9 @@ void cWordTsar::ReadConfig(void)
     // Window size
     resize(config.mWindowWidth, config.mWindowHeight) ;
 
-    // Help display mode
-    mEditor->mHelpDisplay = static_cast<eHelpDisplay>(config.mGuiShowHelp) ;
+    // Help level (WS4 manual's "Help levels", 0-3)
+    mEditor->mHelpLevel = std::clamp(config.mGuiShowHelp, 0, 3) ;
+    mEditor->mHelpDisplay = (mEditor->mHelpLevel == 3) ? HELP_MAIN : HELP_NONE ;
 
     // Measurement units
     mEditor->SetMeasurement(config.mMeasurement) ;
@@ -1226,18 +1251,11 @@ void cWordTsar::WriteConfig(void)
     config.mWindowWidth = wsize.width() ;
     config.mWindowHeight = wsize.height() ;
 
-    // Help display mode: mEditor->mHelpDisplay doubles as both a stable
-    // preference (HELP_NONE/HELP_MAIN, toggled here or via ^J J) and a
-    // momentary UI state (which submenu, if any, is currently open --
-    // HELP_CTRLJ/K/P/Q/O). Only persist the stable states; if the app
-    // quits mid-submenu, capturing that transient value here would
-    // permanently overwrite the user's real preference with whatever
-    // happened to be on screen at that instant. The Preferences dialog
-    // writes config.mGuiShowHelp directly for the same two stable states.
-    if (mEditor->mHelpDisplay == HELP_NONE || mEditor->mHelpDisplay == HELP_MAIN)
-    {
-        config.mGuiShowHelp = mEditor->mHelpDisplay ;
-    }
+    // Help level (WS4 manual's "Help levels", 0-3): unlike mHelpDisplay,
+    // which also carries momentary chord-submenu state (HELP_CTRLJ/K/P/Q/O),
+    // mHelpLevel only ever changes via ChangeHelpLevel() (^J^J or the
+    // Preferences dialog), so it's always safe to persist directly.
+    config.mGuiShowHelp = mEditor->mHelpLevel ;
 
     // Measurement units
     config.mMeasurement = mEditor->GetMeasurement() ;

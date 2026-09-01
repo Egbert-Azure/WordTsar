@@ -40,6 +40,7 @@
 #include "src/core/utils/config.h"
 #include "src/tui/wordstartui/src/listbox.h"
 
+#include <algorithm>
 #include <cctype>
 #include <csignal>
 #include <cstdio>
@@ -655,7 +656,8 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
         mEditor->SetShowControls(SHOW_NONE);
     }
     mEditor->mAlwaysFlag = config.mTuiAlwaysFlagColumn;
-    mEditor->SetHelpDisplay(static_cast<eHelpDisplay>(config.mTuiShowHelp));
+    mEditor->mHelpLevel = std::clamp(config.mTuiShowHelp, 0, 3);
+    mEditor->SetHelpDisplay((mEditor->mHelpLevel == 3) ? HELP_MAIN : HELP_NONE);
 
     // Shared [editor]/[user] settings (match the GUI's ReadConfig).
     mEditor->mSpellCheckLanguage = config.mSpellCheckLanguage;
@@ -809,7 +811,7 @@ void cWSWordTsar::WriteConfig(void)
     config.mLongName = mEditor->mLongName;
 
     // TUI chrome flags (as set by ApplyConfig / System Preferences).
-    config.mTuiShowHelp = static_cast<int>(mEditor->mHelpDisplay);
+    config.mTuiShowHelp = mEditor->mHelpLevel;
     config.mTuiShowTitleBar = mShowTitle;
     config.mTuiShowMenu = mShowMenu;
     config.mTuiShowStyleBar = mShowTopStatus;
@@ -1334,6 +1336,13 @@ bool cWSWordTsar::IsHelpVisible(void)
     if (mode == HELP_MAIN)
     {
         return true;
+    }
+
+    // mode is one of the HELP_CTRLx submenus here. Per the WS4 manual's
+    // "Help levels", submenus only appear at help level 2 or above.
+    if (mEditor->mHelpLevel < 2)
+    {
+        return false;
     }
 
     std::chrono::steady_clock::duration elapsed = std::chrono::steady_clock::now() - mHelpModeChangedAt;

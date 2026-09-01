@@ -140,6 +140,7 @@ public:
     virtual void GotoCharacterBackward(void) = 0;             // Show goto character backward dialog
     virtual void GotoPage(void) = 0;                          // Show goto page dialog
     virtual void DeleteToChar(void) = 0;                      // Show delete to character dialog
+    virtual void ChangeHelpLevel(void) = 0;                   // Prompt for and apply a new WS4 help level (0-3)
 
     // Pure Virtual - Formatting and Layout Dialogs
     virtual void SelectFont(void) = 0;                        // Show font selection dialog
@@ -437,6 +438,7 @@ public:
     std::string mLongName;              // User's long name (config [user])
     bool mAlwaysDot;                    // Preference: always show dot commands
     eHelpDisplay mHelpDisplay;          // Current help mode display
+    int mHelpLevel;                     // WS4 help level 0-3; gates Edit Menu/submenu visibility (see ChangeHelpLevel)
     bool mRevealCodesVisible;           // true if the reveal codes pane should be open for this document
 
     // Search/Replace State

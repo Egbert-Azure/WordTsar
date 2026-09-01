@@ -130,7 +130,7 @@ cConfig::cConfig(void)
     mWindowHeight = 900;
 
     // [gui.display] defaults
-    mGuiShowHelp = 2;
+    mGuiShowHelp = 3;                   // WS4 default: all menus and prompts displayed
     mGuiShowRuler = true;
     mGuiShowScrollBar = true;
     mGuiShowStatusBar = true;
@@ -171,7 +171,7 @@ cConfig::cConfig(void)
 
     // [tui.display] defaults
     mTuiShowTitleBar = true;
-    mTuiShowHelp = 2;
+    mTuiShowHelp = 3;                   // WS4 default: all menus and prompts displayed
     mTuiShowRuler = true;
     mTuiShowScrollBar = true;
     mTuiShowStatusBar = true;

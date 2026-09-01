@@ -167,6 +167,7 @@ public:
     void GotoCharacterBackward(void) override;
     void GotoPage(void) override;
     void DeleteToChar(void) override;
+    void ChangeHelpLevel(void) override;
     void SelectFont(void) override;
     void SelectColor(void) override;
     void About(void) override;
@@ -317,6 +318,7 @@ public:
     bool mDispScrollBar;                  // Display scrollbar flag
     bool mDispStyleBar;                   // Display style bar flag
     bool mDispStatusBar;                  // Display status bar flag
+    bool mDispStatusBarBeforeHelpLevel0;  // mDispStatusBar as it was before ChangeHelpLevel forced it off at level 0
     bool mDispRuler;                      // Display ruler flag
     bool mDispMenu;                       // Display menu bar flag
 

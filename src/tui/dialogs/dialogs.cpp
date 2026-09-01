@@ -2635,10 +2635,10 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         displayFocus.push_back(showMenuPtr);
         displayWidgets.push_back(std::move(showMenu));
 
-        displayLabels.push_back({contentTop + 8, contentLeft, "Help Display:", true});
+        displayLabels.push_back({contentTop + 8, contentLeft, "Help Level:", true});
         auto help = std::make_unique<cDropdown>(MakeDisplayRect(leftCol, 9, fieldWidth));
-        help->SetItems({"Hidden", "Compact", "Full"});
-        help->SetSelectedIndex(Clamp(config.mTuiShowHelp, 0, 2));
+        help->SetItems({"0 - Off", "1 - Menus Off", "2 - Compact", "3 - Full"});
+        help->SetSelectedIndex(Clamp(config.mTuiShowHelp, 0, 3));
         helpPtr = help.get();
         displayFocus.push_back(helpPtr);
         displayWidgets.push_back(std::move(help));
@@ -3724,7 +3724,7 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
     config.mTuiShowMenu = TriToBool(showMenuPtr);
     config.mTuiAlwaysDotCommands = TriToBool(alwaysDotPtr);
     config.mTuiAlwaysFlagColumn = TriToBool(alwaysFlagPtr);
-    config.mTuiShowHelp = Clamp(helpPtr->GetSelectedIndex(), 0, 2);
+    config.mTuiShowHelp = Clamp(helpPtr->GetSelectedIndex(), 0, 3);
 
     config.mShortName = shortNamePtr->GetText();
     config.mLongName = longNamePtr->GetText();

@@ -249,9 +249,13 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 
 The J chord has no Alt equivalent in Modern mode. These bindings are only available in WordStar mode.
 
+Pressing ^J followed by any command key not listed below (e.g. ^J,X) shows a
+one-line description of what that command does -- the WordStar 4.0 manual's
+"press ^J, then any command, to see help for that command."
+
 | Key | WordStar | Description |
 |-----|----------|-------------|
-| J | ^J,J | Toggle help panel display |
+| J | ^J,J | Change help level (0-3); prompts "What help level do you want?" |
 | @ | ^J,@ | Insert current date |
 | ! | ^J,! | Insert current time |
 | * | ^J,* | Insert current filename |
@@ -553,7 +557,8 @@ These provide alternative entry to chord modes (useful in terminals where Ctrl i
 
 | Key | WS7 Function | WordTsar Action | Implemented |
 |-----|-------------|-----------------|-------------|
-| ^JJ | Toggle help display | Toggle help panel | Yes |
+| ^JJ | Change help level | Prompt for and apply a new help level (0-3) | Yes |
+| ^J&lt;letter&gt; | Contextual help | Show a one-line description of that command (single control keys not already claimed below) | Yes |
 | ^J@ | Insert date | Insert current date | Yes |
 | ^J! | Insert time | Insert current time | Yes |
 | ^J* | Insert filename | Insert current filename | Yes |
