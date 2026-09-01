@@ -46,6 +46,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -87,30 +88,78 @@ constexpr int CTRL_Y = 25;
 // Splash frames before auto-advancing (~50ms per loop tick).
 constexpr int SPLASH_TICKS = 12;
 
+enum class eOpeningAction
+{
+    OPEN_DOCUMENT,
+    SPEED_WRITE,
+    OPEN_NONDOCUMENT,
+    PRINT_FILE,
+    FAX,
+    PRINT_FROM_KEYBOARD,
+    INDEX_DOCUMENT,
+    TABLE_OF_CONTENTS,
+    EXIT,
+    CHANGE_DIRECTORY,
+    PROTECT_UNPROTECT,
+    RENAME_FILE,
+    COPY_FILE,
+    DELETE_FILE,
+    TURN_DIRECTORY_OFF,
+    MACROS,
+    RUN_COMMAND,
+    ABOUT,
+    DISPLAY_STATUS,
+    RECENT_FILES,
+    PREFERENCES,
+};
+
 struct sOpeningItem
 {
-    char key;
+    char key;           // typed hotkey; 0 = cursor + Enter only, no direct keypress
     const char* label;
     bool enabled;
-    int column;
+    eOpeningAction action;
 };
 
-// The WordStar opening menu, two columns.
+// The WordStar 7 opening menu, two columns, letter-for-letter matching the
+// real Classic Opening Menu (WordStar 7 manual, "Classic Menus and
+// Commands"). The array is ordered left column first, then right column --
+// see kOpeningLeftCount. The last two rows (no letter shown) are WordTsar's
+// own additions, reachable only by cursor + Enter so they can't collide with
+// a real WordStar 7 binding. F1 (help) is real WS7's own 20th item; it's
+// drawn and handled separately since it arrives as a function-key event, not
+// a typed character (see DrawOpeningMenu / HandleOpeningKey).
 const sOpeningItem kOpeningItems[] =
 {
-    { 'D', "open a document",        true,  0 },
-    { 'S', "speed write (new file)", true,  0 },
-    { 'N', "open a nondocument",     false, 0 },
-    { 'H', "help",                   false, 0 },
-    { 'X', "exit WordTsar",          true,  0 },
-    { 'L', "change directory",       true,  1 },
-    { 'M', "macros",                 false, 1 },
-    { 'R', "recent files",           true,  1 },
-    { 'P', "preferences",            true,  1 },
-    { 'A', "about WordTsar",         true,  1 },
+    // Left column -- 9 rows, matches real WS7 exactly.
+    { 'D',  "open a document",        true,  eOpeningAction::OPEN_DOCUMENT },
+    { 'S',  "speed write (new file)", true,  eOpeningAction::SPEED_WRITE },
+    { 'N',  "open a nondocument",     false, eOpeningAction::OPEN_NONDOCUMENT },
+    { 'P',  "print a file",           true,  eOpeningAction::PRINT_FILE },
+    { '\\', "fax",                    false, eOpeningAction::FAX },
+    { 'K',  "print from keyboard",    false, eOpeningAction::PRINT_FROM_KEYBOARD },
+    { 'I',  "index a document",       false, eOpeningAction::INDEX_DOCUMENT },
+    { 'T',  "table of contents",      false, eOpeningAction::TABLE_OF_CONTENTS },
+    { 'X',  "exit WordTsar",          true,  eOpeningAction::EXIT },
+
+    // Right column -- 10 rows, matches real WS7 exactly, plus two
+    // WordTsar-only rows appended at the end (no letter -- see above).
+    { 'L', "change drive/directory", true,  eOpeningAction::CHANGE_DIRECTORY },
+    { 'C', "protect/unprotect",      false, eOpeningAction::PROTECT_UNPROTECT },
+    { 'E', "rename a file",          false, eOpeningAction::RENAME_FILE },
+    { 'O', "copy a file",            false, eOpeningAction::COPY_FILE },
+    { 'Y', "delete a file",          false, eOpeningAction::DELETE_FILE },
+    { 'F', "turn directory off",     false, eOpeningAction::TURN_DIRECTORY_OFF },
+    { 'M', "macros",                 false, eOpeningAction::MACROS },
+    { 'R', "run a DOS command",      false, eOpeningAction::RUN_COMMAND },
+    { 'A', "about WordTsar",         true,  eOpeningAction::ABOUT },
+    { '?', "display status",         true,  eOpeningAction::DISPLAY_STATUS },
+    {  0,  "recent files",           true,  eOpeningAction::RECENT_FILES },
+    {  0,  "preferences",            true,  eOpeningAction::PREFERENCES },
 };
 
-constexpr int kOpeningCount = 10;
+constexpr int kOpeningLeftCount = 9;
+constexpr int kOpeningCount = 21;
 
 }
 
@@ -133,6 +182,7 @@ cWSWordTsar::cWSWordTsar(void)
     mOpeningSel = 0;
     mHaveFileArg = false;
     mOpeningBrowserFocus = false;
+    mOpeningWantPrint = false;
     mShowTitle = true;
     mShowMenu = true;
     mShowTopStatus = true;
@@ -1725,8 +1775,13 @@ void cWSWordTsar::DrawOpeningMenu(cScreen& screen)
     sStyle sel = base;
     sel.attrs = wordstartui::CELL_ATTR_INVERSE;
 
+    // Gold, not blue -- pure blue reads poorly against a dark terminal
+    // background (this screen paints no background of its own, so it
+    // inherits whatever the user's terminal theme is). Reuses the same
+    // accent as the splash screen's logo, just above, for consistency
+    // between the two "welcome" screens.
     sStyle keyStyle = base;
-    keyStyle.fg = wordstartui::MakeRgb(0, 0, 255);
+    keyStyle.fg = wordstartui::MakeRgb(204, 170, 0);
     keyStyle.attrs = wordstartui::CELL_ATTR_BOLD;
 
     sStyle disabled = base;
@@ -1754,34 +1809,26 @@ void cWSWordTsar::DrawOpeningMenu(cScreen& screen)
     screen.PutText(0, (mCols - static_cast<int>(header.size())) / 2, header, base);
     separator(1);
 
-    // Two-column menu (rows 2-6): left column at 2, right column near mid.
+    // Two-column menu: left column at column 2, right column near mid.
+    // Item order in kOpeningItems is left-column-first (kOpeningLeftCount
+    // rows), then right column -- rows are just the index within that run.
     int leftCol = 2;
     int rightCol = mCols / 2;
     if (rightCol > 40)
     {
         rightCol = 40;
     }
-    int leftRow = 2;
-    int rightRow = 2;
+    int rightCount = kOpeningCount - kOpeningLeftCount;
 
     for (int index = 0; index < kOpeningCount; ++index)
     {
         const sOpeningItem& item = kOpeningItems[index];
-        std::string label = std::string(1, item.key) + " " + item.label;
+        bool onLeft = (index < kOpeningLeftCount);
+        int col = onLeft ? leftCol : rightCol;
+        int row = 2 + (onLeft ? index : (index - kOpeningLeftCount));
 
-        int col = leftCol;
-        int row = leftRow;
-        if (item.column == 0)
-        {
-            row = leftRow;
-            leftRow++;
-        }
-        else
-        {
-            col = rightCol;
-            row = rightRow;
-            rightRow++;
-        }
+        char keyChar = (item.key != 0) ? item.key : ' ';
+        std::string label = std::string(1, keyChar) + " " + item.label;
 
         bool selected = (index == mOpeningSel) && (mOpeningBrowserFocus == false);
 
@@ -1802,17 +1849,32 @@ void cWSWordTsar::DrawOpeningMenu(cScreen& screen)
                 labelStyle = disabled;
             }
             screen.PutText(row, col, label, labelStyle);
-            screen.PutText(row, col, std::string(1, item.key), keyStyle);
+            if (item.key != 0)
+            {
+                screen.PutText(row, col, std::string(1, item.key), keyStyle);
+            }
         }
     }
 
+    // F1 (help) -- real WS7's own 20th opening-menu item, drawn below the
+    // left column since it isn't part of kOpeningItems (it arrives as a
+    // function-key event, not a typed character -- see HandleOpeningKey).
+    {
+        int row = 2 + kOpeningLeftCount;
+        screen.PutText(row, leftCol, "F1 help", base);
+        screen.PutText(row, leftCol, std::string("F1"), keyStyle);
+    }
+
     // Separator, then the Filenames/Path header, then another separator.
-    separator(7);
-    screen.PutText(9, 0, "Filenames:       Path: " + mBrowser.GetCurrentDirectory(), base);
-    separator(10);
+    // Positioned below whichever column (including the F1 row) is taller.
+    int menuRows = std::max(kOpeningLeftCount + 1, rightCount);
+    int separatorRow = 2 + menuRows;
+    separator(separatorRow);
+    screen.PutText(separatorRow + 2, 0, "Filenames:       Path: " + mBrowser.GetCurrentDirectory(), base);
+    separator(separatorRow + 3);
 
     // File browser fills the rest, starting at column 0.
-    int browserTop = 11;
+    int browserTop = separatorRow + 4;
     sRect browserRect;
     browserRect.row = browserTop;
     browserRect.col = 0;
@@ -2618,6 +2680,14 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         return true;
     }
 
+    // F1 (help) works regardless of focus, matching real WS7 -- it's not a
+    // menu item you select, it's always-available help.
+    if ((event.type == wordstartui::INPUT_TYPE_FUNCTION) && (event.functionKey == 1))
+    {
+        ShowOpeningHelp();
+        return true;
+    }
+
     // ----- File picker focused -----
     if (mOpeningBrowserFocus == true)
     {
@@ -2625,6 +2695,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
             (event.special == wordstartui::SPECIAL_KEY_ESCAPE))
         {
             mOpeningBrowserFocus = false;
+            mOpeningWantPrint = false;
             return true;
         }
 
@@ -2634,34 +2705,43 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
             mFilename = mBrowser.GetSelectedFile();
             mEditor->LoadFile(mFilename);
             mEditor->RelayoutAndRedraw();
+            if (mOpeningWantPrint == true)
+            {
+                mOpeningWantPrint = false;
+                mEditor->Print();
+            }
             mMode = APP_EDITOR;
             return true;
         }
         if (action == wsui::cFileBrowser::ACTION_EXIT_TOP)
         {
             mOpeningBrowserFocus = false;
+            mOpeningWantPrint = false;
         }
         return true;
     }
 
     // ----- Menu focused -----
-    char chosen = 0;
+    eOpeningAction action{};
+    bool haveAction = false;
+    int rightCount = kOpeningCount - kOpeningLeftCount;
 
     if (event.type == wordstartui::INPUT_TYPE_SPECIAL)
     {
-        // Two-column grid navigation (5 items per column), 
-        // opening menu: Down/Up move within a column (cursor may land on
-        // disabled items), Down past the bottom enters the file browser, and
-        // Left/Right switch columns at the same row.
-        const int kRowsPerColumn = 5;
-        int col = mOpeningSel / kRowsPerColumn;
-        int row = mOpeningSel % kRowsPerColumn;
+        // Two-column grid navigation: Down/Up move within a column (cursor
+        // may land on disabled items), Down past the bottom enters the file
+        // browser, and Left/Right switch columns, clamping to the target
+        // column's (shorter or longer) row count.
+        bool onLeft = (mOpeningSel < kOpeningLeftCount);
+        int col = onLeft ? 0 : 1;
+        int row = onLeft ? mOpeningSel : (mOpeningSel - kOpeningLeftCount);
+        int rowsInCol = onLeft ? kOpeningLeftCount : rightCount;
 
         if (event.special == wordstartui::SPECIAL_KEY_ARROW_DOWN)
         {
-            if (row < (kRowsPerColumn - 1))
+            if (row < (rowsInCol - 1))
             {
-                mOpeningSel = (col * kRowsPerColumn) + (row + 1);
+                mOpeningSel = onLeft ? (row + 1) : (kOpeningLeftCount + row + 1);
             }
             else
             {
@@ -2673,7 +2753,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         {
             if (row > 0)
             {
-                mOpeningSel = (col * kRowsPerColumn) + (row - 1);
+                mOpeningSel = onLeft ? (row - 1) : (kOpeningLeftCount + row - 1);
             }
             return true;
         }
@@ -2681,7 +2761,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         {
             if (col == 0)
             {
-                mOpeningSel = kRowsPerColumn + row;
+                mOpeningSel = kOpeningLeftCount + std::min(row, rightCount - 1);
             }
             return true;
         }
@@ -2689,7 +2769,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         {
             if (col == 1)
             {
-                mOpeningSel = row;
+                mOpeningSel = std::min(row, kOpeningLeftCount - 1);
             }
             return true;
         }
@@ -2697,57 +2777,133 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         {
             if (kOpeningItems[mOpeningSel].enabled == true)
             {
-                chosen = kOpeningItems[mOpeningSel].key;
+                action = kOpeningItems[mOpeningSel].action;
+                haveAction = true;
             }
         }
         else if (event.special == wordstartui::SPECIAL_KEY_ESCAPE)
         {
-            chosen = 'X';
+            action = eOpeningAction::EXIT;
+            haveAction = true;
         }
     }
     else if ((event.type == wordstartui::INPUT_TYPE_TEXT) && (event.textUtf8.empty() == false))
     {
-        chosen = static_cast<char>(std::toupper(static_cast<unsigned char>(event.textUtf8[0])));
+        char typed = static_cast<char>(std::toupper(static_cast<unsigned char>(event.textUtf8[0])));
+
+        for (int index = 0; index < kOpeningCount; ++index)
+        {
+            const sOpeningItem& item = kOpeningItems[index];
+            if ((item.key != 0) && (item.enabled == true) &&
+                (std::toupper(static_cast<unsigned char>(item.key)) == typed))
+            {
+                mOpeningSel = index;
+                action = item.action;
+                haveAction = true;
+                break;
+            }
+        }
     }
 
-    if (chosen == 0)
+    if (haveAction == false)
     {
         return true;
     }
 
-    if (chosen == 'X')
+    switch (action)
     {
-        Quit();
-        return true;
-    }
-    else if ((chosen == 'D') || (chosen == 'L'))
-    {
-        mOpeningBrowserFocus = true;
-        return true;
-    }
-    else if (chosen == 'S')
-    {
-        mFilename.clear();
-        mMode = APP_EDITOR;
-        return true;
-    }
-    else if (chosen == 'A')
-    {
-        mEditor->About();
-        return true;
-    }
-    else if (chosen == 'P')
-    {
-        OpenSystemPreferences();
-        return true;
-    }
-    else if (chosen == 'R')
-    {
-        OpenRecentFiles();
-        return true;
+        case eOpeningAction::EXIT:
+            Quit();
+            break;
+
+        case eOpeningAction::OPEN_DOCUMENT:
+        case eOpeningAction::CHANGE_DIRECTORY:
+            mOpeningWantPrint = false;
+            mOpeningBrowserFocus = true;
+            break;
+
+        case eOpeningAction::PRINT_FILE:
+            mOpeningWantPrint = true;
+            mOpeningBrowserFocus = true;
+            break;
+
+        case eOpeningAction::SPEED_WRITE:
+            mFilename.clear();
+            mMode = APP_EDITOR;
+            break;
+
+        case eOpeningAction::ABOUT:
+            mEditor->About();
+            break;
+
+        case eOpeningAction::PREFERENCES:
+            OpenSystemPreferences();
+            break;
+
+        case eOpeningAction::RECENT_FILES:
+            OpenRecentFiles();
+            break;
+
+        case eOpeningAction::DISPLAY_STATUS:
+            ShowOpeningStatus();
+            break;
+
+        default:
+            // Fax, print-from-keyboard, index/TOC, protect, rename/copy/
+            // delete, turn-directory-off, macros, and run-a-DOS-command are
+            // all disabled in kOpeningItems (nobody needs a DOS shell from
+            // here today, same as fax), so this is unreachable via normal
+            // dispatch -- kept as a safe no-op rather than a fallthrough
+            // NotImplemented, since none of these can currently be selected.
+            break;
     }
 
     return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Show a small status screen (version, current directory, free disk space)
+/// -- real WS7's own Opening Menu "?" (display status).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::ShowOpeningStatus(void)
+{
+    std::string directory = mBrowser.GetCurrentDirectory();
+
+    std::string text = std::string("WordTsar ") + FULLVERSION_STRING + " " + STATUS + "\n";
+    text += "Current directory: " + directory + "\n";
+
+    std::error_code ec;
+    std::filesystem::space_info space = std::filesystem::space(directory, ec);
+    if (!ec)
+    {
+        double freeGb = static_cast<double>(space.available) / (1024.0 * 1024.0 * 1024.0);
+        char buffer[64];
+        std::snprintf(buffer, sizeof(buffer), "%.1f GB free", freeGb);
+        text += std::string("Disk space: ") + buffer;
+    }
+
+    wsdialogs::MessageBox(this, "Status", text);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Show brief instructions for the Opening Menu -- real WS7's own Opening
+/// Menu "F1" (help).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::ShowOpeningHelp(void)
+{
+    wsdialogs::MessageBox(this, "Help",
+        "Press the highlighted letter to choose a command, or use the arrow "
+        "keys and Enter. Tab moves focus into the file list below.");
 }
 
 /////////////////////////////////////////////////////////////////////////////

@@ -2,6 +2,45 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.7.5 Beta (2026-09-01)
+
+### Help and Level system corrected to real WordStar 7, not WordStar 4
+
+Contextual help now lives on **F1** (press F1, then any command key, for a one-line description), with **F1 F1** cycling a 5-level (0-4) help display — matching real WordStar 7.0D exactly, not the WordStar 4.0 design this was first built against. Date/time/filename/macro insertion moved to **^M** (the real WordStar 7 Macro Menu), freeing `^J` back to unassigned. On the GUI, **⌘/** mirrors F1, and Preferences moved fully to **⌘,** now that F1 has a real job. See [KEY_MAPPING.md](KEY_MAPPING.md) for the full reference.
+
+### The terminal Opening Menu, made honestly WordStar 7
+
+`ws`'s Opening Menu grid now matches real WordStar 7's letter-for-letter: `D S N P \ K I T X` on the left, `L C E O Y F M R A ?` on the right, with `F1` for help. Recent Files and Preferences — WordTsar's own additions, not real WS7 concepts — are reachable by cursor and Enter without occupying a borrowed letter. `P` now prints a file straight from the menu; `?` shows a real status screen (version, current directory, free disk space).
+
+### Fixed in this release
+
+- The Opening Menu's key-letter color, previously a hard-to-read blue on a dark terminal background, now uses the same gold accent as the splash screen.
+- The `^J`-to-`^M` rename had left 16 GUI menu functions and 6 TUI Insert-menu items hardcoding the old chord, silently disabling date/time/filename/macro insertion from those menus.
+
+## 0.6.1 Beta (2026-08-31)
+
+### Real printing, not just preview
+
+`File → Print` on the GUI now opens the OS print dialog and submits to a printer, instead of silently reusing the Print Preview flow. The TUI's `^KP` now auto-picks a default CUPS printer when exactly one exists and prompts otherwise (macOS ships with no default destination even with printers configured), and gained a real Windows print path.
+
+### Reliable Preferences, Find Again, and Fullscreen shortcuts on macOS
+
+macOS reserves F1/F2, F3, and F11 for brightness, Mission Control, and Show Desktop, so they never reliably reached the app. **⌘,**, **⌘⌃F**, and **⌘G** are now the primary shortcuts for Preferences, Fullscreen, and Find Again; the F-keys still work as a bonus if freed in System Settings.
+
+### Spell-check language actually applies on macOS
+
+The Spell Check Language preference was silently ignored — now wired through `NSSpellChecker setLanguage:` end to end.
+
+### WordStar comment lines (`..` / `.IG`) survive Save As Word
+
+`.docx` export previously dropped comment lines entirely; they're now preserved as hidden text and correctly round-trip back in on import without becoming visible.
+
+### Also fixed
+
+- Splash screen and main window now open centered on the same screen, instead of disagreeing on placement.
+- About dialog: correct version string, this fork's own GitHub link (not upstream SourceForge), and an honest third-party dependency list.
+- New documents no longer default to `~` by accident — they use `~/Documents` unless a default directory is set in Preferences.
+- The flaky comm-server QoS-1 retransmit test, root-caused (a timing margin, not a logic bug) and fixed, along with two related test-hygiene hangs found while verifying it.
 
 ## 0.6.0 Beta (2026-08-30) — macOS fork
 
