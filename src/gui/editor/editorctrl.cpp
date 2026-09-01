@@ -4538,6 +4538,12 @@ void cEditorCtrl::ShowError(const std::string& title, const std::string& message
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::ShowMessage(const std::string& title, const std::string& message)
 {
+    const char* qtTesting = std::getenv("QT_TESTING");
+    if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
+    {
+        return;
+    }
+
     QMessageBox msgBox(QMessageBox::Information, QString::fromStdString(title), QString::fromStdString(message), QMessageBox::Ok, this);
     msgBox.exec();
 }
@@ -5658,15 +5664,23 @@ void cEditorCtrl::ChangeHelpLevel(void)
         return ;
     }
 
+    bool wasLevel0 = (mHelpLevel == 0) ;
     mHelpLevel = level ;
     mHelpDisplay = (level == 3) ? HELP_MAIN : HELP_NONE ;
 
     if(level == 0)
     {
-        mDispStatusBarBeforeHelpLevel0 = mDispStatusBar ;
+        // Only capture the pre-level-0 state on the transition into it --
+        // selecting 0 again while already at 0 must not overwrite the saved
+        // flag with the current (already-false) mDispStatusBar, or the next
+        // transition back out would have nothing true to restore.
+        if(wasLevel0 == false)
+        {
+            mDispStatusBarBeforeHelpLevel0 = mDispStatusBar ;
+        }
         mDispStatusBar = false ;
     }
-    else if(mDispStatusBar == false && mDispStatusBarBeforeHelpLevel0 == true)
+    else if(mDispStatusBarBeforeHelpLevel0 == true)
     {
         mDispStatusBar = true ;
     }

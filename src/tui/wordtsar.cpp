@@ -74,9 +74,9 @@ void EmergencySignalHandler(int /*sig*/)
 
 // WordStar control-key prefixes.
 constexpr int CTRL_B = 2;
-constexpr int CTRL_J = 10;
 constexpr int CTRL_K = 11;
 constexpr int CTRL_L = 12;
+constexpr int CTRL_M = 13;
 constexpr int CTRL_O = 15;
 constexpr int CTRL_P = 16;
 constexpr int CTRL_Q = 17;
@@ -1090,17 +1090,17 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(insert, std::string("&Page Break") + SC(".pa", ""), [this](void) { mEditor->InsertText(".pa\r"); });
     mMenu.AddSubItem(insert, std::string("&Column Break") + SC(".cb", ""), none, false);
     mMenu.AddSeparator(insert);
-    mMenu.AddSubItem(insert, std::string("&Today's Date") + SC("^J@", ""), [this](void) { InjectChord(CTRL_J, '@'); });
+    mMenu.AddSubItem(insert, std::string("&Today's Date") + SC("^M@", ""), [this](void) { InjectChord(CTRL_M, '@'); });
 
     int insertOther = mMenu.AddSubMenu(insert, "&Other Value");
-    mMenu.AddSubMenuItem(insertOther, std::string("Current Time") + SC("^J!", ""), [this](void) { InjectChord(CTRL_J, '!'); });
-    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Result") + SC("^J=", ""), none, false);
-    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Expr.") + SC("^J#", ""), none, false);
-    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Dollar") + SC("^J$", ""), none, false);
-    mMenu.AddSubMenuItem(insertOther, std::string("Current Filename") + SC("^J*", ""), [this](void) { InjectChord(CTRL_J, '*'); });
-    mMenu.AddSubMenuItem(insertOther, std::string("Current Drive") + SC("^J:", ""), [this](void) { InjectChord(CTRL_J, ':'); });
-    mMenu.AddSubMenuItem(insertOther, std::string("Current Directory") + SC("^J.", ""), [this](void) { InjectChord(CTRL_J, '.'); });
-    mMenu.AddSubMenuItem(insertOther, std::string("Current Path") + SC("^J\\", ""), [this](void) { InjectChord(CTRL_J, '\\'); });
+    mMenu.AddSubMenuItem(insertOther, std::string("Current Time") + SC("^M!", ""), [this](void) { InjectChord(CTRL_M, '!'); });
+    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Result") + SC("^M=", ""), none, false);
+    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Expr.") + SC("^M#", ""), none, false);
+    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Dollar") + SC("^M$", ""), none, false);
+    mMenu.AddSubMenuItem(insertOther, std::string("Current Filename") + SC("^M*", ""), [this](void) { InjectChord(CTRL_M, '*'); });
+    mMenu.AddSubMenuItem(insertOther, std::string("Current Drive") + SC("^M:", ""), [this](void) { InjectChord(CTRL_M, ':'); });
+    mMenu.AddSubMenuItem(insertOther, std::string("Current Directory") + SC("^M.", ""), [this](void) { InjectChord(CTRL_M, '.'); });
+    mMenu.AddSubMenuItem(insertOther, std::string("Current Path") + SC("^M\\", ""), [this](void) { InjectChord(CTRL_M, '\\'); });
 
     int insertVar = mMenu.AddSubMenu(insert, "&Variable");
     mMenu.AddSubMenuItem(insertVar, "Date", [this](void) { mEditor->InsertText("&@&"); });
@@ -1223,13 +1223,13 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSeparator(util);
 
     int utilMacros = mMenu.AddSubMenu(util, "Macr&os");
-    mMenu.AddSubMenuItem(utilMacros, std::string("Play...") + SC("^JP", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Record...") + SC("^JR", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Edit/Create...") + SC("^JD", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Single Step...") + SC("^JS", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Copy...") + SC("^JO", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Delete...") + SC("^JY", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Rename...") + SC("^JE", ""), none, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Play...") + SC("^MP", ""), none, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Record...") + SC("^MR", ""), none, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Edit/Create...") + SC("^MD", ""), none, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Single Step...") + SC("^MS", ""), none, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Copy...") + SC("^MO", ""), none, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Delete...") + SC("^MY", ""), none, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Rename...") + SC("^ME", ""), none, false);
 
     int utilMerge = mMenu.AddSubMenu(util, "Merge &Print Commands");
     mMenu.AddSubMenuItem(utilMerge, std::string("Data File...") + SC(".df", ""), none, false);
@@ -1314,7 +1314,7 @@ void cWSWordTsar::LayoutChrome(void)
 ///
 /// @brief
 /// The main edit menu (HELP_MAIN) shows immediately; the context menus
-/// (^K/^Q/^O/^P/^J) appear ~1 second after the chord, 
+/// (^K/^Q/^O/^P/^M) appear ~1 second after the chord,
 /// frontend. HELP_NONE/HELP_UNKNOWN never show.
 ///
 /////////////////////////////////////////////////////////////////////////////

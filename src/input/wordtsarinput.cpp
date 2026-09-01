@@ -700,6 +700,18 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
             }
             else
             {
+                // Cancel any pending chord first (same as Escape) -- F1 is
+                // meant to be pressed from a neutral state. Without this, a
+                // stray F1 mid-chord (e.g. after ^K) would leave that chord
+                // flag stuck true, silently misrouting the *next* real
+                // keystroke as a chord subcommand once the help lookup
+                // consumes this one.
+                mControlMMode = false ;
+                mControlKMode = false ;
+                mControlOMode = false ;
+                mControlPMode = false ;
+                mControlQMode = false ;
+                mEditor->mHelpDisplay = mOldHelpStatus ;
                 mWaitingForHelpTarget = true ;
             }
             break ;

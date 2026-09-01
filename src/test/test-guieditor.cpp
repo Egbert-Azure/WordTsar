@@ -12122,11 +12122,17 @@ TEST_CASE("WordStar Input - Ctrl+M Macro Menu / F1 Help Sequences")
     SUBCASE("Ctrl+M,@ inserts today's date and exits the chord")
     {
         editor.mHelpDisplay = HELP_MAIN;
+        editor.GetDocument()->Clear();
 
         editor.mInput->HandleKey(CTRL_M, false);
         CHECK(editor.mHelpDisplay == HELP_CTRLM);
 
         editor.mInput->HandleKey('@', false);
+
+        // Actually inserted text, not just a state transition -- this is
+        // the exact mechanism cWordTsar::InsertDate() (and the other
+        // Insert-menu date/time/filename/etc. wrappers) depend on.
+        CHECK(editor.GetDocument()->GetParagraphText(0).empty() == false);
 
         // Chord exited, display restored
         CHECK(editor.mHelpDisplay != HELP_CTRLM);
@@ -12154,6 +12160,25 @@ TEST_CASE("WordStar Input - Ctrl+M Macro Menu / F1 Help Sequences")
         // so this hits InvalidCommand() -- QT_TESTING-safe, no dialog shown.
         bool handled = editor.mInput->HandleKey('j', false);
         CHECK(handled == true);
+    }
+
+    SUBCASE("F1 pressed mid-chord cancels the pending chord instead of leaving it stuck")
+    {
+        // Enter ^K mode, then interrupt with F1. Use 'j' as the help
+        // target -- it has no per-command entry (^J is unbound in
+        // WordStar 7), so it hits InvalidCommand(), which is
+        // QT_TESTING-safe. A mapped letter would call ShowMessage()
+        // instead, which pops a real (non-QT_TESTING-guarded) dialog.
+        editor.mInput->HandleKey(CTRL_K, false);
+        CHECK(editor.mInput->CheckControlMode() == true);
+
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        editor.mInput->HandleKey('j', false);
+
+        // Without the fix, mControlKMode would still be true here, so the
+        // user's *next* real keystroke would be silently misrouted as a
+        // ^K sub-command instead of behaving normally.
+        CHECK(editor.mInput->CheckControlMode() == false);
     }
 
     SUBCASE("Escape cancels Ctrl+M mode")

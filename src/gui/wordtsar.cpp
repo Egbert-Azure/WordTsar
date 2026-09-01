@@ -2917,63 +2917,63 @@ void cWordTsar::ColumnBreak(void)
 
 void cWordTsar::InsertDate(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('@') ;
 }
 
 
 void cWordTsar::InsertTime(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('!') ;
 }
 
 
 void cWordTsar::MathResult(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('=') ;
 }
 
 
 void cWordTsar::MathExpression(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('#') ;
 }
 
 
 void cWordTsar::MathDollar(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('$') ;
 }
 
 
 void cWordTsar::Filename(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('*') ;
 }
 
 
 void cWordTsar::Drive(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey(':') ;
 }
 
 
 void cWordTsar::Directory(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('.') ;
 }
 
 
 void cWordTsar::Path(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('\\') ;
 }
 
@@ -3527,49 +3527,49 @@ void cWordTsar::WordCount(void)
 
 void cWordTsar::PlayMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('p') ;
 }
 
 
 void cWordTsar::RecordMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('r') ;
 }
 
 
 void cWordTsar::EditMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('D') ;
 }
 
 
 void cWordTsar::SingleStep(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('s') ;
 }
 
 
 void cWordTsar::CopyMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('O') ;
 }
 
 
 void cWordTsar::DeleteMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('y') ;
 }
 
 
 void cWordTsar::RenameMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_J) ;
+    mEditor->mInput->HandleKey(CTRL_M) ;
     mEditor->mInput->HandleKey('e') ;
 }
 

@@ -484,7 +484,7 @@ QString cWordStarMenuProvider::GetInsertColumnBreakLabel(void) const
 
 QString cWordStarMenuProvider::GetInsertDateLabel(void) const
 {
-    return "&Today's Date Value\t^J@";
+    return "&Today's Date Value\t^M@";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -493,42 +493,42 @@ QString cWordStarMenuProvider::GetInsertDateLabel(void) const
 
 QString cWordStarMenuProvider::GetInsertTimeLabel(void) const
 {
-    return "Current &Time\t^J!";
+    return "Current &Time\t^M!";
 }
 
 QString cWordStarMenuProvider::GetInsertMathResultLabel(void) const
 {
-    return "Last &Math Result\t^J=";
+    return "Last &Math Result\t^M=";
 }
 
 QString cWordStarMenuProvider::GetInsertMathExpressionLabel(void) const
 {
-    return "Last Math &Expression\t^J#";
+    return "Last Math &Expression\t^M#";
 }
 
 QString cWordStarMenuProvider::GetInsertMathDollarLabel(void) const
 {
-    return "&Last Math as Dollar\t^J$";
+    return "&Last Math as Dollar\t^M$";
 }
 
 QString cWordStarMenuProvider::GetInsertFilenameLabel(void) const
 {
-    return "Current &Filename\t^J*";
+    return "Current &Filename\t^M*";
 }
 
 QString cWordStarMenuProvider::GetInsertDriveLabel(void) const
 {
-    return "Current &Drive\t^J:";
+    return "Current &Drive\t^M:";
 }
 
 QString cWordStarMenuProvider::GetInsertDirectoryLabel(void) const
 {
-    return "Current D&irectory\t^J.";
+    return "Current D&irectory\t^M.";
 }
 
 QString cWordStarMenuProvider::GetInsertPathLabel(void) const
 {
-    return "Current P&ath\t^J\\";
+    return "Current P&ath\t^M\\";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -969,37 +969,37 @@ QString cWordStarMenuProvider::GetUtilWordCountLabel(void) const
 
 QString cWordStarMenuProvider::GetUtilPlayMacroLabel(void) const
 {
-    return "&Play...\t^JP";
+    return "&Play...\t^MP";
 }
 
 QString cWordStarMenuProvider::GetUtilRecordMacroLabel(void) const
 {
-    return "&Record...\t^JR";
+    return "&Record...\t^MR";
 }
 
 QString cWordStarMenuProvider::GetUtilEditMacroLabel(void) const
 {
-    return "&Edit/Create...\t^JD";
+    return "&Edit/Create...\t^MD";
 }
 
 QString cWordStarMenuProvider::GetUtilSingleStepLabel(void) const
 {
-    return "&Single Step...\t^JS";
+    return "&Single Step...\t^MS";
 }
 
 QString cWordStarMenuProvider::GetUtilCopyMacroLabel(void) const
 {
-    return "&Copy...\t^JO";
+    return "&Copy...\t^MO";
 }
 
 QString cWordStarMenuProvider::GetUtilDeleteMacroLabel(void) const
 {
-    return "&Delete...\t^JY";
+    return "&Delete...\t^MY";
 }
 
 QString cWordStarMenuProvider::GetUtilRenameMacroLabel(void) const
 {
-    return "Re&name...\t^JE";
+    return "Re&name...\t^ME";
 }
 
 /////////////////////////////////////////////////////////////////////////////
