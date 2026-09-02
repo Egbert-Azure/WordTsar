@@ -20,6 +20,7 @@
 
 #include "doctest.h"
 
+#include <cctype>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -112,6 +113,56 @@ TEST_CASE("TOC/Index generator - table of contents resolves real page numbers, r
     CHECK(t01Content.find("Figure 1 . . . 2") != std::string::npos) ;
     // The numbered table must not also appear in the main .TOC file.
     CHECK(tocContent.find("Figure 1") == std::string::npos) ;
+}
+
+
+TEST_CASE("TOC/Index generator - a bare .tc/.tcN with no entry text is skipped, not written as a blank line")
+{
+    ensureQApplication() ;
+
+    cEditorCtrl editor ;
+    cDocument *doc = editor.GetDocument() ;
+    doc->Clear() ;
+
+    doc->Insert(".tc\r") ;                  // bare -- no text at all
+    doc->Insert(".tc Real Entry\r") ;
+    doc->Insert(".tc3\r") ;                 // bare, numbered table -- no text at all
+    doc->Insert(".tc3 Another Entry\r") ;
+
+    editor.GetLayout()->LayoutDocument(doc) ;
+
+    std::string sourcePath = "/tmp/wordtsar_tocgen_blank_source.ws" ;
+    std::vector<std::string> outputFiles ;
+    bool ok = cTOCIndexGenerator::GenerateTOC(&editor, sourcePath, outputFiles) ;
+
+    REQUIRE(ok) ;
+    REQUIRE(outputFiles.size() == 2) ;
+
+    for (auto &path : outputFiles)
+    {
+        std::string content = ReadWholeFile(path) ;
+        bool hasRealEntry = (content.find("Real Entry") != std::string::npos) ||
+                             (content.find("Another Entry") != std::string::npos) ;
+        CHECK(hasRealEntry) ;
+
+        // No paragraph in either output file should be just a bare page
+        // number with nothing in front of it -- that's the blank-line bug.
+        std::istringstream stream(content) ;
+        std::string line ;
+        while (std::getline(stream, line))
+        {
+            bool isBareNumber = !line.empty() ;
+            for (char c : line)
+            {
+                if (!std::isdigit(static_cast<unsigned char>(c)))
+                {
+                    isBareNumber = false ;
+                    break ;
+                }
+            }
+            CHECK_FALSE(isBareNumber) ;
+        }
+    }
 }
 
 

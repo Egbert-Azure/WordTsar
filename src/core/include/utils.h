@@ -29,4 +29,11 @@ std::string string_sprintf(const char *fmt, ...)
 #endif
     ;
 
+// Standard subtractive-notation Roman numerals (1-3999; falls back to plain
+// Arabic digits outside that range). Shared by cDotCommandParser (WordStar
+// page numbering) and the DOCX reader (list numbering), so a correctness fix
+// only needs to happen once.
+std::string ToRomanNumeralLower(long num) ;
+std::string ToRomanNumeralUpper(long num) ;
+
 #endif // UTILS_H

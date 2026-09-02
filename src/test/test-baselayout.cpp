@@ -9962,9 +9962,11 @@ TEST_CASE("Layout R2-1b: DOT_NOTIMPLEMENTED commands - group F-L")
     // 'H' commands (HY only -- HE/HM already tested)
     CHECK(f.parser.ParseDotCommand(".HY on") == DOT_NOTIMPLEMENTED);
 
-    // 'I' commands (IF and IX -- IG already tested)
+    // 'I' commands (IF -- IG already tested; IX is DOT_GOOD, tested elsewhere --
+    // collected by cTOCIndexGenerator, so it must parse cleanly rather than
+    // flag as an error/not-implemented in the editor)
     CHECK(f.parser.ParseDotCommand(".IF var") == DOT_NOTIMPLEMENTED);
-    CHECK(f.parser.ParseDotCommand(".IX entry") == DOT_NOTIMPLEMENTED);
+    CHECK(f.parser.ParseDotCommand(".IX entry") == DOT_GOOD);
 
     // 'K' commands
     CHECK(f.parser.ParseDotCommand(".KR on") == DOT_NOTIMPLEMENTED);
@@ -9998,8 +10000,10 @@ TEST_CASE("Layout R2-1c: DOT_NOTIMPLEMENTED commands - group M-X")
     CHECK(f.parser.ParseDotCommand(".SB on") == DOT_NOTIMPLEMENTED);
     CHECK(f.parser.ParseDotCommand(".SV name=val") == DOT_NOTIMPLEMENTED);
 
-    // 'T' commands (TC -- TB already tested)
-    CHECK(f.parser.ParseDotCommand(".TC entry") == DOT_NOTIMPLEMENTED);
+    // 'T' commands (TB already tested; TC is DOT_GOOD, tested elsewhere --
+    // collected by cTOCIndexGenerator, so it must parse cleanly rather than
+    // flag as an error/not-implemented in the editor)
+    CHECK(f.parser.ParseDotCommand(".TC entry") == DOT_GOOD);
 
     // 'U' commands
     CHECK(f.parser.ParseDotCommand(".UJ on") == DOT_NOTIMPLEMENTED);

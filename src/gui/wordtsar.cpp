@@ -3098,9 +3098,7 @@ void cWordTsar::TOCEntry(void)
         return ;
     }
 
-    mEditor->MoveCursorStartLine() ;
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".tc " + text.toStdString() + "\n") ;
+    mEditor->InsertDotCommandEntry(".tc", text.toStdString()) ;
 }
 
 
@@ -3115,9 +3113,7 @@ void cWordTsar::IndexEntry(void)
         return ;
     }
 
-    mEditor->MoveCursorStartLine() ;
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".ix " + text.toStdString() + "\n") ;
+    mEditor->InsertDotCommandEntry(".ix", text.toStdString()) ;
 }
 
 

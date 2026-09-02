@@ -2954,10 +2954,11 @@ void cWSWordTsar::GenerateTOCFromFile(void)
 
     if (ok == false)
     {
+        // GenerateTOC() never touches mEditor's document unless it actually
+        // has entries to write -- it's already sitting there exactly as the
+        // browser-selection flow loaded it, so there's nothing to reload.
         wsdialogs::MessageBox(this, "Table of Contents",
             "No .tc entries were found in\n" + mFilename);
-        mEditor->LoadFile(mFilename);
-        mEditor->RelayoutAndRedraw();
         return;
     }
 
@@ -2991,10 +2992,11 @@ void cWSWordTsar::GenerateIndexFromFile(void)
 
     if (ok == false)
     {
+        // GenerateIndex() never touches mEditor's document unless it actually
+        // has entries to write -- it's already sitting there exactly as the
+        // browser-selection flow loaded it, so there's nothing to reload.
         wsdialogs::MessageBox(this, "Index",
             "No .ix entries were found in\n" + mFilename);
-        mEditor->LoadFile(mFilename);
-        mEditor->RelayoutAndRedraw();
         return;
     }
 
@@ -3032,9 +3034,7 @@ void cWSWordTsar::InsertTOCEntry(void)
         return;
     }
 
-    mEditor->MoveCursorStartLine();
-    mEditor->GetDocument()->MaybeInsertHardReturn();
-    mEditor->GetDocument()->Insert(".tc " + text + "\n");
+    mEditor->InsertDotCommandEntry(".tc", text);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -3062,9 +3062,7 @@ void cWSWordTsar::InsertIndexEntry(void)
         return;
     }
 
-    mEditor->MoveCursorStartLine();
-    mEditor->GetDocument()->MaybeInsertHardReturn();
-    mEditor->GetDocument()->Insert(".ix " + text + "\n");
+    mEditor->InsertDotCommandEntry(".ix", text);
 }
 
 /////////////////////////////////////////////////////////////////////////////

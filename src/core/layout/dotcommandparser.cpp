@@ -61,6 +61,7 @@
 #include "layoutbase.h"
 #include "layoutstate.h"
 #include "src/core/document/document.h"
+#include "src/core/include/utils.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -1114,24 +1115,7 @@ eDotCommandStatus cDotCommandParser::ParsePageNumber(const std::string& command)
 /////////////////////////////////////////////////////////////////////////////
 std::string cDotCommandParser::ToRomanNumeralLower(PAGE_T num) const
 {
-    if (num <= 0 || num > 3999)
-    {
-        return std::to_string(num);  // Fallback to Arabic for out of range
-    }
-
-    const int values[] = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
-    const char* numerals[] = {"m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"};
-
-    std::string result;
-    for (int i = 0; i < 13; ++i)
-    {
-        while (num >= values[i])
-        {
-            result += numerals[i];
-            num -= values[i];
-        }
-    }
-    return result;
+    return ::ToRomanNumeralLower(static_cast<long>(num)) ;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1147,24 +1131,7 @@ std::string cDotCommandParser::ToRomanNumeralLower(PAGE_T num) const
 /////////////////////////////////////////////////////////////////////////////
 std::string cDotCommandParser::ToRomanNumeralUpper(PAGE_T num) const
 {
-    if (num <= 0 || num > 3999)
-    {
-        return std::to_string(num);  // Fallback to Arabic for out of range
-    }
-
-    const int values[] = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
-    const char* numerals[] = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
-
-    std::string result;
-    for (int i = 0; i < 13; ++i)
-    {
-        while (num >= values[i])
-        {
-            result += numerals[i];
-            num -= values[i];
-        }
-    }
-    return result;
+    return ::ToRomanNumeralUpper(static_cast<long>(num)) ;
 }
 
 /////////////////////////////////////////////////////////////////////////////

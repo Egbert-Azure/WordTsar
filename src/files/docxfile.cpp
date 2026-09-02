@@ -788,11 +788,23 @@ void cDOCXFile::HandleTableNode(pugi::xml_node node, int depth)
 {
     UNUSED_ARGUMENT(depth) ;
 
-    pugi::xml_node firstRow = node.child("w:tr") ;
+    // Column count from the widest row, not just the first -- a first row
+    // whose cells are wrapped in w:sdt (a common Word content-control
+    // pattern) has zero direct w:tc children even though the table is
+    // otherwise normal, and a ragged table can have more cells in a later
+    // row than in its first.
     int columnCount = 0 ;
-    for(pugi::xml_node cell = firstRow.child("w:tc") ; cell ; cell = cell.next_sibling("w:tc"))
+    for(pugi::xml_node row = node.child("w:tr") ; row ; row = row.next_sibling("w:tr"))
     {
-        columnCount++ ;
+        int rowCells = 0 ;
+        for(pugi::xml_node cell = row.child("w:tc") ; cell ; cell = cell.next_sibling("w:tc"))
+        {
+            rowCells++ ;
+        }
+        if(rowCells > columnCount)
+        {
+            columnCount = rowCells ;
+        }
     }
     if(columnCount == 0)
     {
@@ -1848,30 +1860,13 @@ std::string cDOCXFile::FormatNumberingCounter(int count, const std::string &form
         return result ;
     }
 
-    if(format == "lowerRoman" || format == "upperRoman")
+    if(format == "lowerRoman")
     {
-        static const int values[] = { 1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1 } ;
-        static const char* numerals[] = { "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I" } ;
-
-        int remaining = count ;
-        std::string result ;
-        for(int loop = 0 ; loop < 13 ; loop++)
-        {
-            while(remaining >= values[loop])
-            {
-                result += numerals[loop] ;
-                remaining -= values[loop] ;
-            }
-        }
-
-        if(format == "lowerRoman")
-        {
-            for(char &c : result)
-            {
-                c = static_cast<char>(tolower(c)) ;
-            }
-        }
-        return result ;
+        return ToRomanNumeralLower(count) ;
+    }
+    if(format == "upperRoman")
+    {
+        return ToRomanNumeralUpper(count) ;
     }
 
     if(format == "decimalZero")
@@ -1945,12 +1940,18 @@ void cDOCXFile::EmitNumbering(pugi::xml_node &node)
         return ;
     }
 
-    // a shallower level advancing restarts any deeper levels of this list
-    for(auto &entry : mNumberingCounters)
+    // A shallower level advancing restarts any deeper levels of this list --
+    // erase them rather than zero them, so the next use of that level applies
+    // its own w:start instead of silently resuming from 0.
+    for(auto it = mNumberingCounters.begin() ; it != mNumberingCounters.end() ; )
     {
-        if(entry.first.first == numId && entry.first.second > ilvl)
+        if(it->first.first == numId && it->first.second > ilvl)
         {
-            entry.second = 0 ;
+            it = mNumberingCounters.erase(it) ;
+        }
+        else
+        {
+            ++it ;
         }
     }
 
@@ -1966,20 +1967,49 @@ void cDOCXFile::EmitNumbering(pugi::xml_node &node)
     }
     else
     {
-        std::string numtext = FormatNumberingCounter(count, level.format) ;
+        // A compound lvlText like "%1.%2." (common outline/legal numbering)
+        // needs every ancestor level's own placeholder substituted with that
+        // level's own current counter and its own number format, not just
+        // this level's.
         std::string text = level.text ;
-        std::string placeholder = string_sprintf("%%%d", ilvl + 1) ;
+        bool foundOwnPlaceholder = false ;
 
-        size_t pos = text.find(placeholder) ;
-        if(pos != std::string::npos)
+        for(int ancestorLvl = 0 ; ancestorLvl <= ilvl ; ancestorLvl++)
         {
-            text.replace(pos, placeholder.length(), numtext) ;
+            int ancestorCount ;
+            std::string ancestorFormat ;
+
+            if(ancestorLvl == ilvl)
+            {
+                ancestorCount = count ;
+                ancestorFormat = level.format ;
+            }
+            else
+            {
+                std::pair<std::string, int> ancestorKey(numId, ancestorLvl) ;
+                auto ancestorCountIt = mNumberingCounters.find(ancestorKey) ;
+                auto ancestorLvlIt = defIt->second.levels.find(ancestorLvl) ;
+                if(ancestorCountIt == mNumberingCounters.end() || ancestorLvlIt == defIt->second.levels.end())
+                {
+                    continue ;    // that ancestor level was never actually used -- leave its placeholder as-is
+                }
+                ancestorCount = ancestorCountIt->second ;
+                ancestorFormat = ancestorLvlIt->second.format ;
+            }
+
+            std::string placeholder = string_sprintf("%%%d", ancestorLvl + 1) ;
+            size_t pos = text.find(placeholder) ;
+            if(pos != std::string::npos)
+            {
+                text.replace(pos, placeholder.length(), FormatNumberingCounter(ancestorCount, ancestorFormat)) ;
+                if(ancestorLvl == ilvl)
+                {
+                    foundOwnPlaceholder = true ;
+                }
+            }
         }
-        else
-        {
-            text = numtext + "." ;
-        }
-        marker = text + "  " ;
+
+        marker = foundOwnPlaceholder ? (text + "  ") : (FormatNumberingCounter(count, level.format) + ".  ") ;
     }
 
     mDocument->Insert(marker) ;

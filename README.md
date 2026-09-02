@@ -17,7 +17,7 @@ All credit for WordTsar's design and implementation goes to Gerald Brandt — th
 
 WordTsar is currently Beta. What does Beta mean? The core is solid and well-tested, but a handful of things remain unverified or incomplete — see `WHATS_NEW.md` for specifics.
 
-This is version **0.10.2 Beta**, macOS only.
+This is version **0.10.3 Beta**, macOS only.
 
 ## Building
 

@@ -206,9 +206,9 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
         {
             prefixLen++ ;
         }
-        if (prefixLen > text.size())
+        if (prefixLen >= text.size())
         {
-            continue ;
+            continue ;    // bare .tc/.tcN with no entry text -- nothing to add
         }
 
         const sParagraphLayout *paraLayout = layout->GetParagraphLayout(loop) ;

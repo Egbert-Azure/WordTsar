@@ -2,6 +2,23 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.10.3 Beta (2026-09-02)
+
+### Code-review fixes for the TOC/index/DOCX-numbering work (0.9.0-0.10.2)
+
+A `/code-review` pass surfaced several real issues in the last few releases' work, all fixed:
+
+- **Two existing tests were now stale, not just permissive**: `.IX`/`.TC` correctly went from `DOT_NOTIMPLEMENTED` to `DOT_GOOD` in 0.10.0, but the pre-existing test suite still asserted the old status for both — updated to match the intended new behavior.
+- **A DOCX table whose first row wraps its cells in `w:sdt`** (a common Word content-control pattern) was silently dropped entirely, worse than the old placeholder it replaced. Column count is now computed from the widest row in the table, not just the first — this also fixes column misalignment on ragged tables where a later row has more cells than the first.
+- **Multi-level DOCX numbering with a compound `lvlText`** (e.g. `"%1.%2."`, common outline/legal numbering) only substituted its own level's placeholder, leaving parent tokens like `%1` literal in the output. Now every ancestor level's own placeholder is resolved using that level's own counter and number format.
+- **A deeper numbering level's counter was reset to 0** (instead of cleared) when a shallower level advanced, so a nested list with its own `w:start` silently ignored it and restarted at 1 instead. Now cleared properly, so the next use of that level correctly re-applies its own start value.
+- **A bare `.tc`/`.tcN` with no entry text** produced a blank line in the generated `.TOC`/`.T0N` file instead of being skipped, unlike the index generator's equivalent (correct) behavior.
+- **The "no entries found" dialog** was reloading and re-laying-out the whole source file from disk for no reason — the document was never touched in that path to begin with.
+- **TOC/Index entry insertion** (the dialog-driven Insert commands added in 0.10.2) had its "insert the dot command as its own line" logic duplicated verbatim between the GUI and TUI. Consolidated into one shared `cEditorBase::InsertDotCommandEntry()`, which also now strips any embedded line break from the typed text so it can't split a dot-command line in two.
+- **A hand-rolled Roman-numeral converter** in the DOCX numbering code duplicated the existing, already-tested one in the WordStar page-numbering code. Extracted both into shared `ToRomanNumeralLower`/`Upper` functions so a future correctness fix only has to happen once.
+
+New regression tests cover the multi-level numbering fix (a two-level list with different `w:start` values on each level, confirming both placeholders substitute correctly and a restarted level honors its own start) and the bare-`.tc`-is-skipped fix. Full DOCX/TOC/Index/dot-command test suites pass; the wider WSTest suite's pre-existing viewport/scrollbar flakiness (unrelated, confirmed via `git stash` against a clean baseline) is untouched by this pass.
+
 ## 0.10.2 Beta (2026-09-01)
 
 ### TOC and Index entries can now actually be inserted, with real text

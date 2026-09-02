@@ -223,6 +223,7 @@ public:
     void MoveCursorEndBlock(void);
     void MoveCursorStartLine(void);
     void MoveCursorEndLine(void);
+    void InsertDotCommandEntry(const std::string &dotPrefix, const std::string &text);
     void GotoPreviousPosition(void);
     void GotoLastFindandReplace(void);
     void GotoFontTag(void);

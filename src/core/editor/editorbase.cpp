@@ -1775,6 +1775,42 @@ void cEditorBase::MoveCursorStartLine(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  dotPrefix [in] the dot command itself, e.g. ".tc" or ".ix" --
+///                    no trailing space or digit suffix
+/// @param  text [in] the entry text collected from the caller's own dialog
+///
+/// @return nothing
+///
+/// @brief
+/// Shared implementation behind the GUI's and TUI's Insert -> Index/TOC
+/// Entry commands (TOC Entry / Index Entry): inserts "<dotPrefix> <text>"
+/// as its own line right before the current one, matching the WS7 manual's
+/// "WordStar inserts the .tc dot command followed by the text." A dot
+/// command must be its own line to parse, so any embedded line break in
+/// the typed text is stripped first rather than being allowed to split it
+/// into two lines and corrupt the command. Text that's empty (or becomes
+/// empty once line breaks are stripped) inserts nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::InsertDotCommandEntry(const std::string &dotPrefix, const std::string &text)
+{
+    std::string clean = text;
+    clean.erase(std::remove(clean.begin(), clean.end(), '\r'), clean.end());
+    clean.erase(std::remove(clean.begin(), clean.end(), '\n'), clean.end());
+
+    if (clean.empty())
+    {
+        return;
+    }
+
+    MoveCursorStartLine();
+    GetDocument()->MaybeInsertHardReturn();
+    GetDocument()->Insert(dotPrefix + " " + clean + "\n");
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief

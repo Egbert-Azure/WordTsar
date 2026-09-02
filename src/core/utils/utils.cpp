@@ -107,3 +107,71 @@ std::string string_sprintf(const char *fmt, ...)
 #endif
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  num [in] - Number to convert (1-3999)
+///
+/// @return Roman numeral string (lowercase)
+///
+/// @brief
+/// Converts integer to lowercase Roman numerals.
+/// Uses standard subtractive notation (iv, ix, xl, xc, cd, cm).
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string ToRomanNumeralLower(long num)
+{
+    if (num <= 0 || num > 3999)
+    {
+        return std::to_string(num);  // Fallback to Arabic for out of range
+    }
+
+    const int values[] = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
+    const char* numerals[] = {"m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"};
+
+    std::string result;
+    for (int i = 0; i < 13; ++i)
+    {
+        while (num >= values[i])
+        {
+            result += numerals[i];
+            num -= values[i];
+        }
+    }
+    return result;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  num [in] - Number to convert (1-3999)
+///
+/// @return Roman numeral string (uppercase)
+///
+/// @brief
+/// Converts integer to uppercase Roman numerals.
+/// Uses standard subtractive notation (IV, IX, XL, XC, CD, CM).
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string ToRomanNumeralUpper(long num)
+{
+    if (num <= 0 || num > 3999)
+    {
+        return std::to_string(num);  // Fallback to Arabic for out of range
+    }
+
+    const int values[] = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
+    const char* numerals[] = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
+
+    std::string result;
+    for (int i = 0; i < 13; ++i)
+    {
+        while (num >= values[i])
+        {
+            result += numerals[i];
+            num -= values[i];
+        }
+    }
+    return result;
+}
+

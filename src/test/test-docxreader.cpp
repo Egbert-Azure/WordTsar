@@ -238,6 +238,62 @@ TEST_CASE("DOCX reader - numbered and bulleted lists get real marker text")
 }
 
 
+TEST_CASE("DOCX reader - multi-level numbering substitutes every ancestor placeholder and restarts honoring w:start")
+{
+    // Level 0 starts at 5; level 1 (a sub-item) starts at 3 and uses a
+    // compound lvlText referencing BOTH its own counter (%2) and its
+    // parent's (%1) -- real outline/legal numbering shape.
+    std::string body =
+        "<w:p><w:pPr><w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"3\"/></w:numPr></w:pPr>"
+        "<w:r><w:t>Top A</w:t></w:r></w:p>"
+        "<w:p><w:pPr><w:numPr><w:ilvl w:val=\"1\"/><w:numId w:val=\"3\"/></w:numPr></w:pPr>"
+        "<w:r><w:t>Sub A1</w:t></w:r></w:p>"
+        "<w:p><w:pPr><w:numPr><w:ilvl w:val=\"1\"/><w:numId w:val=\"3\"/></w:numPr></w:pPr>"
+        "<w:r><w:t>Sub A2</w:t></w:r></w:p>"
+        "<w:p><w:pPr><w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"3\"/></w:numPr></w:pPr>"
+        "<w:r><w:t>Top B</w:t></w:r></w:p>"
+        "<w:p><w:pPr><w:numPr><w:ilvl w:val=\"1\"/><w:numId w:val=\"3\"/></w:numPr></w:pPr>"
+        "<w:r><w:t>Sub B1</w:t></w:r></w:p>" ;
+
+    std::string numbering =
+        "<w:abstractNum w:abstractNumId=\"30\">"
+        "<w:lvl w:ilvl=\"0\"><w:start w:val=\"5\"/><w:numFmt w:val=\"decimal\"/><w:lvlText w:val=\"%1.\"/></w:lvl>"
+        "<w:lvl w:ilvl=\"1\"><w:start w:val=\"3\"/><w:numFmt w:val=\"lowerLetter\"/><w:lvlText w:val=\"%1.%2)\"/></w:lvl>"
+        "</w:abstractNum>"
+        "<w:num w:numId=\"3\"><w:abstractNumId w:val=\"30\"/></w:num>" ;
+
+    std::string path = "/tmp/wordtsar_docxtest_multilevel.docx" ;
+    BuildTestDocx(path, body, numbering) ;
+    std::vector<std::string> paragraphs = LoadDOCXParagraphs(path) ;
+
+    REQUIRE(paragraphs.size() >= 5) ;
+
+    auto hasMarkerAndText = [&](const std::string &marker, const std::string &text) -> bool
+    {
+        for (auto &p : paragraphs)
+        {
+            if (p.find(marker) != std::string::npos && p.find(text) != std::string::npos)
+            {
+                return true ;
+            }
+        }
+        return false ;
+    } ;
+
+    // Level 0 starts at its own w:start (5), not 1.
+    CHECK(hasMarkerAndText("5.", "Top A")) ;
+    // Compound lvlText substitutes BOTH the parent's placeholder (%1 -> 5)
+    // and its own (%2 -> c, since level 1 starts at 3 -- the third letter).
+    CHECK(hasMarkerAndText("5.c)", "Sub A1")) ;
+    CHECK(hasMarkerAndText("5.d)", "Sub A2")) ;
+    // Level 0's second use advances to 6...
+    CHECK(hasMarkerAndText("6.", "Top B")) ;
+    // ...and restarting level 1 honors ITS OWN w:start (3 -> "c") again,
+    // rather than resuming from 0 (which would wrongly read "6.a)").
+    CHECK(hasMarkerAndText("6.c)", "Sub B1")) ;
+}
+
+
 TEST_CASE("DOCX reader - custom tab stops emit a real .tb dot command")
 {
     std::string body =
