@@ -2,6 +2,12 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.10.1 Beta (2026-09-01)
+
+### GUI's Open/Save dialogs now actually start in your default directory
+
+User-reported: the TUI correctly opens to `~/Documents` (or your configured default), but the GUI didn't. Root cause: `cEditorCtrl::PromptForLoadFile()`/`PromptForSaveFile()` (the GUI's own `QFileDialog` wrappers) passed an empty starting directory to Qt with a comment claiming that meant "use last opened" — it doesn't; Qt falls back to the process's working directory or its own native-panel memory instead. `mFileDir` (which `ReadConfig()` already correctly sets to your configured default, or `~/Documents`, at startup) was computed correctly the whole time but never actually reached the dialog call. Both dialogs now pass it through.
+
 ## 0.10.0 Beta (2026-09-01)
 
 ### Real table of contents and index generation (TUI Opening Menu)

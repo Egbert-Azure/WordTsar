@@ -6948,7 +6948,7 @@ std::string cEditorCtrl::PromptForLoadFile(void)
     QString filename = QFileDialog::getOpenFileName(
         this,
         "Open File",
-        QString(),  // Default directory (use last opened)
+        QString::fromStdString(mFileDir),
         filters
     );
 
@@ -6971,7 +6971,7 @@ std::string cEditorCtrl::PromptForSaveFile(void)
     QString filename = QFileDialog::getSaveFileName(
         this,
         "Save File",
-        QString(),  // Default directory (use last saved)
+        QString::fromStdString(mFileDir),
         filters
     );
 
