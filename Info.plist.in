@@ -26,5 +26,71 @@
     <string>NSApplication</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2018 Gerald Brandt. Portions Copyright © 2026 Egbert H. Schroeer.</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>WordStar Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>ca.wordtsar.wordstar-document</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Rich Text Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.rtf</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Word Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>org.openxmlformats.wordprocessingml.document</string>
+            </array>
+        </dict>
+    </array>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>ca.wordtsar.wordstar-document</string>
+            <key>UTTypeDescription</key>
+            <string>WordStar Document</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+                <string>public.content</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>ws</string>
+                    <string>ws3</string>
+                    <string>ws4</string>
+                    <string>ws5</string>
+                    <string>ws6</string>
+                    <string>ws7</string>
+                    <string>ws8</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>

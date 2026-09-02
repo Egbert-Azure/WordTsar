@@ -27,10 +27,13 @@
  * screen, and creates the main application window.
  *
  * @section main_startup Startup Sequence
- * 1. Creates QApplication with command-line arguments
+ * 1. Creates cWordTsarApplication (a QApplication subclass that also catches
+ *    QEvent::FileOpen -- how Finder/Launch Services-routed opens actually
+ *    arrive, as opposed to a direct command-line invocation's argv)
  * 2. Installs crash handlers via the chillout library for crash reporting
  * 3. Displays a timed splash screen with the WordTsar logo and version info
- * 4. Creates the main cWordTsar window (QMainWindow)
+ * 4. Creates the main cWordTsar window (QMainWindow) and registers it with
+ *    the application object so a FileOpen event has somewhere to deliver to
  * 5. If a filename is passed on the command line, loads it after the window
  *    is shown
  * 6. Enters the Qt event loop (QApplication::exec())
@@ -54,6 +57,8 @@
 #include <QTimer>
 #include <QMessageBox>
 #include <QDialog>
+#include <QFileOpenEvent>
+#include <QStringList>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -72,6 +77,68 @@ cDebugReport *gReport ;
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @class cWordTsarApplication
+///
+/// @brief
+/// QApplication subclass that catches QEvent::FileOpen -- how macOS actually
+/// delivers "open this file" requests routed through Launch Services (Finder
+/// double-click, drag-onto-dock-icon, or "open -a WordTsar.app file.docx"
+/// when the app isn't already running). Plain argv only covers direct
+/// command-line invocation of the binary itself; Finder-style opens never
+/// reach argc/argv at all. Qt queues a FileOpen event that arrives before
+/// the event loop starts and delivers it once exec() runs, so setting
+/// mMainWindow before exec() (done in main(), below) is sufficient even
+/// though the event itself may arrive earlier.
+///
+/////////////////////////////////////////////////////////////////////////////
+class cWordTsarApplication : public QApplication
+{
+public:
+    cWordTsarApplication(int &argc, char **argv) : QApplication(argc, argv) {}
+
+    // Called once the main window exists. Flushes any FileOpen event that
+    // arrived (and was queued) before this point -- a cold `open -a
+    // WordTsar.app file` launch can deliver the Apple Event early enough
+    // that an explicit app.processEvents() call made before the window is
+    // constructed (see main(), for the splash screen) processes and
+    // discards it while mMainWindow is still null. Qt only delivers a given
+    // FileOpen event once, so silently dropping it there would lose the
+    // open request entirely.
+    void SetMainWindow(cWordTsar *window)
+    {
+        mMainWindow = window;
+        for (const QString &file : mPendingFiles)
+        {
+            mMainWindow->LoadFile(file);
+        }
+        mPendingFiles.clear();
+    }
+
+    bool event(QEvent *e) override
+    {
+        if (e->type() == QEvent::FileOpen)
+        {
+            QFileOpenEvent *openEvent = static_cast<QFileOpenEvent*>(e);
+            if (mMainWindow != nullptr)
+            {
+                mMainWindow->LoadFile(openEvent->file());
+            }
+            else
+            {
+                mPendingFiles.append(openEvent->file());
+            }
+            return true;
+        }
+        return QApplication::event(e);
+    }
+
+private:
+    cWordTsar *mMainWindow = nullptr;
+    QStringList mPendingFiles;
+};
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  int argc [in] number of command-line arguments
 /// @param  char *argv[] [in] command-line argument strings
 ///
@@ -85,7 +152,7 @@ cDebugReport *gReport ;
 /////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-    QApplication app(argc, argv);
+    cWordTsarApplication app(argc, argv);
 
     // install crash handler
     cDebugReport mReport ;
@@ -137,6 +204,7 @@ int main(int argc, char *argv[])
     app.processEvents();
 
     cWordTsar w(argc, argv);
+    app.SetMainWindow(&w);
 
     // Center the window on the same screen the splash is centered on --
     // otherwise the two are placed independently (the splash always at
