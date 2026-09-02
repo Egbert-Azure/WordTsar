@@ -12189,6 +12189,102 @@ TEST_CASE("WordStar Input - Ctrl+M Macro Menu / F1 Help Sequences")
         editor.mInput->HandleKey(27, false);  // ESC
         CHECK(editor.mInput->CheckControlMode() == false);
     }
+
+    // F1, <chord-prefix>, <sub-letter> -- e.g. "F1, K, B" describes ^KB.
+    // ShowMessage() is QT_TESTING-guarded (see the code-review fix noted
+    // above this test case), so exercising real mapped letters here is safe.
+
+    SUBCASE("F1, K, B describes a real ^K sub-command")
+    {
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        bool handled1 = editor.mInput->HandleKey('k', false);
+        CHECK(handled1 == true);
+
+        bool handled2 = editor.mInput->HandleKey('b', false);
+        CHECK(handled2 == true);
+
+        // Chord fully resolved -- no leftover chord-entry state, and the
+        // next ordinary keystroke isn't misrouted as more help lookup.
+        CHECK(editor.mInput->CheckControlMode() == false);
+    }
+
+    SUBCASE("F1, Q, F describes a real ^Q sub-command")
+    {
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        editor.mInput->HandleKey('q', false);
+        bool handled = editor.mInput->HandleKey('f', false);
+        CHECK(handled == true);
+    }
+
+    SUBCASE("F1, O, C describes a real ^O sub-command")
+    {
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        editor.mInput->HandleKey('o', false);
+        bool handled = editor.mInput->HandleKey('c', false);
+        CHECK(handled == true);
+    }
+
+    SUBCASE("F1, P, B describes a real ^P sub-command")
+    {
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        editor.mInput->HandleKey('p', false);
+        bool handled = editor.mInput->HandleKey('b', false);
+        CHECK(handled == true);
+    }
+
+    SUBCASE("F1, M, @ describes a real ^M sub-command")
+    {
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        editor.mInput->HandleKey('m', false);
+        bool handled = editor.mInput->HandleKey('@', false);
+        CHECK(handled == true);
+    }
+
+    SUBCASE("F1, K, <unmapped letter> reports invalid command")
+    {
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        editor.mInput->HandleKey('k', false);
+
+        // 'z' is one of ^K's real but not-yet-implemented letters -- no
+        // help entry for it, so this hits InvalidCommand(), QT_TESTING-safe.
+        bool handled = editor.mInput->HandleKey('z', false);
+        CHECK(handled == true);
+    }
+
+    SUBCASE("Escape cancels a pending F1 chord-target wait")
+    {
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        editor.mInput->HandleKey('k', false);
+
+        editor.mInput->HandleKey(27, false);  // ESC
+
+        // 'b' is a plain letter, not a WordStar control-key code, so
+        // HandleKey() only reports it "handled" if some pending state (like
+        // an unresolved F1,K chord-help wait) swallows it first. Without the
+        // Escape fix, this would still be consumed as ^KB's help lookup
+        // (returning true) instead of falling through unhandled, the way a
+        // normal typed character does.
+        bool handled = editor.mInput->HandleKey('b', false);
+        CHECK(handled == false);
+    }
+
+    SUBCASE("F1 pressed while waiting for a chord sub-letter restarts help instead of leaving it stuck")
+    {
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+        editor.mInput->HandleKey('k', false);  // now waiting for F1,K's sub-letter
+
+        // Second F1 should cancel the pending ^K-help wait and start a
+        // fresh F1 sequence, not silently combine with it.
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+
+        // 'j' is unmapped both as a single-key target and (were it still
+        // pending) as a ^K sub-letter, so either interpretation reaches
+        // InvalidCommand() -- QT_TESTING-safe either way. What matters is
+        // that this doesn't crash and returns to a clean state afterward.
+        bool handled = editor.mInput->HandleKey('j', false);
+        CHECK(handled == true);
+        CHECK(editor.mInput->CheckControlMode() == false);
+    }
 }
 
 

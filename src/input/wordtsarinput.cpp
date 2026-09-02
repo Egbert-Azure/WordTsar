@@ -187,6 +187,404 @@ const char *LookupControlKeyHelp(char lower)
     }
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+/// Per-command help text for the ^K (Block and File) chord's sub-letters,
+/// reached via F1, K, <letter>. Descriptions are paraphrased from the WS4
+/// manual's Appendix G entries for the same commands, matched against what
+/// this letter actually does in WordTsar today (see KEY_MAPPING.md's "^K
+/// Chord" table) -- covers every letter OnControlKChar implements, not just
+/// a subset.
+/////////////////////////////////////////////////////////////////////////////
+const char *LookupKChordHelp(char lower)
+{
+    switch(lower)
+    {
+        case 'b' :
+            return "^KB - Mark beginning of block\n\n"
+                   "Marks the current cursor position as the start of a block, shown "
+                   "as <B> in the text. Used with ^KK to select a block for copying, "
+                   "moving, or deleting." ;
+        case 'k' :
+            return "^KK - Mark end of block\n\n"
+                   "Marks the current cursor position as the end of a block, shown as "
+                   "<K> in the text, completing the selection started with ^KB." ;
+        case 'c' :
+            return "^KC - Copy block\n\n"
+                   "Copies the marked block to the cursor position. The original block "
+                   "is unchanged and remains marked." ;
+        case 'v' :
+            return "^KV - Move block\n\n"
+                   "Moves the marked block to the cursor position, removing it from "
+                   "its original location." ;
+        case 'y' :
+            return "^KY - Delete block\n\n"
+                   "Deletes the marked block of text." ;
+        case '\"' :
+            return "^K\" - Convert block to uppercase\n\n"
+                   "Converts every character in the marked block to uppercase." ;
+        case '\'' :
+            return "^K' - Convert block to lowercase\n\n"
+                   "Converts every character in the marked block to lowercase." ;
+        case '.' :
+            return "^K. - Convert block to title case\n\n"
+                   "Capitalizes the first letter of each word in the marked block, "
+                   "converting the rest to lowercase." ;
+        case '<' :
+            return "^K< - Unmark block\n\n"
+                   "Clears the current block's beginning and end markers without "
+                   "changing the text itself." ;
+        case 'h' :
+            return "^KH - Toggle block display\n\n"
+                   "Turns the highlighting of a marked block, and the display of "
+                   "place markers, on or off. Block operations can't be performed "
+                   "while block display is off." ;
+        case 'u' :
+            return "^KU - Mark previous block\n\n"
+                   "Swaps the current marked block with the previously marked one, "
+                   "letting you flip back and forth between two selections." ;
+        case '[' :
+            return "^K[ - Paste from clipboard\n\n"
+                   "Inserts the contents of the system clipboard at the cursor position." ;
+        case ']' :
+            return "^K] - Copy to clipboard\n\n"
+                   "Copies the marked block to the system clipboard." ;
+        case '?' :
+            return "^K? - Word/character count\n\n"
+                   "Displays a word and character count for the marked block, or the "
+                   "whole document if no block is marked." ;
+        case '0' :
+        case '1' :
+        case '2' :
+        case '3' :
+        case '4' :
+        case '5' :
+        case '6' :
+        case '7' :
+        case '8' :
+        case '9' :
+            return "^K0-^K9 - Set a place marker\n\n"
+                   "Sets a nonprinting marker (0-9) at the current cursor position. "
+                   "Use ^Q0-^Q9 to jump back to it. Place markers don't move with "
+                   "blocks and aren't saved once you close the file." ;
+        case 'r' :
+            return "^KR - Open a file\n\n"
+                   "Prompts for a file and loads it, replacing the file currently "
+                   "open for editing." ;
+        case 's' :
+            return "^KS - Save file\n\n"
+                   "Saves the current file without leaving the editor." ;
+        case 't' :
+            return "^KT - Save as\n\n"
+                   "Prompts for a new filename and saves the current file under it." ;
+        case 'd' :
+            return "^KD - Save and clear\n\n"
+                   "Saves the current file, then clears the editor back to a new, "
+                   "unnamed document." ;
+        case 'x' :
+            return "^KX - Save and exit\n\n"
+                   "Saves the current file and quits WordTsar." ;
+        case 'q' :
+            return "^KQ - Abandon file\n\n"
+                   "Closes the current file without saving, discarding any changes "
+                   "made this session." ;
+        case 'p' :
+            return "^KP - Print preview\n\n"
+                   "Opens print preview for the current document." ;
+        default  : return nullptr ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Per-command help text for the ^Q (Quick Functions) chord's sub-letters,
+/// reached via F1, Q, <letter>. Same sourcing approach as LookupKChordHelp --
+/// see KEY_MAPPING.md's "^Q Chord" table for what's actually implemented.
+/////////////////////////////////////////////////////////////////////////////
+const char *LookupQChordHelp(char lower)
+{
+    switch(lower)
+    {
+        case 's' :
+            return "^QS - Move to start of line\n\n"
+                   "Moves the cursor to column 1 of the current line." ;
+        case 'd' :
+            return "^QD - Move to end of line\n\n"
+                   "Moves the cursor to the right end of the current line." ;
+        case 'r' :
+            return "^QR - Move to start of document\n\n"
+                   "Moves the cursor to the very beginning of the document." ;
+        case 'c' :
+            return "^QC - Move to end of document\n\n"
+                   "Moves the cursor to the very end of the document." ;
+        case 'e' :
+            return "^QE - Move to top of screen\n\n"
+                   "Moves the cursor to the left end of the first line currently on "
+                   "screen, without scrolling." ;
+        case 'x' :
+            return "^QX - Move to bottom of screen\n\n"
+                   "Moves the cursor to the right end of the last line currently on "
+                   "screen, without scrolling." ;
+        case 'b' :
+            return "^QB - Go to block start\n\n"
+                   "Moves the cursor to the marked block's beginning marker, if one "
+                   "is set." ;
+        case 'k' :
+            return "^QK - Go to block end\n\n"
+                   "Moves the cursor to the marked block's ending marker, if one is set." ;
+        case 'f' :
+            return "^QF - Find\n\n"
+                   "Opens the Find dialog to search for a string of text." ;
+        case 'a' :
+            return "^QA - Find and replace\n\n"
+                   "Opens the Find and Replace dialog to search for a string and "
+                   "replace it with another." ;
+        case 'g' :
+            return "^QG - Go to character (forward)\n\n"
+                   "Moves the cursor forward to the next occurrence of a character "
+                   "you specify." ;
+        case 'h' :
+            return "^QH - Go to character (backward)\n\n"
+                   "Moves the cursor backward to the previous occurrence of a "
+                   "character you specify." ;
+        case 'i' :
+            return "^QI - Go to page\n\n"
+                   "Moves the cursor to the start of a page number you specify." ;
+        case 'p' :
+            return "^QP - Return to previous position\n\n"
+                   "Moves the cursor back to where it was before the last command "
+                   "that jumped it. Must be used right after that command." ;
+        case 'v' :
+            return "^QV - Go to last find/replace\n\n"
+                   "Moves the cursor to the location of the last Find or Find and "
+                   "Replace match." ;
+        case '=' :
+            return "^Q= - Go to next font tag\n\n"
+                   "Moves the cursor to the next in-text font/style tag." ;
+        case 'u' :
+            return "^QU - Reformat document\n\n"
+                   "Forces the entire document to be fully re-paginated and redrawn." ;
+        case 'l' :
+            return "^QL - Spell check document\n\n"
+                   "Checks the spelling of every word in the document." ;
+        case 'n' :
+            return "^QN - Spell check word\n\n"
+                   "Checks the spelling of the word at the cursor." ;
+        case 'o' :
+            return "^QO - Add word to dictionary\n\n"
+                   "Adds a word you specify to the spelling dictionary." ;
+        case '0' :
+        case '1' :
+        case '2' :
+        case '3' :
+        case '4' :
+        case '5' :
+        case '6' :
+        case '7' :
+        case '8' :
+        case '9' :
+            return "^Q0-^Q9 - Go to a place marker\n\n"
+                   "Moves the cursor to the marker (0-9) previously set with ^K0-^K9." ;
+        case ' ' :
+        case 0x7F :
+            return "^Q(Space) - Delete to start of line\n\n"
+                   "Deletes from the cursor to the start of the current line." ;
+        case 'y' :
+            return "^QY - Delete to end of line\n\n"
+                   "Deletes from the cursor to the end of the current line, not "
+                   "including the line break." ;
+        case 't' :
+            return "^QT - Delete to character\n\n"
+                   "Deletes from the cursor up to and including the next occurrence "
+                   "of a character you specify." ;
+        default  : return nullptr ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Per-command help text for the ^O (Onscreen Format) chord's sub-letters,
+/// reached via F1, O, <letter>. See KEY_MAPPING.md's "^O Chord" table for
+/// what's actually implemented -- most letters not covered here route to
+/// the shared Preferences dialog rather than their own real WS4/WS7 screen;
+/// that's covered by one shared entry below rather than a guess per letter.
+/////////////////////////////////////////////////////////////////////////////
+const char *LookupOChordHelp(char lower)
+{
+    switch(lower)
+    {
+        case 'd' :
+            return "^OD - Toggle control code display\n\n"
+                   "Shows or hides in-text formatting codes (bold, underline, and "
+                   "similar markers) on screen." ;
+        case 'c' :
+            return "^OC - Center line\n\n"
+                   "Centers the current line between the current margins." ;
+        case ']' :
+            return "^O] - Right-align line\n\n"
+                   "Right-aligns the current line to the right margin." ;
+        case '?' :
+            return "^O? - Display status\n\n"
+                   "Shows the current file, directory, and free disk space." ;
+        case 'p' :
+            return "^OP - Print preview\n\n"
+                   "Opens print preview for the current document." ;
+        case 'y' :
+            return "^OY - Page layout\n\n"
+                   "Opens the page layout dialog (margins, page size, orientation)." ;
+        case 't' :
+            return "^OT - Toggle page/continuous mode\n\n"
+                   "Switches the display between paginated (page-break) and "
+                   "continuous scrolling view." ;
+        case 'j' :
+            return "^OJ - Toggle justification\n\n"
+                   "Turns right-margin justification on or off for the current "
+                   "document." ;
+        case '<' :
+            return "^O< - Left-align paragraph\n\n"
+                   "Sets the current paragraph's alignment to left-aligned." ;
+        case '>' :
+            return "^O> - Right-align paragraph\n\n"
+                   "Sets the current paragraph's alignment to right-aligned." ;
+        case '=' :
+            return "^O= - Center paragraph\n\n"
+                   "Sets the current paragraph's alignment to centered." ;
+        case '+' :
+            return "^O+ - Justify paragraph\n\n"
+                   "Sets the current paragraph's alignment to fully justified." ;
+        case 'l' :
+        case 'g' :
+        case 'x' :
+        case 'i' :
+        case 'o' :
+        case 'u' :
+        case 'f' :
+        case 's' :
+        case 'v' :
+        case 'e' :
+        case 'h' :
+        case 'a' :
+        case 'w' :
+        case ' ' :
+        case 'b' :
+            return "^O<letter> - Opens Preferences\n\n"
+                   "This Onscreen Format letter doesn't have its own screen in "
+                   "WordTsar; it opens the Preferences dialog instead, where the "
+                   "matching setting lives." ;
+        default  : return nullptr ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Per-command help text for the ^P (Print Controls) chord's sub-letters,
+/// reached via F1, P, <letter>. See KEY_MAPPING.md's "^P Chord" table.
+/////////////////////////////////////////////////////////////////////////////
+const char *LookupPChordHelp(char lower)
+{
+    switch(lower)
+    {
+        case 'b' :
+            return "^PB - Toggle bold\n\n"
+                   "Boldfaces text typed from here, until used again." ;
+        case 's' :
+            return "^PS - Toggle underline\n\n"
+                   "Underlines text typed from here, until used again." ;
+        case 'y' :
+            return "^PY - Toggle italic\n\n"
+                   "Italicizes text typed from here, until used again." ;
+        case 'v' :
+            return "^PV - Toggle subscript\n\n"
+                   "Subscripts text typed from here, until used again." ;
+        case 't' :
+            return "^PT - Toggle superscript\n\n"
+                   "Superscripts text typed from here, until used again." ;
+        case 'x' :
+        case 'k' :
+            return "^PX - Toggle strikethrough\n\n"
+                   "Strikes through text typed from here, until used again." ;
+        case '=' :
+        case '+' :
+            return "^P= - Select font\n\n"
+                   "Opens the font selection dialog." ;
+        case '-' :
+            return "^P- - Select color\n\n"
+                   "Opens the color selection dialog." ;
+        default  : return nullptr ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Per-command help text for the ^M (Macro Menu) chord's sub-letters,
+/// reached via F1, M, <letter>. This is WS7-specific content (WS4 has no
+/// real ^M chord in this role), paraphrased from the WS7 manual's "Other
+/// Value" insert table and its Macros section -- see KEY_MAPPING.md's "^M
+/// Chord" table.
+/////////////////////////////////////////////////////////////////////////////
+const char *LookupMChordHelp(char lower)
+{
+    switch(lower)
+    {
+        case '@' :
+            return "^M@ - Insert today's date\n\n"
+                   "Inserts the current date at the cursor, for example "
+                   "\"June 4, 2026\"." ;
+        case '!' :
+            return "^M! - Insert current time\n\n"
+                   "Inserts the current time at the cursor, for example \"9:30 PM\"." ;
+        case '*' :
+            return "^M* - Insert filename\n\n"
+                   "Inserts the name of the current file." ;
+        case ':' :
+            return "^M: - Insert drive letter\n\n"
+                   "Inserts the currently logged drive letter (Windows only)." ;
+        case '.' :
+            return "^M. - Insert directory\n\n"
+                   "Inserts the currently logged directory path." ;
+        case '\\' :
+            return "^M\\ - Insert path and filename\n\n"
+                   "Inserts the full path and filename of the current file." ;
+        case '=' :
+            return "^M= - Insert last math result (not yet implemented)\n\n"
+                   "Would insert the result of the last calculation performed with "
+                   "Calculator (^QM) or Block Math (^KM)." ;
+        case '#' :
+            return "^M# - Insert last math expression (not yet implemented)\n\n"
+                   "Would insert the expression last entered in the Calculator (^QM)." ;
+        case '$' :
+            return "^M$ - Insert last math result as dollar amount (not yet "
+                   "implemented)\n\n"
+                   "Would insert the last Calculator/Block Math result formatted as "
+                   "currency, for example \"$23.10\"." ;
+        case 'p' :
+            return "^MP - Play macro (not yet implemented)\n\n"
+                   "Would run a previously recorded keyboard macro." ;
+        case 'r' :
+            return "^MR - Record macro (not yet implemented)\n\n"
+                   "Would record a series of keystrokes to a named macro file for "
+                   "later playback." ;
+        case 'd' :
+            return "^MD - Edit/Create macro (not yet implemented)\n\n"
+                   "Would open a macro's own text for direct editing, using "
+                   "WordStar's macro language." ;
+        case 's' :
+            return "^MS - Single-step macro (not yet implemented)\n\n"
+                   "Would play a macro back one command at a time, to help locate "
+                   "errors in it." ;
+        case 'e' :
+            return "^ME - Rename macro (not yet implemented)\n\n"
+                   "Would rename a macro, or reassign its hot key." ;
+        case 'o' :
+            return "^MO - Copy macro (not yet implemented)\n\n"
+                   "Would copy an existing macro under a new name." ;
+        case 'y' :
+            return "^MY - Delete macro (not yet implemented)\n\n"
+                   "Would delete a recorded macro." ;
+        default  : return nullptr ;
+    }
+}
+
 } // namespace
 
 /// @ingroup Keyboard
@@ -202,6 +600,8 @@ cWordStarInput::cWordStarInput(cEditorBase *editor)
     mControlPMode = false ;
     mControlQMode = false ;
     mWaitingForHelpTarget = false ;
+    mWaitingForHelpChordTarget = false ;
+    mHelpChordPrefix = 0 ;
 
     mOldHelpStatus = HELP_NONE ;
 }
@@ -225,6 +625,17 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
     UNUSED_ARGUMENT(shift) ;
 
     bool handled = false ;
+
+    // F1, <chord-prefix> (e.g. "F1, K") is waiting for the sub-letter that
+    // picks which chord command to describe (e.g. "F1, K, B" -> ^KB's help).
+    // Checked ahead of mWaitingForHelpTarget since it's the deeper of the
+    // two states.
+    if (mWaitingForHelpChordTarget == true)
+    {
+        mWaitingForHelpChordTarget = false ;
+        OnHelpChordTargetChar(ch) ;
+        return true ;
+    }
 
     // F1 (WordStar 7's real help key -- see OnHelpTargetChar) is waiting for
     // the command it should describe. Takes priority over everything else,
@@ -296,6 +707,8 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
         mControlOMode = false ;
         mControlPMode = false ;
         mControlQMode = false ;
+        mWaitingForHelpTarget = false ;
+        mWaitingForHelpChordTarget = false ;
         mEditor->mHelpDisplay = mOldHelpStatus ;
         handled = true ;
     }
@@ -682,6 +1095,7 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
             mControlPMode = false ;
             mControlQMode = false ;
             mWaitingForHelpTarget = false ;
+            mWaitingForHelpChordTarget = false ;
             mEditor->mHelpDisplay = mOldHelpStatus ;
             break ;
         }
@@ -711,6 +1125,7 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
                 mControlOMode = false ;
                 mControlPMode = false ;
                 mControlQMode = false ;
+                mWaitingForHelpChordTarget = false ;
                 mEditor->mHelpDisplay = mOldHelpStatus ;
                 mWaitingForHelpTarget = true ;
             }
@@ -864,6 +1279,16 @@ void cWordStarInput::OnHelpTargetChar(char ch)
     }
     ch = tolower(ch) ;
 
+    // K/Q/O/P/M are chord prefixes, not commands in their own right -- wait
+    // for the sub-letter that actually picks a command (e.g. "F1, K, B")
+    // instead of describing the bare chord-entry keystroke.
+    if(ch == 'k' || ch == 'q' || ch == 'o' || ch == 'p' || ch == 'm')
+    {
+        mHelpChordPrefix = ch ;
+        mWaitingForHelpChordTarget = true ;
+        return ;
+    }
+
     const char *help = LookupControlKeyHelp(ch) ;
     if(help != nullptr)
     {
@@ -872,6 +1297,47 @@ void cWordStarInput::OnHelpTargetChar(char ch)
     else
     {
         std::string t = string_sprintf("F1-%c", ch).c_str() ;
+        mEditor->InvalidCommand(t) ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Second half of "F1, <chord-prefix>, <sub-letter>" -- looks up help for a
+/// specific chord command (^KB, ^QF, and so on) once both keystrokes after
+/// F1 are known. mHelpChordPrefix was set by OnHelpTargetChar above.
+/////////////////////////////////////////////////////////////////////////////
+void cWordStarInput::OnHelpChordTargetChar(char ch)
+{
+    char prefix = mHelpChordPrefix ;
+    mHelpChordPrefix = 0 ;
+
+    char lower = ch ;
+    if(lower < ' ')
+    {
+        lower += '@' ;
+    }
+    lower = tolower(lower) ;
+
+    const char *help = nullptr ;
+    switch(prefix)
+    {
+        case 'k' : help = LookupKChordHelp(lower) ; break ;
+        case 'q' : help = LookupQChordHelp(lower) ; break ;
+        case 'o' : help = LookupOChordHelp(lower) ; break ;
+        case 'p' : help = LookupPChordHelp(lower) ; break ;
+        case 'm' : help = LookupMChordHelp(lower) ; break ;
+        default  : break ;
+    }
+
+    if(help != nullptr)
+    {
+        std::string title = string_sprintf("Help: ^%c", toupper(prefix)) ;
+        mEditor->ShowMessage(title, help) ;
+    }
+    else
+    {
+        std::string t = string_sprintf("F1-%c-%c", toupper(prefix), ch).c_str() ;
         mEditor->InvalidCommand(t) ;
     }
 }

@@ -85,6 +85,7 @@ public:
     bool OnControlKChar(char key) ;
     void OnControlQChar(char key) ;
     void OnHelpTargetChar(char key) ;
+    void OnHelpChordTargetChar(char key) ;
 
     // =================================================================
     // MEMBER VARIABLES
@@ -98,6 +99,8 @@ private:
     bool mControlPMode ;
     bool mControlOMode ;
     bool mWaitingForHelpTarget ;             ///> true after F1, before the command key it describes
+    bool mWaitingForHelpChordTarget ;        ///> true after F1,<chord-prefix>, before the sub-command key
+    char mHelpChordPrefix ;                  ///> which chord (k/q/o/p/m) F1's chord-prefix key selected
 
     eHelpDisplay mOldHelpStatus ;
 

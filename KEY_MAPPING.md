@@ -565,7 +565,7 @@ These provide alternative entry to chord modes (useful in terminals where Ctrl i
 
 ### F1 Contextual Help
 
-Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar 7's real per-command help and help-level toggle live now -- see Function Keys above. `F1<letter>` shows a one-line description of that command; `F1 F1` prompts for and applies a new help level (0-4).
+Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar 7's real per-command help and help-level toggle live now -- see Function Keys above. `F1,<letter>` shows a short description of that single control key; `F1 F1` prompts for and applies a new help level (0-4). For the K/Q/O/P/M chord prefixes, `F1,<prefix>,<sub-letter>` (e.g. `F1,K,B`) waits for a second key and describes that specific chord command instead of the bare chord-entry keystroke -- covers every sub-letter each chord actually implements (see that chord's own table below).
 
 ### ^M Chord -- Macros and Insertion
 
