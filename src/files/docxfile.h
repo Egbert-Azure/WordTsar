@@ -21,7 +21,10 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "src/core/include/config.h"
 #include "src/core/document/document.h"
@@ -64,13 +67,28 @@ struct sCharacterProperties
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @struct sDOCXTabStop
+///
+/// @brief
+/// A single custom tab stop (w:pPr/w:tabs/w:tab), position in twips plus
+/// its alignment type.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sDOCXTabStop
+{
+    std::string pos ;    // twips, absolute from left margin
+    std::string val ;    // "left" (default), "center", "right", "decimal", "clear", "bar"
+};
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @struct sDOCXParagraphStyle
 ///
 /// @brief
 /// DOCX paragraph style definition.
 /// Stores style ID, name, base style, fonts, spacing, indents,
-/// justification, and embedded character properties as parsed
-/// from the DOCX styles.xml (w:style w:type="paragraph").
+/// justification, custom tab stops, and embedded character properties as
+/// parsed from the DOCX styles.xml (w:style w:type="paragraph").
 ///
 /////////////////////////////////////////////////////////////////////////////
 struct sDOCXParagraphStyle
@@ -102,6 +120,8 @@ struct sDOCXParagraphStyle
 
     std::string justify ;
 
+    std::vector<sDOCXTabStop> tabs ;   // custom tab stops (w:pPr/w:tabs), style-level default
+
     struct sCharacterProperties charprops ;
 };
 
@@ -125,6 +145,37 @@ struct sDOCXCharacterStyle
     sCharacterProperties charprops ;
 };
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @struct sDOCXNumberingLevel
+///
+/// @brief
+/// One level (w:lvl) of a DOCX numbering definition: its number format
+/// (decimal, bullet, lowerRoman, etc.), the literal marker text pattern
+/// (w:lvlText, e.g. "%1."), and its starting value.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sDOCXNumberingLevel
+{
+    std::string format ;   // w:numFmt: "decimal", "bullet", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman", "none", ...
+    std::string text ;     // w:lvlText, e.g. "%1)" -- %N is replaced with the level-N counter
+    int start ;            // w:start, default 1
+};
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @struct sDOCXNumberingDefinition
+///
+/// @brief
+/// One DOCX abstract numbering definition (w:abstractNum): its levels,
+/// keyed by w:ilvl.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sDOCXNumberingDefinition
+{
+    std::map<int, sDOCXNumberingLevel> levels ;
+};
+
 
 
 class cDOCXFile : public cFile
@@ -146,10 +197,12 @@ public:
 private :
     void ParseStyles(pugi::xml_node styles) ;
     void GetCharacterStyle(pugi::xml_node &style, sCharacterProperties &cstyle) ;
+    void ParseNumbering(pugi::xml_node numbering) ;
 
     void HandleParagraphNode(pugi::xml_node node, int depth) ;
     void HandleTableNode(pugi::xml_node node, int depth) ;
     void HandleSection(pugi::xml_node node) ;
+    std::string ExtractCellText(pugi::xml_node cellNode) ;
 
     int FindParagraphStyle(std::string &style) ;
     int FindCharacterStyle(std::string &style) ;
@@ -163,6 +216,9 @@ private :
     void EmitJustify(pugi::xml_node &node, pugi::xml_node run, sDOCXParagraphStyle &style) ;
     void EmitPage(void) ;
     void EmitIndent(pugi::xml_node &node, pugi::xml_node run, sDOCXParagraphStyle &style) ;
+    void EmitTabs(pugi::xml_node &node, sDOCXParagraphStyle &style) ;
+    void EmitNumbering(pugi::xml_node &node) ;
+    std::string FormatNumberingCounter(int count, const std::string &format) ;
 
     // --- DOCX writing (Save As Word) ---
     bool WriteDocx(const std::string &filename) ;
@@ -202,6 +258,15 @@ private :
     int mLeft ;
     int mRight ;
     int mFirstline ;
+
+    std::vector<sDOCXTabStop> mCurrentTabs ;    // last-emitted custom tab stops, to avoid redundant .tb lines
+
+    // Numbering (list) state: abstractNum definitions keyed by their id,
+    // w:num -> w:abstractNumId mapping, and a running per-(numId,ilvl)
+    // counter as paragraphs are walked in document order.
+    std::map<std::string, std::string> mNumIdToAbstractId ;
+    std::map<std::string, sDOCXNumberingDefinition> mNumberingDefs ;
+    std::map<std::pair<std::string, int>, int> mNumberingCounters ;
 
     eJustification mAlign ;
 

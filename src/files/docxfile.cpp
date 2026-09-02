@@ -44,12 +44,25 @@
  * @section docx_limitations Current Limitations
  * - Images and embedded objects are not imported; a placeholder marker is
  *   inserted in their place instead
- * - Tables are not imported at all -- HandleTableNode() is a no-op, so a
- *   w:tbl in the source document produces no content whatsoever, not a
- *   simplified rendering
- * - List numbering, paragraph borders, shading, and custom tab stops are
- *   parsed into style structs but never emitted (EmitNumbering, EmitBorder,
- *   EmitShading, EmitTabs are unused) -- list items lose their numbers/bullets
+ * - Tables are imported as tab-delimited text (real w:tr/w:tc traversal,
+ *   one row per line, columns aligned via a real .tb dot command) rather
+ *   than a native table structure -- WordStar has no table/column concept
+ *   to map DOCX's actual cell grid onto, so column widths are approximated
+ *   as equal-width rather than mirroring the source document's own widths
+ * - List numbering (w:numPr/w:numId/w:ilvl, resolved against
+ *   word/numbering.xml's abstractNum definitions) is emitted as literal
+ *   marker text ("1. ", "a) ", "-  " for bullets, etc.) inserted before the
+ *   paragraph's own text, since WordStar has no live auto-numbering field
+ *   to bind it to. Multi-level lists renumber correctly (a level-1 item
+ *   resets deeper levels' counters), but the hanging indent a real bullet
+ *   needs isn't applied -- left/right paragraph indent emission is a
+ *   separate, pre-existing gap (EmitIndent only ever emits first-line
+ *   indent), not something this pass changed
+ * - Custom tab stops (w:pPr/w:tabs) are emitted as a real .tb dot command
+ * - Paragraph borders and shading (w:pBdr, w:shd) are still not emitted --
+ *   deliberately parked, not a gap: WordStar has no paragraph-border or
+ *   shading concept at all, and approximating one with literal ASCII art
+ *   wasn't part of what this pass was asked to cover
  * - Header/footer text content is not imported (only the page margin
  *   distances reserved for them are read from w:pgMar)
  * - Advanced features (tracked changes, comments) are skipped
@@ -210,6 +223,22 @@ bool cDOCXFile::LoadFile(std::string filename)
         free(stylebuf);
 
         ParseStyles(parent) ;
+
+        // Numbering definitions (word/numbering.xml) are optional -- a DOCX
+        // with no lists at all won't have this part in the archive.
+        if(zip_entry_open(zip, "word/numbering.xml") == 0)
+        {
+            void *numberingbuf = nullptr ;
+            size_t numberingsize = 0 ;
+            zip_entry_read(zip, &numberingbuf, &numberingsize) ;
+            zip_entry_close(zip) ;
+
+            pugi::xml_document numberingDoc ;
+            numberingDoc.load_buffer(numberingbuf, numberingsize) ;
+            ParseNumbering(numberingDoc.child("w:numbering")) ;
+
+            free(numberingbuf) ;
+        }
 
         // open document
         zip_entry_open(zip, "word/document.xml");
@@ -385,6 +414,14 @@ void cDOCXFile::ParseStyles(pugi::xml_node style)
             pstyle.firstline = style.child("w:pPr").child("w:ind").attribute("w:firstLine").value() ;
 
             pstyle.justify = style.child("w:pPr").child("w:jc").attribute("w:val").value() ;
+
+            for(pugi::xml_node tab = style.child("w:pPr").child("w:tabs").child("w:tab") ; tab ; tab = tab.next_sibling("w:tab"))
+            {
+                sDOCXTabStop tabstop ;
+                tabstop.val = tab.attribute("w:val").value() ;
+                tabstop.pos = tab.attribute("w:pos").value() ;
+                pstyle.tabs.push_back(tabstop) ;
+            }
 
             GetCharacterStyle(style, pstyle.charprops) ;
 
@@ -563,6 +600,14 @@ void cDOCXFile::HandleParagraphNode(pugi::xml_node node, int depth)
         styleindex = FindParagraphStyle(stylename) ;
     }
 
+    // Tabs and numbering are paragraph-level concepts (not per-run), so they're
+    // resolved and emitted once, before the first run's text -- unlike the
+    // Emit* calls inside the loop below, which re-check per run because they
+    // can carry inline run-level overrides.
+    sDOCXParagraphStyle basestyle = MergeParagraphStyles(styleindex) ;
+    EmitTabs(node, basestyle) ;
+    EmitNumbering(node) ;
+
     pugi::xml_node run = node.child("w:r") ;
     while(run)
     {
@@ -602,11 +647,9 @@ void cDOCXFile::HandleParagraphNode(pugi::xml_node node, int depth)
 //            EmitKeepLines(node, run, newstyle) ;
 //            EmitKeepNext(node, run, newstyle) ;
             EmitIndent(node, run, newstyle) ;
-//            EmitNumbering(node, run, newstyle) ;
 //            EmitOutlineLevel(node, run, newstyle) ;
-//            EmitBorder(node, run, newstyle) ;
-//            EmitShading(node, run, newstyle) ;
-//            EmitTabs(node, run, newstyle) ;
+//            EmitBorder(node, run, newstyle) ;    -- parked: WordStar has no paragraph-border concept
+//            EmitShading(node, run, newstyle) ;   -- parked: WordStar has no paragraph-shading concept
             EmitJustify(node, run, newstyle) ;
             EmitFont(node, run, newstyle) ;
             EmitAttributes(node, run, newstyle) ;
@@ -684,46 +727,116 @@ void cDOCXFile::HandleParagraphNode(pugi::xml_node node, int depth)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  node [in] the w:tbl XML node (unused)
+/// @param  cellNode [in] a w:tc table-cell XML node
+///
+/// @return the cell's text content, one space between paragraphs, tabs
+///         and newlines flattened to spaces
+///
+/// @brief
+/// Concatenate the plain text of every run in every paragraph of a table
+/// cell. Nested tables inside a cell are not descended into.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::ExtractCellText(pugi::xml_node cellNode)
+{
+    std::string text ;
+    bool firstParagraph = true ;
+
+    for(pugi::xml_node para = cellNode.child("w:p") ; para ; para = para.next_sibling("w:p"))
+    {
+        if(!firstParagraph)
+        {
+            text += " " ;
+        }
+        firstParagraph = false ;
+
+        for(pugi::xml_node run = para.child("w:r") ; run ; run = run.next_sibling("w:r"))
+        {
+            text += run.child("w:t").text().get() ;
+        }
+    }
+
+    // A cell's own tab/newline would otherwise break the one-line-per-row
+    // layout the caller builds around real .tb tab stops.
+    for(char &c : text)
+    {
+        if(c == '\t' || c == '\n' || c == '\r')
+        {
+            c = ' ' ;
+        }
+    }
+
+    return text ;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  node [in] the w:tbl XML node
 /// @param  depth [in] XML tree depth (unused)
 ///
 /// @return nothing
 ///
 /// @brief
-/// Handle a DOCX table node. Inserts a placeholder string since full
-/// table support is not implemented.
+/// Handle a DOCX table node. Real w:tr/w:tc traversal: each row becomes
+/// one line of tab-separated cell text, columns aligned with a real .tb
+/// dot command. Column widths are approximated as equal-width across a
+/// nominal 6-inch text width -- WordStar has no table/column-grid concept
+/// to map the source document's own w:tblGrid widths onto.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDOCXFile::HandleTableNode(pugi::xml_node node, int depth)
 {
-    UNUSED_ARGUMENT(node) ;
     UNUSED_ARGUMENT(depth) ;
-#ifdef NOPE
-    cout << setw(5) << depth ;
-    for (int i = 0; i < depth; ++i) std::cout << "  "; // indentation
-    depth++ ;
 
-    std::cout << "Table  " << node_types[node.type()] << ": name='" << node.name() << "', value='" << node.value() << "'" ;
-    if(node.first_attribute())
+    pugi::xml_node firstRow = node.child("w:tr") ;
+    int columnCount = 0 ;
+    for(pugi::xml_node cell = firstRow.child("w:tc") ; cell ; cell = cell.next_sibling("w:tc"))
     {
-        cout << "  " << node.first_attribute().name() << "=" << node.first_attribute().value() << " " ;
-        pugi::xml_attribute node1 = node.first_attribute().next_attribute() ;
-        while(node1)
+        columnCount++ ;
+    }
+    if(columnCount == 0)
+    {
+        return ;
+    }
+
+    const double TABLE_WIDTH_INCHES = 6.0 ;
+    double colwidth = TABLE_WIDTH_INCHES / columnCount ;
+
+    std::string tabcmd = ".tb " ;
+    for(int loop = 1 ; loop <= columnCount ; loop++)
+    {
+        tabcmd += string_sprintf("%.2fi ", colwidth * loop) ;
+    }
+    tabcmd += "\n" ;
+    mDocument->Insert(tabcmd) ;
+
+    for(pugi::xml_node row = node.child("w:tr") ; row ; row = row.next_sibling("w:tr"))
+    {
+        int col = 0 ;
+        for(pugi::xml_node cell = row.child("w:tc") ; cell ; cell = cell.next_sibling("w:tc"))
         {
-            cout << node1.name() << "=" << node1.value() << " " ;
-            node1 = node1.next_attribute() ;
+            if(col > 0)
+            {
+                sWSTab tab ;
+                tab.abstabsize = 0 ;
+                tab.size = 0 ;
+                tab.tabsize = 0 ;
+                tab.type = TAB_TAB ;
+
+                mDocument->InsertTab(tab) ;
+            }
+
+            mDocument->Insert(ExtractCellText(cell)) ;
+
+            col++ ;
         }
+        mDocument->Insert(HARD_RETURN) ;
     }
-    cout << "\n" ;
 
-    for (pugi::xml_node_iterator it = node.begin(); it != node.end(); ++it)
-    {
-        std::cout << "node: ";
-
-        HandleTableNode(*it, depth) ;
-    }
-#endif
-    mDocument->Insert("\n<<< TABLE >>>\n") ;
+    // The table's own .tb overrides whatever the surrounding paragraphs had
+    // set; force the next real paragraph's EmitTabs() to re-assert its own
+    // state rather than comparing against this table's stale tab stops.
+    mCurrentTabs.clear() ;
 }
 
 
@@ -807,11 +920,20 @@ int cDOCXFile::FindCharacterStyle(std::string &style)
 /// Walk the basedOn chain for a paragraph style, collecting all ancestor
 /// styles into a deque, then merge from root to leaf. String properties
 /// override when non-empty. Boolean attributes use XOR to toggle
-/// inheritance.
+/// inheritance. Returns a default-constructed style for an out-of-range
+/// index -- callers pass 0 when a paragraph has no explicit w:pStyle, and
+/// FindParagraphStyle() returns -1 for an unresolved one, either of which
+/// is a real, unbounded index into mParagraphStyles when styles.xml
+/// defines no paragraph styles at all, or references one that's missing.
 ///
 /////////////////////////////////////////////////////////////////////////////
 sDOCXParagraphStyle cDOCXFile::MergeParagraphStyles(int style)
 {
+    if(style < 0 || static_cast<size_t>(style) >= mParagraphStyles.size())
+    {
+        return sDOCXParagraphStyle() ;
+    }
+
     std::deque<int> styles ;    // our styles inheritance
     styles.push_back(style) ;
 
@@ -882,6 +1004,13 @@ sDOCXParagraphStyle cDOCXFile::MergeParagraphStyles(int style)
         if(mParagraphStyles[styles[loop]].justify != "")
         {
             pstyle.justify = mParagraphStyles[styles[loop]].justify ;
+        }
+
+        // custom tab stops -- a derived style's own tabs replace the
+        // base style's wholesale, they don't merge stop-by-stop
+        if(!mParagraphStyles[styles[loop]].tabs.empty())
+        {
+            pstyle.tabs = mParagraphStyles[styles[loop]].tabs ;
         }
 
         // character properties - font size
@@ -1592,6 +1721,316 @@ void cDOCXFile::EmitIndent(pugi::xml_node &node, pugi::xml_node run, sDOCXParagr
         mFirstline = firstline ;
     }
 }
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  node [in] the w:p XML node for inline tab-stop overrides
+/// @param  style [in] resolved paragraph style carrying any style-level tabs
+///
+/// @return nothing
+///
+/// @brief
+/// Emit a .tb dot command for custom tab stops (w:pPr/w:tabs), when the
+/// paragraph or its style define any and they differ from the last ones
+/// emitted. A paragraph with no explicit tabs of its own, and no inherited
+/// style tabs, is left alone rather than reverting to a default -- the
+/// same simplification EmitIndent already makes for indents.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDOCXFile::EmitTabs(pugi::xml_node &node, sDOCXParagraphStyle &style)
+{
+    std::vector<sDOCXTabStop> tabs = style.tabs ;
+
+    pugi::xml_node inlineTabs = node.child("w:pPr").child("w:tabs") ;
+    if(inlineTabs)
+    {
+        tabs.clear() ;
+        for(pugi::xml_node tab = inlineTabs.child("w:tab") ; tab ; tab = tab.next_sibling("w:tab"))
+        {
+            sDOCXTabStop tabstop ;
+            tabstop.val = tab.attribute("w:val").value() ;
+            tabstop.pos = tab.attribute("w:pos").value() ;
+            tabs.push_back(tabstop) ;
+        }
+    }
+
+    if(tabs.empty())
+    {
+        return ;
+    }
+
+    bool same = (tabs.size() == mCurrentTabs.size()) ;
+    if(same)
+    {
+        for(size_t loop = 0 ; loop < tabs.size() ; loop++)
+        {
+            if(tabs[loop].pos != mCurrentTabs[loop].pos || tabs[loop].val != mCurrentTabs[loop].val)
+            {
+                same = false ;
+                break ;
+            }
+        }
+    }
+    if(same)
+    {
+        return ;
+    }
+
+    std::string out = ".tb " ;
+    for(const sDOCXTabStop &tab : tabs)
+    {
+        if(tab.val == "clear")
+        {
+            continue ;
+        }
+
+        double in = atof(tab.pos.c_str()) / TWIPSPERINCH ;
+
+        std::string prefix ;
+        if(tab.val == "center")
+        {
+            prefix = "^" ;
+        }
+        else if(tab.val == "right")
+        {
+            prefix = ">" ;
+        }
+        else if(tab.val == "decimal")
+        {
+            prefix = "#" ;
+        }
+
+        out += string_sprintf("%s%.2fi ", prefix.c_str(), in) ;
+    }
+    out += "\n" ;
+
+    mDocument->Insert(out) ;
+    mCurrentTabs = tabs ;
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  count [in] the 1-based counter value for this list item
+/// @param  format [in] the w:numFmt value (decimal, bullet, lowerLetter, ...)
+///
+/// @return the formatted counter text, e.g. "3", "c", "iii", "III"
+///
+/// @brief
+/// Format a numbering counter per a DOCX w:numFmt. Unrecognized formats
+/// fall back to plain decimal rather than emitting nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDOCXFile::FormatNumberingCounter(int count, const std::string &format)
+{
+    if(count < 1)
+    {
+        count = 1 ;
+    }
+
+    if(format == "lowerLetter" || format == "upperLetter")
+    {
+        // Word's own scheme: 1-26 = a..z, 27-52 = aa..zz, 53-78 = aaa..zzz, ...
+        int cycle = (count - 1) / 26 + 1 ;
+        char letter = static_cast<char>('a' + ((count - 1) % 26)) ;
+
+        std::string result(static_cast<size_t>(cycle), letter) ;
+        if(format == "upperLetter")
+        {
+            for(char &c : result)
+            {
+                c = static_cast<char>(toupper(c)) ;
+            }
+        }
+        return result ;
+    }
+
+    if(format == "lowerRoman" || format == "upperRoman")
+    {
+        static const int values[] = { 1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1 } ;
+        static const char* numerals[] = { "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I" } ;
+
+        int remaining = count ;
+        std::string result ;
+        for(int loop = 0 ; loop < 13 ; loop++)
+        {
+            while(remaining >= values[loop])
+            {
+                result += numerals[loop] ;
+                remaining -= values[loop] ;
+            }
+        }
+
+        if(format == "lowerRoman")
+        {
+            for(char &c : result)
+            {
+                c = static_cast<char>(tolower(c)) ;
+            }
+        }
+        return result ;
+    }
+
+    if(format == "decimalZero")
+    {
+        std::string result = std::to_string(count) ;
+        if(result.length() < 2)
+        {
+            result = "0" + result ;
+        }
+        return result ;
+    }
+
+    // "decimal" and anything unrecognized
+    return std::to_string(count) ;
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  node [in] the w:p XML node
+///
+/// @return nothing
+///
+/// @brief
+/// Emit a literal list marker (e.g. "1. ", "b) ", "-  ") before a numbered
+/// or bulleted paragraph's own text, resolved from word/numbering.xml
+/// against the paragraph's w:pPr/w:numPr. WordStar has no live
+/// auto-numbering field, so the marker is plain inserted text -- correct
+/// once, not automatically renumbered if the source list is edited later.
+/// A shallower level advancing resets any deeper levels of the same list,
+/// matching Word's own outline-numbering behavior.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDOCXFile::EmitNumbering(pugi::xml_node &node)
+{
+    pugi::xml_node numPr = node.child("w:pPr").child("w:numPr") ;
+    if(!numPr)
+    {
+        return ;
+    }
+
+    std::string numId = numPr.child("w:numId").attribute("w:val").value() ;
+    if(numId.empty())
+    {
+        return ;
+    }
+
+    std::string ilvlstr = numPr.child("w:ilvl").attribute("w:val").value() ;
+    int ilvl = ilvlstr.empty() ? 0 : atoi(ilvlstr.c_str()) ;
+
+    auto numIt = mNumIdToAbstractId.find(numId) ;
+    if(numIt == mNumIdToAbstractId.end())
+    {
+        return ;
+    }
+    auto defIt = mNumberingDefs.find(numIt->second) ;
+    if(defIt == mNumberingDefs.end())
+    {
+        return ;
+    }
+    auto lvlIt = defIt->second.levels.find(ilvl) ;
+    if(lvlIt == defIt->second.levels.end())
+    {
+        return ;
+    }
+    const sDOCXNumberingLevel &level = lvlIt->second ;
+
+    if(level.format == "none")
+    {
+        return ;
+    }
+
+    // a shallower level advancing restarts any deeper levels of this list
+    for(auto &entry : mNumberingCounters)
+    {
+        if(entry.first.first == numId && entry.first.second > ilvl)
+        {
+            entry.second = 0 ;
+        }
+    }
+
+    std::pair<std::string, int> key(numId, ilvl) ;
+    auto countIt = mNumberingCounters.find(key) ;
+    int count = (countIt == mNumberingCounters.end()) ? level.start : countIt->second + 1 ;
+    mNumberingCounters[key] = count ;
+
+    std::string marker ;
+    if(level.format == "bullet")
+    {
+        marker = "-  " ;    // a plain-text stand-in; the real lvlText is usually a symbol-font glyph
+    }
+    else
+    {
+        std::string numtext = FormatNumberingCounter(count, level.format) ;
+        std::string text = level.text ;
+        std::string placeholder = string_sprintf("%%%d", ilvl + 1) ;
+
+        size_t pos = text.find(placeholder) ;
+        if(pos != std::string::npos)
+        {
+            text.replace(pos, placeholder.length(), numtext) ;
+        }
+        else
+        {
+            text = numtext + "." ;
+        }
+        marker = text + "  " ;
+    }
+
+    mDocument->Insert(marker) ;
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  numbering [in] the root w:numbering node from word/numbering.xml
+///
+/// @return nothing
+///
+/// @brief
+/// Parse abstract numbering definitions (w:abstractNum, one per w:lvl) and
+/// the w:num -> w:abstractNumId mapping that paragraphs' w:numId values
+/// resolve through.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDOCXFile::ParseNumbering(pugi::xml_node numbering)
+{
+    for(pugi::xml_node abstractNum = numbering.child("w:abstractNum") ; abstractNum ; abstractNum = abstractNum.next_sibling("w:abstractNum"))
+    {
+        std::string abstractId = abstractNum.attribute("w:abstractNumId").value() ;
+
+        sDOCXNumberingDefinition def ;
+        for(pugi::xml_node lvl = abstractNum.child("w:lvl") ; lvl ; lvl = lvl.next_sibling("w:lvl"))
+        {
+            int ilvl = atoi(lvl.attribute("w:ilvl").value()) ;
+
+            sDOCXNumberingLevel level ;
+            level.format = lvl.child("w:numFmt").attribute("w:val").value() ;
+            level.text = lvl.child("w:lvlText").attribute("w:val").value() ;
+
+            std::string startstr = lvl.child("w:start").attribute("w:val").value() ;
+            level.start = startstr.empty() ? 1 : atoi(startstr.c_str()) ;
+
+            def.levels[ilvl] = level ;
+        }
+
+        mNumberingDefs[abstractId] = def ;
+    }
+
+    for(pugi::xml_node num = numbering.child("w:num") ; num ; num = num.next_sibling("w:num"))
+    {
+        std::string numId = num.attribute("w:numId").value() ;
+        std::string abstractId = num.child("w:abstractNumId").attribute("w:val").value() ;
+        mNumIdToAbstractId[numId] = abstractId ;
+    }
+}
+
 
 
 //=============================================================================

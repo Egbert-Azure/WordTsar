@@ -2,6 +2,26 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.9.0 Beta (2026-09-01)
+
+### DOCX import: real tables, not a placeholder
+
+Opening a Word document containing a table used to produce a bare `<<< TABLE >>>` marker and nothing else — the actual cell content was discarded. Tables now import as real text: each row becomes a line, cells are tab-separated with a real tab stop aligning the columns. Column widths are approximated as equal-width rather than matching the source document's own widths, since WordStar has no table/column-grid concept to map them onto.
+
+### DOCX import: numbered and bulleted lists keep their markers
+
+List items used to lose their numbers and bullets entirely on import — the text survived, but "1. First step" and "2. Second step" both came in as indistinguishable plain paragraphs. Numbering is now resolved against the document's own list definitions (`word/numbering.xml`) and written out as literal marker text — decimal, lettered, and Roman-numeral formats all render correctly, multi-level lists renumber the way Word itself does (a level-1 item resets any deeper levels' counters), and bullets come in as a plain-text bullet. Since WordStar has no live auto-numbering field, the marker is correct at import time but won't renumber itself if the list is edited afterward.
+
+### DOCX import: custom tab stops
+
+Custom tab stops (centered, right-aligned, decimal-aligned) defined in a paragraph or its style are now emitted as a real tab-stop dot command, instead of being silently parsed and discarded.
+
+### Fixed a real crash: any DOCX with no paragraph styles defined would abort on open
+
+Found while adding a test fixture for the numbering work above, not something this pass went looking for: `MergeParagraphStyles()` indexed into its style list with no bounds check, so a document whose `styles.xml` defines zero paragraph styles at all — an edge case a hand-built or programmatically generated `.docx` can hit even though real Word documents almost never do — segfaulted immediately on open, before any content ever rendered. The same unguarded index made a dangling style reference (a paragraph naming a style ID that doesn't exist in `styles.xml`) crash the same way. Both now return sensible defaults instead of reading out of bounds.
+
+Paragraph borders and shading remain unimplemented, deliberately: WordStar has no paragraph-border or shading concept to translate them onto, and approximating one with literal ASCII art wasn't part of what this pass covered.
+
 ## 0.8.0 Beta (2026-09-01)
 
 ### Terminal UI font discovery now finds real installed fonts on macOS

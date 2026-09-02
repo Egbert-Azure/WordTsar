@@ -95,6 +95,7 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     ../src/test/test-spellcheck.cpp
     ../src/test/test-rtf.cpp
     ../src/test/test-docxwriter.cpp
+    ../src/test/test-docxreader.cpp
     ../src/test/test-tuifontutils.cpp
     ../src/test/test-config.cpp
     ../src/test/test-wordstarinput.cpp
