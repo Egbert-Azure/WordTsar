@@ -544,6 +544,11 @@ void cWSWordTsar::OpenPreferences(void)
     cConfig config;
     config.Load();
 
+    // Seed from the editor's live state, as OpenSystemPreferences() does --
+    // otherwise ApplyConfig() below resets the file browser to the on-disk
+    // default directory, discarding wherever the user navigated this session.
+    config.mDefaultDirectory = mEditor->mFileDir;
+
     wordstartui::sTerminalSize size = HostScreenSize();
 
     sRect rect;
@@ -898,6 +903,7 @@ void cWSWordTsar::OpenSystemPreferences(void)
     config.mLongName = mEditor->mLongName;
     config.mTuiAlwaysDotCommands = mEditor->mAlwaysDot;
     config.mDefaultFormat = mEditor->mDefaultFormat;
+    config.mDefaultDirectory = mEditor->mFileDir;
 
     if (wsdialogs::SystemPreferences(this, config) == true)
     {

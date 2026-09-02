@@ -218,9 +218,6 @@ std::unique_ptr<cTUIFontCalculator> cTUIFontMeasurementManager::CreateFontCalcul
             case FONT_BACKEND_HARFBUZZ:
                 calculator = std::make_unique<cTUIFontCalculatorHarfBuzz>();
                 break;
-            case FONT_BACKEND_STB_TRUETYPE:
-                calculator = std::make_unique<cTUISTBTrueTypeFontCalculator>();
-                break;
 #endif
             default:
                 // Fall back to built-in metrics

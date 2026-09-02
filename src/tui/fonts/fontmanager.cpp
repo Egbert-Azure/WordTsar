@@ -1123,8 +1123,12 @@ std::vector<cTUIFontManager::FontInfo> cTUIFontManager::DiscoverSystemFonts(void
                 CFIndex nameLen = CFStringGetLength(familyRef);
                 CFIndex nameMax = CFStringGetMaximumSizeForEncoding(nameLen, kCFStringEncodingUTF8) + 1;
                 std::vector<char> nameBuffer(static_cast<size_t>(nameMax));
-                CFStringGetCString(familyRef, nameBuffer.data(), nameMax, kCFStringEncodingUTF8);
+                bool gotName = CFStringGetCString(familyRef, nameBuffer.data(), nameMax, kCFStringEncodingUTF8);
                 CFRelease(familyRef);
+                if (!gotName)
+                {
+                    continue;
+                }
 
                 // Symbolic traits give bold/italic/monospace without loading the font
                 CFDictionaryRef traitsDict = (CFDictionaryRef)CTFontDescriptorCopyAttribute(
