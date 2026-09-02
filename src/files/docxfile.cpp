@@ -211,6 +211,8 @@ bool cDOCXFile::LoadFile(std::string filename)
     zip_t *zip = zip_open(filename.c_str(), ZIP_DEFAULT_COMPRESSION_LEVEL, 'r');
     if(zip != nullptr)
     {
+        retval = true ;
+
         // open Style Sheets
         zip_entry_open(zip, "word/styles.xml");
         zip_entry_read(zip, &stylebuf, &bufsize);
