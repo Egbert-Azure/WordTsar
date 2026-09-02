@@ -2,6 +2,18 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.10.0 Beta (2026-09-01)
+
+### Real table of contents and index generation (TUI Opening Menu)
+
+The Opening Menu's `I` (index a document) and `T` (table of contents) commands were grayed out — real WordStar 7 features with no implementation behind them at all. Both now work end to end: pick a document from the file browser, and every `.tc`/`.tc1`-`.tc9` entry (table of contents) or `.ix` entry (index) already marked in it is collected, resolved against the document's real pagination, and written to a proper output file — `name.TOC` for the default table, `name.T01` through `name.T09` for numbered tables, `name.IDX` for the index — which then opens for editing, matching the manual's own "you can edit the table of contents file to make any formatting changes."
+
+Table of contents entries support the real `#` page-number placeholder (`\#` for a literal `#`) and leading-space indentation, exactly as the real Insert → TOC Entry dialog describes. Index entries support `+` for a bold page number, `-` for a cross-reference (no page number), `,` for a subreference indented under its main entry, and `\` to escape any of those as a literal character. Duplicate index entries merge into one line with a combined, sorted page list; the whole index sorts alphabetically, case-insensitively.
+
+The two `.tc`/`.ix` dot commands themselves — previously flagged "not implemented" in the editor even though the manual documents them fully — are now recognized properly.
+
+Not implemented: real WordStar's other way to mark an index entry, an inline start/end span (`^PK`, "Mark Text for Index") rather than a standalone `.ix` line — a separate, pre-existing gap (WordTsar's native `.ws` reader already discards this marker on load) that this pass didn't touch. The "Index Every Word" auto-indexing mode and the TOC/Index dialogs' page-range and odd/even filters are also not implemented; every entry in the whole document is always included.
+
 ## 0.9.0 Beta (2026-09-01)
 
 ### DOCX import: real tables, not a placeholder

@@ -101,6 +101,8 @@ private:
     bool HandleOpeningKey(const wordstartui::sInputEvent& event);
     void ShowOpeningStatus(void);
     void ShowOpeningHelp(void);
+    void GenerateTOCFromFile(void);
+    void GenerateIndexFromFile(void);
 
     void DrawEditor(wordstartui::cScreen& screen, const wordstartui::cTheme& theme);
     void DrawTitleBar(wordstartui::cScreen& screen, int row);
@@ -139,6 +141,8 @@ private:
     wsui::cFileBrowser mBrowser;  // file picker on the opening screen
     bool mOpeningBrowserFocus;    // true when the browser has focus (not the menu)
     bool mOpeningWantPrint;       // true when the browser was opened via "print a file"
+    bool mOpeningWantTOC;         // true when the browser was opened via "table of contents"
+    bool mOpeningWantIndex;       // true when the browser was opened via "index a document"
 
     // Chrome visibility (Preferences > Display On Screen).
     bool mShowTitle;

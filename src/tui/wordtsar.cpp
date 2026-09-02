@@ -34,6 +34,7 @@
 #include "src/tui/wordstartui/src/dropdown.h"
 
 #include "src/core/include/version.h"
+#include "src/core/generate/tocindexgenerator.h"
 #include "src/core/layout/layoutbase.h"
 #include "src/core/layout/layoutstructs.h"
 #include "src/core/document/document.h"
@@ -138,8 +139,8 @@ const sOpeningItem kOpeningItems[] =
     { 'P',  "print a file",           true,  eOpeningAction::PRINT_FILE },
     { '\\', "fax",                    false, eOpeningAction::FAX },
     { 'K',  "print from keyboard",    false, eOpeningAction::PRINT_FROM_KEYBOARD },
-    { 'I',  "index a document",       false, eOpeningAction::INDEX_DOCUMENT },
-    { 'T',  "table of contents",      false, eOpeningAction::TABLE_OF_CONTENTS },
+    { 'I',  "index a document",       true,  eOpeningAction::INDEX_DOCUMENT },
+    { 'T',  "table of contents",      true,  eOpeningAction::TABLE_OF_CONTENTS },
     { 'X',  "exit WordTsar",          true,  eOpeningAction::EXIT },
 
     // Right column -- 10 rows, matches real WS7 exactly, plus two
@@ -183,6 +184,8 @@ cWSWordTsar::cWSWordTsar(void)
     mHaveFileArg = false;
     mOpeningBrowserFocus = false;
     mOpeningWantPrint = false;
+    mOpeningWantTOC = false;
+    mOpeningWantIndex = false;
     mShowTitle = true;
     mShowMenu = true;
     mShowTopStatus = true;
@@ -2694,6 +2697,8 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         {
             mOpeningBrowserFocus = false;
             mOpeningWantPrint = false;
+            mOpeningWantTOC = false;
+            mOpeningWantIndex = false;
             return true;
         }
 
@@ -2708,6 +2713,16 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
                 mOpeningWantPrint = false;
                 mEditor->Print();
             }
+            if (mOpeningWantTOC == true)
+            {
+                mOpeningWantTOC = false;
+                GenerateTOCFromFile();
+            }
+            if (mOpeningWantIndex == true)
+            {
+                mOpeningWantIndex = false;
+                GenerateIndexFromFile();
+            }
             mMode = APP_EDITOR;
             return true;
         }
@@ -2715,6 +2730,8 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         {
             mOpeningBrowserFocus = false;
             mOpeningWantPrint = false;
+            mOpeningWantTOC = false;
+            mOpeningWantIndex = false;
         }
         return true;
     }
@@ -2817,11 +2834,23 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         case eOpeningAction::OPEN_DOCUMENT:
         case eOpeningAction::CHANGE_DIRECTORY:
             mOpeningWantPrint = false;
+            mOpeningWantTOC = false;
+            mOpeningWantIndex = false;
             mOpeningBrowserFocus = true;
             break;
 
         case eOpeningAction::PRINT_FILE:
             mOpeningWantPrint = true;
+            mOpeningBrowserFocus = true;
+            break;
+
+        case eOpeningAction::TABLE_OF_CONTENTS:
+            mOpeningWantTOC = true;
+            mOpeningBrowserFocus = true;
+            break;
+
+        case eOpeningAction::INDEX_DOCUMENT:
+            mOpeningWantIndex = true;
             mOpeningBrowserFocus = true;
             break;
 
@@ -2902,6 +2931,78 @@ void cWSWordTsar::ShowOpeningHelp(void)
     wsdialogs::MessageBox(this, "Help",
         "Press the highlighted letter to choose a command, or use the arrow "
         "keys and Enter. Tab moves focus into the file list below.");
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WS7's own Opening Menu "T" (table of contents). mFilename (set by
+/// the caller from the file browser selection) is loaded and laid out,
+/// every .tc/.tc1-.tc9 entry in it is collected and resolved to a real
+/// page number, and each non-empty table is written to its own file. The
+/// first file written is then opened for editing, matching the manual's
+/// own "you can edit the table of contents file to make any formatting
+/// changes or corrections."
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::GenerateTOCFromFile(void)
+{
+    std::vector<std::string> outputFiles;
+    bool ok = cTOCIndexGenerator::GenerateTOC(mEditor, mFilename, outputFiles);
+
+    if (ok == false)
+    {
+        wsdialogs::MessageBox(this, "Table of Contents",
+            "No .tc entries were found in\n" + mFilename);
+        mEditor->LoadFile(mFilename);
+        mEditor->RelayoutAndRedraw();
+        return;
+    }
+
+    std::string text = "Wrote:\n";
+    for (const std::string& path : outputFiles)
+    {
+        text += path + "\n";
+    }
+    wsdialogs::MessageBox(this, "Table of Contents", text);
+
+    mFilename = outputFiles.front();
+    mEditor->LoadFile(mFilename);
+    mEditor->RelayoutAndRedraw();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WS7's own Opening Menu "I" (index a document). mFilename is loaded
+/// and laid out, every .ix entry is collected, resolved, alphabetized and
+/// merged, and the result is written to a real .IDX file and opened for
+/// editing.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::GenerateIndexFromFile(void)
+{
+    std::string outputFile;
+    bool ok = cTOCIndexGenerator::GenerateIndex(mEditor, mFilename, outputFile);
+
+    if (ok == false)
+    {
+        wsdialogs::MessageBox(this, "Index",
+            "No .ix entries were found in\n" + mFilename);
+        mEditor->LoadFile(mFilename);
+        mEditor->RelayoutAndRedraw();
+        return;
+    }
+
+    wsdialogs::MessageBox(this, "Index", "Wrote:\n" + outputFile);
+
+    mFilename = outputFile;
+    mEditor->LoadFile(mFilename);
+    mEditor->RelayoutAndRedraw();
 }
 
 /////////////////////////////////////////////////////////////////////////////

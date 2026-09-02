@@ -351,9 +351,9 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
             {
                 return DOT_GOOD;
             }
-            if (cmdCode == "IX")  // Index
+            if (cmdCode == "IX")  // Index entry -- collected by cTOCIndexGenerator, doesn't print
             {
-                return DOT_NOTIMPLEMENTED;
+                return DOT_GOOD;
             }
             break;
         }
@@ -529,9 +529,9 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
             {
                 return ParseTabs(upperCmd);
             }
-            if (cmdCode == "TC")  // Table of Contents
+            if (cmdCode == "TC")  // Table of contents entry (.tc, .tc1-.tc9) -- collected by cTOCIndexGenerator, doesn't print
             {
-                return DOT_NOTIMPLEMENTED;
+                return DOT_GOOD;
             }
             break;
         }
