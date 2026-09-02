@@ -2,6 +2,14 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.10.2 Beta (2026-09-01)
+
+### TOC and Index entries can now actually be inserted, with real text
+
+0.10.0 built real generation of `.tc`/`.ix` entries into `.TOC`/`.IDX` files — but tracing a user report of "no entries found" against a real document turned up a deeper, pre-existing gap: there was never a working way to *create* a well-formed entry in the first place. `TOCEntry()` was a stub (its own comment: `// @TODO - get text via dialog`) that inserted a bare `.tc` with no text at all; `IndexEntry()` tried to simulate the classic `^O N I` keychord, but `^O N` itself was wired to "not implemented." Both Insert menu items were disabled in the GUI as a result.
+
+Both now show a real dialog — `QInputDialog::getText` in the GUI, `wsdialogs::InputBox` in the TUI — prompting for the entry text exactly as the WordStar 7 manual describes (the whole line for a TOC entry, including any leading-space indentation and a `#` page-number placeholder; the word or phrase for an index entry, with its `+`/`-`/`,` conventions), then inserts `.tc <text>` or `.ix <text>` as its own line. The TUI's Insert → Index/TOC Entry submenu items are wired to the same dialogs.
+
 ## 0.10.1 Beta (2026-09-01)
 
 ### GUI's Open/Save dialogs now actually start in your default directory

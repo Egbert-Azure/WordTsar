@@ -73,6 +73,7 @@
 #include <QtWidgets>
 #include <QVBoxLayout>
 #include <QFont>
+#include <QInputDialog>
 
 #include "src/core/include/version.h"
 #include "src/core/include/utils.h"
@@ -1825,9 +1826,7 @@ NoteEndnoteAction->setEnabled(false) ;
 NoteAnnotationAction->setEnabled(false) ;
 
     QAction *TOCEntryAction = new QAction(mMenuProvider->GetInsertTOCEntryLabel(), mMenuBar) ;
-TOCEntryAction->setEnabled(false) ;
     QAction *IndexEntryAction = new QAction(mMenuProvider->GetInsertIndexEntryLabel(), mMenuBar) ;
-IndexEntryAction->setEnabled(false) ;
     QAction *MarkTextforIndexAction = new QAction(mMenuProvider->GetInsertMarkTextForIndexLabel(), mMenuBar) ;
 MarkTextforIndexAction->setEnabled(false) ;
     QAction *DotLeaderAction = new QAction(mMenuProvider->GetInsertDotLeaderLabel(), mMenuBar) ;
@@ -3090,19 +3089,35 @@ void cWordTsar::NoteAnnotation(void)
 
 void cWordTsar::TOCEntry(void)
 {
-    // @TODO - get text via dialog
-    mEditor->MoveCursorStartLine() ;
+    bool ok = false ;
+    QString text = QInputDialog::getText(this, "Table of Contents Entry",
+        "Text to appear in the table of contents:", QLineEdit::Normal, "", &ok) ;
 
+    if (!ok || text.isEmpty())
+    {
+        return ;
+    }
+
+    mEditor->MoveCursorStartLine() ;
     mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".tc\n") ;
+    mEditor->GetDocument()->Insert(".tc " + text.toStdString() + "\n") ;
 }
 
 
 void cWordTsar::IndexEntry(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('n') ;
-    mEditor->mInput->HandleKey('i') ;
+    bool ok = false ;
+    QString text = QInputDialog::getText(this, "Index Entry",
+        "Word or phrase to appear in the index:", QLineEdit::Normal, "", &ok) ;
+
+    if (!ok || text.isEmpty())
+    {
+        return ;
+    }
+
+    mEditor->MoveCursorStartLine() ;
+    mEditor->GetDocument()->MaybeInsertHardReturn() ;
+    mEditor->GetDocument()->Insert(".ix " + text.toStdString() + "\n") ;
 }
 
 

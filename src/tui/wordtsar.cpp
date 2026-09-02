@@ -1190,8 +1190,8 @@ void cWSWordTsar::BuildMenus(void)
 
     mMenu.AddSeparator(insert);
     int insertIndex = mMenu.AddSubMenu(insert, "&Index/TOC Entry");
-    mMenu.AddSubMenuItem(insertIndex, std::string("TOC Entry...") + SC(".tc", ""), none, false);
-    mMenu.AddSubMenuItem(insertIndex, std::string("Index Entry...") + SC("^ONI", ""), none, false);
+    mMenu.AddSubMenuItem(insertIndex, std::string("TOC Entry...") + SC(".tc", ""), [this](void) { InsertTOCEntry(); });
+    mMenu.AddSubMenuItem(insertIndex, std::string("Index Entry...") + SC("^ONI", ""), [this](void) { InsertIndexEntry(); });
     mMenu.AddSubMenuItem(insertIndex, std::string("Mark for Index") + SC("^PK", ""), none, false);
     mMenu.AddSubMenuItem(insertIndex, std::string("Dot Leader to Tab") + SC("^P.", ""), none, false);
 
@@ -3003,6 +3003,68 @@ void cWSWordTsar::GenerateIndexFromFile(void)
     mFilename = outputFile;
     mEditor->LoadFile(mFilename);
     mEditor->RelayoutAndRedraw();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WS7's own Insert -> Index/TOC Entry -> TOC Entry command (classic
+/// .tc). Prompts for the entire line of text to appear in the table of
+/// contents -- per the manual, extra leading spaces indent it, and a bare
+/// # marks where the real page number goes at generation time -- then
+/// inserts ".tc <text>" as its own line right before the current one,
+/// matching the manual's own "WordStar inserts the .tc dot command
+/// followed by the text."
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::InsertTOCEntry(void)
+{
+    std::string text;
+    if (wsdialogs::InputBox(this, "Table of Contents Entry",
+            "Text to appear in the table of contents:", text) == false)
+    {
+        return;
+    }
+    if (text.empty())
+    {
+        return;
+    }
+
+    mEditor->MoveCursorStartLine();
+    mEditor->GetDocument()->MaybeInsertHardReturn();
+    mEditor->GetDocument()->Insert(".tc " + text + "\n");
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WS7's own Insert -> Index/TOC Entry -> Index Entry command
+/// (classic ^ONI). Prompts for the word or phrase to appear in the index
+/// -- a leading + bolds its page number, a leading - marks a
+/// cross-reference, a comma adds a subreference -- then inserts
+/// ".ix <text>" as its own line, the same way TOC Entry does.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::InsertIndexEntry(void)
+{
+    std::string text;
+    if (wsdialogs::InputBox(this, "Index Entry",
+            "Word or phrase to appear in the index:", text) == false)
+    {
+        return;
+    }
+    if (text.empty())
+    {
+        return;
+    }
+
+    mEditor->MoveCursorStartLine();
+    mEditor->GetDocument()->MaybeInsertHardReturn();
+    mEditor->GetDocument()->Insert(".ix " + text + "\n");
 }
 
 /////////////////////////////////////////////////////////////////////////////
