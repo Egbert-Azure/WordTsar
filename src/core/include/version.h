@@ -28,8 +28,8 @@ static const char STATUS_SHORT[] =  "b";
 //Standard Version Type
 static const long MAJOR  = 0;
 static const long MINOR  = 10;
-static const long BUILD  = 4;
+static const long BUILD  = 5;
 
-static const char FULLVERSION_STRING [] = "0.10.4";
+static const char FULLVERSION_STRING [] = "0.10.5";
 
 #endif //VERSION_H

@@ -345,7 +345,20 @@ bool cTerminalDriverPosix::ReadEvent(sInputEvent& event, int timeoutMs)
     {
         uint8_t byte = 0;
 
-        while (ReadByte(byte, 15) == true)
+        // 15ms was too tight for a real Fn+F1 press on some macOS keyboard/
+        // terminal combinations: the ESC arrives, but the OS's Fn-key
+        // handling can delay the following "OP" bytes past this window,
+        // so ReadByte() below times out after just the ESC. That gets
+        // decoded as a lone Escape keypress (DecodeEscape, bytes.size()==1
+        // case), and the "O"/"P" that arrive afterward land as two
+        // unrelated literal-text keystrokes on the *next* ReadEvent() call
+        // instead of the intended single F1 press -- user-reported: F1
+        // appeared to do nothing on the first press, and needed a second
+        // press to actually register. 50ms is still well under normal
+        // human perception for a genuine standalone Escape press (the
+        // only other case this timeout gates), and gives real multi-byte
+        // sequences enough room to fully arrive.
+        while (ReadByte(byte, 50) == true)
         {
             bytes.push_back(byte);
 

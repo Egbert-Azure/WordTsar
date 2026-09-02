@@ -702,6 +702,14 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
 
     if(ch == 27)                    // escape key
     {
+        // mOldHelpStatus only holds a meaningful value once a real ^K/^Q/^O/
+        // ^P/^M chord has actually been entered (that's where it's captured).
+        // Restoring it unconditionally would stomp a perfectly good display
+        // with its stale HELP_NONE construction default the first time
+        // Escape is pressed in a session that never entered one.
+        bool hadActiveChord = mControlMMode || mControlKMode || mControlOMode
+                            || mControlPMode || mControlQMode ;
+
         mControlMMode = false ;
         mControlKMode = false ;
         mControlOMode = false ;
@@ -709,7 +717,10 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
         mControlQMode = false ;
         mWaitingForHelpTarget = false ;
         mWaitingForHelpChordTarget = false ;
-        mEditor->mHelpDisplay = mOldHelpStatus ;
+        if(hadActiveChord == true)
+        {
+            mEditor->mHelpDisplay = mOldHelpStatus ;
+        }
         handled = true ;
     }
 
@@ -1088,7 +1099,13 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
 
         case SPECIAL_ESCAPE:
         {
-            // Cancel any active chord mode
+            // Cancel any active chord mode. See the identical guard in
+            // HandleKey's ch==27 branch for why the display restore is
+            // conditional -- mOldHelpStatus is only meaningful once a real
+            // chord has actually been entered.
+            bool hadActiveChord = mControlMMode || mControlKMode || mControlOMode
+                                || mControlPMode || mControlQMode ;
+
             mControlMMode = false ;
             mControlKMode = false ;
             mControlOMode = false ;
@@ -1096,7 +1113,10 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
             mControlQMode = false ;
             mWaitingForHelpTarget = false ;
             mWaitingForHelpChordTarget = false ;
-            mEditor->mHelpDisplay = mOldHelpStatus ;
+            if(hadActiveChord == true)
+            {
+                mEditor->mHelpDisplay = mOldHelpStatus ;
+            }
             break ;
         }
 
@@ -1119,14 +1139,25 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
                 // stray F1 mid-chord (e.g. after ^K) would leave that chord
                 // flag stuck true, silently misrouting the *next* real
                 // keystroke as a chord subcommand once the help lookup
-                // consumes this one.
+                // consumes this one. The display restore is conditional on
+                // a chord having actually been active -- mOldHelpStatus is
+                // only meaningful once one has really been entered; doing
+                // this unconditionally blanked the help bar the first time
+                // F1 was pressed in a fresh session (mOldHelpStatus still
+                // held its HELP_NONE construction default).
+                bool hadActiveChord = mControlMMode || mControlKMode || mControlOMode
+                                    || mControlPMode || mControlQMode ;
+
                 mControlMMode = false ;
                 mControlKMode = false ;
                 mControlOMode = false ;
                 mControlPMode = false ;
                 mControlQMode = false ;
                 mWaitingForHelpChordTarget = false ;
-                mEditor->mHelpDisplay = mOldHelpStatus ;
+                if(hadActiveChord == true)
+                {
+                    mEditor->mHelpDisplay = mOldHelpStatus ;
+                }
                 mWaitingForHelpTarget = true ;
             }
             break ;

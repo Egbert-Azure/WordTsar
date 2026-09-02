@@ -12143,6 +12143,31 @@ TEST_CASE("WordStar Input - Ctrl+M Macro Menu / F1 Help Sequences")
     // default: falls to InvalidCommand(), which is QT_TESTING-safe -- but
     // covering all of them here isn't the point of this test.
 
+    SUBCASE("F1 pressed first in a fresh session doesn't blank the help display")
+    {
+        // mOldHelpStatus only gets a real value once a ^K/^Q/^O/^P/^M chord
+        // has actually been entered; it starts at its HELP_NONE construction
+        // default otherwise. F1's neutral-state branch used to restore
+        // mHelpDisplay to mOldHelpStatus unconditionally, which stomped a
+        // perfectly good HELP_MAIN display with that stale HELP_NONE the
+        // very first time F1 (or Escape) was pressed in a session that had
+        // never entered a real chord -- user-reported via screenshot.
+        editor.mHelpDisplay = HELP_MAIN;
+
+        editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
+
+        CHECK(editor.mHelpDisplay == HELP_MAIN);
+    }
+
+    SUBCASE("Escape pressed first in a fresh session doesn't blank the help display")
+    {
+        editor.mHelpDisplay = HELP_MAIN;
+
+        editor.mInput->HandleKey(27, false);  // ESC
+
+        CHECK(editor.mHelpDisplay == HELP_MAIN);
+    }
+
     SUBCASE("F1 then F1 attempts a help-level change (no-op under QT_TESTING)")
     {
         bool handled1 = editor.mInput->HandleSpecialKey(SPECIAL_F1, false, false, false);
