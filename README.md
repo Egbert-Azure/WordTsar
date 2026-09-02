@@ -58,6 +58,16 @@ You get the best of both worlds: the classic terminal view, or the macOS GUI —
 - Spell check dictionary language (System Preferences > Editor) is applied on macOS via `NSSpellChecker`, so any installed system dictionary (not just English) works.
 - DOCX import is partial: paragraph text, character formatting, and basic page setup come through, but tables, list numbering, images, and header/footer content do not import yet. DOCX export doesn't cover tables or headers/footers either. See `WHATS_NEW.md` for the full state.
 
+## Credit where it belongs
+
+WordTsar is Gerald Brandt's. He designed it, wrote it, and has maintained it for years — the editing engine, the layout and rendering engines, the WordStar 7 fidelity, the file format handling. Nearly all the code in this repository is his.
+
+He is also, by night, a novelist: the San Angeles cyberpunk trilogy — *The Courier*, *The Operative*, *The Rebel* — published by DAW, and the Quantum Empirica books. *The Courier* was a finalist for the Aurora Award and was named by the CBC as one of ten Canadian science fiction books you need to read. And he writes them in WordTsar. In [his own words](https://geraldbrandt.com/about/): IT administration and C++ by day, author by night, working entirely in the WordStar 7 clone he wrote and maintains himself.
+
+That is the rarest thing about this program. It isn't a nostalgia project or a museum piece — it's a working writer's daily tool, built by someone who has to live with every decision in it. It shows in the details.
+
+For me it has become the quiet place where writing actually happens: no ribbon, no sidebar, no notifications, nothing asking for attention. This fork exists only because I wanted that on one platform, with less to maintain. The original cross-platform WordTsar — Windows, Linux, and macOS — lives at [wordtsar.ca](http://wordtsar.ca) and remains the one to use. Thank you, Gerald.
+
 ## Feedback
 
 This fork is actively developed. If you use it and run into a bug, a missing feature, or just want to share how it's working for you, please [open an issue](https://github.com/Egbert-Azure/WordTsar/issues) on this repo.
