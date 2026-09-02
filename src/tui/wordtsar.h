@@ -2,6 +2,7 @@
 //
 // WordTsar - Wordstar clone for modern systems http://wordtsar.ca
 // Copyright (C) 2018 Gerald Brandt
+// Copyright (C) 2026 Egbert H. Schroeer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -101,6 +102,10 @@ private:
     bool HandleOpeningKey(const wordstartui::sInputEvent& event);
     void ShowOpeningStatus(void);
     void ShowOpeningHelp(void);
+    // Real legal notices (copyright, no-warranty, redistribution rights, how
+    // to view the licence) -- distinct from About()'s memory/status screen,
+    // which stays reachable on its own via ^O? and the Opening Menu's "?".
+    void ShowAboutWordTsar(void);
     void GenerateTOCFromFile(void);
     void GenerateIndexFromFile(void);
     void InsertTOCEntry(void);

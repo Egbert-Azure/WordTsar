@@ -84,7 +84,6 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     ../src/test/test-document.cpp
     ../src/test/test-codepage.cpp
     ../src/test/test-utils.cpp
-    ../src/test/test-commserver.cpp
     ../src/test/test_layoutstructs.cpp
     ../src/test/test-baselayout.cpp
     ../src/test/test-guilayout.cpp
@@ -122,12 +121,6 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     ../src/third-party/chillout/src/chillout/chillout.h
     ../src/third-party/chillout/src/chillout/defines.h
     ../src/third-party/chillout/src/chillout/common/common.h
-
-    # Comm subsystem (test-only for now, not in main build)
-    ../src/core/comm/commdefs.h
-    ../src/core/comm/comm_utils.cpp ../src/core/comm/comm_utils.h
-    ../src/core/comm/commserver.cpp ../src/core/comm/commserver.h
-    ../src/core/comm/commclient.cpp ../src/core/comm/commclient.h
 )
 
 if (WIN32)

@@ -2,6 +2,7 @@
 //
 // WordTsar - Wordstar clone for modern systems http://wordtsar.ca
 // Copyright (C) 2018 Gerald Brandt
+// Copyright (C) 2026 Egbert H. Schroeer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -81,7 +82,6 @@
 #include "src/gui/editor/editorctrl.h"
 #include "src/gui/utils/fontutils.h"
 #include "src/gui/misc/busy.h"
-#include "src/core/comm/commserver.h"
 #include "src/gui/menu/menuprovider.h"
 #include "src/gui/menu/wordstarmenu.h"
 #include "src/gui/menu/modernmenu.h"
@@ -2335,8 +2335,16 @@ void cWordTsar::AboutWordTsar(void)
                     "<p>Wordstar for the 21st century. This is a macOS-focused fork of "
                     "Gerald Brandt's WordTsar &mdash; the Wordstar-clone editing engine, "
                     "document formats, and original design are his work; this fork adds "
-                    "macOS-specific packaging and features on top.</p>" \
-                    "Licensed under the GNU Affero General Public License v3.0<br>" \
+                    "macOS-specific packaging and features on top. Not endorsed by or "
+                    "affiliated with the upstream WordTsar project.</p>" \
+                    "<p>Copyright (C) 2018 Gerald Brandt<br>" \
+                    "Portions Copyright (C) 2026 Egbert H. Schroeer</p>" \
+                    "<p>This program comes with ABSOLUTELY NO WARRANTY. This is free "
+                    "software, and you are welcome to redistribute it under the terms "
+                    "of the GNU Affero General Public License v3.0. See LICENSE.md in "
+                    "the source distribution, or "
+                    "https://www.gnu.org/licenses/agpl-3.0.html for the full licence "
+                    "text.</p>" \
                     "https://github.com/Egbert-Azure/WordTsar<br>" \
                     "<h4>Embedded Third-Party Code</h4>" \
                     "</p>"

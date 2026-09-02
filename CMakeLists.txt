@@ -56,14 +56,12 @@ set(WS_THIRDPARTY_DIR "${CMAKE_SOURCE_DIR}/third-party")
 set(WS_PUGIXML_DIR "${WS_THIRDPARTY_DIR}/pugixml")
 set(WS_UNICODELIB_DIR "${WS_THIRDPARTY_DIR}/cpp-unicodelib")
 set(WS_SIMPLEINI_DIR "${WS_THIRDPARTY_DIR}/simpleini")
-set(WS_EXPRTK_DIR "${WS_THIRDPARTY_DIR}/exprtk")
 set(WS_PICOMATH_DIR "${WS_THIRDPARTY_DIR}/picomath")
 set(WS_ZIP_DIR "${WS_THIRDPARTY_DIR}/zip")
 
 # Dependency versions - single source of truth
 set(PUGIXML_VERSION "1.15")
 set(SIMPLEINI_VERSION "4.22")
-set(EXPRTK_VERSION "0.0.3")
 set(PICOMATH_VERSION "1.1.0")
 set(KUBAZIP_VERSION "0.3.5")
 
@@ -88,15 +86,6 @@ if(NOT EXISTS "${WS_SIMPLEINI_DIR}")
         GIT_TAG v${SIMPLEINI_VERSION}
         SOURCE_DIR "${WS_SIMPLEINI_DIR}")
     FetchContent_Populate(simpleini)
-endif()
-
-if(NOT EXISTS "${WS_EXPRTK_DIR}")
-    message(STATUS "  exprtk: not found, downloading v${EXPRTK_VERSION}...")
-    FetchContent_Declare(exprtk
-        GIT_REPOSITORY https://github.com/ArashPartow/exprtk.git
-        GIT_TAG ${EXPRTK_VERSION}
-        SOURCE_DIR "${WS_EXPRTK_DIR}")
-    FetchContent_Populate(exprtk)
 endif()
 
 if(NOT EXISTS "${WS_PICOMATH_DIR}/include/picomath.hpp")
@@ -188,10 +177,6 @@ if(UPDATE_DEPENDENCIES)
         "https://github.com/brofield/simpleini.git"
         "${SIMPLEINI_VERSION}" "v" "${WS_SIMPLEINI_DIR}")
 
-    check_and_update_dependency("exprtk"
-        "https://github.com/ArashPartow/exprtk.git"
-        "${EXPRTK_VERSION}" "" "${WS_EXPRTK_DIR}")
-
     message(STATUS "  picomath v${PICOMATH_VERSION}: up to date")
 
     check_and_update_dependency("kubazip"
@@ -208,7 +193,6 @@ else()
     message(STATUS "  pugixml v${PUGIXML_VERSION}")
     message(STATUS "  cpp-unicodelib (master)")
     message(STATUS "  simpleini v${SIMPLEINI_VERSION}")
-    message(STATUS "  exprtk v${EXPRTK_VERSION}")
     message(STATUS "  kuba--/zip v${KUBAZIP_VERSION}")
     message(STATUS "  chillout (local)")
 endif()

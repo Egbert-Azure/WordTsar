@@ -5,6 +5,7 @@
 //
 // WordTsar - Wordstar clone for modern systems http://wordtsar.ca
 // Copyright (C) 2018 Gerald Brandt
+// Copyright (C) 2026 Egbert H. Schroeer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as

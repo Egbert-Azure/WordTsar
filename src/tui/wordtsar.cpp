@@ -2,6 +2,7 @@
 //
 // WordTsar - Wordstar clone for modern systems http://wordtsar.ca
 // Copyright (C) 2018 Gerald Brandt
+// Copyright (C) 2026 Egbert H. Schroeer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -1322,7 +1323,7 @@ void cWSWordTsar::BuildMenus(void)
 
     // ------------------------------- Help -------------------------------
     int help = mMenu.AddMenu("Help", 'H');
-    mMenu.AddSubItem(help, "&About WordTsar", [this](void) { mEditor->About(); });
+    mMenu.AddSubItem(help, "&About WordTsar", [this](void) { ShowAboutWordTsar(); });
 }
 
 // =========================================================================
@@ -2860,7 +2861,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
             break;
 
         case eOpeningAction::ABOUT:
-            mEditor->About();
+            ShowAboutWordTsar();
             break;
 
         case eOpeningAction::PREFERENCES:
@@ -2915,6 +2916,44 @@ void cWSWordTsar::ShowOpeningStatus(void)
     }
 
     wsdialogs::MessageBox(this, "Status", text);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Show WordTsar's real legal notices: copyright, no-warranty disclaimer,
+/// redistribution rights, and how to view the full licence text -- AGPL
+/// §5(d)/§0's "Appropriate Legal Notices." Reached via Help -> About
+/// WordTsar. Deliberately separate from About(), which stays the
+/// memory/status screen reachable via ^O? and the Opening Menu's "?".
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::ShowAboutWordTsar(void)
+{
+    std::string text = std::string("WordTsar ") + FULLVERSION_STRING + " " + STATUS + "\n\n";
+
+    text += "Wordstar for the 21st century. This is a macOS-focused fork of "
+            "Gerald Brandt's WordTsar -- the Wordstar-clone editing engine, "
+            "document formats, and original design are his work; this fork "
+            "adds macOS-specific packaging and features on top. Not endorsed "
+            "by or affiliated with the upstream WordTsar project.\n\n";
+
+    text += "Copyright (C) 2018 Gerald Brandt\n";
+    text += "Portions Copyright (C) 2026 Egbert H. Schroeer\n\n";
+
+    text += "This program comes with ABSOLUTELY NO WARRANTY.\n";
+    text += "This is free software, and you are welcome to redistribute it "
+            "under the terms of the GNU Affero General Public License v3.0. "
+            "See LICENSE.md in the source distribution, or "
+            "https://www.gnu.org/licenses/agpl-3.0.html for the full licence "
+            "text.\n\n";
+
+    text += "https://github.com/Egbert-Azure/WordTsar";
+
+    wsdialogs::MessageBox(this, "About WordTsar", text);
 }
 
 /////////////////////////////////////////////////////////////////////////////

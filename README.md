@@ -8,7 +8,7 @@
 
 Wordstar for the 21st Century. WordTsar is a Wordstar 7.0D document mode clone. It loads Wordstar 4, Wordstar 7, RTF (partial), and DOCX (partial) files, and saves in Wordstar 7, RTF, and Word (.docx) format.
 
-All credit for WordTsar's design and implementation goes to Gerald Brandt — this fork simply trims the project down to a macOS-only build. The original, cross-platform project (Windows, Linux, and macOS) lives at the link above and at [wordtsar.ca](http://wordtsar.ca); go there for the full story, the forums, and the Windows/Linux builds.
+All credit for WordTsar's design and implementation goes to Gerald Brandt — this fork simply trims the project down to a macOS-only build. The original, cross-platform project (Windows, Linux, and macOS) lives at the link above and at [wordtsar.ca](http://wordtsar.ca); go there for the full story, the forums, and the Windows/Linux builds. This fork is not endorsed by or affiliated with the upstream WordTsar project — the AGPL grants no rights in the name "WordTsar." macOS fork begun 2025, actively maintained through 2026.
 
 <p align="center">
   <img src="docs/screenshots/michael-shrayer-electric-pencil.png" width="180" alt="Michael Shrayer with his Electric Pencil, running on a TRS-80"><br>
@@ -17,7 +17,7 @@ All credit for WordTsar's design and implementation goes to Gerald Brandt — th
 
 WordTsar is currently Beta. What does Beta mean? The core is solid and well-tested, but a handful of things remain unverified or incomplete — see `WHATS_NEW.md` for specifics.
 
-This is version **0.10.3 Beta**, macOS only.
+This is version **0.10.6 Beta**, macOS only.
 
 ## Building
 
