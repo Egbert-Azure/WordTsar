@@ -15,9 +15,9 @@ All credit for WordTsar's design and implementation goes to Gerald Brandt — th
   <sub>Michael Shrayer's <em>Electric Pencil</em> (1976, TRS-80) — generally credited as the first word processor for a microcomputer, and the ancestor this whole lineage owes a nod to.</sub>
 </p>
 
-WordTsar is currently Beta. What does Beta mean? The core is solid and well-tested, but a handful of things remain unverified or incomplete — see `WHATS_NEW.md` for specifics.
+WordTsar is currently Beta. In practice: I write in it every day — this isn't a project I test and set aside, it's the tool I'm using right now — and it holds up. I'm still finding things as I go, and fixing them as I find them; see `WHATS_NEW.md` for the running list.
 
-This is version **0.10.9 Beta**, macOS only.
+This is version **0.10.10 Beta**, macOS only.
 
 ## Building
 
@@ -50,11 +50,11 @@ You get the best of both worlds: the classic terminal view, or the macOS GUI —
   - **⌘⌃F** (Cmd+Ctrl+F) → Toggle Fullscreen
   - **⌘G** (Cmd+G) → Find Again
 
-  F1 still works as a bonus for Help if you free it yourself in *System Settings > Keyboard > Keyboard Shortcuts* (Preferences moved fully to ⌘, since F1 now has a real WordStar job). See `KEY_MAPPING.md` for details.
+  F1 still works as a bonus for Help if you free it yourself in *System Settings > Keyboard > Keyboard Shortcuts* (Preferences moved fully to ⌘, since F1 now has a real WordStar job). See `KEY_MAPPING.md` for details, or [`docs/QUICKREF.WS`](docs/QUICKREF.WS) for a one-page cheat sheet — it's a WordStar 7 formatted document, so open it in WordTsar (or `ws`) to see it laid out properly; other viewers will just show the raw dot commands.
 - A backup of your file is made every 1 minute. Backups are in Wordstar format.
 - The initial page/paper size is 8.5" x 11"
-- The 0.5.x releases use UTF8 for all in-memory storage of the document and supports Unicode version 16.
-- File → Print opens the native macOS print dialog and prints directly, separate from File → Print Preview. The TUI's `^KP` prints via CUPS.
+- WordTsar uses UTF-8 for all in-memory storage of the document and supports Unicode version 16.
+- File → Print currently opens print preview, same as File → Print Preview — real WordStar's `^KP` prints directly instead, a known deviation not yet fixed (see `KEY_MAPPING.md`). The preview dialog has its own Print button, so printing is still reachable. The TUI's own Print menu item (not the `^KP` keystroke) does print directly via CUPS.
 - Spell check dictionary language (System Preferences > Editor) is applied on macOS via `NSSpellChecker`, so any installed system dictionary (not just English) works.
 - DOCX import is partial: paragraph text, character formatting, and basic page setup come through, but tables, list numbering, images, and header/footer content do not import yet. DOCX export doesn't cover tables or headers/footers either. See `WHATS_NEW.md` for the full state.
 
