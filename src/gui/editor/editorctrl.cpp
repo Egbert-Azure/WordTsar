@@ -3153,7 +3153,11 @@ PARAGRAPH_T cEditorCtrl::GetLastVisibleParagraph(void)
     RecalculatePageScale();
 
     COORD_T viewportTop = mScrollOffset;
-    COORD_T viewportHeight = static_cast<COORD_T>(height() / mPageScale);
+    // GetViewportHeight() guards against mPageScale <= 0 (e.g. the editor
+    // widget hasn't been shown/sized yet); a raw height()/mPageScale here
+    // would divide by zero and produce inf/NaN, wrongly marking every
+    // paragraph "visible" downstream.
+    COORD_T viewportHeight = GetViewportHeight();
     COORD_T viewportBottom = viewportTop + viewportHeight;
 
     if (mDisplaySettings.mode == DISPLAY_PAGE)

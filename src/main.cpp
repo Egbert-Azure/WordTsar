@@ -96,22 +96,34 @@ class cWordTsarApplication : public QApplication
 public:
     cWordTsarApplication(int &argc, char **argv) : QApplication(argc, argv) {}
 
-    // Called once the main window exists. Flushes any FileOpen event that
-    // arrived (and was queued) before this point -- a cold `open -a
-    // WordTsar.app file` launch can deliver the Apple Event early enough
-    // that an explicit app.processEvents() call made before the window is
-    // constructed (see main(), for the splash screen) processes and
-    // discards it while mMainWindow is still null. Qt only delivers a given
-    // FileOpen event once, so silently dropping it there would lose the
-    // open request entirely.
-    void SetMainWindow(cWordTsar *window)
+    // Call once the main window has actually been shown (not right after
+    // construction) -- flushes any FileOpen event queued before this point.
+    // A cold `open -a WordTsar.app file` launch (Finder double-click /
+    // right-click Open With) can deliver the Apple Event early enough that
+    // it arrives before the window even exists, and Qt only delivers a
+    // given FileOpen event once, so it must be queued rather than dropped.
+    // Flushing it here rather than right after construction matters:
+    // LoadFile()'s layout pass (LayoutDocument(), CalculateCaretPosition(),
+    // ScrollIntoView()) needs a real, shown editor viewport -- run it
+    // against the construction-time widget (default/zero geometry) and it
+    // hangs/crashes. A plain command-line launch never hit this, because
+    // its LoadFile() call already ran after w.show().
+    // Returns true if a queued file was loaded. WordTsar is single-document,
+    // so if more than one FileOpen event queued up before the window was
+    // shown (e.g. a multi-file Finder selection), only the last one is
+    // loaded -- loading the earlier ones would just be immediately
+    // discarded work. The return value lets main() skip a redundant argv
+    // load of the same file.
+    bool SetMainWindow(cWordTsar *window)
     {
         mMainWindow = window;
-        for (const QString &file : mPendingFiles)
+        bool loadedFile = !mPendingFiles.isEmpty();
+        if (loadedFile)
         {
-            mMainWindow->LoadFile(file);
+            mMainWindow->LoadFile(mPendingFiles.last());
         }
         mPendingFiles.clear();
+        return loadedFile;
     }
 
     bool event(QEvent *e) override
@@ -204,7 +216,6 @@ int main(int argc, char *argv[])
     app.processEvents();
 
     cWordTsar w(argc, argv);
-    app.SetMainWindow(&w);
 
     // Centering the window (on the same screen the splash is centered on)
     // happens inside cWordTsar::ReadConfig()'s own deferred resize callback
@@ -221,8 +232,15 @@ int main(int argc, char *argv[])
     w.show();
     app.processEvents();
 
-    // filename as argument
-    if(argc > 1)
+    // Register the main window now that it's actually shown and laid out
+    // -- see cWordTsarApplication::SetMainWindow() for why this can't
+    // happen any earlier. Delivers any FileOpen event (Finder "Open With"
+    // / dock-drop launch) queued up to this point.
+    bool openedFromFinder = app.SetMainWindow(&w);
+
+    // filename as argument -- skip if a Finder-delivered file was already
+    // loaded above, so the same file isn't parsed and laid out twice
+    if(argc > 1 && !openedFromFinder)
     {
         QString arg(argv[1]) ;
         app.processEvents() ;
