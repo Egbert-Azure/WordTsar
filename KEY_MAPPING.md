@@ -280,6 +280,26 @@ The M chord has no Alt+letter equivalent in Modern mode, but Alt+M does work as 
 | Alt+M | Enter ^M chord mode | -- |
 | Alt+U | Redo | -- (Modern uses Ctrl+Y) |
 
+**These Alt shortcuts are TUI-only, and need a terminal setting most terminal
+emulators don't enable by default.** `ws` detects Alt/Option the classic
+terminal way: the terminal must send `ESC` immediately followed by the
+plain key (e.g. `ESC k` for Alt+K) -- see
+`src/tui/wordstartui/src/terminaldriverposix.cpp`. On macOS, Terminal.app and
+most other terminal emulators do **not** send that sequence for the
+Option key out of the box; Option instead composes accented/special
+characters, so Alt+K/Q/O/P/M/U silently produce the wrong character
+instead of entering a chord. To fix this:
+- **Terminal.app**: Preferences > Profiles > Keyboard > enable "Use Option as
+  Meta key"
+- **iTerm2**: Preferences > Profiles > Keys > General > set "Option Key Acts
+  as: Esc+"
+
+This doesn't affect the GUI -- Qt receives Option as a normal modifier key
+there regardless of terminal settings, since there's no terminal in between.
+It's the same class of macOS platform quirk as the F1/F3/F11 caveat under
+Function Keys above, just for Option/Alt instead of function keys, and TUI
+instead of GUI.
+
 ---
 
 ## Menu Mapping
@@ -294,10 +314,23 @@ Menu shortcuts shown to the user change based on the active input mode. The func
 | Save | ^KS | Ctrl+S | Save file |
 | Save As | ^KT | Ctrl+Shift+S | Save with new name |
 | Save and Close | ^KD | -- | Save, clear, reset |
-| Print | ^KP | Ctrl+P | Print to a printer (GUI: system print dialog; TUI: CUPS `lp` on macOS/Linux, print spooler on Windows) |
+| Print | ^KP | Ctrl+P | Opens print preview [^print-deviation] |
 | Print Preview | ^OP | -- | Print preview |
 | Preferences | -- | -- | System Preferences dialog |
 | Exit WordTsar | ^KX | Alt+F4 | Quit application |
+
+[^print-deviation]: Real WordStar's ^KP prints directly, without a preview
+step -- that's what `cEditorCtrl::Print()` / `cWSEditorCtrl::Print()`
+implement in the GUI and TUI backends respectively (system print dialog on
+GUI; CUPS `lp` on macOS/Linux or the print spooler on Windows, in the TUI).
+Currently, though, neither the ^K,P keystroke nor the GUI's File > Print menu
+item reaches that code path -- both are wired to Print Preview instead (a
+`QPrintPreviewDialog`, which does have its own Print button, so printing is
+still reachable, just always via preview first). The TUI's own File > Print
+**menu item** (mouse-selected, not the ^K,P keystroke) is the one place that
+still calls direct Print. This is a known deviation from the WordStar 7 spec
+and from wordtsar.ca's documented ^KP, tracked as a bug to fix in code, not
+yet done.
 
 ### Edit Menu
 
@@ -515,7 +548,7 @@ Every key recognized by the WordStar input handler. Status column: **Yes** = fun
 
 ### Alt Shortcuts (WordStar Mode)
 
-These provide alternative entry to chord modes (useful in terminals where Ctrl is intercepted).
+These provide alternative entry to chord modes (useful in terminals where Ctrl is intercepted). On macOS, these need a terminal setting that isn't on by default -- see the caveat under Additional Alt Shortcuts above.
 
 | Key | Action | Implemented |
 |-----|--------|-------------|

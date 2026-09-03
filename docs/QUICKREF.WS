@@ -20,6 +20,13 @@ A chord is a prefix key then a second key: ^K then B.
 In WordStar mode Alt+K/Q/O/P/M also enter chord mode, for
 terminals that swallow Ctrl. Escape cancels a chord.
 
+On macOS this needs "Use Option as Meta key" turned on in
+Terminal.app (Preferences > Profiles > Keyboard), or "Option
+Key Acts as: Esc+" in iTerm2 (Preferences > Profiles > Keys).
+Without it, Option composes accented characters instead of
+entering a chord. GUI WordTsar is unaffected -- this is a
+terminal-only quirk.
+
 Entries marked (WS) exist only in WordStar mode.
 
 .pa
@@ -141,12 +148,17 @@ F2 and F4 through F10 and F12 are unassigned.
 ^K D     Save, clear document, reset (WS)
 ^K X     Save and quit (WS)
 ^K Q     Abandon without saving (WS)
-^K P     Print to a printer (WS)
+^K P     Print preview (WS)
 
 Blocks persist. Mark a block, edit elsewhere for an hour,
 then act on it. Block copy/move use an internal buffer;
 ^K [ and ^K ] are the only bridge to the OS clipboard in
 WordStar mode.
+
+Real WordStar's ^K P prints directly, no preview. WordTsar's
+^K P currently opens print preview instead (same as ^O P
+below) -- a known bug, not yet fixed. The preview dialog has
+its own Print button, so printing is still reachable.
 .pa
 ^Q CHORD - QUICK NAVIGATION AND DELETION
 
@@ -215,7 +227,6 @@ brackets. Modern equivalents: ^L ^E ^R ^J.
 ^M @     Insert current date
 ^M !     Insert current time
 ^M *     Insert current filename
-^M :     Insert drive letter (Windows)
 ^M .     Insert current directory
 ^M \     Insert full path and filename
 
@@ -234,7 +245,7 @@ These expand on display and in headers and footers:
 &#&      Page number
 &_&      Line number
 &*&      Filename
-&:&      Drive letter
+&:&      Filesystem root (/)
 &.&      Directory
 &\&      Full path
 .pa
