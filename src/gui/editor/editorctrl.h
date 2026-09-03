@@ -331,6 +331,8 @@ private:
     QTimer* mAutoSaveTimer;               // Auto-save backup timer
     // Note: Idle layout uses QTimer::singleShot() on-demand, no persistent timer needed
     QRectF mCaretPosQt;                   // Qt rectangle for rendering (synced from base class coords)
+    QRectF mLastPaintedCaretPosQt;         // Caret rect as of the last FULL repaint (not a blink-only tick)
+    COORD_T mLastPaintedScrollOffset;     // Scroll offset as of the last FULL repaint
     double mPageScale;                    // Dynamic page zoom scale
 
     // Visual display colors (Qt-specific)

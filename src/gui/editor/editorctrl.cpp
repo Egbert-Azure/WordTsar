@@ -234,6 +234,8 @@ void cEditorCtrl::Init(void)
 
     // Qt-specific caret position (synced from base class)
     mCaretPosQt = QRectF(0, 0, 30, 300);
+    mLastPaintedCaretPosQt = mCaretPosQt;
+    mLastPaintedScrollOffset = mScrollOffset;
 
     // Enable Input Method (IME) support for CJK text input
     // This allows Japanese, Chinese, Korean, etc. input via system IME
@@ -1405,15 +1407,32 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
     // Check if this is a timer-triggered caret blink
     if (mDoDrawCaret)
     {
-        painter.save();
-        painter.scale(mPageScale, mPageScale);
-        if (mDisplaySettings.mode == DISPLAY_PAGE)
+        // Guard against a stale blink tick racing a still-pending full repaint.
+        // Qt coalesces multiple update() calls into a single paintEvent, so if the
+        // caret-blink timer's timeout is processed after a scroll/navigation/edit
+        // already requested a real repaint (via update()) but before that paint
+        // event is dispatched, mDoDrawCaret can end up true here even though the
+        // viewport actually needs a full redraw. Taking the cheap XOR-only caret
+        // path in that case would leave stale (unscrolled) content on screen with
+        // just the caret toggling on top of it -- visible as flicker/stutter
+        // during sustained fast scrolling (e.g. holding an arrow key). Only take
+        // the cheap path if nothing has moved since the last full repaint.
+        SyncCaretToQt();
+        if (mScrollOffset == mLastPaintedScrollOffset && mCaretPosQt == mLastPaintedCaretPosQt)
         {
-            painter.translate(mDisplaySettings.pageBorder, mDisplaySettings.pageBorder);
+            painter.save();
+            painter.scale(mPageScale, mPageScale);
+            if (mDisplaySettings.mode == DISPLAY_PAGE)
+            {
+                painter.translate(mDisplaySettings.pageBorder, mDisplaySettings.pageBorder);
+            }
+            DrawCaret(painter);
+            painter.restore();
+            return;
         }
-        DrawCaret(painter);
-        painter.restore();
-        return;
+
+        // Stale -- fall through to a full repaint below instead.
+        mDoDrawCaret = false;
     }
 
     // FULL DOCUMENT REPAINT
@@ -1781,6 +1800,13 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
 
         mDrawnCaret = true;
     }
+
+    // Record the state this full repaint reflects, so a later caret-blink-only
+    // tick (see the mDoDrawCaret staleness check above) can tell whether the
+    // viewport has moved since and needs a full repaint instead of a cheap
+    // XOR-only caret toggle.
+    mLastPaintedScrollOffset = mScrollOffset;
+    mLastPaintedCaretPosQt = mCaretPosQt;
 
     // Update ruler to reflect current caret position and layout settings
     UpdateRuler();
@@ -3004,6 +3030,14 @@ void cEditorCtrl::OnCaretTimer(void)
 {
     mDoDrawCaret = true;
     update();
+
+    // mCaretTimer is single-shot, so it must be restarted every tick to keep
+    // blinking. It used to be restarted only inside DrawCaret() -- but the
+    // paintEvent this tick triggers may instead take the full-repaint path
+    // (see the staleness check in paintEvent()), which never calls DrawCaret().
+    // Restarting unconditionally here keeps the blink cadence alive regardless
+    // of which paint path actually runs.
+    mCaretTimer->start(mCaretBlinkRate);
 }
 
 
