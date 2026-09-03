@@ -1181,12 +1181,30 @@ void cWordTsar::ReadConfig(void)
     // resize() here with its own size-hint-computed geometry regardless of
     // what was requested. Deferring until the event loop actually starts
     // (after that initial layout has already settled) makes it stick.
+    //
+    // Re-centers in the same callback rather than leaving that to main.cpp's
+    // own move() call: that call runs synchronously right after this
+    // constructor returns, using width()/height() as they are *then* --
+    // still the old pre-resize size, since this deferred callback hasn't
+    // run yet -- so it centered for the wrong size and the window visibly
+    // jumped after show(). Doing both together here, after the real size is
+    // actually applied, keeps them in sync. Uses the primary screen to
+    // match main.cpp's splash centering, which isn't multi-monitor-aware
+    // either.
     {
         int savedWidth = config.mWindowWidth ;
         int savedHeight = config.mWindowHeight ;
         QTimer::singleShot(0, this, [this, savedWidth, savedHeight]()
         {
             resize(savedWidth, savedHeight) ;
+
+            QScreen *screen = QGuiApplication::primaryScreen() ;
+            if (screen)
+            {
+                QRect avail = screen->availableGeometry() ;
+                move(avail.x() + (avail.width() - savedWidth) / 2,
+                     avail.y() + (avail.height() - savedHeight) / 2) ;
+            }
         }) ;
     }
 

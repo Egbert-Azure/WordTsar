@@ -206,13 +206,15 @@ int main(int argc, char *argv[])
     cWordTsar w(argc, argv);
     app.SetMainWindow(&w);
 
-    // Center the window on the same screen the splash is centered on --
-    // otherwise the two are placed independently (the splash always at
-    // screen-center, the window wherever the OS/window manager defaults to)
-    // and can end up looking like they belong to two different launches.
-    QRect avail = screen->availableGeometry() ;
-    w.move(avail.x() + (avail.width() - w.width()) / 2,
-           avail.y() + (avail.height() - w.height()) / 2) ;
+    // Centering the window (on the same screen the splash is centered on)
+    // happens inside cWordTsar::ReadConfig()'s own deferred resize callback
+    // now, not here -- w.width()/w.height() at this point are still the
+    // pre-resize construction-time size (that resize is itself deferred to
+    // the same 0ms singleShot, for the same "Qt's first layout pass
+    // overrides anything set before show()" reason), so centering against
+    // them here used the wrong size and made the window visibly jump after
+    // show(). Doing both together, once, after the real size is applied,
+    // keeps them in sync.
 
     QTimer::singleShot(5000, &splash, SLOT(close())) ;
 

@@ -133,9 +133,8 @@ void cPrintout::PrintPreview(void)
     // status bar, help panel all sit outside it). Sizing to it left the
     // dialog too small to cover the window it's centered over, so the
     // window's own chrome and content showed through above and below it.
-    QWidget *topLevel = mEditor->window();
-    QSize size = topLevel ? topLevel->size() : mEditor->size();
-    preview.resize(size);
+    // window() never returns null (a parentless widget returns itself).
+    preview.resize(mEditor->window()->size());
     connect(&preview, &QPrintPreviewDialog::paintRequested,
             this, &cPrintout::printDocument);
     preview.exec();
