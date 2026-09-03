@@ -188,6 +188,88 @@ TEST_CASE("DOCX reader - table imports as tab-separated rows, not a placeholder"
 }
 
 
+TEST_CASE("DOCX reader - table columns keep the source w:tblGrid proportions, not equal width")
+{
+    // 1440 twips = 1 inch. A 1in / 3in / 2in split (6in total, same nominal
+    // total the old equal-width fallback used) makes an equal-width guess
+    // (2.00i / 4.00i / 6.00i) easy to tell apart from the real proportions
+    // (1.00i / 4.00i / 6.00i).
+    std::string body =
+        "<w:tbl>"
+        "<w:tblGrid><w:gridCol w:w=\"1440\"/><w:gridCol w:w=\"4320\"/><w:gridCol w:w=\"2880\"/></w:tblGrid>"
+        "<w:tr><w:tc><w:p><w:r><w:t>Ort</w:t></w:r></w:p></w:tc>"
+               "<w:tc><w:p><w:r><w:t>Taetigkeit</w:t></w:r></w:p></w:tc>"
+               "<w:tc><w:p><w:r><w:t>Datum</w:t></w:r></w:p></w:tc></w:tr>"
+        "</w:tbl>" ;
+
+    std::string path = "/tmp/wordtsar_docxtest_tablegrid.docx" ;
+    BuildTestDocx(path, body) ;
+    std::vector<std::string> paragraphs = LoadDOCXParagraphs(path) ;
+
+    std::string tabcmd ;
+    for(auto &p : paragraphs)
+    {
+        if(p.rfind(".tb", 0) == 0 || p.rfind(".TB", 0) == 0)
+        {
+            tabcmd = p ;
+        }
+    }
+
+    REQUIRE(!tabcmd.empty()) ;
+    CHECK(tabcmd.find("1.00i") != std::string::npos) ;   // end of column 1 (1in)
+    CHECK(tabcmd.find("4.00i") != std::string::npos) ;   // end of column 2 (1in + 3in)
+    CHECK(tabcmd.find("6.00i") != std::string::npos) ;   // end of column 3 (1in + 3in + 2in)
+    CHECK(tabcmd.find("2.00i") == std::string::npos) ;   // would only appear for an equal-width guess
+}
+
+
+TEST_CASE("DOCX reader - a merged cell (w:gridSpan) keeps later cells on their own column")
+{
+    std::string body =
+        "<w:tbl>"
+        "<w:tblGrid><w:gridCol w:w=\"1440\"/><w:gridCol w:w=\"1440\"/><w:gridCol w:w=\"1440\"/></w:tblGrid>"
+        "<w:tr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc>"
+               "<w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc>"
+               "<w:tc><w:p><w:r><w:t>C</w:t></w:r></w:p></w:tc></w:tr>"
+        "<w:tr><w:tc><w:tcPr><w:gridSpan w:val=\"2\"/></w:tcPr><w:p><w:r><w:t>Merged</w:t></w:r></w:p></w:tc>"
+               "<w:tc><w:p><w:r><w:t>Solo</w:t></w:r></w:p></w:tc></w:tr>"
+        "</w:tbl>" ;
+
+    std::string path = "/tmp/wordtsar_docxtest_gridspan.docx" ;
+    BuildTestDocx(path, body) ;
+    std::vector<std::string> paragraphs = LoadDOCXParagraphs(path) ;
+
+    std::string all ;
+    for(auto &p : paragraphs)
+    {
+        all += p ;
+    }
+    CHECK(all.find("Merged") != std::string::npos) ;
+    CHECK(all.find("Solo") != std::string::npos) ;
+
+    // The merged cell spans 2 grid columns, so "Solo" must be reached by
+    // TWO tab stops after "Merged", not one -- otherwise it lands under
+    // column 2 instead of column 3, out of alignment with the row above.
+    int tabsBetween = 0 ;
+    for(auto &p : paragraphs)
+    {
+        size_t mergedPos = p.find("Merged") ;
+        size_t soloPos = p.find("Solo") ;
+        if(mergedPos != std::string::npos && soloPos != std::string::npos && soloPos > mergedPos)
+        {
+            for(size_t i = mergedPos ; i < soloPos ; i++)
+            {
+                if(static_cast<unsigned char>(p[i]) == static_cast<unsigned char>(MARKER_CHAR))
+                {
+                    tabsBetween++ ;
+                }
+            }
+        }
+    }
+    CHECK(tabsBetween == 2) ;
+}
+
+
 TEST_CASE("DOCX reader - numbered and bulleted lists get real marker text")
 {
     std::string body =

@@ -888,12 +888,24 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
         }
     }
 
-    // Warn the user if characters will be lost during save
+    // Warn the user if characters will be lost during save. The loss is a
+    // property of the *code page* currently selected (Preferences > Code
+    // Page), not of the WordStar format itself -- a document with the same
+    // characters can round-trip cleanly under a different code page, so the
+    // message names the one actually in effect instead of blaming the format.
     if(unmappableCount > 0)
     {
+        static const char *codePageNames[] = { "CP437", "CP737", "CP850", "CP1252" } ;
+        const char *codePageName = "the current code page" ;
+        if(static_cast<size_t>(scanCodePage) < sizeof(codePageNames) / sizeof(codePageNames[0]))
+        {
+            codePageName = codePageNames[scanCodePage] ;
+        }
+
         std::string message = "This document contains " +
             std::to_string(unmappableCount) +
-            " character(s) that cannot be represented in WordStar format and will be lost. Save anyway?" ;
+            " character(s) not supported by the " + codePageName +
+            " code page currently in use, and they will be lost. Save anyway?" ;
 
         if(mEditor->AskYesNo("Unicode Warning", message) == false)
         {

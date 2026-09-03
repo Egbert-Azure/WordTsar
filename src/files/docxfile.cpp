@@ -774,6 +774,30 @@ std::string cDOCXFile::ExtractCellText(pugi::xml_node cellNode)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  cell [in] a w:tc table-cell XML node
+///
+/// @return the number of grid columns the cell occupies (w:gridSpan), 1 if
+///         absent
+///
+/// @brief
+/// Read a table cell's horizontal span so a merged cell can be counted as
+/// occupying multiple grid columns instead of just one.
+///
+/////////////////////////////////////////////////////////////////////////////
+static int GetCellGridSpan(pugi::xml_node cell)
+{
+    std::string val = cell.child("w:tcPr").child("w:gridSpan").attribute("w:val").value() ;
+    if(val.empty())
+    {
+        return 1 ;
+    }
+
+    int span = atoi(val.c_str()) ;
+    return (span > 0) ? span : 1 ;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  node [in] the w:tbl XML node
 /// @param  depth [in] XML tree depth (unused)
 ///
@@ -782,9 +806,10 @@ std::string cDOCXFile::ExtractCellText(pugi::xml_node cellNode)
 /// @brief
 /// Handle a DOCX table node. Real w:tr/w:tc traversal: each row becomes
 /// one line of tab-separated cell text, columns aligned with a real .tb
-/// dot command. Column widths are approximated as equal-width across a
-/// nominal 6-inch text width -- WordStar has no table/column-grid concept
-/// to map the source document's own w:tblGrid widths onto.
+/// dot command. Column widths are read from the table's own w:tblGrid
+/// (falling back to equal division of a nominal 6-inch text width only
+/// when the grid is missing or malformed) and merged cells (w:gridSpan)
+/// are accounted for so following cells still land on the right tab stop.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDOCXFile::HandleTableNode(pugi::xml_node node, int depth)
@@ -795,14 +820,15 @@ void cDOCXFile::HandleTableNode(pugi::xml_node node, int depth)
     // whose cells are wrapped in w:sdt (a common Word content-control
     // pattern) has zero direct w:tc children even though the table is
     // otherwise normal, and a ragged table can have more cells in a later
-    // row than in its first.
+    // row than in its first. Count each cell by its grid span so a row
+    // with a merged cell doesn't under-report the table's true column count.
     int columnCount = 0 ;
     for(pugi::xml_node row = node.child("w:tr") ; row ; row = row.next_sibling("w:tr"))
     {
         int rowCells = 0 ;
         for(pugi::xml_node cell = row.child("w:tc") ; cell ; cell = cell.next_sibling("w:tc"))
         {
-            rowCells++ ;
+            rowCells += GetCellGridSpan(cell) ;
         }
         if(rowCells > columnCount)
         {
@@ -814,23 +840,50 @@ void cDOCXFile::HandleTableNode(pugi::xml_node node, int depth)
         return ;
     }
 
-    const double TABLE_WIDTH_INCHES = 6.0 ;
-    double colwidth = TABLE_WIDTH_INCHES / columnCount ;
+    // Prefer the table's own w:tblGrid column widths (in twips) so uneven
+    // columns (a narrow "Ort" next to a wide "Tätigkeit") keep their source
+    // proportions instead of being forced to equal width.
+    std::vector<double> colWidthInches ;
+    for(pugi::xml_node gridCol = node.child("w:tblGrid").child("w:gridCol") ; gridCol ; gridCol = gridCol.next_sibling("w:gridCol"))
+    {
+        std::string val = gridCol.attribute("w:w").value() ;
+        if(val.empty())
+        {
+            colWidthInches.clear() ;
+            break ;
+        }
+        colWidthInches.push_back(atof(val.c_str()) / TWIPSPERINCH) ;
+    }
+
+    if(static_cast<int>(colWidthInches.size()) != columnCount)
+    {
+        // Missing, absent, or ragged grid -- fall back to the previous
+        // equal-width approximation rather than trusting a partial grid.
+        const double TABLE_WIDTH_INCHES = 6.0 ;
+        double colwidth = TABLE_WIDTH_INCHES / columnCount ;
+
+        colWidthInches.assign(columnCount, colwidth) ;
+    }
 
     std::string tabcmd = ".tb " ;
-    for(int loop = 1 ; loop <= columnCount ; loop++)
+    double cumulative = 0.0 ;
+    for(int loop = 0 ; loop < columnCount ; loop++)
     {
-        tabcmd += string_sprintf("%.2fi ", colwidth * loop) ;
+        cumulative += colWidthInches[loop] ;
+        tabcmd += string_sprintf("%.2fi ", cumulative) ;
     }
     tabcmd += "\n" ;
     mDocument->Insert(tabcmd) ;
 
     for(pugi::xml_node row = node.child("w:tr") ; row ; row = row.next_sibling("w:tr"))
     {
-        int col = 0 ;
+        int prevSpan = 0 ;
         for(pugi::xml_node cell = row.child("w:tc") ; cell ; cell = cell.next_sibling("w:tc"))
         {
-            if(col > 0)
+            // Advance one tab stop per grid column the previous cell spanned,
+            // so a cell after a merged cell still lands on its own column
+            // instead of the one right after the merge.
+            for(int loop = 0 ; loop < prevSpan ; loop++)
             {
                 sWSTab tab ;
                 tab.abstabsize = 0 ;
@@ -843,7 +896,7 @@ void cDOCXFile::HandleTableNode(pugi::xml_node node, int depth)
 
             mDocument->Insert(ExtractCellText(cell)) ;
 
-            col++ ;
+            prevSpan = GetCellGridSpan(cell) ;
         }
         mDocument->Insert(HARD_RETURN) ;
     }
