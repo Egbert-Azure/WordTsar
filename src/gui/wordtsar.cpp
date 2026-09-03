@@ -1174,8 +1174,21 @@ void cWordTsar::ReadConfig(void)
     mEditor->mShortName = config.mShortName ;
     mEditor->mLongName = config.mLongName ;
 
-    // Window size
-    resize(config.mWindowWidth, config.mWindowHeight) ;
+    // Window size. Deferred to a 0ms singleShot rather than applied here
+    // directly -- this runs during construction, before the window is ever
+    // shown, and Qt's first real layout pass (triggered by show(), in
+    // main.cpp, after this constructor returns) was overriding an immediate
+    // resize() here with its own size-hint-computed geometry regardless of
+    // what was requested. Deferring until the event loop actually starts
+    // (after that initial layout has already settled) makes it stick.
+    {
+        int savedWidth = config.mWindowWidth ;
+        int savedHeight = config.mWindowHeight ;
+        QTimer::singleShot(0, this, [this, savedWidth, savedHeight]()
+        {
+            resize(savedWidth, savedHeight) ;
+        }) ;
+    }
 
     // Help level (WordStar 7 manual's "Change Help Level", 0-4)
     mEditor->mHelpLevel = std::clamp(config.mGuiShowHelp, 0, 4) ;
