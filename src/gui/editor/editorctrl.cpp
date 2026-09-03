@@ -6549,6 +6549,17 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
         fileReader = new cTextFile(this);
     }
 
+    // Clear the current document before loading new content -- otherwise the
+    // new file's content is inserted into whatever the current document
+    // already contains (at its current cursor position), "merging" the two
+    // documents together instead of replacing one with the other. This must
+    // run before the dirty-flag save below so a freshly loaded document
+    // always ends up not-dirty, regardless of the previous document's state.
+    if (mDocument)
+    {
+        mDocument->Clear();
+    }
+
     // Save dirty flag before loading (Insert() sets mChanged for every character)
     // Restore after so loading doesn't change the document's dirty state
     bool wasDirty = mDocument->mChanged;

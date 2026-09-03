@@ -13672,6 +13672,48 @@ TEST_CASE("GUI editor - LoadFile on a .ws file overrides the temp-dir backup nam
 }
 
 
+TEST_CASE("GUI editor - LoadFile replaces the current document instead of merging into it")
+{
+    // Regression test: LoadFile() used to insert the new file's content into
+    // whatever the current document already contained (at its current cursor
+    // position) instead of clearing it first -- so opening file B over an
+    // already-open file A "merged" the two together (A's own header/dot
+    // commands and body text stayed present alongside B's content).
+    ensureQApplication();
+    auto dir = MakeGUIBackupTestDir("noduplicate");
+    auto firstPath = dir / "first.ws";
+    auto secondPath = dir / "second.ws";
+
+    {
+        cEditorCtrl seed;
+        cDocument* doc = seed.GetDocument();
+        REQUIRE(doc != nullptr);
+        doc->SetPosition(0);
+        doc->Insert(".he First document header\rFirst document body text\r");
+        REQUIRE(seed.SaveFile(firstPath.string()));
+    }
+    {
+        cEditorCtrl seed;
+        cDocument* doc = seed.GetDocument();
+        REQUIRE(doc != nullptr);
+        doc->SetPosition(0);
+        doc->Insert("Second document body text\r");
+        REQUIRE(seed.SaveFile(secondPath.string()));
+    }
+
+    cEditorCtrl editor;
+    REQUIRE(editor.LoadFile(firstPath.string()));
+    REQUIRE(editor.LoadFile(secondPath.string()));
+
+    std::string text = editor.GetDocument()->GetText();
+    CHECK(text.find("Second document body text") != std::string::npos);
+    CHECK(text.find("First document header") == std::string::npos);
+    CHECK(text.find("First document body text") == std::string::npos);
+
+    CleanupGUIBackupTestDir(dir);
+}
+
+
 TEST_CASE("GUI editor - OnAutoSaveTimer slot can be invoked and rewrites the backup")
 {
     // The auto-save QTimer fires OnAutoSaveTimer() every 60 s on the GUI
