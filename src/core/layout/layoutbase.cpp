@@ -955,6 +955,7 @@ void cLayoutBase::SaveParagraphEndState(PARAGRAPH_T para)
     mParagraphLayout[para].endState.center = mLayoutState->GetModifiers().center;
     mParagraphLayout[para].endState.justify = mLayoutState->GetModifiers().justify;
     mParagraphLayout[para].endState.linespace = mLayoutState->GetModifiers().linespace;
+    mParagraphLayout[para].endState.wordWrap = mLayoutState->IsWordWrapEnabled();
 
     // Margin end state
     mParagraphLayout[para].endState.leftMargin = mLayoutState->GetLeftMargin();

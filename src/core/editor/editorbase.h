@@ -185,6 +185,12 @@ public:
     void ToggleDisplayMode(void);
     bool IsPageModeSupported(void) const;
 
+    // TUI-only: center the editing pane horizontally in the terminal instead
+    // of pinning it to the left edge (the character-grid equivalent of the
+    // GUI's pixel-based page centering). No-op where not overridden (GUI uses
+    // ToggleDisplayMode/page mode for its own centering instead).
+    virtual void ToggleCenterView(void) {}
+
     // Document/Layout Accessors
     cDocument* GetDocument(void) const;
     cLayoutBase* GetLayout(void) const;
@@ -275,6 +281,7 @@ public:
 
     // Formatting
     void ToggleJustification(void);
+    void ToggleWordWrap(void);
     void SetAlignment(eJustification align) ;
     void SetParagraphAlignment(eJustification align) ;
 

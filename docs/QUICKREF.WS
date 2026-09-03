@@ -1,5 +1,5 @@
 .. QUICKREF.WS - WordTsar 0.10.9 keyboard quick reference
-.. Generated from KEY_MAPPING.md. Edit freely.
+.. Source of truth: KEY_MAPPING.md and the input-handler source. Edit freely.
 .pl 66
 .mt 4
 .mb 6
@@ -8,29 +8,31 @@
 .oj off
 .aw off
 .he WordTsar 0.10.9 Quick Reference
-WORDTSAR 0.10.9 - KEYBOARD QUICK REFERENCE
+WORDTSAR 0.10.9 - KEYBOARD QUICK REFERENCE
 
 Two input modes, set in System Preferences > Editor >
 Keyboard Mode:
 
   WordStar (default)  classic WS7 control-key sequences
-  Modern (CUA)        Ctrl+C/V/X/Z, with Alt-prefix chords
+  Modern (CUA)         Ctrl+C/V/X/Z and MS-Word-style keys
 
-A chord is a prefix key then a second key: ^K then B.
-In WordStar mode Alt+K/Q/O/P/M also enter chord mode, for
-terminals that swallow Ctrl. Escape cancels a chord.
+Both the terminal app (ws) and the GUI app (WordTsar) support
+BOTH modes. The mode is a per-app Preferences setting, not
+tied to which binary you run -- switching apps does not
+switch modes, and "GUI" does not mean Modern any more than
+"terminal" means WordStar.
 
-On macOS this needs "Use Option as Meta key" turned on in
-Terminal.app (Preferences > Profiles > Keyboard), or "Option
-Key Acts as: Esc+" in iTerm2 (Preferences > Profiles > Keys).
-Without it, Option composes accented characters instead of
-entering a chord. GUI WordTsar is unaffected -- this is a
-terminal-only quirk.
+A chord is a prefix key then a second key: ^K then B. Ctrl
+chords (^K ^Q ^O ^P ^M) work everywhere, in both apps, on any
+terminal, with no setup. Everything below marked "Alt+" is an
+optional alternate way to enter the same chord, not a separate
+feature -- see ALTERNATE CHORD ENTRY further down before
+relying on it.
 
 Entries marked (WS) exist only in WordStar mode.
 
 .pa
-SINGLE CTRL KEYS
+SINGLE CTRL KEYS
 
 Key    WordStar                     Modern (MS Word)
 ----------------------------------------------------------------
@@ -61,23 +63,12 @@ Key    WordStar                     Modern (MS Word)
 ^Y     Delete line                  Redo
 ^Z     Scroll down                  Undo
 
-MODERN MODE EXTRAS
+MODERN MODE EXTRAS
 
 ^Shift+S Save as
 ^Shift+Z Redo (alternate)
-Alt+K    Block and marker chord
-Alt+Q    Navigation and deletion chord
-Alt+O    Onscreen formatting chord
-Alt+P    Style chord
-
-Alt chords take the same second key as the WordStar ^K,
-^Q, ^O and ^P chords listed below. The ^M chord has no
-Modern equivalent.
-
-WordStar mode also has Alt+M for the ^M chord, and Alt+U
-for Redo.
 .pa
-SPECIAL KEYS (BOTH MODES)
+SPECIAL KEYS (BOTH MODES)
 
 Arrows   Cursor movement
 ^Left    Word left
@@ -98,7 +89,7 @@ Tab      Insert tab
 Enter    Line break
 Esc      Cancel chord
 
-FUNCTION KEYS AND macOS SHORTCUTS
+FUNCTION KEYS AND macOS SHORTCUTS
 
 F1       WordStar mode: contextual help
          Modern mode: System Preferences
@@ -123,9 +114,54 @@ Cmd chords are GUI only; a terminal emulator takes them
 before ws ever sees them. In the TUI F1 does reach the
 app, and Preferences is menu-only.
 
-F2 and F4 through F10 and F12 are unassigned.
+F2 and F4 through F10 and F12 are unassigned. F10 opens
+the pull-down menu bar in both apps -- every command
+below, including the ones with no reachable keystroke, is
+also there if you'd rather click/select than remember a
+chord.
 .pa
-^K CHORD - BLOCK AND FILE
+ALTERNATE CHORD ENTRY (OPTIONAL -- READ THIS FIRST)
+
+^K ^Q ^O ^P already work with plain Ctrl in every terminal
+and in the GUI. You do not need anything below this line
+for those four. Skip it unless a chord genuinely won't
+enter.
+
+^M is the one real exception: the byte for Ctrl+M is
+identical to Return/Enter on every terminal there is, so
+^M can never be typed as "Ctrl, then M" in the TUI. Use
+the Insert menu (F10 > Insert) for dates, times and
+filenames instead -- it sends the same command without
+touching the keyboard, and it always works.
+
+WordStar mode also offers Alt+K/Q/O/P/M as a second way to
+enter these same chords, and Alt+U for Redo. This exists
+for terminals that intercept plain Ctrl. It needs "Use
+Option as Meta key" turned on in Terminal.app
+(Preferences > Profiles > Keyboard), or "Option Key Acts
+as: Esc+" in iTerm2 (Preferences > Profiles > Keys) --
+macOS does not send the required escape sequence by
+default, so out of the box these Alt combinations just
+type accented characters instead of entering a chord. This
+is a terminal quirk only: the GUI receives Option as a
+plain modifier key regardless of any setting, so Alt+K
+etc. work there immediately.
+
+Given the setup cost, prefer plain Ctrl chords and the F10
+menu; treat Alt-entry as a fallback for a terminal that
+truly swallows Ctrl, not the normal way to work.
+
+Modern mode chord prefixes:
+Alt+K    Block and marker chord
+Alt+Q    Navigation and deletion chord
+Alt+O    Onscreen formatting chord
+Alt+P    Style chord
+
+Alt chords take the same second key as the WordStar ^K,
+^Q, ^O and ^P chords listed below. The ^M chord has no
+Modern equivalent.
+.pa
+^K CHORD - BLOCK AND FILE
 
 ^K B     Mark block start
 ^K K     Mark block end
@@ -148,19 +184,14 @@ F2 and F4 through F10 and F12 are unassigned.
 ^K D     Save, clear document, reset (WS)
 ^K X     Save and quit (WS)
 ^K Q     Abandon without saving (WS)
-^K P     Print preview (WS)
+^K P     Print preview (WS) -- see GAPS below
 
 Blocks persist. Mark a block, edit elsewhere for an hour,
 then act on it. Block copy/move use an internal buffer;
 ^K [ and ^K ] are the only bridge to the OS clipboard in
 WordStar mode.
-
-Real WordStar's ^K P prints directly, no preview. WordTsar's
-^K P currently opens print preview instead (same as ^O P
-below) -- a known bug, not yet fixed. The preview dialog has
-its own Print button, so printing is still reachable.
 .pa
-^Q CHORD - QUICK NAVIGATION AND DELETION
+^Q CHORD - QUICK NAVIGATION AND DELETION
 
 ^Q S     Start of line (WS)
 ^Q D     End of line (WS)
@@ -188,12 +219,11 @@ its own Print button, so printing is still reachable.
 ^Q Y     Delete to end of line
 ^Q T     Delete to given character
 .pa
-^O CHORD - ONSCREEN FORMAT
+^O CHORD - ONSCREEN FORMAT
 
 ^O C     Center line
 ^O ]     Right align line
 ^O D     Toggle command tags
-^O T     Toggle page/continuous mode (GUI only)
 ^O J     Toggle justification
 ^O Y     Page layout dialog
 ^O <     Left align paragraph
@@ -203,13 +233,15 @@ its own Print button, so printing is still reachable.
 ^O P     Print preview (WS)
 ^O ?     Status and memory info (WS)
 ^O B     Screen settings (WS)
+^O T     GUI: page/continuous view. TUI: center view
+^O W     Word wrap on/off
 
 The four paragraph alignment commands bracket the current
 paragraph with .oj dot commands, and restore the previous
 alignment after it. Repeating the same one removes the
 brackets. Modern equivalents: ^L ^E ^R ^J.
 
-^P CHORD - STYLE AND PRINT
+^P CHORD - STYLE AND PRINT
 
 ^P B     Bold (Modern: ^B)
 ^P S     Underline (Modern: ^U)
@@ -222,7 +254,7 @@ brackets. Modern equivalents: ^L ^E ^R ^J.
 ^P +     Font dialog (alternate)
 ^P -     Color dialog
 .pa
-^M CHORD - MACROS AND INSERTION (WORDSTAR ONLY)
+^M CHORD - MACROS AND INSERTION (WORDSTAR ONLY)
 
 ^M @     Insert current date
 ^M !     Insert current time
@@ -230,13 +262,11 @@ brackets. Modern equivalents: ^L ^E ^R ^J.
 ^M .     Insert current directory
 ^M \     Insert full path and filename
 
-Alt+M enters the same chord where Ctrl is intercepted.
+In the TUI, reach this chord via F10 > Insert, not the
+keyboard -- see ALTERNATE CHORD ENTRY above. In the GUI,
+Alt+M works directly.
 
-Macro keys P R D S E O Y, and the math inserts ^M= ^M#
-and ^M$, are recognised but not yet implemented. ^J is
-unassigned, matching real WordStar 7.
-
-VARIABLES
+VARIABLES
 
 These expand on display and in headers and footers:
 
@@ -249,7 +279,50 @@ These expand on display and in headers and footers:
 &.&      Directory
 &\&      Full path
 .pa
-DOT COMMANDS IN COMMON USE
+GAPS -- NOT YET IMPLEMENTED
+
+These are on the roadmap; the command exists but doesn't
+do its job yet:
+
+  ^B          Reformat paragraph (WordStar mode)
+  ^K P        Opens print preview instead of printing
+              directly, same as ^O P. Real WordStar's ^K P
+              prints with no preview. The preview dialog
+              has its own Print button, so printing is
+              still reachable meanwhile.
+  ^M P/R/D/S/E/O/Y
+              Macro play/record/edit/single-step/rename/
+              copy/delete -- recognised, not implemented.
+  ^M = , ^M #  Math insert/recalculate -- recognised, not
+              implemented.
+
+GAPS -- PLATFORM LIMITS, NOT ON THE ROADMAP
+
+These stay this way by design, not by omission:
+
+  ^O T        Not a real WordStar 7 command -- checked
+              against the WS7 manual's full command
+              reference, which has no ^OT at all. WordTsar
+              put it on an unused letter, and the two apps
+              use it for platform-appropriate things: the
+              GUI toggles its pixel-based page/continuous
+              view (and hides reveal codes, like real
+              print preview does); the terminal has no
+              pixel canvas to paginate, so it instead
+              centers the editing pane and ruler
+              horizontally -- text floats in the middle of
+              a wide terminal instead of sitting flush left.
+              Command-tag visibility is unaffected in the
+              TUI; toggle that separately with ^O D.
+  Alt+ chords Need "Option as Meta" turned on in the
+              terminal (see ALTERNATE CHORD ENTRY); off by
+              default on macOS. Not needed in the GUI.
+  F1 / F3 / F11
+              Unreliable in the GUI on macOS unless freed
+              from system shortcuts; use the Cmd+ equivalents
+              listed under FUNCTION KEYS instead.
+.pa
+DOT COMMANDS IN COMMON USE
 
 Type at column 1, alone on the line. WordTsar shows any
 dot command it does not implement on a red background, so
@@ -282,7 +355,7 @@ the editor is the authority, not this page.
   .rr        Ruler line
   .ig or ..  Comment, not printed
 
-MEASUREMENTS AND MATH
+MEASUREMENTS AND MATH
 
 Arguments take i or in (inches), c or cm, mm, and p or pt
 (points). Bare numbers are columns of 0.1 inch. Addition

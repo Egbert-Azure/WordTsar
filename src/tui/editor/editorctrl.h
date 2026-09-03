@@ -131,6 +131,11 @@ public:
     void SetInputMode(eInputMode mode);
     eInputMode GetInputMode(void) const;
 
+    // ---- Horizontal centering (^O T in the TUI; see cEditorBase) ----
+    void ToggleCenterView(void) override;
+    bool IsCenterViewEnabled(void) const { return mCenterView; }
+    void SetCenterView(bool enabled) { mCenterView = enabled; }
+
     // ---- Viewport / terminal geometry ----
     void SetViewport(LINE_T firstLine, int rows);
     void SetTerminalSize(int rows, int cols);
@@ -225,6 +230,8 @@ public:
     bool mAlwaysFlag;                            // Always show indicator column
 
 private:
+    bool SaveFileImpl(const std::string& filename, bool silent);
+
     // Title / message state
     std::string mTitle;                          // Current window/document title
     std::string mLastMessage;                    // Last message shown (for app display)
@@ -255,6 +262,9 @@ private:
 
     // Input mode
     eInputMode mInputMode;
+
+    // Horizontal centering (^O T); see ToggleCenterView
+    bool mCenterView;
 
     // Redraw hook (invoked by Repaint)
     std::function<void()> mRedrawHook;

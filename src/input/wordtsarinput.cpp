@@ -1711,15 +1711,25 @@ void cWordStarInput::OnControlOChar(char ch)
             break ;
 
         case 't' :
-            // Page mode disabled in TUI (no pixel rendering)
+            // GUI: real pixel-based page/continuous mode.
+            // TUI: no pixel canvas to paginate, so instead center the
+            // editing pane (and ruler) horizontally in the terminal.
             if (mEditor->IsPageModeSupported())
             {
                 mEditor->ToggleDisplayMode() ;
+            }
+            else
+            {
+                mEditor->ToggleCenterView() ;
             }
             break ;
 
         case 'j' :
             mEditor->ToggleJustification() ;
+            break ;
+
+        case 'w' :          // ^OW: word wrap on/off (real WordStar 7 command)
+            mEditor->ToggleWordWrap() ;
             break ;
 
         case 'l' :
@@ -1734,7 +1744,6 @@ void cWordStarInput::OnControlOChar(char ch)
         case 'e' :
         case 'h' :
         case 'a' :
-        case 'w' :
         case ' ' :
         case 'b' :
             {

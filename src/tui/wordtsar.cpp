@@ -702,6 +702,7 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
     mShowRuler = config.mTuiShowRuler;
     mShowBottomStatus = config.mTuiShowStatusBar;
     mView->SetShowScrollbar(config.mTuiShowScrollBar);
+    mEditor->SetCenterView(config.mTuiCenterView);
 
     mEditor->SetMeasurement(config.mMeasurement);
     mEditor->SetCodePage(static_cast<eCodePage>(config.mCodePage));
@@ -882,6 +883,7 @@ void cWSWordTsar::WriteConfig(void)
     config.mTuiShowStatusBar = mShowBottomStatus;
     config.mTuiAlwaysFlagColumn = mEditor->mAlwaysFlag;
     config.mTuiAlwaysDotCommands = mEditor->mAlwaysDot;
+    config.mTuiCenterView = mEditor->IsCenterViewEnabled();
 
     config.Save();
 }
@@ -1645,7 +1647,7 @@ std::string cWSWordTsar::GetHelpText(eHelpDisplay help) const
                    "                     \001=\001 center paragraph\n"
                    "                     \001>\001 right align paragraph\n"
                    "                     \001+\001 justify paragraph\n"
-                   "                                                     \001T\001 toggle display mode\n"
+                   "                                                     \001T\001 center view\n"
                    " \001S\001 set line spacing \001RET\001 turn Enter closes dialog off \001N\001 notes";
         }
 
@@ -1892,6 +1894,55 @@ void cWSWordTsar::DrawOpeningMenu(cScreen& screen)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  int& offset      [out] column offset to center the pane, 0 if off
+/// @param  int& contentCols [out] pane width in columns, mCols if off
+///
+/// @return nothing
+///
+/// @brief
+/// See declaration in wordtsar.h.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::GetEditorHorizontalExtent(int& offset, int& contentCols) const
+{
+    offset = 0;
+    contentCols = mCols;
+
+    if (mEditor->IsCenterViewEnabled() == false)
+    {
+        return;
+    }
+
+    cLayoutBase* layout = mEditor->GetLayout();
+    COORD_T twipsPerCol = mEditor->GetTwipsPerColumn();
+    if ((layout == nullptr) || (twipsPerCol <= 0))
+    {
+        return;
+    }
+
+    COORD_T leftMargin = layout->GetLeftMargin();
+    COORD_T rightMargin = layout->GetRightMargin();
+    int cols = static_cast<int>((rightMargin - leftMargin) / twipsPerCol);
+    if (cols < 10)
+    {
+        cols = 10;
+    }
+    if (cols > mCols)
+    {
+        cols = mCols;
+    }
+
+    contentCols = cols;
+    offset = (mCols - cols) / 2;
+    if (offset < 0)
+    {
+        offset = 0;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  cScreen& screen [in,out] target screen
 /// @param  const cTheme& theme [in] color theme
 ///
@@ -1954,11 +2005,15 @@ void cWSWordTsar::DrawEditor(cScreen& screen, const cTheme& theme)
         editorRows = 1;
     }
 
+    int centerOffset = 0;
+    int centerCols = mCols;
+    GetEditorHorizontalExtent(centerOffset, centerCols);
+
     sRect editorRect;
     editorRect.row = editorTop;
-    editorRect.col = 0;
+    editorRect.col = centerOffset;
     editorRect.rows = editorRows;
-    editorRect.cols = mCols;
+    editorRect.cols = centerCols;
 
     mEditor->SetChromeRows(mRows - editorRows);
     mView->SetBounds(editorRect);
@@ -2382,11 +2437,15 @@ void cWSWordTsar::DrawRuler(cScreen& screen, int row)
     style.bg = mRulerBg;
     style.attrs = wordstartui::CELL_ATTR_NONE;
 
+    int offset = 0;
+    int rulerCols = mCols;
+    GetEditorHorizontalExtent(offset, rulerCols);
+
     sRect bar;
     bar.row = row;
-    bar.col = 0;
+    bar.col = offset;
     bar.rows = 1;
-    bar.cols = mCols;
+    bar.cols = rulerCols;
     screen.FillRect(bar, "\xe2\x94\x80", style);
 
     cLayoutBase* layout = mEditor->GetLayout();
@@ -2397,16 +2456,6 @@ void cWSWordTsar::DrawRuler(cScreen& screen, int row)
     }
 
     COORD_T leftMargin = layout->GetLeftMargin();
-    COORD_T rightMargin = layout->GetRightMargin();
-    int rulerCols = static_cast<int>((rightMargin - leftMargin) / twipsPerCol);
-    if (rulerCols < 10)
-    {
-        rulerCols = 10;
-    }
-    if (rulerCols > mCols)
-    {
-        rulerCols = mCols;
-    }
 
     // Tab stops.
     const std::vector<sTabStop>& tabs = layout->GetTabs();
@@ -2420,7 +2469,7 @@ void cWSWordTsar::DrawRuler(cScreen& screen, int row)
             {
                 glyph = "\xe2\x80\xa2";             // bullet
             }
-            screen.PutCell(row, tabCol, glyph, style);
+            screen.PutCell(row, offset + tabCol, glyph, style);
         }
     }
 
@@ -2431,15 +2480,15 @@ void cWSWordTsar::DrawRuler(cScreen& screen, int row)
         int pmCol = static_cast<int>(paraIndent / twipsPerCol);
         if ((pmCol > 0) && (pmCol < rulerCols - 1))
         {
-            screen.PutCell(row, pmCol, "\xc2\xb6", style);
+            screen.PutCell(row, offset + pmCol, "\xc2\xb6", style);
         }
     }
 
     // Left and right margin markers.
-    screen.PutCell(row, 0, "\xe2\x94\x9c", style);
+    screen.PutCell(row, offset, "\xe2\x94\x9c", style);
     if (rulerCols > 1)
     {
-        screen.PutCell(row, rulerCols - 1, "\xe2\x94\xa4", style);
+        screen.PutCell(row, offset + rulerCols - 1, "\xe2\x94\xa4", style);
     }
 
     // Caret indicator (inverted), hidden on dot/comment lines.
@@ -2462,7 +2511,7 @@ void cWSWordTsar::DrawRuler(cScreen& screen, int row)
                 {
                     sStyle inv = style;
                     inv.attrs = inv.attrs | wordstartui::CELL_ATTR_INVERSE;
-                    screen.PutCell(row, caretCol, "\xe2\x94\x80", inv);
+                    screen.PutCell(row, offset + caretCol, "\xe2\x94\x80", inv);
                 }
             }
         }

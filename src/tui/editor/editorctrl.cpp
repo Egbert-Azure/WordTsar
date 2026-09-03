@@ -165,6 +165,7 @@ cWSEditorCtrl::cWSEditorCtrl(void)
 {
     // wordstartui does not support page view mode (no pixel rendering)
     mPageModeSupported = false;
+    mCenterView = false;
 
     // Create and own document and layout
     mDocument = new cDocument();
@@ -601,6 +602,24 @@ eInputMode cWSEditorCtrl::GetInputMode(void) const
 {
     return mInputMode;
 }
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Toggle horizontal centering of the editing pane (^O T). The host
+/// (cWSWordTsar::DrawEditor/DrawRuler) reads IsCenterViewEnabled() each
+/// frame to decide the pane's column offset -- no relayout is needed here,
+/// this only affects where the already-laid-out content is drawn.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::ToggleCenterView(void)
+{
+    mCenterView = !mCenterView;
+}
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -1198,6 +1217,26 @@ void cWSEditorCtrl::FileIOProgress(int percent)
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::SaveFile(const std::string& filename)
 {
+    return SaveFileImpl(filename, false);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] path to save to
+/// @param  silent   [in] suppress interactive warning dialogs (e.g. lossy
+///                       character warnings) -- used for crash-path
+///                       emergency saves where the terminal may already be
+///                       torn down and a blocking dialog would hang
+///
+/// @return bool - true on success
+///
+/// @brief
+/// Shared implementation behind SaveFile() and EmergencySaveFile().
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
+{
     if (filename.empty() || !mDocument)
     {
         return false;
@@ -1228,6 +1267,8 @@ bool cWSEditorCtrl::SaveFile(const std::string& filename)
         fileWriter = new cWordstarFile(this);
     }
 
+    fileWriter->SetSilent(silent);
+
     POSITION_T docSize = mDocument->GetTextSize();
     bool success = fileWriter->SaveFile(filename, docSize);
 
@@ -1249,6 +1290,7 @@ bool cWSEditorCtrl::SaveFile(const std::string& filename)
         if (ext != ".docx")
         {
             cFile* backupWriter = new cWordstarFile(this);
+            backupWriter->SetSilent(true);
             POSITION_T backupSize = mDocument->GetTextSize();
             backupWriter->SaveFile(mBackupFileName, backupSize);
             delete backupWriter;
@@ -1290,7 +1332,7 @@ void cWSEditorCtrl::EmergencySaveFile(char *text)
     }
 
     std::string emergency = filename + ".emergency";
-    SaveFile(emergency);
+    SaveFileImpl(emergency, true);
 
     if (text)
     {
@@ -1325,6 +1367,7 @@ void cWSEditorCtrl::AutoSaveBackup(void)
     SetStatusMessage("Saving backup...", true, 30);
 
     cFile* backupWriter = new cWordstarFile(this);
+    backupWriter->SetSilent(true);
     POSITION_T backupSize = mDocument->GetTextSize();
     backupWriter->SaveFile(mBackupFileName, backupSize);
     delete backupWriter;

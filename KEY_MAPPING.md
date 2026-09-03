@@ -6,6 +6,8 @@ WordTsar supports two input modes, selectable in **System Preferences > Editor >
 - **WordStar** (default) -- Classic WordStar 7 control-key sequences
 - **Modern (CUA/MS Word)** -- Standard Ctrl+C/V/X/Z shortcuts with Alt-prefix chords for advanced operations
 
+Both apps -- the terminal `ws` and the GUI `WordTsar` -- support both modes independently. The mode is a per-app Preferences setting, not a property of which binary you're running: "GUI" does not imply Modern, and "terminal" does not imply WordStar.
+
 ---
 
 ## Table of Contents
@@ -65,7 +67,7 @@ Every Ctrl+letter key has a different meaning in WordStar vs Modern mode.
 | Key | WordStar Action | MS Word Action |
 |-----|----------------|-------------------|
 | Ctrl+A | Word left | Select All |
-| Ctrl+B | Reformat paragraph | **Bold** toggle |
+| Ctrl+B | Reformat paragraph (not implemented) | **Bold** toggle |
 | Ctrl+C | Page down | **Copy** to clipboard |
 | Ctrl+D | Cursor right | Select **Font** |
 | Ctrl+E | Cursor up | **Center** align paragraph |
@@ -73,10 +75,10 @@ Every Ctrl+letter key has a different meaning in WordStar vs Modern mode.
 | Ctrl+G | Delete (forward) | **Goto** page |
 | Ctrl+H | Delete (backspace) | Find & **Replace** |
 | Ctrl+I | Insert tab | **Italic** toggle |
-| Ctrl+J | Help prefix (chord) | **Justify** align paragraph |
+| Ctrl+J | -- (unassigned in WS7) | **Justify** align paragraph |
 | Ctrl+K | Block/File prefix (chord) | Set Begin Block |
 | Ctrl+L | Find Again | **Left** align paragraph |
-| Ctrl+M | (not implemented) | -- |
+| Ctrl+M | Macro/Insert prefix (chord) | -- |
 | Ctrl+N | Line break (Enter) | **New** document |
 | Ctrl+O | Format prefix (chord) | **Open** file |
 | Ctrl+P | Style prefix (chord) | **Print** preview |
@@ -231,7 +233,7 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | D | ^O,D | Alt+O,D | Toggle control code display |
 | C | ^O,C | Alt+O,C | Insert center tab stop |
 | ] | ^O,] | Alt+O,] | Insert right-aligned tab stop |
-| T | ^O,T | Alt+O,T | Toggle page/continuous mode |
+| T | ^O,T | Alt+O,T | Toggle page/continuous mode (GUI); center view (TUI) |
 | J | ^O,J | Alt+O,J | Toggle justification on/off |
 | < | ^O,< | Alt+O,< | Left align paragraph (bracketed) |
 | > | ^O,> | Alt+O,> | Right align paragraph (bracketed) |
@@ -668,7 +670,7 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^OC | Center line | Center current line | Yes |
 | ^O] | Right align line | Right align current line | Yes |
 | ^OD | Toggle command tags | Toggle control code display | Yes |
-| ^OT | Toggle page/continuous | Toggle page/continuous mode (GUI only) | Yes |
+| ^OT | Toggle page/continuous | GUI: page/continuous mode. TUI: centers the editing pane and ruler horizontally instead (no pixel canvas to paginate) | Yes |
 | ^OJ | Toggle justification | Toggle justification | Yes |
 | ^OY | Page layout dialog | Open page layout dialog | Yes |
 | ^OP | Print preview | Print preview | Yes |
@@ -691,7 +693,7 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^OE | Soft hyphen | -- | No |
 | ^OH | Auto-hyphenation off | -- | No |
 | ^OA | Auto-align off | -- | No |
-| ^OW | Word wrap off | -- | No |
+| ^OW | Word wrap on/off | Toggles word wrap (inserts .aw on/off) | Yes |
 | ^O(space) | (reserved) | -- | No |
 | ^OK | Open/switch window | -- | No |
 | ^OM | Size window | -- | No |
@@ -904,7 +906,7 @@ Same as WordStar mode, plus F3 = Find Again.
 | Alt+O, C | Center current line | Yes |
 | Alt+O, ] | Right align current line | Yes |
 | Alt+O, D | Toggle control code display | Yes |
-| Alt+O, T | Toggle page/continuous mode (GUI only) | Yes |
+| Alt+O, T | Toggle page/continuous mode (GUI); center view (TUI) | Yes |
 | Alt+O, J | Toggle justification | Yes |
 | Alt+O, Y | Open page layout dialog | Yes |
 

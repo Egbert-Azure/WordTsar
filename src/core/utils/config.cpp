@@ -185,6 +185,7 @@ cConfig::cConfig(void)
     mTuiShowMenu = true;
     mTuiAlwaysDotCommands = true;
     mTuiAlwaysFlagColumn = true;
+    mTuiCenterView = false;
 
     // [tui.colors] defaults (CGA blue bg, CGA gray text)
     mTuiBackground = {0, 0, 170};
@@ -782,6 +783,7 @@ bool cConfig::Load(void)
     mTuiShowMenu = ini.GetBoolValue("tui.display", "showMenu", mTuiShowMenu);
     mTuiAlwaysDotCommands = ini.GetBoolValue("tui.display", "alwaysDotCommands", mTuiAlwaysDotCommands);
     mTuiAlwaysFlagColumn = ini.GetBoolValue("tui.display", "alwaysFlagColumn", mTuiAlwaysFlagColumn);
+    mTuiCenterView = ini.GetBoolValue("tui.display", "centerView", mTuiCenterView);
 
     // --- [tui.colors] ---
     mTuiBackground = ReadRGB(&ini, "tui.colors", "background", mTuiBackground);
@@ -966,6 +968,7 @@ bool cConfig::Save(void)
     ini.SetBoolValue("tui.display", "showMenu", mTuiShowMenu);
     ini.SetBoolValue("tui.display", "alwaysDotCommands", mTuiAlwaysDotCommands);
     ini.SetBoolValue("tui.display", "alwaysFlagColumn", mTuiAlwaysFlagColumn);
+    ini.SetBoolValue("tui.display", "centerView", mTuiCenterView);
 
     // --- [tui.colors] ---
     WriteRGB(&ini, "tui.colors", "background", mTuiBackground);

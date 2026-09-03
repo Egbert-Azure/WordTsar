@@ -47,10 +47,17 @@ public:
     virtual bool CanSave(void) = 0 ;
     virtual std::string GetExtensions(void) = 0 ;
 
+    // When true, SaveFile() must not pop up interactive warning dialogs
+    // (e.g. lossy-character-on-save prompts) -- used for automatic backup
+    // writes and other saves the user didn't directly initiate, where a
+    // blocking dialog would otherwise reappear on every autosave tick.
+    void SetSilent(bool silent) { mSilent = silent ; }
+
 //protected:
     void UpdateProgress(int percent) ;
 
     cEditorBase *mEditor ;
+    bool mSilent = false ;
 
 private:
 };

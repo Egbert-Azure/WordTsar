@@ -3039,6 +3039,7 @@ void cEditorCtrl::OnAutoSaveTimer(void)
 
     // Always save backups in WordStar format -- avoids hangs from RTF/DOCX backup loading
     cFile* fileWriter = new cWordstarFile(this);
+    fileWriter->SetSilent(true);
 
     POSITION_T docSize = mDocument->GetTextSize();
     fileWriter->SaveFile(mBackupFileName, docSize);
@@ -6737,6 +6738,7 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
         if (!qfilename.endsWith(".docx", Qt::CaseInsensitive))
         {
             cFile* backupWriter = new cWordstarFile(this);
+            backupWriter->SetSilent(true);
             POSITION_T backupSize = mDocument->GetTextSize();
             backupWriter->SaveFile(mBackupFileName, backupSize);
             delete backupWriter;
@@ -6794,8 +6796,10 @@ void cEditorCtrl::EmergencySaveFile(char *text)
 
     std::string emergencyFilename = std::string("emergency-") + timestamp + ".ws";
 
-    // Save document without progress UI (we're crashing)
+    // Save document without progress UI (we're crashing) -- never block on a
+    // dialog here, the app may be unwinding from a fatal error.
     cWordstarFile fileWriter(this);
+    fileWriter.SetSilent(true);
     POSITION_T docSize = mDocument->GetTextSize();
     bool success = fileWriter.SaveFile(emergencyFilename, docSize);
 

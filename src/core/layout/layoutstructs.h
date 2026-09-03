@@ -66,6 +66,7 @@ struct sModifierParagraph
     bool bold, italics, underline;                 // Attributes at the end of the paragraph
     bool superscript, subscript, strikethrough;    // Attributes at the end of the paragraph
     bool right, left, justify, center;             // Attributes at the end of the paragraph
+    bool wordWrap;                                 // Word wrap (.aw) state at the end of the paragraph
     double linespace;
 
     // Margin state at end of paragraph (for identical full/partial layout)
@@ -78,6 +79,7 @@ struct sModifierParagraph
     sModifierParagraph() : font(""), bold(false), italics(false), underline(false),
                            superscript(false), subscript(false), strikethrough(false),
                            right(false), left(true), justify(false), center(false),
+                           wordWrap(true),
                            linespace(1.0),
                            leftMargin(0), rightMargin(9360), paragraphMargin(0),
                            validParagraphMargin(false)

@@ -1118,10 +1118,15 @@ void cModernInput::OnAltOChar(char key)
 
         case 't' :
         {
-            // Toggle page/continuous mode (only if supported)
+            // GUI: toggle page/continuous mode. TUI: center the editing
+            // pane horizontally instead (no pixel canvas to paginate).
             if (mEditor->IsPageModeSupported())
             {
                 mEditor->ToggleDisplayMode() ;
+            }
+            else
+            {
+                mEditor->ToggleCenterView() ;
             }
             break ;
         }

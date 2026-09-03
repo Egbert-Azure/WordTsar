@@ -123,6 +123,14 @@ private:
     void DrawRuler(wordstartui::cScreen& screen, int row);
     void DrawBottomStatus(wordstartui::cScreen& screen);
 
+    // When ^O T centering is on, returns the left-margin-to-right-margin
+    // width in columns, clamped to [10, mCols], and the column offset that
+    // centers it in the terminal. Both are 0/mCols (no centering) otherwise,
+    // or when the layout/font metrics aren't available yet. Shared by
+    // DrawEditor (editing pane bounds) and DrawRuler (marker positions) so
+    // they can never drift out of sync with each other.
+    void GetEditorHorizontalExtent(int& offset, int& contentCols) const;
+
     bool IsHelpVisible(void);
     int HelpPanelRows(void);
     void DrawHelpPanel(wordstartui::cScreen& screen, int startRow, int rows);

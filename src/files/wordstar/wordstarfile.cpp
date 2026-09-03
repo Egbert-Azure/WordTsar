@@ -893,7 +893,7 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
     // Page), not of the WordStar format itself -- a document with the same
     // characters can round-trip cleanly under a different code page, so the
     // message names the one actually in effect instead of blaming the format.
-    if(unmappableCount > 0)
+    if(unmappableCount > 0 && !mSilent)
     {
         static const char *codePageNames[] = { "CP437", "CP737", "CP850", "CP1252" } ;
         const char *codePageName = "the current code page" ;
