@@ -385,16 +385,52 @@ CFStringRef cTUIFontCalculatorMacOSNative::StdStringToCFString(const std::string
 
 bool cTUIFontCalculatorMacOSNative::CreateCTFont(const std::string& fontName, CGFloat pointSize) {
     mFontSize = pointSize;
-    
-    // Create CTFont - completely headless, no GUI required
-    CFStringRef fontNameRef = StdStringToCFString(fontName);
-    if (fontName.empty() || !fontNameRef) {
-        mCTFont = CTFontCreateWithName(CFSTR("Times"), mFontSize, nullptr);
-    } else {
-        mCTFont = CTFontCreateWithName(fontNameRef, mFontSize, nullptr);
-        CFRelease(fontNameRef);
+
+    // fontName is usually a real filesystem path to the matched TrueType file
+    // (cTUIFontManager::SetFont populates sTUIFontInfo::name from the font's
+    // fullName, which on macOS is a path -- see fontmanager.cpp). Load it the
+    // same way cTUIPrintout::GetOrLoadFont() loads the identical file for
+    // actual PDF drawing: CTFontCreateWithName() only accepts a PostScript/
+    // family *name*, not a path -- given a path it silently substitutes an
+    // unrelated fallback font instead of failing, so measurement here and
+    // drawing there would use two different fonts with different glyph
+    // advance widths, corrupting every position computed from this measurement
+    // (this was the root cause of the TUI print-preview word-splitting bug).
+    if (fontName.find('/') != std::string::npos) {
+        CFURLRef fontUrl = CFURLCreateFromFileSystemRepresentation(
+            kCFAllocatorDefault,
+            reinterpret_cast<const UInt8*>(fontName.c_str()),
+            static_cast<CFIndex>(fontName.length()),
+            false);
+
+        if (fontUrl) {
+            CGDataProviderRef provider = CGDataProviderCreateWithURL(fontUrl);
+            CFRelease(fontUrl);
+
+            if (provider) {
+                CGFontRef cgFont = CGFontCreateWithDataProvider(provider);
+                CGDataProviderRelease(provider);
+
+                if (cgFont) {
+                    mCTFont = CTFontCreateWithGraphicsFont(cgFont, mFontSize, nullptr, nullptr);
+                    CGFontRelease(cgFont);
+                }
+            }
+        }
     }
-    
+
+    if (!mCTFont) {
+        // Not a path (a real family/PostScript name), or the file failed to
+        // load -- fall back to the original name-based lookup.
+        CFStringRef fontNameRef = StdStringToCFString(fontName);
+        if (fontName.empty() || !fontNameRef) {
+            mCTFont = CTFontCreateWithName(CFSTR("Times"), mFontSize, nullptr);
+        } else {
+            mCTFont = CTFontCreateWithName(fontNameRef, mFontSize, nullptr);
+            CFRelease(fontNameRef);
+        }
+    }
+
     if (!mCTFont) {
         // Fallback to system font
         mCTFont = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, mFontSize, nullptr);

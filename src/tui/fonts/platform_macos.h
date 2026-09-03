@@ -25,6 +25,7 @@
 
 #include "tuifontcalc.h"
 #include <CoreText/CoreText.h>
+#include <CoreGraphics/CoreGraphics.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <vector>
 

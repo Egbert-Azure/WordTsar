@@ -22,6 +22,9 @@
 #include "doctest.h"
 
 #include "src/tui/fonts/fontmanager.h"
+#include "src/tui/fonts/platform_macos.h"
+
+#include <filesystem>
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -159,6 +162,40 @@ TEST_CASE("TUI font manager - macOS system font discovery finds real files")
     CHECK(foundRealFilePath);
 
     mgr.Shutdown();
+}
+
+
+TEST_CASE("TUI macOS native font calculator - a font-file path measures against the real font, not a fallback")
+{
+    // Root cause of the TUI print-preview word-splitting bug: sTUIFontInfo::name
+    // is populated with a real filesystem path (see cTUIFontManager::SetFont),
+    // but CreateCTFont() used to hand that path straight to CTFontCreateWithName(),
+    // which only accepts a PostScript/family *name* -- given a path it silently
+    // substitutes an unrelated fallback font instead of failing. Every glyph
+    // position in a printed line was measured against that wrong font while
+    // cTUIPrintout::GetOrLoadFont() drew with the real one, so widths never
+    // matched and text visibly gained/lost spaces at word boundaries.
+    std::string courierPath = "/System/Library/Fonts/Supplemental/Courier New.ttf";
+    if (!std::filesystem::exists(courierPath))
+    {
+        // Not present on this system (e.g. CI) -- nothing to verify against.
+        return;
+    }
+
+    cTUIFontCalculatorMacOSNative calc;
+    REQUIRE(calc.Initialize());
+
+    sTUIFontInfo font;
+    font.name = courierPath;
+    font.size = 12;
+    REQUIRE(calc.SetFont(font));
+
+    // A fallback substitution would not report "Courier New" as its family,
+    // and there's no guarantee it would be monospace either.
+    CHECK(calc.GetFontFamilyName() == "Courier New");
+    CHECK(calc.IsMonospaceFont());
+
+    calc.Shutdown();
 }
 #endif
 
