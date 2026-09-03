@@ -1,10 +1,10 @@
 # WordTsar Key and Menu Mapping Reference
 
-This document maps WordStar keyboard commands and menus to their Modern/MS Word equivalents in WordTsar, along with the functionality each binding provides.
+This document maps WordStar keyboard commands and menus to their Modern (CUA) equivalents in WordTsar, along with the functionality each binding provides.
 
 WordTsar supports two input modes, selectable in **System Preferences > Editor > Keyboard Mode**:
 - **WordStar** (default) -- Classic WordStar 7 control-key sequences
-- **Modern (CUA/MS Word)** -- Standard Ctrl+C/V/X/Z shortcuts with Alt-prefix chords for advanced operations
+- **Modern (CUA)** -- Standard Ctrl+C/V/X/Z shortcuts with Alt-prefix chords for advanced operations, following the same conventions as most modern text editors
 
 Both apps -- the terminal `ws` and the GUI `WordTsar` -- support both modes independently. The mode is a per-app Preferences setting, not a property of which binary you're running: "GUI" does not imply Modern, and "terminal" does not imply WordStar.
 
@@ -47,7 +47,7 @@ Both apps -- the terminal `ws` and the GUI `WordTsar` -- support both modes inde
   - [^O Chord -- Onscreen Format](#o-chord----onscreen-format)
   - [^Q Chord -- Quick Functions](#q-chord----quick-functions)
   - [^P Chord -- Print Controls and Styles](#p-chord----print-controls-and-styles)
-- [Complete Modern/MS Word Input Handler Reference](#complete-modernms-word-input-handler-reference)
+- [Complete Modern (CUA) Input Handler Reference](#complete-modern-cua-input-handler-reference)
   - [Ctrl+Letter Keys (Modern)](#ctrlletter-keys-modern)
   - [Alt Prefix Chords (Modern)](#alt-prefix-chords-modern)
   - [Special / Navigation Keys (Modern)](#special--navigation-keys-modern)
@@ -64,7 +64,7 @@ Both apps -- the terminal `ws` and the GUI `WordTsar` -- support both modes inde
 
 Every Ctrl+letter key has a different meaning in WordStar vs Modern mode.
 
-| Key | WordStar Action | MS Word Action |
+| Key | WordStar Action | Modern (CUA) Action |
 |-----|----------------|-------------------|
 | Ctrl+A | Word left | Select All |
 | Ctrl+B | Reformat paragraph (not implemented) | **Bold** toggle |
@@ -460,7 +460,7 @@ Contextual per-command help isn't a menu item -- it's `F1` (WordStar mode only),
 
 ### How Modern Mode Works
 
-Modern/MS Word mode reassigns all 26 Ctrl+letter keys to standard shortcuts that users expect from Microsoft Word and other modern editors. Operations that lose their Ctrl+letter binding (block operations, navigation, formatting) are available through **Alt-prefix chords**:
+Modern (CUA) mode reassigns all 26 Ctrl+letter keys to the standard shortcuts most modern editors use. Operations that lose their Ctrl+letter binding (block operations, navigation, formatting) are available through **Alt-prefix chords**:
 
 - **Alt+K** replaces ^K (block/file operations)
 - **Alt+Q** replaces ^Q (quick navigation and deletion)
@@ -773,13 +773,13 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 
 ---
 
-## Complete Modern/MS Word Input Handler Reference
+## Complete Modern (CUA) Input Handler Reference
 
-Every key recognized by the Modern/MS Word input handler. Modern mode uses standard MS Word shortcuts (Ctrl+C/V/X/Z) and Alt-prefix chords for advanced operations.
+Every key recognized by the Modern (CUA) input handler. Modern mode uses standard CUA shortcuts (Ctrl+C/V/X/Z) and Alt-prefix chords for advanced operations.
 
 ### Ctrl+Letter Keys (Modern)
 
-| Key | MS Word Function | WordTsar Action | Implemented |
+| Key | Standard Function | WordTsar Action | Implemented |
 |-----|-------------|-----------------|-------------|
 | Ctrl+A | Select all | Select entire document | Yes |
 | Ctrl+B | Bold | Toggle bold | Yes |

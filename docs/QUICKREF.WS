@@ -34,7 +34,7 @@ Entries marked (WS) exist only in WordStar mode.
 .pa
 SINGLE CTRL KEYS
 
-Key    WordStar                     Modern (MS Word)
+Key    WordStar                     Modern (CUA)
 ----------------------------------------------------------------
 ^A     Word left                    Select all
 ^B     Reformat para (not impl)     Bold toggle
