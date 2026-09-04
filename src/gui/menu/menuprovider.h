@@ -118,9 +118,7 @@ public:
 
     // Edit Menu - Notes
     virtual QString GetEditEditNoteLabel(void) const = 0;
-    virtual QString GetEditNoteStartNumberLabel(void) const = 0;
     virtual QString GetEditNoteConvertLabel(void) const = 0;
-    virtual QString GetEditNoteConvertPrintLabel(void) const = 0;
     virtual QString GetEditNoteEndnoteLocationLabel(void) const = 0;
 
     // Edit Menu - Settings
@@ -138,7 +136,6 @@ public:
 
     // Insert Menu - Basic
     virtual QString GetInsertPageBreakLabel(void) const = 0;
-    virtual QString GetInsertColumnBreakLabel(void) const = 0;
     virtual QString GetInsertDateLabel(void) const = 0;
 
     // Insert Menu - Other Values
@@ -147,7 +144,6 @@ public:
     virtual QString GetInsertMathExpressionLabel(void) const = 0;
     virtual QString GetInsertMathDollarLabel(void) const = 0;
     virtual QString GetInsertFilenameLabel(void) const = 0;
-    virtual QString GetInsertDriveLabel(void) const = 0;
     virtual QString GetInsertDirectoryLabel(void) const = 0;
     virtual QString GetInsertPathLabel(void) const = 0;
 
@@ -155,7 +151,6 @@ public:
     virtual QString GetInsertVarDateLabel(void) const = 0;
     virtual QString GetInsertVarTimeLabel(void) const = 0;
     virtual QString GetInsertVarPageLabel(void) const = 0;
-    virtual QString GetInsertVarLineLabel(void) const = 0;
     virtual QString GetInsertVarFilenameLabel(void) const = 0;
     virtual QString GetInsertVarDriveLabel(void) const = 0;
     virtual QString GetInsertVarDirectoryLabel(void) const = 0;
@@ -177,7 +172,6 @@ public:
     // Insert Menu - Index/TOC
     virtual QString GetInsertTOCEntryLabel(void) const = 0;
     virtual QString GetInsertIndexEntryLabel(void) const = 0;
-    virtual QString GetInsertMarkTextForIndexLabel(void) const = 0;
     virtual QString GetInsertDotLeaderLabel(void) const = 0;
     virtual QString GetInsertParOutlineNumberLabel(void) const = 0;
 
@@ -205,7 +199,6 @@ public:
     virtual QString GetStyleUppercaseLabel(void) const = 0;
     virtual QString GetStyleLowercaseLabel(void) const = 0;
     virtual QString GetStyleSentenceCaseLabel(void) const = 0;
-    virtual QString GetStyleSettingsLabel(void) const = 0;
 
     // Layout Menu - Line Alignment
     virtual QString GetLayoutCenterLineLabel(void) const = 0;
@@ -242,9 +235,7 @@ public:
     virtual QString GetUtilSpellCheckRestLabel(void) const = 0;
     virtual QString GetUtilSpellCheckWordLabel(void) const = 0;
     virtual QString GetUtilSpellCheckTypeLabel(void) const = 0;
-    virtual QString GetUtilSpellCheckNotesLabel(void) const = 0;
     virtual QString GetUtilThesaurusLabel(void) const = 0;
-    virtual QString GetUtilLanguageChangeLabel(void) const = 0;
 
     // Utilities Menu - Tools
     virtual QString GetUtilInsetLabel(void) const = 0;
@@ -280,9 +271,7 @@ public:
 
     // Utilities Menu - Reformat
     virtual QString GetUtilReformatRestLabel(void) const = 0;
-    virtual QString GetUtilReformatParaLabel(void) const = 0;
     virtual QString GetUtilReformatNotesLabel(void) const = 0;
-    virtual QString GetUtilRepeatKeyLabel(void) const = 0;
 
     // Help Menu
     virtual QString GetHelpAboutLabel(void) const = 0;

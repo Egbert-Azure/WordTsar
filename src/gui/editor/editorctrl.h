@@ -184,6 +184,7 @@ public:
     void LayoutDocument(bool force) override;
     bool IsBusy(void) const;
     bool LoadFile(const std::string& filename) override;
+    bool InsertFileAtCursor(const std::string& filename) override;
     bool SaveFile(const std::string& filename) override;
     std::string PromptForLoadFile(void) override;
     std::string PromptForSaveFile(void) override;

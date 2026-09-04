@@ -42,6 +42,7 @@
 
 class cEditorCtrl ;
 class IMenuProvider ;
+class cWordStarInput ;
 
 class cWordTsar : public QMainWindow
 {
@@ -94,6 +95,7 @@ private :
 private slots :
     // File Menu
     void Open(void) ;
+    void InsertFile(void) ;
     void Save(void) ;
     void SaveAs(void) ;
     void SaveandClose(void) ;
@@ -156,9 +158,7 @@ private slots :
     void Set9(void) ;
     void Set0(void) ;
     void EditNote(void) ;
-    void NoteStartNumber(void) ;
     void NoteCOnvert(void) ;
-    void NoteConcertForPrint(void) ;
     void NoteEndNoteLocation(void) ;
     void ColumnBlockMode(void) ;
     void ColumnReplaceMode(void) ;
@@ -173,20 +173,17 @@ private slots :
 
     // InsertMenu
     void PageBreak(void) ;
-    void ColumnBreak(void) ;
     void InsertDate(void) ;
     void InsertTime(void) ;
     void MathResult(void) ;
     void MathExpression(void) ;
     void MathDollar(void) ;
     void Filename(void) ;
-    void Drive(void) ;
     void Directory(void) ;
     void Path(void) ;
     void VarDate(void) ;
     void VarTime(void) ;
     void VarPage(void) ;
-    void VarLine(void) ;
     void VarFilename(void) ;
     void VarDirectory(void) ;
     void VarDrive(void) ;
@@ -201,7 +198,6 @@ private slots :
     void NoteAnnotation(void) ;
     void TOCEntry(void) ;
     void IndexEntry(void) ;
-    void MarkIndex(void) ;
     void DotLeader(void) ;
     void ParOutlineNumber(void) ;
 
@@ -225,7 +221,6 @@ private slots :
     void Uppercase(void) ;
     void Lowercase(void) ;
     void Sentencecase(void) ;
-    void Settings(void) ;
 
     // Layout Menu
     void CenterLine(void) ;
@@ -255,9 +250,7 @@ private slots :
     void SpellCheckRest(void) ;
     void SpellCheckWord(void) ;
     void SpellCheckType(void) ;
-    void SpellCheckNotes(void) ;
     void Thesaurus(void) ;
-    void LanguageChange(void) ;
     void Inset(void) ;
     void Calculator(void) ;
     void BlockMath(void) ;
@@ -285,9 +278,7 @@ private slots :
     void Display(void) ;
     void PrintNTimes(void) ;
     void ReformatRest(void) ;
-    void ReformatPara(void) ;
     void ReformatNotes(void) ;
-    void RepeatKey(void) ;
 
     // Status bar timer slots
     void ClearStatus(void) ;
@@ -359,6 +350,12 @@ private:
 
     // Editor and reveal codes state
     cEditorCtrl *mEditor;
+    // Dedicated WordStar-chord input handler for menu dispatch only -- never
+    // mEditor->mInput (which SetInputMode() swaps between WordStar/Modern), so
+    // a menu click always runs the real WordStar-mode command regardless of
+    // the user's selected keyboard mode, and can't collide with a chord the
+    // user has half-typed on the real, active handler.
+    cWordStarInput *mMenuInput;
     cEditorCtrl *mRevealCodesEditor ;         // codes pane editor (nullptr when hidden)
     bool mRevealCodesVisible ;                // reveal codes toggle state
     QAction *mCommandTagsAction ;             // Command Tags / Show Formatting menu action

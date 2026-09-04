@@ -160,7 +160,8 @@ public:
 
     // Pure Virtual - File Operations
     virtual void LayoutDocument(bool force) = 0;              // Layout document (platform-specific refresh)
-    virtual bool LoadFile(const std::string& filename) = 0;   // Load file with platform progress display
+    virtual bool LoadFile(const std::string& filename) = 0;   // Load file with platform progress display, replacing the current document
+    virtual bool InsertFileAtCursor(const std::string& filename) = 0; // Insert a file's parsed content at the cursor, real WS7 ^KR/Insert>File
     virtual bool SaveFile(const std::string& filename) = 0;   // Save file
     virtual void EmergencySaveFile(char *text) = 0;           // Emergency save on fatal error (e.g., bad_alloc)
     virtual std::string PromptForLoadFile(void) = 0;          // Show file open dialog

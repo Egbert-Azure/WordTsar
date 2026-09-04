@@ -23,6 +23,7 @@
 #include "editor/editorctrl.h"
 #include "editor/editorview.h"
 #include "dialogs/dialogs.h"
+#include "src/input/wordtsarinput.h"
 
 #include "src/tui/wordstartui/src/screen.h"
 #include "src/tui/wordstartui/src/theme.h"
@@ -75,18 +76,6 @@ void EmergencySignalHandler(int /*sig*/)
     gShutdownPending = 1;
 }
 
-// WordStar control-key prefixes.
-constexpr int CTRL_B = 2;
-constexpr int CTRL_K = 11;
-constexpr int CTRL_L = 12;
-constexpr int CTRL_M = 13;
-constexpr int CTRL_O = 15;
-constexpr int CTRL_P = 16;
-constexpr int CTRL_Q = 17;
-constexpr int CTRL_T = 20;
-constexpr int CTRL_U = 21;
-constexpr int CTRL_Y = 25;
-
 // Splash frames before auto-advancing (~50ms per loop tick).
 constexpr int SPLASH_TICKS = 12;
 
@@ -124,13 +113,13 @@ struct sOpeningItem
 };
 
 // The WordStar 7 opening menu, two columns, letter-for-letter matching the
-// real Classic Opening Menu (WordStar 7 manual, "Classic Menus and
-// Commands"). The array is ordered left column first, then right column --
-// see kOpeningLeftCount. The last two rows (no letter shown) are WordTsar's
-// own additions, reachable only by cursor + Enter so they can't collide with
-// a real WordStar 7 binding. F1 (help) is real WS7's own 20th item; it's
-// drawn and handled separately since it arrives as a function-key event, not
-// a typed character (see DrawOpeningMenu / HandleOpeningKey).
+// real Classic Opening Menu. The array is ordered left column first, then
+// right column -- see kOpeningLeftCount. The last two rows (no letter shown)
+// are WordTsar's own additions, reachable only by cursor + Enter so they
+// can't collide with a real WordStar 7 binding. F1 (help) is real WS7's own
+// 20th item; it's drawn and handled separately since it arrives as a
+// function-key event, not a typed character (see DrawOpeningMenu /
+// HandleOpeningKey).
 const sOpeningItem kOpeningItems[] =
 {
     // Left column -- 9 rows, matches real WS7 exactly.
@@ -177,6 +166,7 @@ cWSWordTsar::cWSWordTsar(void)
 {
     mEditor = new cWSEditorCtrl();
     mView = new cWSEditorView(mEditor);
+    mMenuInput = new cWordStarInput(mEditor);
     mRows = 24;
     mCols = 80;
     mMode = APP_SPLASH;
@@ -236,6 +226,7 @@ cWSWordTsar::~cWSWordTsar(void)
 
     delete mView;
     delete mEditor;
+    delete mMenuInput;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -463,20 +454,18 @@ void cWSWordTsar::HostHideLoadProgress(void)
 /// @return nothing
 ///
 /// @brief
-/// Fire a two-key WordStar command through the shared input handler, exactly as
-/// if the user typed it. Used by the menu bar so menu items run real commands.
+/// Fire a two-key WordStar command through the dedicated menu input handler,
+/// exactly as if the user had typed it in WordStar mode. Used by the menu bar
+/// so a menu item always runs the real WordStar command regardless of the
+/// user's selected keyboard mode (mMenuInput is never swapped by
+/// SetInputMode()), and never collides with a chord the user has half-typed
+/// on the real, active mEditor->GetInput().
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::InjectChord(int controlCode, char follow)
 {
-    IInputHandler* input = mEditor->GetInput();
-    if (input == nullptr)
-    {
-        return;
-    }
-
-    input->HandleKey(static_cast<char>(controlCode), false, false);
-    input->HandleKey(follow, false, false);
+    mMenuInput->HandleKey(static_cast<char>(controlCode), false, false);
+    mMenuInput->HandleKey(follow, false, false);
 
     mView->EnsureCaretVisible();
 
@@ -490,18 +479,13 @@ void cWSWordTsar::InjectChord(int controlCode, char follow)
 /// @return nothing
 ///
 /// @brief
-/// Fire a single-key WordStar command through the shared input handler.
+/// Fire a single-key WordStar command through the dedicated menu input
+/// handler (see InjectChord).
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::InjectControl(int controlCode)
 {
-    IInputHandler* input = mEditor->GetInput();
-    if (input == nullptr)
-    {
-        return;
-    }
-
-    input->HandleKey(static_cast<char>(controlCode), false, false);
+    mMenuInput->HandleKey(static_cast<char>(controlCode), false, false);
 
     mView->EnsureCaretVisible();
 
@@ -1014,6 +998,27 @@ void cWSWordTsar::OpenRecentFiles(void)
     }
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// File > Open/Read: prompts for a file and replaces the whole current
+/// document with it (real WS7's "Open a document"). No longer reachable via
+/// ^K R, which now inserts a file at the cursor instead -- see
+/// cWordStarInput::OnControlKChar case 'r'.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::OpenFile(void)
+{
+    std::string filename = mEditor->PromptForLoadFile();
+    if (!filename.empty())
+    {
+        mEditor->LoadFile(filename);
+    }
+}
+
 // =========================================================================
 // Menu bar
 // =========================================================================
@@ -1053,7 +1058,7 @@ void cWSWordTsar::BuildMenus(void)
 
     // ------------------------------- File -------------------------------
     int file = mMenu.AddMenu("File", 'F');
-    mMenu.AddSubItem(file, LB("&Open/Read...", "&Open...") + SC("^KR", "Ctrl+O"), [this](void) { InjectChord(CTRL_K, 'r'); });
+    mMenu.AddSubItem(file, LB("&Open/Read...", "&Open...") + SC("", "Ctrl+O"), [this](void) { OpenFile(); });
     mMenu.AddSubItem(file, std::string("&Save") + SC("^KS", "Ctrl+S"), [this](void) { InjectChord(CTRL_K, 's'); });
     mMenu.AddSubItem(file, std::string("Save &As...") + SC("^KT", "Ctrl+Shift+S"), [this](void) { InjectChord(CTRL_K, 't'); });
     mMenu.AddSubItem(file, std::string("Save and &Close") + SC("^KD", ""), [this](void) { InjectChord(CTRL_K, 'd'); });
@@ -1130,9 +1135,7 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(edit, std::string("Edit &Note") + SC("^OND", ""), none, false);
 
     int editNoteOpt = mMenu.AddSubMenu(edit, "Note Optio&ns");
-    mMenu.AddSubMenuItem(editNoteOpt, "Starting Number...", none, false);
     mMenu.AddSubMenuItem(editNoteOpt, std::string("Convert Note...") + SC("^ONV", ""), none, false);
-    mMenu.AddSubMenuItem(editNoteOpt, std::string("Convert at Print...") + SC(".cv", ""), none, false);
     mMenu.AddSubMenuItem(editNoteOpt, std::string("Endnote Location") + SC(".pe", ""), none, false);
 
     int editSettings = mMenu.AddSubMenu(edit, "Editing Se&ttings");
@@ -1149,12 +1152,11 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSeparator(view);
     mMenu.AddSubItem(view, std::string("Sc&reen Settings...") + SC("^OB", ""), [this](void) { OpenPreferences(); });
     mMenu.AddSeparator(view);
-    mMenu.AddSubItem(view, std::string("Switch Modes") + SC("^OT", "Alt+O, T"), none, false);
+    mMenu.AddSubItem(view, std::string("Switch Modes") + SC("^OT", "Alt+O, T"), [this](void) { InjectChord(CTRL_O, 't'); });
 
     // ------------------------------ Insert ------------------------------
     int insert = mMenu.AddMenu("Insert", 'I');
     mMenu.AddSubItem(insert, std::string("&Page Break") + SC(".pa", ""), [this](void) { mEditor->InsertText(".pa\r"); });
-    mMenu.AddSubItem(insert, std::string("&Column Break") + SC(".cb", ""), none, false);
     mMenu.AddSeparator(insert);
     mMenu.AddSubItem(insert, std::string("&Today's Date") + SC("^M@", ""), [this](void) { InjectChord(CTRL_M, '@'); });
 
@@ -1164,7 +1166,6 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(insertOther, std::string("Last Math Expr.") + SC("^M#", ""), none, false);
     mMenu.AddSubMenuItem(insertOther, std::string("Last Math Dollar") + SC("^M$", ""), none, false);
     mMenu.AddSubMenuItem(insertOther, std::string("Current Filename") + SC("^M*", ""), [this](void) { InjectChord(CTRL_M, '*'); });
-    mMenu.AddSubMenuItem(insertOther, std::string("Current Drive") + SC("^M:", ""), [this](void) { InjectChord(CTRL_M, ':'); });
     mMenu.AddSubMenuItem(insertOther, std::string("Current Directory") + SC("^M.", ""), [this](void) { InjectChord(CTRL_M, '.'); });
     mMenu.AddSubMenuItem(insertOther, std::string("Current Path") + SC("^M\\", ""), [this](void) { InjectChord(CTRL_M, '\\'); });
 
@@ -1172,7 +1173,6 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(insertVar, "Date", [this](void) { mEditor->InsertText("&@&"); });
     mMenu.AddSubMenuItem(insertVar, "Time", [this](void) { mEditor->InsertText("&!&"); });
     mMenu.AddSubMenuItem(insertVar, "Page", [this](void) { mEditor->InsertText("&#&"); });
-    mMenu.AddSubMenuItem(insertVar, "Line", [this](void) { mEditor->InsertText("&_&"); });
     mMenu.AddSubMenuItem(insertVar, "Filename", [this](void) { mEditor->InsertText("&*&"); });
     mMenu.AddSubMenuItem(insertVar, "Drive", [this](void) { mEditor->InsertText("&:&"); });
     mMenu.AddSubMenuItem(insertVar, "Directory", [this](void) { mEditor->InsertText("&.&"); });
@@ -1195,7 +1195,6 @@ void cWSWordTsar::BuildMenus(void)
     int insertIndex = mMenu.AddSubMenu(insert, "&Index/TOC Entry");
     mMenu.AddSubMenuItem(insertIndex, std::string("TOC Entry...") + SC(".tc", ""), [this](void) { InsertTOCEntry(); });
     mMenu.AddSubMenuItem(insertIndex, std::string("Index Entry...") + SC("^ONI", ""), [this](void) { InsertIndexEntry(); });
-    mMenu.AddSubMenuItem(insertIndex, std::string("Mark for Index") + SC("^PK", ""), none, false);
     mMenu.AddSubMenuItem(insertIndex, std::string("Dot Leader to Tab") + SC("^P.", ""), none, false);
 
     mMenu.AddSubItem(insert, std::string("Outline Number...") + SC("^OZ", ""), none, false);
@@ -1231,12 +1230,11 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(styleCase, std::string("Sentence Case") + SC("^K.", "Alt+K, ."), [this](void) { InjectChord(CTRL_K, '.'); });
 
     mMenu.AddSeparator(style);
-    mMenu.AddSubItem(style, "Settings", none, false);
 
     // ------------------------------ Layout ------------------------------
     int layout = mMenu.AddMenu("Layout", 'L');
     mMenu.AddSubItem(layout, LB("&Center Line", "&Center Paragraph") + SC("^OC", "Alt+O, C"), [this](void) { InjectChord(CTRL_O, 'c'); });
-    mMenu.AddSubItem(layout, LB("R&ight Align Line", "R&ight Align Paragraph") + SC("^OJ", "Alt+O, ]"), [this](void) { InjectChord(CTRL_O, ']'); });
+    mMenu.AddSubItem(layout, LB("R&ight Align Line", "R&ight Align Paragraph") + SC("^O]", "Alt+O, ]"), [this](void) { InjectChord(CTRL_O, ']'); });
     mMenu.AddSeparator(layout);
     mMenu.AddSubItem(layout, std::string("&Left Align Para") + SC("^O<", "Ctrl+L"), [this](void) { InjectChord(CTRL_O, '<'); });
     mMenu.AddSubItem(layout, std::string("Center &Paragraph") + SC("^O=", "Ctrl+E"), [this](void) { InjectChord(CTRL_O, '='); });
@@ -1248,8 +1246,16 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(layout, std::string("Pa&ge...") + SC("^OY", "Alt+O, Y"), [this](void) { InjectChord(CTRL_O, 'Y'); });
 
     int layoutHF = mMenu.AddSubMenu(layout, "&Headers/Footers");
-    mMenu.AddSubMenuItem(layoutHF, std::string("Header...") + SC(".he", ""), none, false);
-    mMenu.AddSubMenuItem(layoutHF, std::string("Footer...") + SC(".fo", ""), none, false);
+    mMenu.AddSubMenuItem(layoutHF, std::string("Header...") + SC(".he", ""), [this](void) {
+        mEditor->MoveCursorStartLine();
+        mEditor->GetDocument()->MaybeInsertHardReturn();
+        mEditor->GetDocument()->Insert(".he\n");
+    });
+    mMenu.AddSubMenuItem(layoutHF, std::string("Footer...") + SC(".fo", ""), [this](void) {
+        mEditor->MoveCursorStartLine();
+        mEditor->GetDocument()->MaybeInsertHardReturn();
+        mEditor->GetDocument()->Insert(".fo\n");
+    });
 
     mMenu.AddSubItem(layout, std::string("Page Numbering...") + SC("^O#", ""), none, false);
     mMenu.AddSubItem(layout, std::string("Line Numbering...") + SC(".l#", ""), none, false);
@@ -1261,7 +1267,11 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Option Hyphen") + SC("^OE", ""), none, false);
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Vertically Center") + SC("^OV", ""), none, false);
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Word Together") + SC("^PO", ""), none, false);
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Page") + SC(".cp", ""), none, false);
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Page") + SC(".cp", ""), [this](void) {
+        mEditor->MoveCursorStartLine();
+        mEditor->GetDocument()->MaybeInsertHardReturn();
+        mEditor->GetDocument()->Insert(".cp\n");
+    });
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Column") + SC(".cc", ""), none, false);
 
     // ----------------------------- Utilities ----------------------------
@@ -1272,10 +1282,8 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(utilSpell, std::string("Rest of Document") + SC("^QL", ""), [this](void) { mEditor->SpellCheckDocument(); });
     mMenu.AddSubMenuItem(utilSpell, std::string("Word") + SC("^QN", ""), [this](void) { mEditor->SpellCheckWord(); });
     mMenu.AddSubMenuItem(utilSpell, std::string("Type Word...") + SC("^QO", ""), none, false);
-    mMenu.AddSubMenuItem(utilSpell, std::string("Rest of Notes") + SC("^ONL", ""), none, false);
 
     mMenu.AddSubItem(util, std::string("&Thesaurus") + SC("^QJ", ""), none, false);
-    mMenu.AddSubItem(util, std::string("&Language Change...") + SC(".la", ""), none, false);
     mMenu.AddSeparator(util);
     mMenu.AddSubItem(util, std::string("&Inset") + SC("^P&", ""), none, false);
     mMenu.AddSubItem(util, std::string("&Calculator") + SC("^QM", ""), none, false);
@@ -1316,10 +1324,8 @@ void cWSWordTsar::BuildMenus(void)
 
     int utilReformat = mMenu.AddSubMenu(util, "&Reformat");
     mMenu.AddSubMenuItem(utilReformat, std::string("Rest of Document") + SC("^QU", "Alt+Q, U"), [this](void) { InjectChord(CTRL_Q, 'u'); });
-    mMenu.AddSubMenuItem(utilReformat, std::string("Paragraph") + SC("^B", ""), none, false);
     mMenu.AddSubMenuItem(utilReformat, std::string("Rest of Notes") + SC("^ONU", ""), none, false);
 
-    mMenu.AddSubItem(util, std::string("Repeat Keystroke") + SC("^QQ", ""), none, false);
     mMenu.AddSeparator(util);
     mMenu.AddSubItem(util, std::string("System Preferences"), [this](void) { OpenSystemPreferences(); });
 
@@ -3030,9 +3036,7 @@ void cWSWordTsar::ShowOpeningHelp(void)
 /// the caller from the file browser selection) is loaded and laid out,
 /// every .tc/.tc1-.tc9 entry in it is collected and resolved to a real
 /// page number, and each non-empty table is written to its own file. The
-/// first file written is then opened for editing, matching the manual's
-/// own "you can edit the table of contents file to make any formatting
-/// changes or corrections."
+/// first file written is then opened for editing.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::GenerateTOCFromFile(void)
@@ -3102,11 +3106,9 @@ void cWSWordTsar::GenerateIndexFromFile(void)
 /// @brief
 /// Real WS7's own Insert -> Index/TOC Entry -> TOC Entry command (classic
 /// .tc). Prompts for the entire line of text to appear in the table of
-/// contents -- per the manual, extra leading spaces indent it, and a bare
-/// # marks where the real page number goes at generation time -- then
-/// inserts ".tc <text>" as its own line right before the current one,
-/// matching the manual's own "WordStar inserts the .tc dot command
-/// followed by the text."
+/// contents -- extra leading spaces indent it, and a bare # marks where
+/// the real page number goes at generation time -- then inserts
+/// ".tc <text>" as its own line right before the current one.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::InsertTOCEntry(void)

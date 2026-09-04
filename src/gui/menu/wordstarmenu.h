@@ -115,9 +115,7 @@ public:
 
     // Edit Menu - Notes
     QString GetEditEditNoteLabel(void) const override;
-    QString GetEditNoteStartNumberLabel(void) const override;
     QString GetEditNoteConvertLabel(void) const override;
-    QString GetEditNoteConvertPrintLabel(void) const override;
     QString GetEditNoteEndnoteLocationLabel(void) const override;
 
     // Edit Menu - Settings
@@ -135,7 +133,6 @@ public:
 
     // Insert Menu - Basic
     QString GetInsertPageBreakLabel(void) const override;
-    QString GetInsertColumnBreakLabel(void) const override;
     QString GetInsertDateLabel(void) const override;
 
     // Insert Menu - Other Values
@@ -144,7 +141,6 @@ public:
     QString GetInsertMathExpressionLabel(void) const override;
     QString GetInsertMathDollarLabel(void) const override;
     QString GetInsertFilenameLabel(void) const override;
-    QString GetInsertDriveLabel(void) const override;
     QString GetInsertDirectoryLabel(void) const override;
     QString GetInsertPathLabel(void) const override;
 
@@ -152,7 +148,6 @@ public:
     QString GetInsertVarDateLabel(void) const override;
     QString GetInsertVarTimeLabel(void) const override;
     QString GetInsertVarPageLabel(void) const override;
-    QString GetInsertVarLineLabel(void) const override;
     QString GetInsertVarFilenameLabel(void) const override;
     QString GetInsertVarDriveLabel(void) const override;
     QString GetInsertVarDirectoryLabel(void) const override;
@@ -174,7 +169,6 @@ public:
     // Insert Menu - Index/TOC
     QString GetInsertTOCEntryLabel(void) const override;
     QString GetInsertIndexEntryLabel(void) const override;
-    QString GetInsertMarkTextForIndexLabel(void) const override;
     QString GetInsertDotLeaderLabel(void) const override;
     QString GetInsertParOutlineNumberLabel(void) const override;
 
@@ -202,7 +196,6 @@ public:
     QString GetStyleUppercaseLabel(void) const override;
     QString GetStyleLowercaseLabel(void) const override;
     QString GetStyleSentenceCaseLabel(void) const override;
-    QString GetStyleSettingsLabel(void) const override;
 
     // Layout Menu - Line Alignment
     QString GetLayoutCenterLineLabel(void) const override;
@@ -239,9 +232,7 @@ public:
     QString GetUtilSpellCheckRestLabel(void) const override;
     QString GetUtilSpellCheckWordLabel(void) const override;
     QString GetUtilSpellCheckTypeLabel(void) const override;
-    QString GetUtilSpellCheckNotesLabel(void) const override;
     QString GetUtilThesaurusLabel(void) const override;
-    QString GetUtilLanguageChangeLabel(void) const override;
 
     // Utilities Menu - Tools
     QString GetUtilInsetLabel(void) const override;
@@ -277,9 +268,7 @@ public:
 
     // Utilities Menu - Reformat
     QString GetUtilReformatRestLabel(void) const override;
-    QString GetUtilReformatParaLabel(void) const override;
     QString GetUtilReformatNotesLabel(void) const override;
-    QString GetUtilRepeatKeyLabel(void) const override;
 
     // Help Menu
     QString GetHelpAboutLabel(void) const override;

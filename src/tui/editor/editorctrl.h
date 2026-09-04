@@ -110,6 +110,7 @@ public:
     // ---- Pure virtual: file operations ----
     void LayoutDocument(bool force) override;
     bool LoadFile(const std::string& filename) override;
+    bool InsertFileAtCursor(const std::string& filename) override;
     bool SaveFile(const std::string& filename) override;
     void EmergencySaveFile(char *text) override;
     void AutoSaveBackup(void);

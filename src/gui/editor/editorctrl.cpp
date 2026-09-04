@@ -3550,6 +3550,13 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
             FindAgain() ;
             handled = true ;
         }
+        else if (meta && !ctrl && !alt && key == Qt::Key_Q)
+        {
+            // macOS's own Quit convention (real WS7 has no such command --
+            // this is a Modern/CUA-only accelerator, unlike the others above).
+            ExitApplication() ;
+            handled = true ;
+        }
         else
         switch (key)
         {
@@ -6679,6 +6686,86 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
 
         // Emit signal for file loaded (signal not yet implemented)
         // emit FileLoaded(qfilename);
+    }
+
+    return success;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  std::string filename [in] - File to insert
+///
+/// @return bool - true if inserted successfully
+///
+/// @brief
+/// Insert a file's content at the cursor, into the document already open --
+/// real WordStar 7's ^KR / Insert > File. Detects file type the same way
+/// LoadFile() does, but skips LoadFile()'s Clear() and cursor/state reset:
+/// each file reader's own LoadFile() is just a sequence of cDocument::Insert()
+/// calls, so run against the document exactly as it is now, it inserts here
+/// instead of replacing it.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorCtrl::InsertFileAtCursor(const std::string& filename)
+{
+    if (filename.empty())
+    {
+        return false;
+    }
+
+    if (!mDocument)
+    {
+        return false;
+    }
+
+    cFile* fileReader = nullptr;
+
+    cWordstarFile wsCheck(this);
+    cRTFFile rtfCheck(this);
+    cDOCXFile docxCheck(this);
+
+    if (wsCheck.CheckType(filename))
+    {
+        fileReader = new cWordstarFile(this);
+    }
+    else if (rtfCheck.CheckType(filename))
+    {
+        fileReader = new cRTFFile(this);
+    }
+    else if (docxCheck.CheckType(filename))
+    {
+        fileReader = new cDOCXFile(this);
+    }
+    else
+    {
+        fileReader = new cTextFile(this);
+    }
+
+    mDocument->SetLoading(true);
+    mDocument->BeginUndoGroup();
+
+    StartProgress("Inserting...");
+    QProgressDialog progress("Inserting file...", "Cancel", 0, 100, this);
+    progress.setWindowModality(Qt::ApplicationModal);
+    mProgress = &progress;
+    progress.show();
+
+    bool success = fileReader->LoadFile(filename);
+
+    mProgress = nullptr;
+    StopProgress();
+
+    mDocument->EndUndoGroup();
+    mDocument->SetLoading(false);
+
+    delete fileReader;
+
+    if (success)
+    {
+        LayoutDocument(true);
+        CalculateCaretPosition();
+        ScrollIntoView();
+        update();
     }
 
     return success;

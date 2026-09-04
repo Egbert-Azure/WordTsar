@@ -65,7 +65,7 @@
 
 QString cWordStarMenuProvider::GetFileOpenLabel(void) const
 {
-    return "&Open/Read\t^KR";
+    return "&Open/Read";
 }
 
 QString cWordStarMenuProvider::GetFileSaveLabel(void) const
@@ -395,20 +395,11 @@ QString cWordStarMenuProvider::GetEditEditNoteLabel(void) const
     return "Edit &Note\t^OND";
 }
 
-QString cWordStarMenuProvider::GetEditNoteStartNumberLabel(void) const
-{
-    return "&Starting Number for Note...";
-}
-
 QString cWordStarMenuProvider::GetEditNoteConvertLabel(void) const
 {
     return "&Convert Note...\t^ONV";
 }
 
-QString cWordStarMenuProvider::GetEditNoteConvertPrintLabel(void) const
-{
-    return "Convert at &Print...\t.cv";
-}
 
 QString cWordStarMenuProvider::GetEditNoteEndnoteLocationLabel(void) const
 {
@@ -477,11 +468,6 @@ QString cWordStarMenuProvider::GetInsertPageBreakLabel(void) const
     return "&Page Break\t.pa";
 }
 
-QString cWordStarMenuProvider::GetInsertColumnBreakLabel(void) const
-{
-    return "&Column Break\t.cb";
-}
-
 QString cWordStarMenuProvider::GetInsertDateLabel(void) const
 {
     return "&Today's Date Value\t^M@";
@@ -516,10 +502,6 @@ QString cWordStarMenuProvider::GetInsertFilenameLabel(void) const
     return "Current &Filename\t^M*";
 }
 
-QString cWordStarMenuProvider::GetInsertDriveLabel(void) const
-{
-    return "Current &Drive\t^M:";
-}
 
 QString cWordStarMenuProvider::GetInsertDirectoryLabel(void) const
 {
@@ -550,10 +532,6 @@ QString cWordStarMenuProvider::GetInsertVarPageLabel(void) const
     return "&Page\t&&#&&";
 }
 
-QString cWordStarMenuProvider::GetInsertVarLineLabel(void) const
-{
-    return "&Line\t&&_&&";
-}
 
 QString cWordStarMenuProvider::GetInsertVarFilenameLabel(void) const
 {
@@ -640,11 +618,6 @@ QString cWordStarMenuProvider::GetInsertTOCEntryLabel(void) const
 QString cWordStarMenuProvider::GetInsertIndexEntryLabel(void) const
 {
     return "&Index Entry...\t^ONI";
-}
-
-QString cWordStarMenuProvider::GetInsertMarkTextForIndexLabel(void) const
-{
-    return "&Mark Text for Index\t^PK";
 }
 
 QString cWordStarMenuProvider::GetInsertDotLeaderLabel(void) const
@@ -764,10 +737,6 @@ QString cWordStarMenuProvider::GetStyleSentenceCaseLabel(void) const
     return "&Sentence Case\t^K.";
 }
 
-QString cWordStarMenuProvider::GetStyleSettingsLabel(void) const
-{
-    return "S&ettings";
-}
 
 /////////////////////////////////////////////////////////////////////////////
 // Layout Menu - Line Alignment
@@ -780,7 +749,7 @@ QString cWordStarMenuProvider::GetLayoutCenterLineLabel(void) const
 
 QString cWordStarMenuProvider::GetLayoutRightAlignLabel(void) const
 {
-    return "R&ight Align Line\t^OJ";
+    return "R&ight Align Line\t^O]";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -914,19 +883,9 @@ QString cWordStarMenuProvider::GetUtilSpellCheckTypeLabel(void) const
     return "&Type Word...\t^QO";
 }
 
-QString cWordStarMenuProvider::GetUtilSpellCheckNotesLabel(void) const
-{
-    return "Rest of &Notes\t^ONL";
-}
-
 QString cWordStarMenuProvider::GetUtilThesaurusLabel(void) const
 {
     return "&Thesaurus\t^QJ";
-}
-
-QString cWordStarMenuProvider::GetUtilLanguageChangeLabel(void) const
-{
-    return "Language Change...\t.la";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1080,19 +1039,10 @@ QString cWordStarMenuProvider::GetUtilReformatRestLabel(void) const
     return "&Rest of Document\t^QU";
 }
 
-QString cWordStarMenuProvider::GetUtilReformatParaLabel(void) const
-{
-    return "&Paragraph\t^B";
-}
 
 QString cWordStarMenuProvider::GetUtilReformatNotesLabel(void) const
 {
     return "Resst of &Notes\t^ONU";
-}
-
-QString cWordStarMenuProvider::GetUtilRepeatKeyLabel(void) const
-{
-    return "R&epeat Next Keystroke\t^QQ";
 }
 
 /////////////////////////////////////////////////////////////////////////////

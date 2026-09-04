@@ -398,6 +398,7 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
     mainLayout->setContentsMargins(0, 0, 0, 0) ;
     mScrollbar = new QScrollBar(mMainEditorWidget) ;
     mEditor = new cEditorCtrl(mMainEditorWidget) ;
+    mMenuInput = new cWordStarInput(mEditor) ;
     mainLayout->addWidget(mEditor) ;
     mainLayout->addWidget(mScrollbar) ;
     mSplitter->addWidget(mMainEditorWidget) ;
@@ -501,6 +502,7 @@ cWordTsar::~cWordTsar(void)
     // Clean up menu provider
     delete mMenuProvider ;
 
+    delete mMenuInput ;
 }
 
 
@@ -1624,12 +1626,8 @@ GotoScrollDownAction->setEnabled(false) ;
     QAction *EditNoteAction = new QAction(mMenuProvider->GetEditEditNoteLabel(), mMenuBar) ;
 EditNoteAction->setEnabled(false) ;
 
-    QAction *NoteStartNumberAction = new QAction(mMenuProvider->GetEditNoteStartNumberLabel(), mMenuBar) ;
-NoteStartNumberAction->setEnabled(false) ;
     QAction *NoteConvertAction = new QAction(mMenuProvider->GetEditNoteConvertLabel(), mMenuBar) ;
 NoteConvertAction->setEnabled(false) ;
-    QAction *NoteCovertPrintAction = new QAction(mMenuProvider->GetEditNoteConvertPrintLabel(), mMenuBar) ;
-NoteCovertPrintAction->setEnabled(false) ;
     QAction *NotEndnoteLocationAction = new QAction(mMenuProvider->GetEditNoteEndnoteLocationLabel(), mMenuBar) ;
 NotEndnoteLocationAction->setEnabled(false) ;
 
@@ -1712,9 +1710,7 @@ CloseDialogAction->setEnabled(false) ;
     editmenu->addAction(EditNoteAction) ;
 
     QMenu *NoteOptionsMenu = editmenu->addMenu("No&te Options") ;
-    NoteOptionsMenu->addAction(NoteStartNumberAction) ;
     NoteOptionsMenu->addAction(NoteConvertAction) ;
-    NoteOptionsMenu->addAction(NoteCovertPrintAction) ;
     NoteOptionsMenu->addAction(NotEndnoteLocationAction) ;
 
     QMenu *EditSettingsMenu = editmenu->addMenu("Ed&iting Settings") ;
@@ -1776,9 +1772,7 @@ CloseDialogAction->setEnabled(false) ;
     connect(SetMarker9Action, &QAction::triggered, this, &cWordTsar::Set9) ;
     connect(SetMarker0Action, &QAction::triggered, this, &cWordTsar::Set0) ;
     connect(EditNoteAction, &QAction::triggered, this, &cWordTsar::EditNote) ;
-    connect(NoteStartNumberAction, &QAction::triggered, this, &cWordTsar::NoteStartNumber) ;
     connect(NoteConvertAction, &QAction::triggered, this, &cWordTsar::NoteCOnvert) ;
-    connect(NoteCovertPrintAction, &QAction::triggered, this, &cWordTsar::NoteConcertForPrint) ;
     connect(NotEndnoteLocationAction, &QAction::triggered, this, &cWordTsar::NoteEndNoteLocation) ;
     connect(ColumnBlockModeAction, &QAction::triggered, this, &cWordTsar::ColumnBlockMode) ;
     connect(ColumnReplaceModeAction, &QAction::triggered, this, &cWordTsar::ColumnReplaceMode) ;
@@ -1812,8 +1806,6 @@ CloseDialogAction->setEnabled(false) ;
 
     // Insert menu
     QAction *PageBreakAction = new QAction(mMenuProvider->GetInsertPageBreakLabel(), mMenuBar) ;
-    QAction *ColumnBreakAction = new QAction(mMenuProvider->GetInsertColumnBreakLabel(), mMenuBar) ;
-ColumnBreakAction->setEnabled(false) ;
     QAction *DateAction = new QAction(mMenuProvider->GetInsertDateLabel(), mMenuBar) ;
 
     QAction *TimeAction = new QAction(mMenuProvider->GetInsertTimeLabel(), mMenuBar) ;
@@ -1824,14 +1816,12 @@ ExpressionAction->setEnabled(false) ;
     QAction *DollarAction = new QAction(mMenuProvider->GetInsertMathDollarLabel(), mMenuBar) ;
 DollarAction->setEnabled(false) ;
     QAction *FilenameAction = new QAction(mMenuProvider->GetInsertFilenameLabel(), mMenuBar) ;
-    QAction *DriveAction = new QAction(mMenuProvider->GetInsertDriveLabel(), mMenuBar) ;
     QAction *DirectoryAction = new QAction(mMenuProvider->GetInsertDirectoryLabel(), mMenuBar) ;
     QAction *PathAction = new QAction(mMenuProvider->GetInsertPathLabel(), mMenuBar) ;
 
     QAction *VarDateAction = new QAction(mMenuProvider->GetInsertVarDateLabel(), mMenuBar) ;
     QAction *VarTimeAction = new QAction(mMenuProvider->GetInsertVarTimeLabel(), mMenuBar) ;
     QAction *VarPageAction = new QAction(mMenuProvider->GetInsertVarPageLabel(), mMenuBar) ;
-    QAction *VarLineAction = new QAction(mMenuProvider->GetInsertVarLineLabel(), mMenuBar) ;
     QAction *VarFileAction = new QAction(mMenuProvider->GetInsertVarFilenameLabel(), mMenuBar) ;
     QAction *VarDriveAction = new QAction(mMenuProvider->GetInsertVarDriveLabel(), mMenuBar) ;
     QAction *VarDirAction = new QAction(mMenuProvider->GetInsertVarDirectoryLabel(), mMenuBar) ;
@@ -1858,8 +1848,6 @@ NoteAnnotationAction->setEnabled(false) ;
 
     QAction *TOCEntryAction = new QAction(mMenuProvider->GetInsertTOCEntryLabel(), mMenuBar) ;
     QAction *IndexEntryAction = new QAction(mMenuProvider->GetInsertIndexEntryLabel(), mMenuBar) ;
-    QAction *MarkTextforIndexAction = new QAction(mMenuProvider->GetInsertMarkTextForIndexLabel(), mMenuBar) ;
-MarkTextforIndexAction->setEnabled(false) ;
     QAction *DotLeaderAction = new QAction(mMenuProvider->GetInsertDotLeaderLabel(), mMenuBar) ;
 DotLeaderAction->setEnabled(false) ;
 
@@ -1870,7 +1858,6 @@ ParOutlineNumberAction->setEnabled(false) ;
 
 
     insertmenu->addAction(PageBreakAction) ;
-    insertmenu->addAction(ColumnBreakAction) ;
     insertmenu->addSeparator() ;
     insertmenu->addAction(DateAction) ;
 
@@ -1880,7 +1867,6 @@ ParOutlineNumberAction->setEnabled(false) ;
     OtherValueMenu->addAction(ExpressionAction) ;
     OtherValueMenu->addAction(DollarAction) ;
     OtherValueMenu->addAction(FilenameAction) ;
-    OtherValueMenu->addAction(DriveAction) ;
     OtherValueMenu->addAction(DirectoryAction) ;
     OtherValueMenu->addAction(PathAction) ;
 
@@ -1888,7 +1874,6 @@ ParOutlineNumberAction->setEnabled(false) ;
     VariableMenu->addAction(VarDateAction) ;
     VariableMenu->addAction(VarTimeAction) ;
     VariableMenu->addAction(VarPageAction) ;
-    VariableMenu->addAction(VarLineAction) ;
     VariableMenu->addAction(VarFileAction) ;
     VariableMenu->addAction(VarDriveAction) ;
     VariableMenu->addAction(VarDirAction) ;
@@ -1912,33 +1897,29 @@ ParOutlineNumberAction->setEnabled(false) ;
     QMenu *IndexMenu = insertmenu->addMenu("&Index/TOC Entry") ;
     IndexMenu->addAction(TOCEntryAction) ;
     IndexMenu->addAction(IndexEntryAction) ;
-    IndexMenu->addAction(MarkTextforIndexAction) ;
     IndexMenu->addAction(DotLeaderAction) ;
 
     insertmenu->addAction(ParOutlineNumberAction) ;
 
     connect(PageBreakAction, &QAction::triggered, this, &cWordTsar::PageBreak) ;
-    connect(ColumnBreakAction, &QAction::triggered, this, &cWordTsar::ColumnBreak) ;
     connect(DateAction, &QAction::triggered, this, &cWordTsar::InsertDate) ;
     connect(TimeAction, &QAction::triggered, this, &cWordTsar::InsertTime) ;
     connect(ResultAction, &QAction::triggered, this, &cWordTsar::MathResult) ;
     connect(ExpressionAction, &QAction::triggered, this, &cWordTsar::MathExpression) ;
     connect(DollarAction, &QAction::triggered, this, &cWordTsar::MathDollar) ;
     connect(FilenameAction, &QAction::triggered, this, &cWordTsar::Filename) ;
-    connect(DriveAction, &QAction::triggered, this, &cWordTsar::Drive) ;
     connect(DirectoryAction, &QAction::triggered, this, &cWordTsar::Directory) ;
     connect(PathAction, &QAction::triggered, this, &cWordTsar::Path) ;
     connect(VarDateAction, &QAction::triggered, this, &cWordTsar::VarDate) ;
     connect(VarTimeAction, &QAction::triggered, this, &cWordTsar::VarTime) ;
     connect(VarPageAction, &QAction::triggered, this, &cWordTsar::VarPage) ;
-    connect(VarLineAction, &QAction::triggered, this, &cWordTsar::VarLine) ;
     connect(VarFileAction, &QAction::triggered, this, &cWordTsar::VarFilename) ;
     connect(VarDriveAction, &QAction::triggered, this, &cWordTsar::VarDrive) ;
     connect(VarDirAction, &QAction::triggered, this, &cWordTsar::VarDirectory) ;
     connect(VarPathAction, &QAction::triggered, this, &cWordTsar::VarPath) ;
     connect(VarWordCountAction, &QAction::triggered, this, &cWordTsar::VarWordCount) ;
     connect(ExtendedCharAction, &QAction::triggered, this, &cWordTsar::ExtendedChar) ;
-    connect(FileAction, &QAction::triggered, this, &cWordTsar::Open) ;
+    connect(FileAction, &QAction::triggered, this, &cWordTsar::InsertFile) ;
     connect(FileAtPrintAction, &QAction::triggered, this, &cWordTsar::FileAtPrint) ;
     connect(GraphicAction, &QAction::triggered, this, &cWordTsar::Graphic) ;
     connect(NoteCommentAction, &QAction::triggered, this, &cWordTsar::NoteComment) ;
@@ -1947,7 +1928,6 @@ ParOutlineNumberAction->setEnabled(false) ;
     connect(NoteAnnotationAction, &QAction::triggered, this, &cWordTsar::NoteAnnotation) ;
     connect(TOCEntryAction, &QAction::triggered, this, &cWordTsar::TOCEntry) ;
     connect(IndexEntryAction, &QAction::triggered, this, &cWordTsar::IndexEntry) ;
-    connect(MarkTextforIndexAction, &QAction::triggered, this, &cWordTsar::MarkIndex) ;
     connect(DotLeaderAction, &QAction::triggered, this, &cWordTsar::DotLeader) ;
     connect(ParOutlineNumberAction, &QAction::triggered, this, &cWordTsar::ParOutlineNumber) ;
 
@@ -1984,8 +1964,6 @@ RenameDocStyleAction->setEnabled(false) ;
     QAction *LowercaseAction = new QAction(mMenuProvider->GetStyleLowercaseLabel(), mMenuBar) ;
     QAction *SentenceCaseAction = new QAction(mMenuProvider->GetStyleSentenceCaseLabel(), mMenuBar) ;
 
-    QAction *SettingsAction = new QAction(mMenuProvider->GetStyleSettingsLabel(), mMenuBar) ;
-SettingsAction->setEnabled(false) ;
 
     stylemenu->addAction(BoldAction) ;
     stylemenu->addAction(ItalicAction) ;
@@ -2014,7 +1992,6 @@ SettingsAction->setEnabled(false) ;
     ConvertMenu->addAction(LowercaseAction) ;
     ConvertMenu->addAction(SentenceCaseAction) ;
 
-    stylemenu->addAction(SettingsAction) ;
 
     connect(BoldAction, &QAction::triggered, this, &cWordTsar::Bold) ;
     connect(ItalicAction, &QAction::triggered, this, &cWordTsar::Italics) ;
@@ -2035,7 +2012,6 @@ SettingsAction->setEnabled(false) ;
     connect(UppercaseAction, &QAction::triggered, this, &cWordTsar::Uppercase) ;
     connect(LowercaseAction, &QAction::triggered, this, &cWordTsar::Lowercase) ;
     connect(SentenceCaseAction, &QAction::triggered, this, &cWordTsar::Sentencecase) ;
-    connect(SettingsAction, &QAction::triggered, this, &cWordTsar::Settings) ;
 
     // Layout Menu
     QAction *CenterLineAction = new QAction(mMenuProvider->GetLayoutCenterLineLabel(), mMenuBar) ;
@@ -2129,13 +2105,8 @@ KeepLinesTogetherColumnAction->setEnabled(false) ;
     QAction *SpellCheckRestAction = new QAction(mMenuProvider->GetUtilSpellCheckRestLabel(), mMenuBar) ;
     QAction *SpellCheckWordAction = new QAction(mMenuProvider->GetUtilSpellCheckWordLabel(), mMenuBar) ;
     QAction *SpellCheckTypeAction = new QAction(mMenuProvider->GetUtilSpellCheckTypeLabel(), mMenuBar) ;
-SpellCheckTypeAction->setEnabled(false) ;
-    QAction *SpellCheckNotesAction = new QAction(mMenuProvider->GetUtilSpellCheckNotesLabel(), mMenuBar) ;
-SpellCheckNotesAction->setEnabled(false) ;
     QAction *ThesaurusAction = new QAction(mMenuProvider->GetUtilThesaurusLabel(), mMenuBar) ;
 ThesaurusAction->setEnabled(false) ;
-    QAction *LanguageChangeAction = new QAction(mMenuProvider->GetUtilLanguageChangeLabel(), mMenuBar) ;
-LanguageChangeAction->setEnabled(false) ;
     QAction *InsetAction = new QAction(mMenuProvider->GetUtilInsetLabel(), mMenuBar) ;
 InsetAction->setEnabled(false) ;
     QAction *CalculatorAction = new QAction(mMenuProvider->GetUtilCalculatorLabel(), mMenuBar) ;
@@ -2188,12 +2159,8 @@ DisplayAction->setEnabled(false) ;
     QAction *PrintNTimesAction = new QAction(mMenuProvider->GetUtilPrintNTimesLabel(), mMenuBar) ;
 PrintNTimesAction->setEnabled(false) ;
     QAction *ReformatRestAction = new QAction(mMenuProvider->GetUtilReformatRestLabel(), mMenuBar) ;
-    QAction *ReformatParaAction = new QAction(mMenuProvider->GetUtilReformatParaLabel(), mMenuBar) ;
-ReformatParaAction->setEnabled(false) ;
     QAction *ReformatNotesAction = new QAction(mMenuProvider->GetUtilReformatNotesLabel(), mMenuBar) ;
 ReformatNotesAction->setEnabled(false) ;
-    QAction *RepeatKeyAction = new QAction(mMenuProvider->GetUtilRepeatKeyLabel(), mMenuBar) ;
-RepeatKeyAction->setEnabled(false) ;
 
     utilitiesmenu->addAction(SpellCheckGlobalAction) ;
 
@@ -2201,10 +2168,8 @@ RepeatKeyAction->setEnabled(false) ;
     SpellMenu->addAction(SpellCheckRestAction) ;
     SpellMenu->addAction(SpellCheckWordAction) ;
     SpellMenu->addAction(SpellCheckTypeAction) ;
-    SpellMenu->addAction(SpellCheckNotesAction) ;
 
     utilitiesmenu->addAction(ThesaurusAction) ;
-    utilitiesmenu->addAction(LanguageChangeAction) ;
     utilitiesmenu->addSeparator() ;
 
     utilitiesmenu->addAction(InsetAction) ;
@@ -2246,18 +2211,14 @@ RepeatKeyAction->setEnabled(false) ;
 
     QMenu *ReformatMenu = utilitiesmenu->addMenu("&Reformat") ;
     ReformatMenu->addAction(ReformatRestAction) ;
-    ReformatMenu->addAction(ReformatParaAction) ;
     ReformatMenu->addAction(ReformatNotesAction) ;
 
-    utilitiesmenu->addAction(RepeatKeyAction) ;
 
     connect(SpellCheckGlobalAction, &QAction::triggered, this, &cWordTsar::SpellCheckGlobal) ;
     connect(SpellCheckRestAction, &QAction::triggered, this, &cWordTsar::SpellCheckRest) ;
     connect(SpellCheckWordAction, &QAction::triggered, this, &cWordTsar::SpellCheckWord) ;
     connect(SpellCheckTypeAction, &QAction::triggered, this, &cWordTsar::SpellCheckType) ;
-    connect(SpellCheckNotesAction, &QAction::triggered, this, &cWordTsar::SpellCheckNotes) ;
     connect(ThesaurusAction, &QAction::triggered, this, &cWordTsar::Thesaurus) ;
-    connect(LanguageChangeAction, &QAction::triggered, this, &cWordTsar::LanguageChange) ;
     connect(InsetAction, &QAction::triggered, this, &cWordTsar::Inset) ;
     connect(CalculatorAction, &QAction::triggered, this, &cWordTsar::Calculator) ;
     connect(BlockMathAction, &QAction::triggered, this, &cWordTsar::BlockMath) ;
@@ -2285,9 +2246,7 @@ RepeatKeyAction->setEnabled(false) ;
     connect(DisplayAction, &QAction::triggered, this, &cWordTsar::Display) ;
     connect(PrintNTimesAction, &QAction::triggered, this, &cWordTsar::PrintNTimes) ;
     connect(ReformatRestAction, &QAction::triggered, this, &cWordTsar::ReformatRest) ;
-    connect(ReformatParaAction, &QAction::triggered, this, &cWordTsar::ReformatPara) ;
     connect(ReformatNotesAction, &QAction::triggered, this, &cWordTsar::ReformatNotes) ;
-    connect(RepeatKeyAction, &QAction::triggered, this, &cWordTsar::RepeatKey) ;
 
     // System Preferences (separate from existing Preferences dialog)
     utilitiesmenu->addSeparator() ;
@@ -2319,6 +2278,20 @@ RepeatKeyAction->setEnabled(false) ;
 void cWordTsar::Open(void)
 {
     mEditor->Open() ;
+}
+
+
+void cWordTsar::InsertFile(void)
+{
+    // Real WordStar 7's ^KR / Insert > File: inserts the chosen file's
+    // content at the cursor, into the document already open -- see
+    // cEditorCtrl::InsertFileAtCursor(). Distinct from Open() above, which
+    // replaces the whole document (real WS7's "Open a document").
+    std::string filename = mEditor->PromptForLoadFile() ;
+    if (!filename.empty())
+    {
+        mEditor->InsertFileAtCursor(filename) ;
+    }
 }
 
 
@@ -2719,19 +2692,9 @@ void cWordTsar::EditNote(void)
 
 
 
-void cWordTsar::NoteStartNumber(void)
-{
-}
-
-
 void cWordTsar::NoteCOnvert(void)
 {
     mEditor->NotImplemented("^O-n-v") ;
-}
-
-
-void cWordTsar::NoteConcertForPrint(void)
-{
 }
 
 
@@ -2788,8 +2751,8 @@ void cWordTsar::ScreenSettings(void)
 
 void cWordTsar::SwitchModes(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('t') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('t') ;
 }
 
 
@@ -2943,75 +2906,61 @@ void cWordTsar::PageBreak(void)
 };
 
 
-void cWordTsar::ColumnBreak(void)
-{
-    mEditor->MoveCursorStartLine() ;
-
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".cb\n") ;
-}
-
 
 void cWordTsar::InsertDate(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('@') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('@') ;
 }
 
 
 void cWordTsar::InsertTime(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('!') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('!') ;
 }
 
 
 void cWordTsar::MathResult(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('=') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('=') ;
 }
 
 
 void cWordTsar::MathExpression(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('#') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('#') ;
 }
 
 
 void cWordTsar::MathDollar(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('$') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('$') ;
 }
 
 
 void cWordTsar::Filename(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('*') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('*') ;
 }
 
-
-void cWordTsar::Drive(void)
-{
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey(':') ;
-}
 
 
 void cWordTsar::Directory(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('.') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('.') ;
 }
 
 
 void cWordTsar::Path(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('\\') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('\\') ;
 }
 
 
@@ -3033,10 +2982,6 @@ void cWordTsar::VarPage(void)
 }
 
 
-void cWordTsar::VarLine(void)
-{
-    mEditor->InsertText("&_&") ;
-}
 
 
 void cWordTsar::VarFilename(void)
@@ -3071,8 +3016,8 @@ void cWordTsar::VarWordCount(void)
 
 void cWordTsar::ExtendedChar(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('0') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('0') ;
 }
 
 
@@ -3089,40 +3034,40 @@ void cWordTsar::FileAtPrint(void)
 void cWordTsar::Graphic(void)
 {
     // @TODO - get file via dialog
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('*') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('*') ;
 }
 
 
 void cWordTsar::NoteComment(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('n') ;
-    mEditor->mInput->HandleKey('c') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('n') ;
+    mMenuInput->HandleKey('c') ;
 }
 
 
 void cWordTsar::NoteFootnote(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('n') ;
-    mEditor->mInput->HandleKey('f') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('n') ;
+    mMenuInput->HandleKey('f') ;
 }
 
 
 void cWordTsar::NoteEndnote(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('n') ;
-    mEditor->mInput->HandleKey('e') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('n') ;
+    mMenuInput->HandleKey('e') ;
 }
 
 
 void cWordTsar::NoteAnnotation(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('n') ;
-    mEditor->mInput->HandleKey('a') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('n') ;
+    mMenuInput->HandleKey('a') ;
 }
 
 
@@ -3156,184 +3101,173 @@ void cWordTsar::IndexEntry(void)
 }
 
 
-void cWordTsar::MarkIndex(void)
-{
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('k') ;
-}
-
-
 void cWordTsar::DotLeader(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('.') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('.') ;
 }
 
 
 void cWordTsar::ParOutlineNumber(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('z') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('z') ;
 }
 
 
 void cWordTsar::Bold(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('b') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('b') ;
 }
 
 
 void cWordTsar::Italics(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('y') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('y') ;
 }
 
 
 void cWordTsar::Underline(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('s') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('s') ;
 }
 
 
 void cWordTsar::font(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('=') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('=') ;
 }
 
 
 void cWordTsar::Strikeout(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('x') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('x') ;
 }
 
 
 void cWordTsar::Subscript(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('v') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('v') ;
 }
 
 
 void cWordTsar::Superscript(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('t') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('t') ;
 }
 
 
 void cWordTsar::DoubleStrike(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('d') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('d') ;
 }
 
 
 void cWordTsar::Color(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('-') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('-') ;
 }
 
 
 void cWordTsar::SelectParStyle(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('f') ;
-    mEditor->mInput->HandleKey('s') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('f') ;
+    mMenuInput->HandleKey('s') ;
 }
 
 
 void cWordTsar::ReturntoPrevStyle(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('f') ;
-    mEditor->mInput->HandleKey('p') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('f') ;
+    mMenuInput->HandleKey('p') ;
 }
 
 
 void cWordTsar::DefineParStyle(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('f') ;
-    mEditor->mInput->HandleKey('d') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('f') ;
+    mMenuInput->HandleKey('d') ;
 }
 
 
 void cWordTsar::CopyStyletoLibrary(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('f') ;
-    mEditor->mInput->HandleKey('o') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('f') ;
+    mMenuInput->HandleKey('o') ;
 }
 
 
 void cWordTsar::DeleteLibraryStyle(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('f') ;
-    mEditor->mInput->HandleKey('y') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('f') ;
+    mMenuInput->HandleKey('y') ;
 }
 
 
 void cWordTsar::RenameLibraryStyle(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('f') ;
-    mEditor->mInput->HandleKey('r') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('f') ;
+    mMenuInput->HandleKey('r') ;
 }
 
 
 void cWordTsar::RenameDocStyle(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('f') ;
-    mEditor->mInput->HandleKey('e') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('f') ;
+    mMenuInput->HandleKey('e') ;
 }
 
 
 void cWordTsar::Uppercase(void)
 {
-    mEditor->mInput->HandleKey(CTRL_K) ;
-    mEditor->mInput->HandleKey('\"') ;
+    mMenuInput->HandleKey(CTRL_K) ;
+    mMenuInput->HandleKey('\"') ;
 }
 
 
 void cWordTsar::Lowercase(void)
 {
-    mEditor->mInput->HandleKey(CTRL_K) ;
-    mEditor->mInput->HandleKey('\'') ;
+    mMenuInput->HandleKey(CTRL_K) ;
+    mMenuInput->HandleKey('\'') ;
 }
 
 
 void cWordTsar::Sentencecase(void)
 {
-    mEditor->mInput->HandleKey(CTRL_K) ;
-    mEditor->mInput->HandleKey('.') ;
+    mMenuInput->HandleKey(CTRL_K) ;
+    mMenuInput->HandleKey('.') ;
 }
 
 
-void cWordTsar::Settings(void)
-{
-    // @TODO implement
-}
 
 
 void cWordTsar::CenterLine(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('c') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('c') ;
 }
 
 
 void cWordTsar::RightAlign(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey(']') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey(']') ;
 }
 
 
@@ -3363,22 +3297,22 @@ void cWordTsar::JustifyParagraph(void)
 
 void cWordTsar::RulerLine(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('l') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('l') ;
 }
 
 
 void cWordTsar::Columns(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('U') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('U') ;
 }
 
 
 void cWordTsar::Page(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('Y') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('Y') ;
 }
 
 
@@ -3402,8 +3336,8 @@ void cWordTsar::Footer(void)
 
 void cWordTsar::PageNumbering(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('#') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('#') ;
 }
 
 
@@ -3418,43 +3352,43 @@ void cWordTsar::LineNumbering(void)
 
 void cWordTsar::Alignment(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('s') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('s') ;
 }
 
 
 void cWordTsar::OverprintChar(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('H') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('H') ;
 }
 
 
 void cWordTsar::OverprintLine(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey(HARD_RETURN) ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey(HARD_RETURN) ;
 }
 
 
 void cWordTsar::OptionalHyphen(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('e') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('e') ;
 }
 
 
 void cWordTsar::VerticalCenter(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('v') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('v') ;
 }
 
 
 void cWordTsar::KeepWordsTogether(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('O') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('O') ;
 }
 
 
@@ -3478,148 +3412,132 @@ void cWordTsar::KeepLinesTogetherColumn(void)
 
 void cWordTsar::SpellCheckGlobal(void)
 {
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('r') ;
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('l') ;
+    mMenuInput->HandleKey(CTRL_Q) ;
+    mMenuInput->HandleKey('r') ;
+    mMenuInput->HandleKey(CTRL_Q) ;
+    mMenuInput->HandleKey('l') ;
 }
 
 
 void cWordTsar::SpellCheckRest(void)
 {
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('l') ;
+    mMenuInput->HandleKey(CTRL_Q) ;
+    mMenuInput->HandleKey('l') ;
 }
 
 
 void cWordTsar::SpellCheckWord(void)
 {
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('N') ;
+    mMenuInput->HandleKey(CTRL_Q) ;
+    mMenuInput->HandleKey('N') ;
 }
 
 
 void cWordTsar::SpellCheckType(void)
 {
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('o') ;
-}
-
-
-void cWordTsar::SpellCheckNotes(void)
-{
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('O') ;
-    mEditor->mInput->HandleKey('L') ;
+    mMenuInput->HandleKey(CTRL_Q) ;
+    mMenuInput->HandleKey('o') ;
 }
 
 
 void cWordTsar::Thesaurus(void)
 {
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('j') ;
+    mMenuInput->HandleKey(CTRL_Q) ;
+    mMenuInput->HandleKey('j') ;
 }
 
-
-void cWordTsar::LanguageChange(void)
-{
-    mEditor->MoveCursorStartLine() ;
-
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".la\n") ;
-}
 
 
 void cWordTsar::Inset(void)
 {
-    mEditor->mInput->HandleKey(CTRL_P) ;
-    mEditor->mInput->HandleKey('&') ;
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('&') ;
 }
 
 
 void cWordTsar::Calculator(void)
 {
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('M') ;
+    mMenuInput->HandleKey(CTRL_Q) ;
+    mMenuInput->HandleKey('M') ;
 }
 
 
 void cWordTsar::BlockMath(void)
 {
-    mEditor->mInput->HandleKey(CTRL_K) ;
-    mEditor->mInput->HandleKey('m') ;
+    mMenuInput->HandleKey(CTRL_K) ;
+    mMenuInput->HandleKey('m') ;
 }
 
 
 void cWordTsar::SortBlockAsc(void)
 {
-    mEditor->mInput->HandleKey(CTRL_K) ;
-    mEditor->mInput->HandleKey('z') ;
-    mEditor->mInput->HandleKey('a') ;
+    mMenuInput->HandleKey(CTRL_K) ;
+    mMenuInput->HandleKey('z') ;
+    mMenuInput->HandleKey('a') ;
 }
 
 
 void cWordTsar::SortBlockDes(void)
 {
-    mEditor->mInput->HandleKey(CTRL_K) ;
-    mEditor->mInput->HandleKey('z') ;
-    mEditor->mInput->HandleKey('d') ;
+    mMenuInput->HandleKey(CTRL_K) ;
+    mMenuInput->HandleKey('z') ;
+    mMenuInput->HandleKey('d') ;
 }
 
 
 void cWordTsar::WordCount(void)
 {
-    mEditor->mInput->HandleKey(CTRL_K) ;
-    mEditor->mInput->HandleKey('?') ;
+    mMenuInput->HandleKey(CTRL_K) ;
+    mMenuInput->HandleKey('?') ;
 }
 
 
 void cWordTsar::PlayMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('p') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('p') ;
 }
 
 
 void cWordTsar::RecordMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('r') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('r') ;
 }
 
 
 void cWordTsar::EditMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('D') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('D') ;
 }
 
 
 void cWordTsar::SingleStep(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('s') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('s') ;
 }
 
 
 void cWordTsar::CopyMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('O') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('O') ;
 }
 
 
 void cWordTsar::DeleteMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('y') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('y') ;
 }
 
 
 void cWordTsar::RenameMacro(void)
 {
-    mEditor->mInput->HandleKey(CTRL_M) ;
-    mEditor->mInput->HandleKey('e') ;
+    mMenuInput->HandleKey(CTRL_M) ;
+    mMenuInput->HandleKey('e') ;
 }
 
 
@@ -3742,27 +3660,18 @@ void cWordTsar::PrintNTimes(void)
 
 void cWordTsar::ReformatRest(void)
 {
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('u') ;
+    mMenuInput->HandleKey(CTRL_Q) ;
+    mMenuInput->HandleKey('u') ;
 }
 
 
-void cWordTsar::ReformatPara(void)
-{
-    mEditor->mInput->HandleKey(CTRL_B) ;
-}
 
 
 void cWordTsar::ReformatNotes(void)
 {
-    mEditor->mInput->HandleKey(CTRL_O) ;
-    mEditor->mInput->HandleKey('n') ;
-    mEditor->mInput->HandleKey('u') ;
+    mMenuInput->HandleKey(CTRL_O) ;
+    mMenuInput->HandleKey('n') ;
+    mMenuInput->HandleKey('u') ;
 }
 
 
-void cWordTsar::RepeatKey(void)
-{
-    mEditor->mInput->HandleKey(CTRL_Q) ;
-    mEditor->mInput->HandleKey('q') ;
-}

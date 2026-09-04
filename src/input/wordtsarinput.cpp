@@ -269,9 +269,9 @@ const char *LookupKChordHelp(char lower)
                    "Use ^Q0-^Q9 to jump back to it. Place markers don't move with "
                    "blocks and aren't saved once you close the file." ;
         case 'r' :
-            return "^KR - Open a file\n\n"
-                   "Prompts for a file and loads it, replacing the file currently "
-                   "open for editing." ;
+            return "^KR - Insert a file\n\n"
+                   "Prompts for a file and inserts its contents at the cursor, "
+                   "into the document already open for editing." ;
         case 's' :
             return "^KS - Save file\n\n"
                    "Saves the current file without leaving the editor." ;
@@ -537,9 +537,6 @@ const char *LookupMChordHelp(char lower)
         case '*' :
             return "^M* - Insert filename\n\n"
                    "Inserts the name of the current file." ;
-        case ':' :
-            return "^M: - Insert drive letter\n\n"
-                   "Inserts the currently logged drive letter (Windows only)." ;
         case '.' :
             return "^M. - Insert directory\n\n"
                    "Inserts the currently logged directory path." ;
@@ -1239,15 +1236,6 @@ void cWordStarInput::OnControlMChar(char ch)
                 break ;
             }
 
-        case ':' :
-            {
-#ifdef _WINDOWS
-            std::string name = mEditor->mFileDir.substr(0, 2);
-                mEditor->InsertWordStarString(name) ;
-#endif
-                break ;
-            }
-
         case '.' :
             {
 #ifdef _WINDOWS
@@ -1388,52 +1376,14 @@ bool cWordStarInput::OnControlKChar(char ch)
     
     switch(ch)
     {
-        case 'r' :          // insert/open a file
+        case 'r' :          // insert a file at the cursor (real WordStar 7 ^KR)
             {
-                // P0: File I/O temporarily disabled (Week 3)
-                // TODO: Re-enable when file handlers are updated for new editor
-                /*
-                QString loadable ;
-                bool first = true ;
-                for(auto & mFileType : mEditor->mFileTypes)
-                {
-                    if(mFileType->CanLoad())
-                    {
-                        std::string ext = mFileType->GetExtensions() ;
-                        if(!first)
-                        {
-                            ext = ";;" + ext ;
-                        }
-                        first = false ;
-                        loadable.append(ext.c_str()) ;
-                    }
-                }
-
-                QString filename = QFileDialog::getOpenFileName(mEditor, "Insert a file...", QString(), loadable) ;
-                */
                 std::string filename = mEditor->PromptForLoadFile();
                 if(!filename.empty())
                 {
-                    // API CHANGE: Access document through GetDocument()
-                    cDocument* doc = mEditor->GetDocument();
-                    POSITION_T position = doc ? doc->GetPosition() : 0 ;
                     mEditor->SetEnabled(false) ;
-
-                    std::filesystem::path filepath(filename) ;
-                    mEditor->mFileName = filepath.filename().string() ;
-                    mEditor->mFileDir = filepath.parent_path().string() + '/' ;
-                    mEditor->mFileSet = true ;
-
-                    std::string loadfile = mEditor->mFileDir + mEditor->mFileName ;
-                    mEditor->LoadFile(loadfile) ;
-
+                    mEditor->InsertFileAtCursor(filename) ;
                     mEditor->SetEnabled(true) ;
-
-                    if (doc)
-                    {
-                        doc->SetPosition(position) ;
-                    }
-
                 }
                 retval = true ;
             }

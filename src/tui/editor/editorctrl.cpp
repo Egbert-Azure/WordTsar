@@ -1188,6 +1188,91 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  filename [in] path to file to insert
+///
+/// @return bool - true if inserted successfully
+///
+/// @brief
+/// Insert a file's content at the cursor, into the document already open --
+/// real WordStar 7's ^KR / Insert > File. Detects file type the same way
+/// LoadFile() does, but skips LoadFile()'s Clear() and cursor/state reset:
+/// each file reader's own LoadFile() is just a sequence of cDocument::Insert()
+/// calls, so run against the document exactly as it is now, it inserts here
+/// instead of replacing it.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSEditorCtrl::InsertFileAtCursor(const std::string& filename)
+{
+    if (filename.empty())
+    {
+        return false;
+    }
+
+    if (!mDocument)
+    {
+        return false;
+    }
+
+    std::filesystem::path filepath = std::filesystem::absolute(filename);
+
+    cFile* fileReader = nullptr;
+
+    cWordstarFile wsCheck(this);
+    cRTFFile rtfCheck(this);
+    cDOCXFile docxCheck(this);
+
+    if (wsCheck.CheckType(filename))
+    {
+        fileReader = new cWordstarFile(this);
+    }
+    else if (rtfCheck.CheckType(filename))
+    {
+        fileReader = new cRTFFile(this);
+    }
+    else if (docxCheck.CheckType(filename))
+    {
+        fileReader = new cDOCXFile(this);
+    }
+    else
+    {
+        fileReader = new cTextFile(this);
+    }
+
+    mDocument->SetLoading(true);
+    mDocument->BeginUndoGroup();
+
+    mLoadingFileName = filepath.filename().string();
+    if (mHost != nullptr)
+    {
+        mHost->HostShowLoadProgress(mLoadingFileName, 0);
+    }
+
+    bool success = fileReader->LoadFile(filename);
+
+    if (mHost != nullptr)
+    {
+        mHost->HostHideLoadProgress();
+    }
+
+    mDocument->EndUndoGroup();
+    mDocument->SetLoading(false);
+
+    delete fileReader;
+
+    if (success)
+    {
+        LayoutDocument(true);
+        CalculateCaretPosition();
+        ScrollIntoView();
+        Repaint();
+    }
+
+    return success;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  percent [in] load progress 0..100
 ///
 /// @return nothing

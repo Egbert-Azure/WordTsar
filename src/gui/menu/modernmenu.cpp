@@ -125,7 +125,7 @@ QString cModernMenuProvider::GetFilePrintPreviewLabel(void) const
 /////////////////////////////////////////////////////////////////////////////
 QString cModernMenuProvider::GetFileExitLabel(void) const
 {
-    return "E&xit WordTsar\tAlt+F4";
+    return "E&xit WordTsar\tCmd+Q";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -692,19 +692,9 @@ QString cModernMenuProvider::GetEditEditNoteLabel(void) const
     return "Edit &Note";
 }
 
-QString cModernMenuProvider::GetEditNoteStartNumberLabel(void) const
-{
-    return "&Starting Number for Note...";
-}
-
 QString cModernMenuProvider::GetEditNoteConvertLabel(void) const
 {
     return "&Convert Note...";
-}
-
-QString cModernMenuProvider::GetEditNoteConvertPrintLabel(void) const
-{
-    return "Convert at &Print...";
 }
 
 QString cModernMenuProvider::GetEditNoteEndnoteLocationLabel(void) const
@@ -798,11 +788,6 @@ QString cModernMenuProvider::GetInsertPageBreakLabel(void) const
     return "&Page Break";
 }
 
-QString cModernMenuProvider::GetInsertColumnBreakLabel(void) const
-{
-    return "&Column Break";
-}
-
 QString cModernMenuProvider::GetInsertDateLabel(void) const
 {
     return "&Today's Date Value";
@@ -845,10 +830,6 @@ QString cModernMenuProvider::GetInsertFilenameLabel(void) const
     return "Current &Filename";
 }
 
-QString cModernMenuProvider::GetInsertDriveLabel(void) const
-{
-    return "Current &Drive";
-}
 
 QString cModernMenuProvider::GetInsertDirectoryLabel(void) const
 {
@@ -887,10 +868,6 @@ QString cModernMenuProvider::GetInsertVarPageLabel(void) const
     return "&Page";
 }
 
-QString cModernMenuProvider::GetInsertVarLineLabel(void) const
-{
-    return "&Line";
-}
 
 QString cModernMenuProvider::GetInsertVarFilenameLabel(void) const
 {
@@ -1001,11 +978,6 @@ QString cModernMenuProvider::GetInsertTOCEntryLabel(void) const
 QString cModernMenuProvider::GetInsertIndexEntryLabel(void) const
 {
     return "&Index Entry...";
-}
-
-QString cModernMenuProvider::GetInsertMarkTextForIndexLabel(void) const
-{
-    return "&Mark Text for Index";
 }
 
 QString cModernMenuProvider::GetInsertDotLeaderLabel(void) const
@@ -1149,10 +1121,6 @@ QString cModernMenuProvider::GetStyleSentenceCaseLabel(void) const
     return "&Sentence Case\tAlt+K, .";
 }
 
-QString cModernMenuProvider::GetStyleSettingsLabel(void) const
-{
-    return "Se&ttings";
-}
 
 /////////////////////////////////////////////////////////////////////////////
 // Layout Menu - Line Alignment
@@ -1331,19 +1299,10 @@ QString cModernMenuProvider::GetUtilSpellCheckTypeLabel(void) const
     return "&Type Word...";
 }
 
-QString cModernMenuProvider::GetUtilSpellCheckNotesLabel(void) const
-{
-    return "Rest of &Notes";
-}
 
 QString cModernMenuProvider::GetUtilThesaurusLabel(void) const
 {
     return "&Thesaurus";
-}
-
-QString cModernMenuProvider::GetUtilLanguageChangeLabel(void) const
-{
-    return "Language Change...";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1529,19 +1488,10 @@ QString cModernMenuProvider::GetUtilReformatRestLabel(void) const
     return "&Rest of Document\tAlt+Q, U";
 }
 
-QString cModernMenuProvider::GetUtilReformatParaLabel(void) const
-{
-    return "&Paragraph";
-}
 
 QString cModernMenuProvider::GetUtilReformatNotesLabel(void) const
 {
     return "Rest of &Notes";
-}
-
-QString cModernMenuProvider::GetUtilRepeatKeyLabel(void) const
-{
-    return "R&epeat Next Keystroke";
 }
 
 /////////////////////////////////////////////////////////////////////////////

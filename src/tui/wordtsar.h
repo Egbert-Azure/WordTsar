@@ -35,6 +35,7 @@
 class cWSEditorCtrl;
 class cWSEditorView;
 class cConfig;
+class cWordStarInput;
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -57,6 +58,13 @@ public:
     ~cWSWordTsar(void) override;
 
     int Run(int argc, char* argv[]);
+
+#ifdef WORDTSAR_TUI_TEST_HOOKS
+    // Test-only: build the real menu tree and expose it for walking (menu
+    // dispatch-resolution regression test). Not compiled into ws/WordTsar.
+    void TestBuildMenus(void) { BuildMenus(); }
+    const wordstartui::cMenuBar& TestGetMenu(void) const { return mMenu; }
+#endif
 
     // ---- iWSDialogHost ----
     void HostRunModal(wordstartui::cDialog& dialog) override;
@@ -94,6 +102,11 @@ private:
     void ApplyConfig(cConfig& config, bool applyColors);
     void WriteConfig(void);
     void OpenRecentFiles(void);
+    // File > Open/Read: prompts for a file and replaces the whole current
+    // document with it (real WS7 "Open a document"). Distinct from ^K R /
+    // Insert > File, which now inserts a file at the cursor instead -- see
+    // cWordStarInput::OnControlKChar case 'r'.
+    void OpenFile(void);
     // Present the character-style selector and apply the chosen style.
     void SelectStyle(void);
 
@@ -143,6 +156,11 @@ private:
 private:
     cWSEditorCtrl* mEditor;    // owned
     cWSEditorView* mView;      // owned
+    // Dedicated WordStar-chord input handler for menu dispatch only -- never
+    // the active mEditor->GetInput(), so a menu click always runs the real
+    // WordStar-mode command regardless of the user's selected keyboard mode,
+    // and can't collide with a chord the user has half-typed on the real one.
+    cWordStarInput* mMenuInput; // owned
     wordstartui::cMenuBar mMenu;
     std::string mFilename;
     int mRows;
