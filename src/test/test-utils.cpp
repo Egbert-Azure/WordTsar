@@ -154,6 +154,43 @@ TEST_CASE("UT-2e: cConfig ApplyGUIPalette")
     CHECK(config.mGuiRulerBackground.r == palettes[1].rulerBackground.r);
 }
 
+TEST_CASE("UT-3a: AbbreviatePathForDisplay leaves paths that already fit untouched")
+{
+    CHECK(AbbreviatePathForDisplay("/tmp/test.ws", 60) == "/tmp/test.ws");
+    CHECK(AbbreviatePathForDisplay("test.ws", 7) == "test.ws");
+}
+
+TEST_CASE("UT-3b: AbbreviatePathForDisplay maxWidth 0 means no limit")
+{
+    std::string longPath = "/Users/egbert/Documents/Vati - Buchkonzept und Kapitel/New Chapter One.ws";
+    CHECK(AbbreviatePathForDisplay(longPath, 0) == longPath);
+}
+
+TEST_CASE("UT-3c: AbbreviatePathForDisplay keeps the filename, elides the directory")
+{
+    std::string longPath = "/Users/egbert/Documents/Vati - Buchkonzept und Kapitel/New Chapter One.ws";
+    std::string result = AbbreviatePathForDisplay(longPath, 40);
+    CHECK(result.size() <= 40);
+    CHECK(result.find("New Chapter One.ws") != std::string::npos);
+    CHECK(result.substr(0, 4) == ".../");
+}
+
+TEST_CASE("UT-3d: AbbreviatePathForDisplay elides the filename itself when nothing else fits")
+{
+    std::string longPath = "/Users/egbert/Documents/Vati - Buchkonzept und Kapitel/New Chapter One.ws";
+    std::string result = AbbreviatePathForDisplay(longPath, 20);
+    CHECK(result.size() <= 20);
+    // Even the bare ".../filename" form doesn't fit at width 20, so the
+    // filename's own middle gets elided -- the extension must survive.
+    CHECK(result.find(".ws") != std::string::npos);
+    CHECK(result.find("...") != std::string::npos);
+}
+
+TEST_CASE("UT-3e: AbbreviatePathForDisplay handles a bare filename with no directory")
+{
+    CHECK(AbbreviatePathForDisplay("New Chapter One.ws", 10).find(".ws") != std::string::npos);
+}
+
 TEST_CASE("UT-2f: cConfig ApplyTUIPalette")
 {
     cConfig config;

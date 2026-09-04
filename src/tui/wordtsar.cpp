@@ -36,6 +36,7 @@
 #include "src/tui/wordstartui/src/dropdown.h"
 
 #include "src/core/include/version.h"
+#include "src/core/include/utils.h"
 #include "src/core/generate/tocindexgenerator.h"
 #include "src/core/layout/layoutbase.h"
 #include "src/core/layout/layoutstructs.h"
@@ -956,8 +957,14 @@ void cWSWordTsar::OpenRecentFiles(void)
     lr.col = rect.col + 2;
     lr.rows = static_cast<int>(files.size());
     lr.cols = rect.cols - 4;
+    std::vector<std::string> displayNames;
+    for (const std::string &path : files)
+    {
+        displayNames.push_back(AbbreviatePathForDisplay(path, static_cast<size_t>(lr.cols)));
+    }
+
     std::unique_ptr<wordstartui::cListBox> list = std::make_unique<wordstartui::cListBox>(lr);
-    list->SetItems(files);
+    list->SetItems(displayNames);
     wordstartui::cListBox* listPtr = list.get();
     dialog.AddWidget(std::move(list));
 

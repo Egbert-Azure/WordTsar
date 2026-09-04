@@ -702,10 +702,11 @@ void cWordTsar::UpdateRecentFilesMenu(void)
     {
         if (!config.mRecentFiles[i].empty())
         {
-            // Number prefix with accelerator: "&1 /path/to/file"
+            // Number prefix with accelerator: "&1 .../dir/file.ws"
+            std::string shortPath = AbbreviatePathForDisplay(config.mRecentFiles[i], 70) ;
             QString label = QString("&%1 %2")
                 .arg((i + 1) % 10)
-                .arg(QString::fromStdString(config.mRecentFiles[i])) ;
+                .arg(QString::fromStdString(shortPath)) ;
 
             QAction *action = mRecentFilesMenu->addAction(label) ;
             action->setData(QString::fromStdString(config.mRecentFiles[i])) ;

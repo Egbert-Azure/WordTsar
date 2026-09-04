@@ -176,3 +176,66 @@ std::string ToRomanNumeralUpper(long num)
     return result;
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  fullPath  [in] - full file path to abbreviate for display
+/// @param  maxWidth  [in] - maximum length of the returned string, in
+///                          characters (0 = no limit, return fullPath as-is)
+///
+/// @return the abbreviated path
+///
+/// @brief
+/// Recent-files style path shortening. The filename is what actually tells
+/// two entries apart, so it's the last thing this ever cuts -- the directory
+/// is elided from the front instead (".../Kapitel/New.ws"), falling back to
+/// eliding the filename's own middle only if even that doesn't fit.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string AbbreviatePathForDisplay(const std::string &fullPath, size_t maxWidth)
+{
+    if ((maxWidth == 0) || (fullPath.size() <= maxWidth))
+    {
+        return fullPath;
+    }
+
+    size_t lastSlash = fullPath.find_last_of('/');
+    std::string filename = (lastSlash == std::string::npos) ? fullPath : fullPath.substr(lastSlash + 1);
+
+    std::string parentName;
+    if (lastSlash != std::string::npos && lastSlash != 0)
+    {
+        size_t prevSlash = fullPath.find_last_of('/', lastSlash - 1);
+        size_t parentStart = (prevSlash == std::string::npos) ? 0 : (prevSlash + 1);
+        parentName = fullPath.substr(parentStart, lastSlash - parentStart);
+    }
+
+    std::string withParent = parentName.empty() ? (".../" + filename) : (".../" + parentName + "/" + filename);
+    if (withParent.size() <= maxWidth)
+    {
+        return withParent;
+    }
+
+    std::string bare = ".../" + filename;
+    if (bare.size() <= maxWidth)
+    {
+        return bare;
+    }
+
+    // Even the bare filename doesn't fit -- elide its own middle, keeping
+    // the head and the extension.
+    if (maxWidth <= 3)
+    {
+        return filename.substr(0, maxWidth);
+    }
+
+    size_t keep = maxWidth - 3;
+    size_t head = keep / 2;
+    size_t tail = keep - head;
+    if ((head + tail) >= filename.size())
+    {
+        return filename;
+    }
+    return filename.substr(0, head) + "..." + filename.substr(filename.size() - tail);
+}
+

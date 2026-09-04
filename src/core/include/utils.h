@@ -36,4 +36,9 @@ std::string string_sprintf(const char *fmt, ...)
 std::string ToRomanNumeralLower(long num) ;
 std::string ToRomanNumeralUpper(long num) ;
 
+// Recent-files style path shortening -- shared by the GUI's Recent Files menu
+// and the TUI's Recent Files dialog so a long directory doesn't push the
+// filename (the part that actually tells two entries apart) off screen.
+std::string AbbreviatePathForDisplay(const std::string &fullPath, size_t maxWidth) ;
+
 #endif // UTILS_H
