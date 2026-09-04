@@ -392,6 +392,12 @@ protected:
     void SetTextMeasurement(cTextMeasurement* textMeasurement);
     COORD_T CalculateFontBasedLineHeight(void) const;
 
+    // Line height for a line started under the CURRENT font/modifier state
+    // (.LH-configured or font-based, times the .LS line spacing multiplier).
+    // Shared by CreateLine() and the pre-paragraph page-break check so the
+    // two can't drift apart.
+    COORD_T ComputeCurrentLineHeight(void) const;
+
     // ----- Segment Helpers -----
     void MarkControlCodesInSegment(sSegmentLayout& segment, const std::vector<std::string>& graphemes);
     void MarkSegmentIfInRange(sSegmentLayout& segment, POSITION_T paragraphStart);

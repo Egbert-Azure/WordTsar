@@ -1954,6 +1954,24 @@ COORD_T cLayoutBase::CalculateFontBasedLineHeight(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return line height in twips for a line started under the current state
+///
+/// @brief
+/// Line height for a line begun under whatever font/modifier state is
+/// current right now (.LH-configured or font-metric-based, times the .LS
+/// line spacing multiplier). Shared by CreateLine() and the pre-paragraph
+/// page-break check in WordWrapParagraph() so the two formulas can't drift
+/// apart.
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T cLayoutBase::ComputeCurrentLineHeight(void) const
+{
+    return GetLineHeight() * mLayoutState->GetModifiers().linespace;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return true if auto-leading mode enabled, false otherwise
 ///
 /// @brief
@@ -2720,7 +2738,7 @@ sLineLayout cLayoutBase::CreateLine(PARAGRAPH_T paragraphNum)
     mCurrentPageLineNumber++;
 
     // Apply line spacing multiplier from .LS command to configured line height
-    line.lineheight = GetLineHeight() * mLayoutState->GetModifiers().linespace;
+    line.lineheight = ComputeCurrentLineHeight();
 
     // Increment cumulative height for next line
     mCurrentCumulativeHeight += line.lineheight;
@@ -2885,6 +2903,19 @@ bool cLayoutBase::WordWrapParagraph(PARAGRAPH_T paragraphNum)
         FinalizeLine(line, 0);
         SaveLine(paragraphNum, line);
         return true;
+    }
+
+    // Check for page break before placing this paragraph's first line. The
+    // look-ahead check at the end of the PREVIOUS paragraph only estimates
+    // fit using that paragraph's own last line height, which is wrong
+    // whenever this paragraph starts with a different font/size. Check here,
+    // BEFORE BuildParagraphSegments() below walks the paragraph's own control
+    // codes and advances the current font state -- otherwise GetLineHeight()
+    // would reflect whatever font this paragraph ENDS with, not the one its
+    // actual first line starts with.
+    if (NeedNewPage(ComputeCurrentLineHeight()))
+    {
+        IncrementPageAndCreateBox();
     }
 
     // Two-phase word wrap approach

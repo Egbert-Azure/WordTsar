@@ -244,11 +244,24 @@ void cPrintout::printDocument(QPrinter *printer)
     // This is the same approach as the old printout.cpp (line 81)
     painter.setWindow(0, 0, printerwidth, printerheight);
 
-    // Calculate scale factor for font size conversion (pixels per twip)
+    // Calculate scale factor for font size conversion (device pixels per twip).
     // When using setWindow(), font sizes need to be converted from device units
-    // to logical coordinate system units using this scale factor
-    int screenwidth = painter.device()->width();
-    mScale = (double)screenwidth / (double)printerwidth;
+    // to logical coordinate system units using this scale factor. Derive it from
+    // the QPrinter's own declared resolution (DPI / twips-per-inch) rather than
+    // painter.device()->width() -- during Print Preview, Qt renders through an
+    // internal preview surface whose reported pixel width doesn't reliably match
+    // the DPI it actually uses for font metrics, which was making preview text
+    // (and only preview text) render too large near the DPI mismatch.
+    // Guard against a misconfigured/virtual printer backend reporting no
+    // resolution -- dividing by zero below would set an infinite point size
+    // and crash the font engine, instead of the old code's safer (if wrong)
+    // zero-size fallback.
+    double resolution = printer->resolution();
+    if (resolution <= 0.0)
+    {
+        resolution = 72.0;
+    }
+    mScale = resolution / TWIPSPERINCH;
 
     bool firstPage = true;
 
