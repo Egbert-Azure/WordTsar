@@ -67,7 +67,7 @@ Every Ctrl+letter key has a different meaning in WordStar vs Modern mode.
 | Key | WordStar Action | Modern (CUA) Action |
 |-----|----------------|-------------------|
 | Ctrl+A | Word left | Select All |
-| Ctrl+B | Reformat paragraph (not implemented) | **Bold** toggle |
+| Ctrl+B | Not bound (layout engine reflows on every edit, so there's no manual "reformat" step) | **Bold** toggle |
 | Ctrl+C | Page down | **Copy** to clipboard |
 | Ctrl+D | Cursor right | Select **Font** |
 | Ctrl+E | Cursor up | **Center** align paragraph |
@@ -186,10 +186,10 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | ] | ^K,] | -- | Copy to system clipboard (WS only) |
 | " | ^K," | Alt+K," | Convert block to uppercase |
 | ' | ^K,' | Alt+K,' | Convert block to lowercase |
-| . | ^K,. | Alt+K,. | Convert block to title case |
+| . | ^K,. | Alt+K,. | Convert block to sentence case |
 | ? | ^K,? | Alt+K,? | Word/character count for block |
 | 0-9 | ^K,0-9 | Alt+K,0-9 | Save cursor position to marker |
-| R | ^K,R | -- | Open/insert file (WS only) |
+| R | ^K,R | -- | Insert file at cursor (WS only) |
 | S | ^K,S | -- | Save current file (WS only) |
 | T | ^K,T | -- | Save file with new name (WS only) |
 | D | ^K,D | -- | Save, clear document, reset (WS only) |
@@ -312,14 +312,14 @@ Menu shortcuts shown to the user change based on the active input mode. The func
 
 | Item | WordStar Shortcut | Modern Shortcut | Action |
 |------|------------------|----------------|--------|
-| Open/Read | ^KR | Ctrl+O | Load file |
+| Open/Read | -- | Ctrl+O | Load file, replacing the current document |
 | Save | ^KS | Ctrl+S | Save file |
 | Save As | ^KT | Ctrl+Shift+S | Save with new name |
 | Save and Close | ^KD | -- | Save, clear, reset |
 | Print | ^KP | Ctrl+P | Opens print preview [^print-deviation] |
 | Print Preview | ^OP | -- | Print preview |
 | Preferences | -- | -- | System Preferences dialog |
-| Exit WordTsar | ^KX | Alt+F4 | Quit application |
+| Exit WordTsar | ^KX | Cmd+Q | Quit application |
 
 [^print-deviation]: Real WordStar's ^KP prints directly, without a preview
 step -- that's what `cEditorCtrl::Print()` / `cWSEditorCtrl::Print()`
@@ -392,7 +392,6 @@ yet done.
 | **Other Value submenu** | | | |
 | -- Current Time | ^M! | -- | Insert current time |
 | -- Current Filename | ^M* | -- | Insert filename |
-| -- Current Drive | ^M: | -- | Insert drive letter |
 | -- Current Directory | ^M. | -- | Insert directory path |
 | -- Current Path | ^M\ | -- | Insert full path |
 | **Variable submenu** | | | |
@@ -415,7 +414,7 @@ yet done.
 | **Convert Case submenu** | | | |
 | -- Uppercase | ^K" | Alt+K," | Block to uppercase |
 | -- Lowercase | ^K' | Alt+K,' | Block to lowercase |
-| -- Sentence Case | ^K. | Alt+K,. | Block to title case |
+| -- Sentence Case | ^K. | Alt+K,. | Block to sentence case |
 
 ### Layout Menu
 
@@ -521,7 +520,7 @@ Every key recognized by the WordStar input handler. Status column: **Yes** = fun
 | Key | WS7 Function | WordTsar Action | Implemented |
 |-----|-------------|-----------------|-------------|
 | ^A | Word left | Move cursor left one word | Yes |
-| ^B | Reformat paragraph | Reformat paragraph | No |
+| ^B | Reformat paragraph | Not bound -- the layout engine reflows every paragraph against current margins on every relayout, so there is no stale state to fix | -- |
 | ^C | Page down | Move cursor down one page | Yes |
 | ^D | Cursor right | Move cursor right | Yes |
 | ^E | Cursor up | Move cursor up one line | Yes |
@@ -639,10 +638,10 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^K] | Copy to clipboard | Copy to clipboard | Yes |
 | ^K" | Uppercase block | Convert block to uppercase | Yes |
 | ^K' | Lowercase block | Convert block to lowercase | Yes |
-| ^K. | Title case block | Convert block to title case | Yes |
+| ^K. | Sentence case block | Convert block to sentence case | Yes |
 | ^K? | Word count block | Count words in block | Yes |
 | ^K0-9 | Set marker 0-9 | Set position marker 0-9 | Yes |
-| ^KR | Open/insert file | Open or insert file | Yes |
+| ^KR | Insert file at cursor | Insert file at cursor | Yes |
 | ^KS | Save file | Save file | Yes |
 | ^KT | Save as | Save file as | Yes |
 | ^KD | Save and clear | Save file and clear editor | Yes |
@@ -875,7 +874,7 @@ Same as WordStar mode, plus F3 = Find Again.
 | Alt+K, U | Restore previous block | Yes |
 | Alt+K, " | Convert block to uppercase | Yes |
 | Alt+K, ' | Convert block to lowercase | Yes |
-| Alt+K, . | Convert block to title case | Yes |
+| Alt+K, . | Convert block to sentence case | Yes |
 | Alt+K, ? | Count words in block | Yes |
 | Alt+K, 0-9 | Set position marker 0-9 | Yes |
 

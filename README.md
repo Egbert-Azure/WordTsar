@@ -8,7 +8,7 @@
 
 Wordstar for the 21st Century. WordTsar is a Wordstar 7.0D document mode clone. It loads Wordstar 4, Wordstar 7, RTF (partial), and DOCX (partial) files, and saves in Wordstar 7, RTF, and Word (.docx) format.
 
-All credit for WordTsar's design and implementation goes to Gerald Brandt — this fork simply trims the project down to a macOS-only build. The original, cross-platform project (Windows, Linux, and macOS) lives at the link above and at [wordtsar.ca](http://wordtsar.ca); go there for the full story, the forums, and the Windows/Linux builds. This fork is not endorsed by or affiliated with the upstream WordTsar project — the AGPL grants no rights in the name "WordTsar." macOS fork begun 2025, actively maintained through 2026.
+All credit for WordTsar's design and implementation goes to Gerald Brandt — this fork simply trims the project down to a macOS-only build. The original, cross-platform project (Windows, Linux, and macOS) is developed at the link above on SourceForge — go there for the code and the Windows/Linux builds. [wordtsar.ca](http://wordtsar.ca) is the project's original home; its newest posted release is 0.3 (March 2023), so it's no longer where current builds live, but it's still the place for the project's history and forums. This fork is not endorsed by or affiliated with the upstream WordTsar project — the AGPL grants no rights in the name "WordTsar." macOS fork begun 2025, actively maintained through 2026.
 
 <p align="center">
   <img src="docs/screenshots/michael-shrayer-electric-pencil.png" width="180" alt="Michael Shrayer with his Electric Pencil, running on a TRS-80"><br>
@@ -64,9 +64,9 @@ WordTsar is Gerald Brandt's. He designed it, wrote it, and has maintained it for
 
 He is also, by night, a novelist: the San Angeles cyberpunk trilogy — *The Courier*, *The Operative*, *The Rebel* — published by DAW, and the Quantum Empirica books. *The Courier* was a finalist for the Aurora Award and was named by the CBC as one of ten Canadian science fiction books you need to read. And he writes them in WordTsar. In [his own words](https://geraldbrandt.com/about/): IT administration and C++ by day, author by night, working entirely in the WordStar 7 clone he wrote and maintains himself.
 
-That is the rarest thing about this program. It isn't a nostalgia project or a museum piece — it's a working writer's daily tool, built by someone who has to live with every decision in it. It shows in the details.
+That is the rarest thing about this program. It isn't a nostalgia project or a museum piece or someone who like to have fun with vintage computer coding — it's a working writer's daily tool, built by someone who has to live with every decision in it. It shows in the details. And this was inspiring to mee too.
 
-For me it has become the quiet place where writing actually happens: no ribbon, no sidebar, no notifications, nothing asking for attention. This fork exists only because I wanted that on one platform, with less to maintain. The original cross-platform WordTsar — Windows, Linux, and macOS — lives at [wordtsar.ca](http://wordtsar.ca) and remains the one to use. Thank you, Gerald.
+For me it has become the quiet place where writing actually happens: no ribbon, no sidebar, no notifications, nothing asking for attention. This fork exists only because I wanted that on one platform, with less to maintain. The original cross-platform WordTsar — Windows, Linux, and macOS — is developed on [SourceForge](https://sourceforge.net/p/wordtsar/mercurial/ci/default/tree/) and remains the one to use. Thank you, Gerald.
 
 ## Feedback
 

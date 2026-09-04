@@ -1,5 +1,6 @@
 .. QUICKREF.WS - WordTsar 0.10.9 keyboard quick reference
-.. Source of truth: KEY_MAPPING.md and the input-handler source. Edit freely.
+.. Source of truth: the input handlers, menu builders, and dot-command
+.. parser source directly -- not KEY_MAPPING.md or the WS7 manual. Edit freely.
 .pl 66
 .mt 4
 .mb 6
@@ -24,12 +25,16 @@ switch modes, and "GUI" does not mean Modern any more than
 
 A chord is a prefix key then a second key: ^K then B. Ctrl
 chords (^K ^Q ^O ^P ^M) work everywhere, in both apps, on any
-terminal, with no setup. Everything below marked "Alt+" is an
+terminal, with no setup. Everything below marked "Option+" is an
 optional alternate way to enter the same chord, not a separate
 feature -- see ALTERNATE CHORD ENTRY further down before
 relying on it.
 
 Entries marked (WS) exist only in WordStar mode.
+
+Mac names are used throughout: Cmd, Option, Control, Shift,
+return, delete, esc, fn. Option is what other keyboard docs
+call Alt. delete is what other docs call Backspace.
 
 .pa
 SINGLE CTRL KEYS
@@ -37,7 +42,7 @@ SINGLE CTRL KEYS
 Key    WordStar                     Modern (CUA)
 ----------------------------------------------------------------
 ^A     Word left                    Select all
-^B     Reformat para (not impl)     Bold toggle
+^B     --                           Bold toggle
 ^C     Page down                    Copy
 ^D     Cursor right                 Select font
 ^E     Cursor up                    Center paragraph
@@ -70,55 +75,64 @@ MODERN MODE EXTRAS
 .pa
 SPECIAL KEYS (BOTH MODES)
 
-Arrows   Cursor movement
-^Left    Word left
-^Right   Word right
-Home     Start of line
-End      End of line
-^Home    Start of document
-^End     End of document
-PgUp     Page up
-PgDn     Page down
-^PgUp    Scroll up
-^PgDn    Scroll down
-Del      Delete forward
-^Del     Delete word right
-Bksp     Delete backward
-^Bksp    Delete word left
-Tab      Insert tab
-Enter    Line break
-Esc      Cancel chord
+MacBook keyboards have no Home, End, Page Up, Page Down, or
+forward-delete key -- use fn with the key shown below. A
+full-size external keyboard has the dedicated key itself;
+either way reaches the same command.
+
+Arrows              Cursor movement
+Ctrl+Left            Word left
+Ctrl+Right           Word right
+fn+Left              Start of line (Home key)
+fn+Right             End of line (End key)
+Ctrl+fn+Left         Start of document (Ctrl+Home)
+Ctrl+fn+Right        End of document (Ctrl+End)
+fn+Up                Page up (Page Up key)
+fn+Down              Page down (Page Down key)
+Ctrl+fn+Up           Scroll up
+Ctrl+fn+Down         Scroll down
+fn+delete            Delete forward (forward-delete key)
+Ctrl+fn+delete       Delete word right
+delete               Delete backward
+Ctrl+delete          Delete word left
+Tab                  Insert tab
+return               Line break
+esc                  Cancel chord
 
 FUNCTION KEYS AND macOS SHORTCUTS
 
-F1       WordStar mode: contextual help
+F-keys need fn held on a MacBook keyboard (or freeing in
+System Settings > Keyboard, where F1/F3/F11 are otherwise
+claimed for brightness, Mission Control and Show Desktop).
+In the GUI these Cmd+ shortcuts reach the same commands
+without fn:
+
+Cmd+,       Preferences (same in both modes)
+Cmd+/       Mirrors F1 -- WordStar mode: contextual help.
+            Modern mode: Preferences, same as Cmd+,.
+Cmd+Ctrl+F  Toggle fullscreen, both modes
+Cmd+G       Find again, both modes
+
+Cmd chords are GUI only; a terminal emulator takes them
+before ws ever sees them. In the TUI, fn+F1/F3/F11 do
+reach the app directly, and Preferences is menu-only.
+
+fn+F1    WordStar mode: contextual help
          Modern mode: System Preferences
-F3       Find again (Modern mode only)
-F11      Toggle fullscreen
+fn+F3    Find again (Modern mode only)
+fn+F11   Toggle fullscreen
 
 F1 then a command key describes that command. F1 twice
 sets the help level, 0 to 4. For a chord press F1, the
 prefix, then the sub-letter, for example F1 K B.
 
-On macOS F1, F3 and F11 are unreliable: the system claims
-them for brightness, Mission Control and Show Desktop
-unless you free them in System Settings > Keyboard. In
-the GUI, use these instead:
-
-Cmd+,       Preferences
-Cmd+/       Help
-Cmd+Ctrl+F  Toggle fullscreen
-Cmd+G       Find again, both modes
-
-Cmd chords are GUI only; a terminal emulator takes them
-before ws ever sees them. In the TUI F1 does reach the
-app, and Preferences is menu-only.
-
-F2 and F4 through F10 and F12 are unassigned. F10 opens
-the pull-down menu bar in both apps -- every command
-below, including the ones with no reachable keystroke, is
-also there if you'd rather click/select than remember a
-chord.
+F2, F4 through F9, and F12 are unassigned in both apps.
+F10 opens the pull-down menu bar in the TUI only -- it
+does nothing in the GUI, which shows its menu bar directly
+(click it, or use standard macOS menu navigation). Every
+command below, including the ones with no reachable
+keystroke, is also on that menu bar in both apps, if you'd
+rather select than remember a chord.
 .pa
 ALTERNATE CHORD ENTRY (OPTIONAL -- READ THIS FIRST)
 
@@ -134,30 +148,31 @@ the Insert menu (F10 > Insert) for dates, times and
 filenames instead -- it sends the same command without
 touching the keyboard, and it always works.
 
-WordStar mode also offers Alt+K/Q/O/P/M as a second way to
-enter these same chords, and Alt+U for Redo. This exists
-for terminals that intercept plain Ctrl. It needs "Use
-Option as Meta key" turned on in Terminal.app
+WordStar mode also offers Option+K/Q/O/P/M as a second way
+to enter these same chords, and Ctrl+Option+U for Redo
+(that one needs both modifiers together, not Option alone).
+This exists for terminals that intercept plain Ctrl. It
+needs "Use Option as Meta key" turned on in Terminal.app
 (Preferences > Profiles > Keyboard), or "Option Key Acts
 as: Esc+" in iTerm2 (Preferences > Profiles > Keys) --
 macOS does not send the required escape sequence by
-default, so out of the box these Alt combinations just
+default, so out of the box these Option combinations just
 type accented characters instead of entering a chord. This
 is a terminal quirk only: the GUI receives Option as a
-plain modifier key regardless of any setting, so Alt+K
+plain modifier key regardless of any setting, so Option+K
 etc. work there immediately.
 
 Given the setup cost, prefer plain Ctrl chords and the F10
-menu; treat Alt-entry as a fallback for a terminal that
+menu; treat Option-entry as a fallback for a terminal that
 truly swallows Ctrl, not the normal way to work.
 
 Modern mode chord prefixes:
-Alt+K    Block and marker chord
-Alt+Q    Navigation and deletion chord
-Alt+O    Onscreen formatting chord
-Alt+P    Style chord
+Option+K    Block and marker chord
+Option+Q    Navigation and deletion chord
+Option+O    Onscreen formatting chord
+Option+P    Style chord
 
-Alt chords take the same second key as the WordStar ^K,
+Option chords take the same second key as the WordStar ^K,
 ^Q, ^O and ^P chords listed below. The ^M chord has no
 Modern equivalent.
 .pa
@@ -175,10 +190,10 @@ Modern equivalent.
 ^K ]     Copy to system clipboard (WS)
 ^K "     Block to uppercase
 ^K '     Block to lowercase
-^K .     Block to title case
+^K .     Block to sentence case
 ^K ?     Word and character count for block
 ^K 0-9   Set position marker
-^K R     Open or insert file (WS)
+^K R     Insert a file at the cursor (WS)
 ^K S     Save file (WS)
 ^K T     Save as (WS)
 ^K D     Save, clear document, reset (WS)
@@ -264,7 +279,7 @@ brackets. Modern equivalents: ^L ^E ^R ^J.
 
 In the TUI, reach this chord via F10 > Insert, not the
 keyboard -- see ALTERNATE CHORD ENTRY above. In the GUI,
-Alt+M works directly.
+Option+M works directly.
 
 VARIABLES
 
@@ -273,28 +288,48 @@ These expand on display and in headers and footers:
 &@&      Current date
 &!&      Current time
 &#&      Page number
-&_&      Line number
 &*&      Filename
 &:&      Filesystem root (/)
 &.&      Directory
 &\&      Full path
+&?&      Word count
 .pa
 GAPS -- NOT YET IMPLEMENTED
 
-These are on the roadmap; the command exists but doesn't
-do its job yet:
+These are recognised by the keyboard handler but don't do
+their job yet -- pressing them either shows a "not yet
+implemented" message, or does something other than what
+the letter suggests:
 
-  ^B          Reformat paragraph (WordStar mode)
   ^K P        Opens print preview instead of printing
               directly, same as ^O P. Real WordStar's ^K P
               prints with no preview. The preview dialog
               has its own Print button, so printing is
               still reachable meanwhile.
+  ^K other letters (E, F, G, I, J, L, M, N, O, W, Z, \)
+              Recognised, show "not yet implemented."
+  ^Q other letters (J, M, W, Z)
+              Recognised, show "not yet implemented."
+  ^O A, B, E, F, G, H, I, L, O, S, U, V, X, Space
+              Recognised, but open Preferences rather than
+              a dedicated screen for that letter.
+  ^O other letters (K, M, N, Z, #)
+              Recognised, show "not yet implemented."
+  ^P other letters/symbols (besides B, S, Y, V, T, X, K,
+              =, +, -)
+              Recognised, show "not yet implemented."
   ^M P/R/D/S/E/O/Y
               Macro play/record/edit/single-step/rename/
               copy/delete -- recognised, not implemented.
-  ^M = , ^M #  Math insert/recalculate -- recognised, not
-              implemented.
+  ^M = , ^M # , ^M $
+              Math insert/recalculate/dollar -- recognised,
+              not implemented.
+  ^M :        Insert current drive letter -- Windows-only
+              in the source; always does nothing on this
+              macOS build.
+  &_&         Line number variable -- always expands to 0,
+              not actually implemented. Type it directly;
+              no menu item offers it any more.
 
 GAPS -- PLATFORM LIMITS, NOT ON THE ROADMAP
 
@@ -314,13 +349,19 @@ These stay this way by design, not by omission:
               a wide terminal instead of sitting flush left.
               Command-tag visibility is unaffected in the
               TUI; toggle that separately with ^O D.
-  Alt+ chords Need "Option as Meta" turned on in the
+  Option+ chords
+              Need "Option as Meta" turned on in the
               terminal (see ALTERNATE CHORD ENTRY); off by
               default on macOS. Not needed in the GUI.
-  F1 / F3 / F11
+  fn+F1 / fn+F3 / fn+F11
               Unreliable in the GUI on macOS unless freed
               from system shortcuts; use the Cmd+ equivalents
               listed under FUNCTION KEYS instead.
+  F10 in the GUI
+              Does nothing -- the GUI's menu bar is always
+              visible natively; F10-to-open is a TUI-only
+              convention (the TUI has no persistent menu bar
+              of its own otherwise).
 .pa
 DOT COMMANDS IN COMMON USE
 
@@ -347,8 +388,8 @@ the editor is the authority, not this page.
   .fm n      Footer margin
   .pn n      Page number, with format
   .pg        Print page numbers
+  .pc n      Page number column, 0 = centered (default)
   .op        Omit page numbers
-  .pc n      Page number column
   .pr or=l   Landscape (or=p for portrait)
   .sr n      Sub/superscript roll
   .tb        Tab stops
