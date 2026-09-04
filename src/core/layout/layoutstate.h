@@ -134,6 +134,8 @@ public:
     void SetLandscapeMode(bool landscape);
     bool ShouldPrintPageNumbers(void) const;
     void SetPrintPageNumbers(bool print);
+    COORD_T GetPageNumberColumn(void) const;   // .pc: distance from left margin, 0 = centered
+    void SetPageNumberColumn(COORD_T column);
 
     // Text formatting state
     bool IsBoldActive(void) const;
@@ -221,6 +223,7 @@ private:
     bool mWordWrapEnabled;
     bool mLandscapeMode;
     bool mPrintPageNumbers;
+    COORD_T mPageNumberColumn;
 
     // Text formatting state
     bool mBoldActive;

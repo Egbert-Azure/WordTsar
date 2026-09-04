@@ -82,6 +82,10 @@ public:
     void ShrinkToFit(void);
 
 private:
+    // .pg with no real footer defined for this page: synthesizes a plain
+    // page-number line at footerY, positioned per .pc (0 = centered).
+    void InsertAutomaticPageNumber(PAGE_T page, COORD_T footerY);
+
     // Storage arrays for header/footer templates
     std::array<sLineLayout, MAX_HEADER_FOOTER> mStoreHeader;      // Regular headers (both pages)
     std::array<sLineLayout, MAX_HEADER_FOOTER> mStoreHeaderEven;  // Even page headers

@@ -2500,6 +2500,21 @@ PAGE_T cLayoutBase::GetCurrentPage(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return LINE_T - number of content lines already laid out on the current page
+///
+/// @brief
+/// Returns the page-relative line counter (excludes dot commands, resets
+/// per page). Zero means nothing has been laid out on the current page yet.
+///
+/////////////////////////////////////////////////////////////////////////////
+LINE_T cLayoutBase::GetCurrentPageLineNumber(void) const
+{
+    return mCurrentPageLineNumber;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return current paragraph number being laid out
 ///
 /// @brief
@@ -5299,6 +5314,7 @@ void cLayoutBase::SaveFormattingCheckpoint(PARAGRAPH_T para)
     cp.pageNumberOffset = mLayoutState->GetPageNumberOffset();
     cp.pageNumFormat = mLayoutState->GetPageNumFormat();
     cp.printPageNumbers = mLayoutState->ShouldPrintPageNumbers();
+    cp.pageNumberColumn = mLayoutState->GetPageNumberColumn();
     cp.landscapeMode = mLayoutState->IsLandscapeMode();
     cp.pageLength = mLayoutState->GetPageLength();
     cp.paragraphSpacingBefore = mLayoutState->GetParagraphSpacingBefore();
@@ -5361,6 +5377,7 @@ void cLayoutBase::RestoreFormattingCheckpoint(const sFormattingCheckpoint& cp)
     mLayoutState->SetPageNumberOffset(cp.pageNumberOffset);
     mLayoutState->SetPageNumFormat(cp.pageNumFormat);
     mLayoutState->SetPrintPageNumbers(cp.printPageNumbers);
+    mLayoutState->SetPageNumberColumn(cp.pageNumberColumn);
     mLayoutState->SetLandscapeMode(cp.landscapeMode);
     mLayoutState->SetPageLength(cp.pageLength);
     mLayoutState->SetParagraphSpacingBefore(cp.paragraphSpacingBefore);
@@ -5427,6 +5444,7 @@ bool cLayoutBase::UpdateCheckpointIfNeeded(PARAGRAPH_T para)
     newCp.pageNumberOffset = mLayoutState->GetPageNumberOffset();
     newCp.pageNumFormat = mLayoutState->GetPageNumFormat();
     newCp.printPageNumbers = mLayoutState->ShouldPrintPageNumbers();
+    newCp.pageNumberColumn = mLayoutState->GetPageNumberColumn();
     newCp.landscapeMode = mLayoutState->IsLandscapeMode();
     newCp.pageLength = mLayoutState->GetPageLength();
     newCp.paragraphSpacingBefore = mLayoutState->GetParagraphSpacingBefore();

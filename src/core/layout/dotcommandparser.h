@@ -60,6 +60,7 @@ protected:
     eDotCommandStatus ParseParagraphMargin(const std::string& command);
     eDotCommandStatus ParsePageOffset(const std::string& command);
     eDotCommandStatus ParsePageLength(const std::string& command);
+    eDotCommandStatus ParsePageNumberColumn(const std::string& command);
     eDotCommandStatus ParseLineHeight(const std::string& command);
     eDotCommandStatus ParsePageNumber(const std::string& command);
     eDotCommandStatus ParseWordWrap(const std::string& command);

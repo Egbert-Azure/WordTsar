@@ -466,10 +466,9 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
             {
                 return ParseParagraphSpacing(upperCmd);
             }
-            if (cmdCode == "PC")  // Page Column
+            if (cmdCode == "PC")  // Page number column (0 = centered, the default)
             {
-                // NOTE: takes a numeric value -- use EvaluateExpression for math support
-                return DOT_NOTIMPLEMENTED;
+                return ParsePageNumberColumn(upperCmd);
             }
             if (cmdCode == "PE")  // Print Endnotes
             {
@@ -818,6 +817,54 @@ eDotCommandStatus cDotCommandParser::ParsePageOffset(const std::string& command)
             mLayoutState->SetPageOffsetOdd(newOffset);
             mLayoutState->SetPageOffsetEven(newOffset);
         }
+    }
+
+    return DOT_GOOD;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  command [in] full dot command string (.pc n)
+///
+/// @return true if parsed successfully, false otherwise
+///
+/// @brief
+/// Parses .PC (page number column) command: the horizontal position, from
+/// the left margin, at which the automatic page number prints. 0 means
+/// centered, which is also the default.
+///
+/////////////////////////////////////////////////////////////////////////////
+eDotCommandStatus cDotCommandParser::ParsePageNumberColumn(const std::string& command)
+{
+    bool incdec;
+    bool hasUnits;
+    double value = mDocument->EvaluateExpression(command.substr(3), incdec, hasUnits);
+
+    if (value < 0.0 && !incdec)
+    {
+        return DOT_ERROR;
+    }
+
+    COORD_T newColumn;
+
+    if (hasUnits)
+    {
+        // value is already in twips from EvaluateExpression
+        newColumn = static_cast<COORD_T>(value);
+    }
+    else
+    {
+        // bare number -- treat as inches (WS7 default)
+        newColumn = mDocument->ConvertToTwips(value, 'I', 0);
+    }
+
+    if (incdec)
+    {
+        mLayoutState->SetPageNumberColumn(mLayoutState->GetPageNumberColumn() + newColumn);
+    }
+    else
+    {
+        mLayoutState->SetPageNumberColumn(newColumn);
     }
 
     return DOT_GOOD;

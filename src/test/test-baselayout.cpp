@@ -8421,6 +8421,127 @@ TEST_CASE("Layout - Even/odd headers with .HEE and .HEO")
     CHECK(!headers.empty());
 }
 
+TEST_CASE("Layout - .HE at top of page 1 applies to page 1 itself (WS7: before any text on the page)")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert(".HE KAPITEL 8\r");
+    doc->Insert("Body text on page one\r");
+    layout->LayoutDocument(doc);
+
+    const auto& headers = layout->GetPageHeaders();
+    auto it = headers.find(1);
+    REQUIRE(it != headers.end());
+    CHECK(!it->second.empty());
+}
+
+TEST_CASE("Layout - .HE after body text on a page defers to the next page")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert("Body text before the header command\r");
+    doc->Insert(".HE Late Header\r");
+    doc->Insert("More body text on page one\r");
+    doc->Insert(".PA\r");
+    doc->Insert("Body text on page two\r");
+    layout->LayoutDocument(doc);
+
+    CHECK(layout->GetNumberOfPages() >= 2);
+    const auto& headers = layout->GetPageHeaders();
+    CHECK(headers.find(1) == headers.end());
+    auto it2 = headers.find(2);
+    REQUIRE(it2 != headers.end());
+    CHECK(!it2->second.empty());
+}
+
+TEST_CASE("Layout - .pg on with no .fo defined synthesizes an automatic page number footer")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert("Body text on page one\r");
+    layout->LayoutDocument(doc);
+
+    const auto& footers = layout->GetPageFooters();
+    auto it = footers.find(1);
+    REQUIRE(it != footers.end());
+    CHECK(!it->second.empty());
+}
+
+TEST_CASE("Layout - a real .fo footer suppresses the automatic page number")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert(".FO Custom Footer Text\r");
+    doc->Insert("Body text on page one\r");
+    layout->LayoutDocument(doc);
+
+    const auto& footers = layout->GetPageFooters();
+    auto it = footers.find(1);
+    REQUIRE(it != footers.end());
+    // Only the one real .FO line -- no duplicate automatic page number appended.
+    CHECK(it->second.size() == 1);
+}
+
+TEST_CASE("Layout - .op omits the automatic page number")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert(".OP\r");
+    doc->Insert("Body text on page one\r");
+    layout->LayoutDocument(doc);
+
+    const auto& footers = layout->GetPageFooters();
+    auto it = footers.find(1);
+    if (it != footers.end())
+    {
+        CHECK(it->second.empty());
+    }
+}
+
+TEST_CASE("Layout - .pc n shifts the automatic page number away from centered")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert("Body text on page one\r");
+    layout->LayoutDocument(doc);
+    const auto& centeredFooters = layout->GetPageFooters();
+    REQUIRE(centeredFooters.find(1) != centeredFooters.end());
+    REQUIRE(!centeredFooters.at(1).empty());
+    COORD_T centeredX = centeredFooters.at(1)[0].line.pagex;
+
+    cEditorCtrl editor2;
+    cDocument* doc2 = editor2.GetDocument();
+    cLayout* layout2 = dynamic_cast<cLayout*>(editor2.GetLayout());
+
+    doc2->Insert(".PC 1\"\r");
+    doc2->Insert("Body text on page one\r");
+    layout2->LayoutDocument(doc2);
+    const auto& shiftedFooters = layout2->GetPageFooters();
+    REQUIRE(shiftedFooters.find(1) != shiftedFooters.end());
+    REQUIRE(!shiftedFooters.at(1).empty());
+    COORD_T shiftedX = shiftedFooters.at(1)[0].line.pagex;
+
+    CHECK(shiftedX != centeredX);
+}
+
 
 // =========================================================================
 // GROUP H: Dot command parser edge cases (dotcommandparser.cpp)
@@ -9986,8 +10107,7 @@ TEST_CASE("Layout R2-1c: DOT_NOTIMPLEMENTED commands - group M-X")
     // Unknown 'O' command (to cover the break at line 421)
     CHECK(f.parser.ParseDotCommand(".OX on") == DOT_UNKNOWN);
 
-    // 'P' commands (PC, PE, PF, P# -- PA/PL/PO/PN already tested)
-    CHECK(f.parser.ParseDotCommand(".PC 2") == DOT_NOTIMPLEMENTED);
+    // 'P' commands (PE, PF, P# -- PA/PC/PL/PO/PN already tested)
     CHECK(f.parser.ParseDotCommand(".PE ") == DOT_NOTIMPLEMENTED);
     CHECK(f.parser.ParseDotCommand(".PF on") == DOT_NOTIMPLEMENTED);
     CHECK(f.parser.ParseDotCommand(".P# 1") == DOT_NOTIMPLEMENTED);

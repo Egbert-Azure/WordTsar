@@ -127,6 +127,7 @@ cLayoutState::cLayoutState(void)
     mWordWrapEnabled = true;         // Word wrap enabled by default
     mLandscapeMode = false;          // Portrait orientation by default
     mPrintPageNumbers = true;        // Auto page numbering enabled by default
+    mPageNumberColumn = 0;            // 0 = centered (the default)
 
     // Text formatting state (default: no formatting active)
     mBoldActive = false;
@@ -646,6 +647,18 @@ bool cLayoutState::ShouldPrintPageNumbers(void) const
 void cLayoutState::SetPrintPageNumbers(bool print)
 {
     mPrintPageNumbers = print;
+}
+
+
+COORD_T cLayoutState::GetPageNumberColumn(void) const
+{
+    return mPageNumberColumn;
+}
+
+
+void cLayoutState::SetPageNumberColumn(COORD_T column)
+{
+    mPageNumberColumn = column;
 }
 
 

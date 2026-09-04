@@ -108,6 +108,7 @@ struct sFormattingCheckpoint
     PAGE_T pageNumberOffset;
     ePageNumberFormat pageNumFormat;
     bool printPageNumbers;
+    COORD_T pageNumberColumn;
     bool landscapeMode;
     COORD_T pageLength;
     COORD_T paragraphSpacingBefore;
@@ -141,6 +142,7 @@ struct sFormattingCheckpoint
                pageNumberOffset == other.pageNumberOffset &&
                pageNumFormat == other.pageNumFormat &&
                printPageNumbers == other.printPageNumbers &&
+               pageNumberColumn == other.pageNumberColumn &&
                landscapeMode == other.landscapeMode && pageLength == other.pageLength &&
                paragraphSpacingBefore == other.paragraphSpacingBefore &&
                paragraphSpacingAfter == other.paragraphSpacingAfter &&
@@ -356,6 +358,7 @@ public:
     COORD_T GetAverageLineHeight(void) const;
     cDocument* GetDocument(void) const;
     PAGE_T GetCurrentPage(void) const;
+    LINE_T GetCurrentPageLineNumber(void) const;
     PARAGRAPH_T GetCurrentParagraph(void) const;
 
     // ----- Character/Variable Display Helpers -----

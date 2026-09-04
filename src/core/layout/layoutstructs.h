@@ -334,13 +334,16 @@ struct sLineLayout
     POSITION_T linestart;                   // Start position in paragraph (grapheme index, paragraph-relative)
     POSITION_T documentPosition;            // Absolute document position where line starts (used for caret navigation)
 
+    // Header/footer template use only; not compared in IsEqualTo().
+    bool appliesSamePage;
+
     // Constructor
     sLineLayout() : left(true), center(false), right(false), justify(false),
                      centerLine(false), rightLine(false),
                      pagex(0), pagey(0), screeny(0),
                      pagenumber(0), pageLineNumber(0), contentLineNumber(0), rawLineNumber(0),
                      lineheight(0), cumalativeheight(0), isPrintable(true),
-                     boxIndex(-1), linestart(0), documentPosition(0) {}
+                     boxIndex(-1), linestart(0), documentPosition(0), appliesSamePage(false) {}
 
     // Equality comparison for layout change detection (Phase 4: incremental layout)
     bool IsEqualTo(PARAGRAPH_T paragraphNum, LINE_T lineNum, const sLineLayout& other) const;

@@ -217,6 +217,8 @@ void cHeaderFooterManager::HandleHeaderFooterText(const std::string& text, const
     PARAGRAPH_T currentParagraph = mLayoutBase->GetCurrentParagraph();
     POSITION_T startPos = static_cast<POSITION_T>(textStart);  // Position within paragraph where content starts
 
+    line.appliesSamePage = (mLayoutBase->GetCurrentPageLineNumber() == 0);
+
     if (isHeader)
     {
         if (pageType == "E")
@@ -419,7 +421,8 @@ sHeaderFooterLine cHeaderFooterManager::LayoutHeaderFooterText(const std::string
 /// Inserts appropriate headers and footers for the specified page.
 ///
 /// Selects even/odd/both variants based on page number.
-/// Headers/footers only apply to pages AFTER they are defined.
+/// Headers/footers apply to pages after they are defined, and to their own
+/// defining page too if nothing has been laid out on it yet.
 /// Stores rendered lines in mPageHeaders and mPageFooters maps.
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -467,16 +470,20 @@ void cHeaderFooterManager::InsertHeadersFooters(PAGE_T page)
             headerStartPos = mStoreHeaderStartPos[i];
         }
 
-        // If we have a template, layout and store it
-        // Headers/footers apply to pages AFTER they are defined (not on definition page)
-        if (headerTemplate != nullptr && !headerTemplate->segments.empty() && headerTemplate->pagenumber < page)
+        // If we have a template, layout and store it.
+        if (headerTemplate != nullptr && !headerTemplate->segments.empty())
         {
-            // Layout at header position using stored text and document position for control code lookup
-            sHeaderFooterLine headerLine = LayoutHeaderFooterText(headerText, headerY, page, headerParagraph, headerStartPos);
-            mPageHeaders[page].push_back(headerLine);
+            bool headerApplies = (headerTemplate->pagenumber < page)
+                || (headerTemplate->appliesSamePage && headerTemplate->pagenumber == page);
+            if (headerApplies)
+            {
+                // Layout at header position using stored text and document position for control code lookup
+                sHeaderFooterLine headerLine = LayoutHeaderFooterText(headerText, headerY, page, headerParagraph, headerStartPos);
+                mPageHeaders[page].push_back(headerLine);
 
-            // Advance Y for next header
-            headerY += mLayoutBase->GetLineHeight();
+                // Advance Y for next header
+                headerY += mLayoutBase->GetLineHeight();
+            }
         }
     }
 
@@ -511,18 +518,115 @@ void cHeaderFooterManager::InsertHeadersFooters(PAGE_T page)
             footerStartPos = mStoreFooterStartPos[i];
         }
 
-        // If we have a template, layout and store it
-        // Headers/footers apply to pages AFTER they are defined (not on definition page)
-        if (footerTemplate != nullptr && !footerTemplate->segments.empty() && footerTemplate->pagenumber < page)
+        // If we have a template, layout and store it.
+        if (footerTemplate != nullptr && !footerTemplate->segments.empty())
         {
-            // Layout at footer position using stored text and document position for control code lookup
-            sHeaderFooterLine footerLine = LayoutHeaderFooterText(footerText, footerY, page, footerParagraph, footerStartPos);
-            mPageFooters[page].push_back(footerLine);
+            bool footerApplies = (footerTemplate->pagenumber < page)
+                || (footerTemplate->appliesSamePage && footerTemplate->pagenumber == page);
+            if (footerApplies)
+            {
+                // Layout at footer position using stored text and document position for control code lookup
+                sHeaderFooterLine footerLine = LayoutHeaderFooterText(footerText, footerY, page, footerParagraph, footerStartPos);
+                mPageFooters[page].push_back(footerLine);
 
-            // Move Y up for next footer (footers stack from bottom)
-            footerY -= mLayoutBase->GetLineHeight();
+                // Move Y up for next footer (footers stack from bottom)
+                footerY -= mLayoutBase->GetLineHeight();
+            }
         }
     }
+
+    InsertAutomaticPageNumber(page, footerY);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  page [in] page number to insert the automatic page number for
+/// @param  footerY [in] Y position for the footer area (unchanged from
+///                      InsertHeadersFooters if no real footer applied)
+///
+/// @return nothing
+///
+/// @brief
+/// Real WordStar 7's automatic page numbering (.pg, position set by .pc):
+/// when enabled and no real .fo footer occupies this page, prints the page
+/// number by itself, in the current font, at the column .pc set (0 = the
+/// default, centered between the margins). No inline formatting is
+/// supported here, matching the manual's own "Page numbers are printed in
+/// the default font. To use another font, insert a footer."
+///
+/////////////////////////////////////////////////////////////////////////////
+void cHeaderFooterManager::InsertAutomaticPageNumber(PAGE_T page, COORD_T footerY)
+{
+    if (mLayoutState->ShouldPrintPageNumbers() == false)
+    {
+        return;
+    }
+
+    if (mPageFooters[page].empty() == false)
+    {
+        return;
+    }
+
+    std::string pageNumStr = mLayoutBase->FormatPageNumber(page, mLayoutState->GetPageNumFormatForPage(page));
+    if (pageNumStr.empty())
+    {
+        return;
+    }
+
+    bool isEvenPage = (page % 2 == 0);
+    COORD_T pageOffset = isEvenPage ? mLayoutState->GetPageOffsetEven() : mLayoutState->GetPageOffsetOdd();
+    COORD_T leftMargin = pageOffset + mLayoutState->GetLeftMargin();
+    COORD_T rightMargin = pageOffset + mLayoutState->GetRightMargin();
+
+    COORD_T totalWidth = mLayoutBase->GetTextWidth(pageNumStr);
+    COORD_T column = mLayoutState->GetPageNumberColumn();
+    COORD_T textX;
+
+    if (column == 0)
+    {
+        COORD_T available = rightMargin - leftMargin;
+        COORD_T remaining = available - totalWidth;
+        if (remaining < 0)
+        {
+            remaining = 0;
+        }
+        textX = leftMargin + (remaining / 2);
+    }
+    else
+    {
+        textX = leftMargin + column;
+    }
+
+    sHeaderFooterLine result;
+    sLineLayout& line = result.line;
+
+    line.pagex = textX;
+    line.pagey = footerY;
+    line.screeny = 0;
+    line.pagenumber = page;
+    line.lineheight = mLayoutBase->GetLineHeight();
+    line.left = true;
+
+    sSegmentLayout segment;
+    segment.font = mLayoutState->GetCurrentFont();
+    segment.paragraph = 0;
+    segment.startPosition = 0;
+    segment.length = static_cast<POSITION_T>(pageNumStr.size());
+    segment.totalWidth = totalWidth;
+
+    COORD_T runningX = 0;
+    for (char ch : pageNumStr)
+    {
+        std::string glyph(1, ch);
+        result.graphemes.push_back(glyph);
+        segment.position.push_back(static_cast<float>(runningX));
+        runningX += mLayoutBase->GetTextWidth(glyph);
+    }
+
+    line.segments.push_back(segment);
+
+    mPageFooters[page].push_back(result);
 }
 
 
