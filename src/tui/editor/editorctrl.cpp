@@ -65,6 +65,8 @@
 
 // Spell checking
 #include "src/core/spellcheck/spellcheck.h"
+#include "unicodelib.h"
+#include "unicodelib_encodings.h"
 
 // Print preview (PDF via Quartz/Core Text, backend-neutral)
 #include "src/tui/print/tuiprintout.h"
@@ -2973,10 +2975,14 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                 if (index < graphemes.size())
                 {
                     const std::string& grapheme = graphemes[index];
-                    if (grapheme.size() == 1)
+                    if (grapheme == "'")
                     {
-                        unsigned char code = static_cast<unsigned char>(grapheme[0]);
-                        if ((std::isalpha(code) != 0) || (code == '\''))
+                        isWordChar = true;
+                    }
+                    else
+                    {
+                        std::u32string codepoints = unicode::utf8::decode(grapheme);
+                        if ((codepoints.empty() == false) && (unicode::is_alphabetic(codepoints[0]) != 0))
                         {
                             isWordChar = true;
                         }
@@ -3064,17 +3070,17 @@ void cWSEditorCtrl::SpellCheckWord(void)
     }
 
     // Trim trailing non-word characters that GetBlockText may include.
-    while (word.empty() == false)
+    // Operates on decoded codepoints so multi-byte UTF-8 letters (umlauts,
+    // ß, etc.) are not mistaken for trailing punctuation and stripped.
     {
-        unsigned char code = static_cast<unsigned char>(word.back());
-        if ((std::isalpha(code) == 0) && (code != '\''))
+        std::u32string codepoints = unicode::utf8::decode(word);
+        while ((codepoints.empty() == false)
+            && (unicode::is_alphabetic(codepoints.back()) == 0)
+            && (codepoints.back() != U'\''))
         {
-            word.pop_back();
+            codepoints.pop_back();
         }
-        else
-        {
-            break;
-        }
+        word = unicode::utf8::encode(codepoints);
     }
 
     if (word.empty() == true)
