@@ -296,15 +296,9 @@ if(BUILD_TUI)
         src/test/test-tuilayout.cpp
         src/test/test-tuicolorutils.cpp
         src/test/test-tuicolorpicker.cpp
-        src/tui/wordstartui/src/colorutils.cpp
-        src/tui/wordstartui/src/tuidefs.cpp
-        src/tui/wordstartui/src/colorfield2d.cpp
-        src/tui/wordstartui/src/huebar.cpp
-        src/tui/wordstartui/src/widget.cpp
-        src/tui/wordstartui/src/screen.cpp
-        src/tui/wordstartui/src/terminaldriver.cpp
-        src/tui/wordstartui/src/utf8helper.cpp
-        ${WORDTSAR_TUI_NEUTRAL_SOURCES}
+        src/test/test-tuimenuwalk.cpp
+        src/tui/print/tuiprintout.cpp
+        ${WORDTSAR_WSTUI_SOURCES_NO_MAIN}
         ${WORDTSAR_CORE_SOURCES}
         ${WORDTSAR_INPUT_SOURCES}
         ${WORDTSAR_FILE_SOURCES}
@@ -331,14 +325,16 @@ if(BUILD_TUI)
         WORDTSAR_TUI_BUILD
         WORDTSAR_NO_QT
         WORDTSAR_USE_SIMPLE_FONTS
+        WORDTSAR_TUI_TEST_HOOKS
         MINIZ_EXPORT=
     )
 
     find_library(COREFOUNDATION_LIBRARY CoreFoundation)
     find_library(CORETEXT_LIBRARY CoreText)
+    find_library(COREGRAPHICS_LIBRARY CoreGraphics)
     target_link_libraries(WSTuiTest PRIVATE
         "-framework Foundation" "-framework AppKit"
-        ${COREFOUNDATION_LIBRARY} ${CORETEXT_LIBRARY})
+        ${COREFOUNDATION_LIBRARY} ${CORETEXT_LIBRARY} ${COREGRAPHICS_LIBRARY})
 
     set_target_properties(WSTuiTest PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/test"

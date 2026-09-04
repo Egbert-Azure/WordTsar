@@ -88,6 +88,8 @@ public:
     bool IsOpen(void) const;
     void Close(void);
 
+    const std::vector<sMenuItem>& GetItems(void) const;
+
 private:
     int MenuColumn(int menuIndex) const;
     int MenuTextWidth(int menuIndex) const;

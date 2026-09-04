@@ -103,3 +103,11 @@ file(GLOB WORDTSAR_WSTUI_SOURCES
     "${WS_SRC_DIR}/tui/wordstartui/src/*.h"
 )
 list(APPEND WORDTSAR_WSTUI_SOURCES ${WORDTSAR_TUI_NEUTRAL_SOURCES})
+
+# ------------------------------------------------------------------------
+# Same as WORDTSAR_WSTUI_SOURCES but without main.cpp, so WSTuiTest can link
+# the real cWSWordTsar (menu tree, dialogs, editor glue) while still
+# supplying its own main() via doctest.
+# ------------------------------------------------------------------------
+set(WORDTSAR_WSTUI_SOURCES_NO_MAIN ${WORDTSAR_WSTUI_SOURCES})
+list(REMOVE_ITEM WORDTSAR_WSTUI_SOURCES_NO_MAIN "${WS_SRC_DIR}/tui/main.cpp")

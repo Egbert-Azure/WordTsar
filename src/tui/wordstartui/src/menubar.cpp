@@ -1000,6 +1000,19 @@ void cMenuBar::Close(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return the top-level menu items, each with its full entries tree
+///
+/// @brief
+/// Read-only access to the built menu tree (walked by tests and tooling).
+///
+/////////////////////////////////////////////////////////////////////////////
+const std::vector<sMenuItem>& cMenuBar::GetItems(void) const
+{
+    return mItems;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  int menuIndex [in] menu to open
 ///
 /// @return nothing
