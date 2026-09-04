@@ -2981,8 +2981,9 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                     }
                     else
                     {
-                        std::u32string codepoints = unicode::utf8::decode(grapheme);
-                        if ((codepoints.empty() == false) && (unicode::is_alphabetic(codepoints[0]) != 0))
+                        char32_t codepoint = 0;
+                        if ((unicode::utf8::decode_codepoint(grapheme.data(), grapheme.size(), codepoint) > 0)
+                            && (unicode::is_alphabetic(codepoint) != 0))
                         {
                             isWordChar = true;
                         }
@@ -2999,7 +3000,9 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                     continue;
                 }
 
-                if ((word.size() > 1) && (ignored.count(word) == 0) && (checker.CheckWord(word) == false))
+                size_t wordGraphemeCount = word.empty() ? 0 : (index - wordStart);
+
+                if ((wordGraphemeCount > 1) && (ignored.count(word) == 0) && (checker.CheckWord(word) == false))
                 {
                     misspelled++;
                     std::vector<std::string> suggestions = checker.suggestions(word);
@@ -3020,7 +3023,7 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                         {
                             POSITION_T pos = paraStart + static_cast<POSITION_T>(wordStart);
                             mDocument->SetPosition(pos);
-                            Delete(pos, static_cast<POSITION_T>(word.size()));
+                            Delete(pos, static_cast<POSITION_T>(wordGraphemeCount));
                             InsertText(suggestions[static_cast<size_t>(selected)]);
                             LayoutDocument(false);
                             rescan = true;
