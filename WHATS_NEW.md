@@ -4,174 +4,112 @@ Release history for WordTsar, in reverse chronological order.
 
 ## 0.11.0 Beta (2026-09-04)
 
-### Menu items now do what the keyboard does, in both keyboard modes
+### Menu items now match the keyboard, in both keyboard modes
 
-A full menu/handler audit of both frontends found that menu clicks and keyboard
-chords could disagree: menus fired commands through whichever input handler
-(WordStar or Modern) the user currently had selected in Preferences, but every
-menu wrapper sent WordStar-style codes regardless. Under Modern mode this made
-much of the Style, Layout, and Utilities menus silently do the wrong thing —
-Style > Bold opened Print Preview, Style > Convert Case marked a block, and so
-on — while looking completely normal. Both GUI and TUI now dispatch every menu
-item through a dedicated WordStar-mode input handler that is never affected by
-the user's keyboard-mode preference, so a menu click always does what its
-label says, in either mode.
+Fixed: some menu items could trigger the wrong command when using the Modern/CUA keyboard mode instead of WordStar mode. Menu clicks now always do what their label says, in either mode.
 
-The same audit turned up several items that had never had a real
-implementation behind them, and one that quietly did the wrong real thing:
+### Other fixes and changes
 
-- **^K R / Insert > File** now inserts the chosen file's content at the
-  cursor — the actual WS7 command — instead of replacing the whole open
-  document (which is what File > Open/Read is for, and still does).
-- **Sentence Case (^K .)** now does real sentence case (capitalize after
-  `.`/`?`/`!` plus a space, lowercase the rest, leave a standalone "I" alone)
-  instead of title case, which every menu label had been claiming all along.
-- **`.pc`** (page number column) is implemented — automatic page numbers now
-  print at a configurable column instead of always centered-or-nothing, and
-  the automatic-numbering renderer itself is new: it previously had a flag
-  with no consumer anywhere in the render or print pipeline.
-- Removed ten menu items with no real target at all (Mark Text for Index,
-  Spell Check Rest of Notes, Column Break, Language Change, Repeat Keystroke,
-  Note Options Starting Number and Convert at Print, Style Settings, Current
-  Drive, Variable > Line) and the vestigial Reformat Paragraph (^B) — this
-  engine reflows every paragraph on every relayout, so there's no manual
-  reformat step for it to perform.
-- Wired several TUI menu items (Header, Footer, Keep Lines Together on Page,
-  Switch Modes) that had real dot-command or keyboard support underneath but
-  no menu entry connected to it, closing a GUI/TUI parity gap.
-
-A new regression test walks the real TUI menu tree the app itself builds and
-asserts every enabled item resolves to an actual handler, catching future
-drift at the dispatch-resolution level without needing a second maintained
-copy of what each item should do. `docs/MENU_AUDIT.md`, `KEY_MAPPING.md`, and
-`docs/QUICKREF.WS` are updated to match.
+- **^K R / Insert File** now inserts the chosen file at the cursor, matching real WordStar 7 — use **File > Open** to replace the whole document instead.
+- **Sentence Case (^K .)** now capitalizes the first letter of each sentence and lowercases the rest, instead of capitalizing every word.
+- **New dot command `.pc`**: sets the column where automatic page numbers print, instead of always centering them.
+- Removed several menu items that had no effect when clicked (Mark Text for Index, Spell Check Rest of Notes, Column Break, Language Change, Repeat Keystroke, Note Options Starting Number/Convert at Print, Style Settings, Current Drive, Variable > Line), along with Reformat Paragraph (^B) — not needed, since WordTsar reflows text automatically as you type.
+- The terminal UI's Header, Footer, Keep Lines Together, and Switch Modes menu items now work — these already worked from the keyboard, they just weren't reachable from the menu.
 
 ## 0.10.3 Beta (2026-09-02)
 
-### Code-review fixes for the TOC/index/DOCX-numbering work (0.9.0-0.10.2)
+### DOCX import fixes
 
-A `/code-review` pass surfaced several real issues in the last few releases' work, all fixed:
-
-- **Two existing tests were now stale, not just permissive**: `.IX`/`.TC` correctly went from `DOT_NOTIMPLEMENTED` to `DOT_GOOD` in 0.10.0, but the pre-existing test suite still asserted the old status for both — updated to match the intended new behavior.
-- **A DOCX table whose first row wraps its cells in `w:sdt`** (a common Word content-control pattern) was silently dropped entirely, worse than the old placeholder it replaced. Column count is now computed from the widest row in the table, not just the first — this also fixes column misalignment on ragged tables where a later row has more cells than the first.
-- **Multi-level DOCX numbering with a compound `lvlText`** (e.g. `"%1.%2."`, common outline/legal numbering) only substituted its own level's placeholder, leaving parent tokens like `%1` literal in the output. Now every ancestor level's own placeholder is resolved using that level's own counter and number format.
-- **A deeper numbering level's counter was reset to 0** (instead of cleared) when a shallower level advanced, so a nested list with its own `w:start` silently ignored it and restarted at 1 instead. Now cleared properly, so the next use of that level correctly re-applies its own start value.
-- **A bare `.tc`/`.tcN` with no entry text** produced a blank line in the generated `.TOC`/`.T0N` file instead of being skipped, unlike the index generator's equivalent (correct) behavior.
-- **The "no entries found" dialog** was reloading and re-laying-out the whole source file from disk for no reason — the document was never touched in that path to begin with.
-- **TOC/Index entry insertion** (the dialog-driven Insert commands added in 0.10.2) had its "insert the dot command as its own line" logic duplicated verbatim between the GUI and TUI. Consolidated into one shared `cEditorBase::InsertDotCommandEntry()`, which also now strips any embedded line break from the typed text so it can't split a dot-command line in two.
-- **A hand-rolled Roman-numeral converter** in the DOCX numbering code duplicated the existing, already-tested one in the WordStar page-numbering code. Extracted both into shared `ToRomanNumeralLower`/`Upper` functions so a future correctness fix only has to happen once.
-
-New regression tests cover the multi-level numbering fix (a two-level list with different `w:start` values on each level, confirming both placeholders substitute correctly and a restarted level honors its own start) and the bare-`.tc`-is-skipped fix. Full DOCX/TOC/Index/dot-command test suites pass; the wider WSTest suite's pre-existing viewport/scrollbar flakiness (unrelated, confirmed via `git stash` against a clean baseline) is untouched by this pass.
+- Fixed: a table whose first row used certain Word formatting (content controls) could import with the entire table missing.
+- Fixed: multi-level numbered lists using combined numbering (e.g., "1.1.") could show literal placeholder text instead of real numbers, and a restarted list level could ignore its intended starting number.
+- Fixed: an empty table-of-contents or index entry produced a blank line in the generated file.
 
 ## 0.10.2 Beta (2026-09-01)
 
-### TOC and Index entries can now actually be inserted, with real text
+### Table of Contents and Index entries now insert real text
 
-0.10.0 built real generation of `.tc`/`.ix` entries into `.TOC`/`.IDX` files — but tracing a user report of "no entries found" against a real document turned up a deeper, pre-existing gap: there was never a working way to *create* a well-formed entry in the first place. `TOCEntry()` was a stub (its own comment: `// @TODO - get text via dialog`) that inserted a bare `.tc` with no text at all; `IndexEntry()` tried to simulate the classic `^O N I` keychord, but `^O N` itself was wired to "not implemented." Both Insert menu items were disabled in the GUI as a result.
-
-Both now show a real dialog — `QInputDialog::getText` in the GUI, `wsdialogs::InputBox` in the TUI — prompting for the entry text exactly as the WordStar 7 manual describes (the whole line for a TOC entry, including any leading-space indentation and a `#` page-number placeholder; the word or phrase for an index entry, with its `+`/`-`/`,` conventions), then inserts `.tc <text>` or `.ix <text>` as its own line. The TUI's Insert → Index/TOC Entry submenu items are wired to the same dialogs.
+**Insert > TOC Entry** and **Insert > Index Entry** now prompt you for the entry text, matching the WordStar 7 manual. Previously these inserted an empty placeholder.
 
 ## 0.10.1 Beta (2026-09-01)
 
-### GUI's Open/Save dialogs now actually start in your default directory
+### GUI's Open/Save dialogs now start in your default folder
 
-User-reported: the TUI correctly opens to `~/Documents` (or your configured default), but the GUI didn't. Root cause: `cEditorCtrl::PromptForLoadFile()`/`PromptForSaveFile()` (the GUI's own `QFileDialog` wrappers) passed an empty starting directory to Qt with a comment claiming that meant "use last opened" — it doesn't; Qt falls back to the process's working directory or its own native-panel memory instead. `mFileDir` (which `ReadConfig()` already correctly sets to your configured default, or `~/Documents`, at startup) was computed correctly the whole time but never actually reached the dialog call. Both dialogs now pass it through.
+Fixed: the GUI's Open and Save dialogs opened somewhere unexpected instead of your configured default folder (or `~/Documents`). The terminal UI already did this correctly.
 
 ## 0.10.0 Beta (2026-09-01)
 
-### Real table of contents and index generation (TUI Opening Menu)
+### Real table of contents and index generation
 
-The Opening Menu's `I` (index a document) and `T` (table of contents) commands were grayed out — real WordStar 7 features with no implementation behind them at all. Both now work end to end: pick a document from the file browser, and every `.tc`/`.tc1`-`.tc9` entry (table of contents) or `.ix` entry (index) already marked in it is collected, resolved against the document's real pagination, and written to a proper output file — `name.TOC` for the default table, `name.T01` through `name.T09` for numbered tables, `name.IDX` for the index — which then opens for editing, matching the manual's own "you can edit the table of contents file to make any formatting changes."
+The terminal UI's Opening Menu **I** (index) and **T** (table of contents) commands now work. Pick a document, and every `.tc`/`.ix` entry in it is collected and written to a real output file — `name.TOC` (or `name.T01`–`name.T09` for numbered tables) and `name.IDX` — which then opens for editing.
 
-Table of contents entries support the real `#` page-number placeholder (`\#` for a literal `#`) and leading-space indentation, exactly as the real Insert → TOC Entry dialog describes. Index entries support `+` for a bold page number, `-` for a cross-reference (no page number), `,` for a subreference indented under its main entry, and `\` to escape any of those as a literal character. Duplicate index entries merge into one line with a combined, sorted page list; the whole index sorts alphabetically, case-insensitively.
-
-The two `.tc`/`.ix` dot commands themselves — previously flagged "not implemented" in the editor even though the manual documents them fully — are now recognized properly.
-
-Not implemented: real WordStar's other way to mark an index entry, an inline start/end span (`^PK`, "Mark Text for Index") rather than a standalone `.ix` line — a separate, pre-existing gap (WordTsar's native `.ws` reader already discards this marker on load) that this pass didn't touch. The "Index Every Word" auto-indexing mode and the TOC/Index dialogs' page-range and odd/even filters are also not implemented; every entry in the whole document is always included.
+- Table of contents entries support a `#` placeholder that's replaced with the real page number, and leading-space indentation.
+- Index entries support `+` (bold page number), `-` (cross-reference, no page number), and `,` (sub-entry).
+- Not yet supported: marking an index entry by selecting text (`^PK`) rather than typing a `.ix` line, "Index Every Word" auto-indexing, and page-range/odd-even filters.
 
 ## 0.9.0 Beta (2026-09-01)
 
-### DOCX import: real tables, not a placeholder
+### DOCX import: real tables, numbered lists, and tab stops
 
-Opening a Word document containing a table used to produce a bare `<<< TABLE >>>` marker and nothing else — the actual cell content was discarded. Tables now import as real text: each row becomes a line, cells are tab-separated with a real tab stop aligning the columns. Column widths are approximated as equal-width rather than matching the source document's own widths, since WordStar has no table/column-grid concept to map them onto.
-
-### DOCX import: numbered and bulleted lists keep their markers
-
-List items used to lose their numbers and bullets entirely on import — the text survived, but "1. First step" and "2. Second step" both came in as indistinguishable plain paragraphs. Numbering is now resolved against the document's own list definitions (`word/numbering.xml`) and written out as literal marker text — decimal, lettered, and Roman-numeral formats all render correctly, multi-level lists renumber the way Word itself does (a level-1 item resets any deeper levels' counters), and bullets come in as a plain-text bullet. Since WordStar has no live auto-numbering field, the marker is correct at import time but won't renumber itself if the list is edited afterward.
-
-### DOCX import: custom tab stops
-
-Custom tab stops (centered, right-aligned, decimal-aligned) defined in a paragraph or its style are now emitted as a real tab-stop dot command, instead of being silently parsed and discarded.
-
-### Fixed a real crash: any DOCX with no paragraph styles defined would abort on open
-
-Found while adding a test fixture for the numbering work above, not something this pass went looking for: `MergeParagraphStyles()` indexed into its style list with no bounds check, so a document whose `styles.xml` defines zero paragraph styles at all — an edge case a hand-built or programmatically generated `.docx` can hit even though real Word documents almost never do — segfaulted immediately on open, before any content ever rendered. The same unguarded index made a dangling style reference (a paragraph naming a style ID that doesn't exist in `styles.xml`) crash the same way. Both now return sensible defaults instead of reading out of bounds.
-
-Paragraph borders and shading remain unimplemented, deliberately: WordStar has no paragraph-border or shading concept to translate them onto, and approximating one with literal ASCII art wasn't part of what this pass covered.
+- Tables now import with their actual content — previously a table produced an empty placeholder marker.
+- Numbered and bulleted lists now keep their numbers/bullets on import, including multi-level lists. (Since WordStar has no live numbering field, the numbers won't automatically renumber if you edit the list afterward.)
+- Custom tab stops (centered, right-aligned, decimal-aligned) now carry over correctly instead of being dropped.
+- Fixed a crash opening some DOCX files with unusual style definitions.
+- Paragraph borders and shading are still not supported — WordStar has no equivalent formatting to convert them to.
 
 ## 0.8.0 Beta (2026-09-01)
 
-### Terminal UI font discovery now finds real installed fonts on macOS
+### Terminal UI now finds your installed fonts correctly on macOS
 
-`ws` had no macOS-specific font discovery at all — it silently fell back to a Linux-only directory scan (`/usr/share/fonts`, etc.) that finds nothing on a Mac. This meant printing or classifying anything other than the three built-in fallback font families (Courier, Times, Helvetica) never resolved to the font's actual installed file. Now backed by Core Text's own font collection, so print embeds the real installed file — e.g. a genuine `CourierNewPSMT` from `Courier New.ttf`, not a generic substitute.
+Fixed: the terminal UI (`ws`) couldn't find installed fonts on macOS, so printing always used a generic substitute instead of your actual font.
 
-### Removed the last of the STB TrueType dependency
+### New splash screen
 
-The terminal UI's TrueType-metrics backend (`stbtruetype.cpp`) turned out to already be dead code on macOS — Core Text has handled real text-layout metrics here for a while. The one genuinely live use left was WordStar-format font classification (reading a font's OS/2/PANOSE data and glyph coverage to pick the right typestyle when saving a `.ws` file), shared by both the GUI and the terminal UI. That's now Core Text too, so the vendored STB TrueType library is gone from the build entirely — nothing left in WordTsar depends on it.
-
-### New splash screen artwork
-
-Both the GUI and the terminal UI now open with an updated splash based on the original WordTsar cover art. The terminal UI's version reworks it as a letter-spaced title and rule, since a plain terminal can't display an actual image.
+Both the GUI and terminal UI open with updated splash artwork.
 
 ## 0.7.6 Beta (2026-09-01)
 
-### Fixed: garbled accented characters (ü, ä, ö, „ ") in `ws` PDF printing/preview
+### Fixed: garbled accented characters in terminal UI PDF printing/preview
 
-Printing or previewing a document containing German umlauts, curly quotes, or other non-ASCII characters from the terminal UI could silently corrupt them in the output PDF — e.g. "Glück" became "Glˆ…ck". Root cause: the terminal UI's PDF engine (libharu) drew one grapheme at a time through a single shared, stateful UTF-8 text encoder, and that per-character call pattern could desynchronize the encoder's internal byte-sequence tracking, splitting a multi-byte character into two bogus single-byte glyphs. Replacing the PDF engine with macOS's native Quartz/Core Text (below) draws each grapheme as a proper Unicode string with no shared encoder state to desynchronize, eliminating this entire class of bug rather than patching around it.
-
-### Terminal UI's PDF printing now uses Quartz/Core Text, not a vendored library
-
-`ws`'s `^KP`/Print Preview PDF generation no longer depends on the embedded libharu library — it now draws through the same macOS frameworks (Quartz, Core Text) the GUI already uses for its own printing. Output is unchanged in appearance (same fonts, positions, bold/italic/underline handling); see the fix above for the one behavior change this surfaced.
+Printing or previewing a document from the terminal UI could corrupt accented characters (ü, ä, ö) and curly quotes in the resulting PDF. Fixed.
 
 ## 0.7.5 Beta (2026-09-01)
 
-### Help and Level system corrected to real WordStar 7, not WordStar 4
+### Help and keyboard layout corrected to match real WordStar 7
 
-Contextual help now lives on **F1** (press F1, then any command key, for a one-line description), with **F1 F1** cycling a 5-level (0-4) help display — matching real WordStar 7.0D exactly, not the WordStar 4.0 design this was first built against. Date/time/filename/macro insertion moved to **^M** (the real WordStar 7 Macro Menu), freeing `^J` back to unassigned. On the GUI, **⌘/** mirrors F1, and Preferences moved fully to **⌘,** now that F1 has a real job. See [KEY_MAPPING.md](KEY_MAPPING.md) for the full reference.
+Contextual help now lives on **F1** — press F1, then any command key, for a one-line description. **F1 F1** cycles through 5 help detail levels. Date/time/filename/macro insertion moved to **^M** (the real WordStar 7 Macro Menu). On the GUI, **⌘/** also opens help, and Preferences moved to **⌘,**. See [KEY_MAPPING.md](KEY_MAPPING.md) for the full reference.
 
-### The terminal Opening Menu, made honestly WordStar 7
+### Terminal UI Opening Menu now matches real WordStar 7
 
-`ws`'s Opening Menu grid now matches real WordStar 7's letter-for-letter: `D S N P \ K I T X` on the left, `L C E O Y F M R A ?` on the right, with `F1` for help. Recent Files and Preferences — WordTsar's own additions, not real WS7 concepts — are reachable by cursor and Enter without occupying a borrowed letter. `P` now prints a file straight from the menu; `?` shows a real status screen (version, current directory, free disk space).
+The letter grid now matches WordStar 7 exactly. **P** prints a file directly from the menu; **?** shows version, current directory, and free disk space.
 
 ### Fixed in this release
 
-- The Opening Menu's key-letter color, previously a hard-to-read blue on a dark terminal background, now uses the same gold accent as the splash screen.
-- The `^J`-to-`^M` rename had left 16 GUI menu functions and 6 TUI Insert-menu items hardcoding the old chord, silently disabling date/time/filename/macro insertion from those menus.
+- The Opening Menu's key-letter color is now easier to read on a dark terminal background.
+- Date/time/filename/macro insertion from several GUI and terminal UI menu items had silently stopped working after the ^M change above — fixed.
 
 ## 0.6.1 Beta (2026-08-31)
 
 ### Real printing, not just preview
 
-`File → Print` on the GUI now opens the OS print dialog and submits to a printer, instead of silently reusing the Print Preview flow. The TUI's `^KP` now auto-picks a default CUPS printer when exactly one exists and prompts otherwise (macOS ships with no default destination even with printers configured), and gained a real Windows print path.
+**File > Print** on the GUI now opens the system print dialog and prints directly. The terminal UI's `^KP` now picks a default printer automatically when there's only one, and prompts otherwise.
 
 ### Reliable Preferences, Find Again, and Fullscreen shortcuts on macOS
 
-macOS reserves F1/F2, F3, and F11 for brightness, Mission Control, and Show Desktop, so they never reliably reached the app. **⌘,**, **⌘⌃F**, and **⌘G** are now the primary shortcuts for Preferences, Fullscreen, and Find Again; the F-keys still work as a bonus if freed in System Settings.
+macOS reserves F1/F2, F3, and F11 for its own use, so they didn't always reach the app. **⌘,**, **⌘⌃F**, and **⌘G** are now the primary shortcuts for Preferences, Fullscreen, and Find Again; the F-keys still work if you've freed them in System Settings.
 
-### Spell-check language actually applies on macOS
+### Spell-check language now applies correctly on macOS
 
-The Spell Check Language preference was silently ignored — now wired through `NSSpellChecker setLanguage:` end to end.
+Fixed: the Spell Check Language preference was ignored.
 
-### WordStar comment lines (`..` / `.IG`) survive Save As Word
+### WordStar comment lines survive Save As Word
 
-`.docx` export previously dropped comment lines entirely; they're now preserved as hidden text and correctly round-trip back in on import without becoming visible.
+`..` and `.IG` comment lines used to be dropped when saving as `.docx`. They're now preserved and round-trip correctly.
 
 ### Also fixed
 
-- Splash screen and main window now open centered on the same screen, instead of disagreeing on placement.
-- About dialog: correct version string, this fork's own GitHub link (not upstream SourceForge), and an honest third-party dependency list.
-- New documents no longer default to `~` by accident — they use `~/Documents` unless a default directory is set in Preferences.
-- The flaky comm-server QoS-1 retransmit test, root-caused (a timing margin, not a logic bug) and fixed, along with two related test-hygiene hangs found while verifying it.
+- Splash screen and main window now open centered on the same screen.
+- About dialog now shows the correct version, this fork's GitHub link, and an accurate list of included libraries.
+- New documents default to `~/Documents` instead of your home folder, unless you've set a different default in Preferences.
 
 ## 0.6.0 Beta (2026-08-30) — macOS fork
 
@@ -179,20 +117,19 @@ This fork trims WordTsar down to a macOS-only build. See the [README](README.md)
 
 ### Save As Word (.docx)
 
-WordTsar can now write `.docx` files, not just read them. File → Save As offers Word format alongside Wordstar and RTF. Tables and headers/footers aren't covered yet.
+WordTsar can now write `.docx` files, not just read them. **File > Save As** offers Word format alongside WordStar and RTF. Tables and headers/footers aren't covered yet.
 
 ### Terminal UI, buildable again
 
-The `ws` terminal UI builds alongside the GUI from the same source (`-DBUILD_TUI=ON`, off by default). See [BUILDING.md](BUILDING.md#build-targets) for how to choose between the GUI, the TUI, or both.
+The `ws` terminal UI builds alongside the GUI. See [BUILDING.md](BUILDING.md#build-targets) for how to choose between the GUI, the TUI, or both.
 
 ### Fixed
 
-- A crash in the macOS spell checker when adding a word to the dictionary (wrong `NSSpellChecker` API was being called).
+- A crash in the macOS spell checker when adding a word to the dictionary.
 
 ### Removed
 
 - Windows and Linux project files, build scripts, and packaging assets. Full cross-platform support remains available from the original project at [wordtsar.ca](http://wordtsar.ca).
-
 
 ## 0.5.1804 Alpha (2026-03-01)
 
@@ -200,11 +137,11 @@ The `ws` terminal UI builds alongside the GUI from the same source (`-DBUILD_TUI
 
 Completely rewritten layout and rendering engines for improved performance, accuracy, and future capabilities.
 
-Performance difference is good. version 0.3 took about 800ms to lay out a full novel of around 110,000 words. Version 0.5 does the same novel in about 430ms.
+Performance difference is good. Version 0.3 took about 800ms to lay out a full novel of around 110,000 words. Version 0.5 does the same novel in about 430ms.
 
 ### Wordwrap
 
-Wordwrap now behaves a little more like Word or LibreOffice Writer, etc. Wordstar would not wrap a solid line of characters... a single really long line would be made. We now wrap at the right margin instead of doing that.
+Wordwrap now behaves a little more like Word or LibreOffice Writer, etc. WordStar would not wrap a solid line of characters — a single really long line would be made. We now wrap at the right margin instead of doing that.
 
 ### Recent Files
 
@@ -212,21 +149,20 @@ Recent files are remembered for easy file loading.
 
 ### Keyboard handlers
 
-- Wordstar keyboard handler (default)
+- WordStar keyboard handler (default)
 
 - Microsoft Word/CUA keyboard handler **(very much untested)**
 
-Changing keyboard handlers does not change how WordTsar works... it's still a Wordstar clone. So don't expect MS Word style selection block handling, etc.
+Changing keyboard handlers does not change how WordTsar works — it's still a WordStar clone. So don't expect MS Word style selection block handling, etc.
 
 ### New layout/formatting commands
 
 | Keys | Menu | Action | MS Word (CUA) Matches |
 | - | - | - | - |
-| ^O\< | ALt-L-L | Left Justify Pargaraph Toggle | ^L |
+| ^O\< | Alt-L-L | Left Justify Paragraph Toggle | ^L |
 | ^O= | Alt-L-N | Center Justify Paragraph Toggle | ^E |
 | ^O\> | Alt-L-G | Right Align Paragraph Toggle | ^R |
-| ^O+ | Alt-L-J | Justift Paragraph Toggle | ^J |
-
+| ^O+ | Alt-L-J | Justify Paragraph Toggle | ^J |
 
 ### Editor Color Configuration
 
@@ -318,7 +254,7 @@ Large improvements to RTF import and export including Unicode support, paragraph
 
 ### Top Status Bar
 
-items are clickable to select font, set attributes, and alignment
+Items are clickable to select font, set attributes, and alignment.
 
 ### Bottom Status Bar
 
@@ -326,7 +262,7 @@ Insert/Overwrite and Page number are clickable items.
 
 ### Backup file changed
 
-backup file changed from *filename.ws-bak* to *filename-bak.ws* so it can be opened easily by WordTsar
+Backup file changed from *filename.ws-bak* to *filename-bak.ws* so it can be opened easily by WordTsar.
 
 ### International Input
 
@@ -334,25 +270,21 @@ CJK (Japanese, Chinese, Korean) and Thai input method support.
 
 ### Terminal Interface
 
-Run from a shell or via ssh. ***Pre-alpha***. There is some mouse support, but it's patchy at best. Some dialogs require mouse and keyboard for navigation and/or selection. Use at your own risk. Executable name is **ws** (Gui executable name is **WordTsar**)
+Run from a shell or via ssh. ***Pre-alpha***. There is some mouse support, but it's patchy at best. Some dialogs require mouse and keyboard for navigation and/or selection. Use at your own risk. Executable name is **ws** (GUI executable name is **WordTsar**).
 
-- **note**: TUI is not designed to work over a serial interface to a terminal (such at vt-100, Wyse-60, etc)
+- **note**: TUI is not designed to work over a serial interface to a terminal (such as vt-100, Wyse-60, etc)
 
 ### Math Expressions in Dot Commands
 
-Dot commands now support full arithmetic with unit-aware calculations. Use expressions like `.rm 4c + 2i` to mix centimeters and inches, `.po 8 \* 2i` for multiplication, or `.lm +2c` to adjust margins relative to their current value. All margin, page setup, and tab commands support math with inches, centimeters, millimeters, and points. (Limitation: addition and subtraction can mix measurements units i.e. .5i + 2c. Multiplation and Division cannot, and the dot command will be marked as an error)
-
-### Math Library
-
-Switch from exprtk to picomath for math routines cut the binary size down by half.
+Dot commands now support full arithmetic with unit-aware calculations. Use expressions like `.rm 4c + 2i` to mix centimeters and inches, `.po 8 \* 2i` for multiplication, or `.lm +2c` to adjust margins relative to their current value. All margin, page setup, and tab commands support math with inches, centimeters, millimeters, and points. (Limitation: addition and subtraction can mix measurement units, e.g. .5i + 2c. Multiplication and Division cannot, and the dot command will be marked as an error.)
 
 ### Wordstar files
 
-If a file being loaded doesn't have a known extension, WordTsar will do its best to figure out if it is a Wordstar file and load it. If that fails, it will load as plain text.
+If a file being loaded doesn't have a known extension, WordTsar will do its best to figure out if it is a WordStar file and load it. If that fails, it will load as plain text.
 
-If saving as Wordstar will result in data loss, a dialog will be displayed.
+If saving as WordStar will result in data loss, a dialog will be displayed.
 
-Known extensions for Wordstar files are .ws, .ws3, .ws4, .ws5, .ws6, .ws7, .ws8
+Known extensions for WordStar files are .ws, .ws3, .ws4, .ws5, .ws6, .ws7, .ws8
 
 ### Bug Fixes
 
@@ -362,7 +294,7 @@ Multiple bug fixes, some in the ticket system on Sourceforge, most not.
 
 ### .rr command
 
-The .rr command currently assumes everthing is Courier New 12 point font, so each dash (-) represents 144 twips or 0.1 of an inch (2.54 mm). The width of a single Courier New 12 point character. As far as I can tell, Worstar 7.0D also uses 0.1 of an inch.
+The .rr command currently assumes everything is Courier New 12 point font, so each dash (-) represents 144 twips or 0.1 of an inch (2.54 mm) — the width of a single Courier New 12 point character. As far as we can tell, WordStar 7.0D also uses 0.1 of an inch.
 
 The .rr command has been extended with tab types. ^ is a center align tab, and \> is a right align tab. For example:
 
@@ -374,8 +306,7 @@ The .tb command has been extended with tab type prefixes. ^ is center tab, \> is
 
 `.tb 1.0i ^2.1i 3i \>5i \#6.0i`
 
-numbers with no measurement specifier (i for inches, etc) default to colum positions where each column is assumed to be 144 twips or 0.1 of an inch (2.54 mm). The width of a single Courier New 12 point character.
-
+Numbers with no measurement specifier (i for inches, etc) default to column positions where each column is assumed to be 144 twips or 0.1 of an inch (2.54 mm) — the width of a single Courier New 12 point character.
 
 ## 0.4.1505 Alpha (2025-10-03)
 
@@ -385,5 +316,4 @@ numbers with no measurement specifier (i for inches, etc) default to colum posit
 
 - Unicode version 16 support
 
-- Linux, Windows, and MacOS builds
-
+- Linux, Windows, and macOS builds
