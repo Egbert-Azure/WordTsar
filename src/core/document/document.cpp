@@ -4159,6 +4159,77 @@ std::string cDocument::TitleCase(const std::string &str)
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  str     [IN]  the string to sentence-case
+///
+/// @return string - the sentence-cased string
+///
+/// @brief
+/// Real WordStar 7 Sentence Case (manual, "Convert Case"): capitalizes the
+/// first letter following a period, question mark, or exclamation point plus
+/// a space, converts every other letter to lowercase, and leaves a standalone
+/// "I" alone. Nothing at the very start of the string is capitalized unless
+/// it independently qualifies as a standalone "I" -- the rule only reacts to
+/// punctuation actually present in the string being converted.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDocument::SentenceCase(const std::string &str)
+{
+    std::u32string str32 = NormalizeToUTF32(str) ;
+    str32 = unicode::to_lowercase(str32) ;
+
+    bool capitalizeNext = false ;
+    size_t len = str32.size() ;
+
+    for (size_t i = 0 ; i < len ; i++)
+    {
+        char32_t ch = str32[i] ;
+
+        if (unicode::is_alphabetic(ch) != 0)
+        {
+            if (capitalizeNext == true)
+            {
+                std::u32string single(1, ch) ;
+                single = unicode::to_uppercase(single) ;
+                str32[i] = single[0] ;
+                capitalizeNext = false ;
+            }
+            continue ;
+        }
+
+        if (((ch == U'.') || (ch == U'?') || (ch == U'!'))
+            && (i + 1 < len) && (str32[i + 1] == U' '))
+        {
+            capitalizeNext = true ;
+        }
+    }
+
+    // Standalone "i" -> "I": a lowercase i with no letter immediately
+    // before or after it (already-capitalized sentence-start "I"s from
+    // the pass above are untouched, since they're no longer lowercase).
+    for (size_t i = 0 ; i < len ; i++)
+    {
+        if (str32[i] != U'i')
+        {
+            continue ;
+        }
+
+        bool leftOk = (i == 0) || (unicode::is_alphabetic(str32[i - 1]) == 0) ;
+        bool rightOk = (i + 1 == len) || (unicode::is_alphabetic(str32[i + 1]) == 0) ;
+
+        if (leftOk && rightOk)
+        {
+            str32[i] = U'I' ;
+        }
+    }
+
+    str32 = unicode::to_nfc(str32) ;
+
+    return unicode::utf8::encode(str32) ;
+}
+
+
 
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////

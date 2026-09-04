@@ -228,9 +228,10 @@ const char *LookupKChordHelp(char lower)
             return "^K' - Convert block to lowercase\n\n"
                    "Converts every character in the marked block to lowercase." ;
         case '.' :
-            return "^K. - Convert block to title case\n\n"
-                   "Capitalizes the first letter of each word in the marked block, "
-                   "converting the rest to lowercase." ;
+            return "^K. - Convert block to sentence case\n\n"
+                   "Capitalizes the first letter following a period, question mark, "
+                   "or exclamation point plus a space, converts every other letter "
+                   "to lowercase, and leaves a standalone \"I\" alone." ;
         case '<' :
             return "^K< - Unmark block\n\n"
                    "Clears the current block's beginning and end markers without "
@@ -1543,7 +1544,7 @@ bool cWordStarInput::OnControlKChar(char ch)
             break ;
             
         case '.' :
-            mEditor->TitleCaseBlock() ;
+            mEditor->SentenceCaseBlock() ;
             break ;
 
         case '<' :          // unset block

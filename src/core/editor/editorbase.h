@@ -270,7 +270,7 @@ public:
     void ToggleHideBlock(void);
     void UpperCaseBlock(void);
     void LowerCaseBlock(void);
-    void TitleCaseBlock(void);
+    void SentenceCaseBlock(void);
 
     // Batch Update
     void BeginBatchUpdate(void);

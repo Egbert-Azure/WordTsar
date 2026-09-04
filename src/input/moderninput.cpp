@@ -906,7 +906,7 @@ void cModernInput::OnAltKChar(char key)
 
         case '.' :
         {
-            mEditor->TitleCaseBlock() ;
+            mEditor->SentenceCaseBlock() ;
             break ;
         }
 

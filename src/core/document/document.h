@@ -388,6 +388,7 @@ public:
     std::string LowerCase(const std::string &str) ;
     std::string UpperCase(const std::string &str) ;
     std::string TitleCase(const std::string &str) ;
+    std::string SentenceCase(const std::string &str) ;
 
 private:
     // --- Attribute Modification ---

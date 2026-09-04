@@ -4954,7 +4954,7 @@ TEST_CASE("P1 Auxiliary: LowerCaseBlock - Convert block to lowercase")
 // P1 AUXILIARY: TITLECASEBLOCK
 /////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("P1 Auxiliary: TitleCaseBlock - Convert block to titlecase")
+TEST_CASE("P1 Auxiliary: SentenceCaseBlock - real WordStar 7 Sentence Case")
 {
     cEditorCtrl editor;
     cDocument* doc = editor.GetDocument();  // Get reference for direct document access
@@ -4963,35 +4963,59 @@ TEST_CASE("P1 Auxiliary: TitleCaseBlock - Convert block to titlecase")
     // Setup
     layout->SetDocument(doc);
 
-    SUBCASE("Convert lowercase to titlecase")
+    auto setBlock = [&](const std::string& text)
     {
-        doc->Insert("hello world\r");
+        doc->Insert(text);
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        doc->SetPosition(11);
+        doc->SetPosition(static_cast<POSITION_T>(text.size()));
         doc->SetEndBlock();
+    };
 
-        editor.TitleCaseBlock();
-
-        std::string text = doc->GetBlockText(0, 11);
-        CHECK(text == "Hello World");
-
-        // Block should still be selected
+    SUBCASE("Standalone I is preserved")
+    {
+        setBlock("she and i are here");
+        editor.SentenceCaseBlock();
+        std::string text = doc->GetBlockText(0, 19);
+        CHECK(text == "she and I are here");
         CHECK(doc->mBlockSet == true);
     }
 
-    SUBCASE("Convert uppercase to titlecase")
+    SUBCASE("i as part of a word is lowercased, not treated as standalone I")
     {
-        doc->Insert("HELLO WORLD\r");
-        doc->SetPosition(0);
-        doc->SetBeginBlock();
-        doc->SetPosition(11);
-        doc->SetEndBlock();
+        setBlock("This is Mississippi");
+        editor.SentenceCaseBlock();
+        std::string text = doc->GetBlockText(0, 19);
+        CHECK(text == "this is mississippi");
+    }
 
-        editor.TitleCaseBlock();
+    SUBCASE("Multiple sentences: capitalizes only after . ? ! plus a space")
+    {
+        setBlock("Hello world. How are you? Fine!");
+        editor.SentenceCaseBlock();
+        std::string text = doc->GetBlockText(0, 32);
+        // The block's own first letter is not itself preceded by
+        // qualifying punctuation, so it is not force-capitalized --
+        // see "block starting mid-sentence" below for the same rule.
+        CHECK(text == "hello world. How are you? Fine!");
+    }
 
-        std::string text = doc->GetBlockText(0, 11);
-        CHECK(text == "Hello World");
+    SUBCASE("Block starting mid-sentence: first letter is not force-capitalized")
+    {
+        setBlock("world. Hello there.");
+        editor.SentenceCaseBlock();
+        std::string text = doc->GetBlockText(0, 20);
+        CHECK(text == "world. Hello there.");
+    }
+
+    SUBCASE("Abbreviation followed by a space still triggers capitalization")
+    {
+        // WS7's rule has no abbreviation exception -- "Mr. " mechanically
+        // ends in period-plus-space like any sentence end.
+        setBlock("Mr. Smith won.");
+        editor.SentenceCaseBlock();
+        std::string text = doc->GetBlockText(0, 14);
+        CHECK(text == "mr. Smith won.");
     }
 
     SUBCASE("No block set - should do nothing")
@@ -4999,7 +5023,7 @@ TEST_CASE("P1 Auxiliary: TitleCaseBlock - Convert block to titlecase")
         doc->Insert("hello world\r");
         doc->UnsetBlock();
 
-        editor.TitleCaseBlock();
+        editor.SentenceCaseBlock();
 
         // Text should be unchanged
         std::string text = doc->GetBlockText(0, 11);
@@ -5245,9 +5269,9 @@ TEST_CASE("P1 Auxiliary: Integration - Case conversion preserves block selection
         CHECK(doc->mEndBlock == 10);
     }
 
-    SUBCASE("TitleCase preserves block")
+    SUBCASE("SentenceCase preserves block")
     {
-        editor.TitleCaseBlock();
+        editor.SentenceCaseBlock();
         CHECK(doc->mBlockSet == true);
         CHECK(doc->mStartBlock == 0);
         CHECK(doc->mEndBlock == 10);

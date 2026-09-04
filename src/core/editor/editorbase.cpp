@@ -2947,25 +2947,18 @@ void cEditorBase::LowerCaseBlock(void)
     mDocument->EndUndoGroup() ;
 }
 
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @return nothing
 ///
 /// @brief
-/// Convert all characters in block to titlecase.
-/// Uses Unicode-aware case conversion to handle international characters.
-/// Block remains selected after conversion.
-/// [REFACTORED from editorctrl.cpp::TitleCaseBlock()]
-///
-/// @note
-/// The old system had "// not working" comment, but the implementation
-/// appears correct - uses unicode::to_titlecase().
+/// Convert all characters in block to real WordStar 7 Sentence Case (see
+/// cDocument::SentenceCase). Block remains selected after conversion.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorBase::TitleCaseBlock(void)
+void cEditorBase::SentenceCaseBlock(void)
 {
-    // *** COPIED FROM OLD SYSTEM - editorctrl.cpp::TitleCaseBlock() ***
-
     if (!mDocument || mDocument->mBlockSet == false)
     {
         return;
@@ -2974,29 +2967,22 @@ void cEditorBase::TitleCaseBlock(void)
     CloseTypingGroup() ;
     mDocument->BeginUndoGroup() ;
 
-    // Get block boundaries
     POSITION_T start = 0;
     POSITION_T end = 0;
     mDocument->GetBlock(start, end);
 
-    // Get block text (GetBlockText uses half-open interval, so pass end+1)
     std::string str = mDocument->GetBlockText(start, end + 1);
 
-    // Convert to titlecase via cDocument (Unicode-aware)
-    str = mDocument->TitleCase(str) ;
+    str = mDocument->SentenceCase(str) ;
 
-    // Batch wraps DeleteBlock + InsertWordStarString + block re-selection
     BeginBatchUpdate() ;
 
-    // Delete old block
     mDocument->DeleteBlock();
 
-    // Insert converted text at block start
     mDocument->SetPosition(start);
     InsertWordStarString(str);
     CloseTypingGroup() ;
 
-    // Re-select the block using actual inserted length
     POSITION_T newEnd = mDocument->GetPosition();
 
     mDocument->SetPosition(start);
