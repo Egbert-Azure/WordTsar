@@ -13116,8 +13116,8 @@ TEST_CASE("Continuous vs page mode: all lines reachable by ScrollIntoView")
 /// driven without waiting 60 s on the real timer.
 ///
 /// Tests of cWordstarFile itself, if added in the future, belong in
-/// their own test-wordstarfile.cpp per CLAUDE.md's "tests live in the
-/// file named after the source class" rule.
+/// their own test-wordstarfile.cpp, matching this project's convention
+/// of naming a test file after the source class it covers.
 ///
 /////////////////////////////////////////////////////////////////////////////
 

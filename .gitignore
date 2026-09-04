@@ -11,6 +11,8 @@ CMakeCache.txt
 WordTsar_autogen/
 WSTest_autogen/
 VisualTest_autogen/
+ws_autogen/
+WSTuiTest_autogen/
 doxygen/
 DEV_DOCUMENTS/
 .DS_Store
