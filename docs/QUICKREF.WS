@@ -1,4 +1,4 @@
-.. QUICKREF.WS - WordTsar 0.10.9 keyboard quick reference
+.. QUICKREF.WS - WordTsar 0.11.0 keyboard quick reference
 .. Source of truth: the input handlers, menu builders, and dot-command
 .. parser source directly -- not KEY_MAPPING.md or the WS7 manual. Edit freely.
 .pl 66
@@ -8,8 +8,8 @@
 .rm 66
 .oj off
 .aw off
-.he WordTsar 0.10.9 Quick Reference
-WORDTSAR 0.10.9 - KEYBOARD QUICK REFERENCE
+.he WordTsar 0.11.0 Quick Reference
+WORDTSAR 0.11.0 - KEYBOARD QUICK REFERENCE
 
 Two input modes, set in System Preferences > Editor >
 Keyboard Mode:

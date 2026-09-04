@@ -2,6 +2,50 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.11.0 Beta (2026-09-04)
+
+### Menu items now do what the keyboard does, in both keyboard modes
+
+A full menu/handler audit of both frontends found that menu clicks and keyboard
+chords could disagree: menus fired commands through whichever input handler
+(WordStar or Modern) the user currently had selected in Preferences, but every
+menu wrapper sent WordStar-style codes regardless. Under Modern mode this made
+much of the Style, Layout, and Utilities menus silently do the wrong thing —
+Style > Bold opened Print Preview, Style > Convert Case marked a block, and so
+on — while looking completely normal. Both GUI and TUI now dispatch every menu
+item through a dedicated WordStar-mode input handler that is never affected by
+the user's keyboard-mode preference, so a menu click always does what its
+label says, in either mode.
+
+The same audit turned up several items that had never had a real
+implementation behind them, and one that quietly did the wrong real thing:
+
+- **^K R / Insert > File** now inserts the chosen file's content at the
+  cursor — the actual WS7 command — instead of replacing the whole open
+  document (which is what File > Open/Read is for, and still does).
+- **Sentence Case (^K .)** now does real sentence case (capitalize after
+  `.`/`?`/`!` plus a space, lowercase the rest, leave a standalone "I" alone)
+  instead of title case, which every menu label had been claiming all along.
+- **`.pc`** (page number column) is implemented — automatic page numbers now
+  print at a configurable column instead of always centered-or-nothing, and
+  the automatic-numbering renderer itself is new: it previously had a flag
+  with no consumer anywhere in the render or print pipeline.
+- Removed ten menu items with no real target at all (Mark Text for Index,
+  Spell Check Rest of Notes, Column Break, Language Change, Repeat Keystroke,
+  Note Options Starting Number and Convert at Print, Style Settings, Current
+  Drive, Variable > Line) and the vestigial Reformat Paragraph (^B) — this
+  engine reflows every paragraph on every relayout, so there's no manual
+  reformat step for it to perform.
+- Wired several TUI menu items (Header, Footer, Keep Lines Together on Page,
+  Switch Modes) that had real dot-command or keyboard support underneath but
+  no menu entry connected to it, closing a GUI/TUI parity gap.
+
+A new regression test walks the real TUI menu tree the app itself builds and
+asserts every enabled item resolves to an actual handler, catching future
+drift at the dispatch-resolution level without needing a second maintained
+copy of what each item should do. `docs/MENU_AUDIT.md`, `KEY_MAPPING.md`, and
+`docs/QUICKREF.WS` are updated to match.
+
 ## 0.10.3 Beta (2026-09-02)
 
 ### Code-review fixes for the TOC/index/DOCX-numbering work (0.9.0-0.10.2)
