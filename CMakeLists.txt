@@ -220,6 +220,9 @@ set(SOURCES
     src/main.cpp
     src/third-party/chillout/src/chillout/posix/posixcrashhandler.cpp
     src/core/spellcheck/macspellcheck.mm
+    # Native PDFKit print-preview window -- .mm, so not picked up by the
+    # WORDTSAR_GUI_SOURCES *.cpp/*.h glob in cmake/sources.cmake.
+    src/gui/print/pdfpreviewwindow.mm
 )
 
 if(BUILD_GUI)
@@ -352,6 +355,9 @@ target_include_directories(WordTsar PRIVATE
     ${WS_ZIP_DIR}/src
 )
 
+find_library(WORDTSAR_CORETEXT_LIBRARY CoreText)
+find_library(WORDTSAR_COREGRAPHICS_LIBRARY CoreGraphics)
+
 target_link_libraries(WordTsar PUBLIC
     Qt::Core
     Qt::Gui
@@ -359,6 +365,9 @@ target_link_libraries(WordTsar PUBLIC
     Qt::Widgets
     "-framework Foundation"
     "-framework AppKit"
+    "-framework PDFKit"
+    ${WORDTSAR_CORETEXT_LIBRARY}
+    ${WORDTSAR_COREGRAPHICS_LIBRARY}
 )
 
 # Compile options for better compatibility

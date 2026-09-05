@@ -2910,6 +2910,23 @@ bool cLayoutBase::WordWrapParagraph(PARAGRAPH_T paragraphNum)
     // Help displays never wrap text
     if (!mLayoutState->IsWordWrapEnabled() || mLayoutState->IsHelp())
     {
+        // Check for page break before placing this paragraph's single line.
+        // Unlike the word-wrap path below, this branch has no per-line loop
+        // to catch overflow -- without this check, a run of many one-line
+        // paragraphs under .aw off (auto word wrap disabled) never triggers
+        // a page break at all, and just keeps stacking below the visible
+        // page until the document's own next .PA finally catches up,
+        // silently losing everything placed in between (confirmed: traced
+        // a real document where this dropped several paragraphs' worth of
+        // content ~5300 twips past the page bottom before the next .PA).
+        // Help displays use an effectively unbounded box (see
+        // CreatePageBox()), so this would be a no-op for them anyway --
+        // skip it regardless, to avoid touching that path's behavior.
+        if (!mLayoutState->IsHelp() && NeedNewPage(ComputeCurrentLineHeight()))
+        {
+            IncrementPageAndCreateBox();
+        }
+
         // Use new two-phase approach (BuildParagraphSegments + place all on one line)
         std::vector<sSegmentLayout> segments = BuildParagraphSegments(paragraphNum);
 

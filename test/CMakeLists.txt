@@ -140,6 +140,10 @@ endif()
 if (APPLE)
   target_sources(WSTest PRIVATE
     ../src/core/spellcheck/macspellcheck.mm
+    # cPrintout::PrintPreview() (part of WORDTSAR_ALL_SOURCES above) calls
+    # ShowPDFPrintPreview(), defined here -- not picked up by the
+    # WORDTSAR_GUI_SOURCES *.cpp/*.h glob since this is a .mm file.
+    ../src/gui/print/pdfpreviewwindow.mm
   )
 endif()
 
@@ -248,10 +252,19 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
       hunspell
    )
 elseif(APPLE)
-   # macOS specific libraries
+   # macOS specific libraries. CoreText/CoreGraphics are needed here because
+   # WORDTSAR_ALL_SOURCES (below) glob-includes src/gui/print/pdfprintout.cpp,
+   # which calls those frameworks' C APIs directly for PDF generation.
+   # PDFKit is needed for pdfpreviewwindow.mm (added above), which
+   # cPrintout::PrintPreview() calls into.
+   find_library(WSTEST_CORETEXT_LIBRARY CoreText)
+   find_library(WSTEST_COREGRAPHICS_LIBRARY CoreGraphics)
    list(APPEND LIBS
       "-framework Foundation"
       "-framework AppKit"
+      "-framework PDFKit"
+      ${WSTEST_CORETEXT_LIBRARY}
+      ${WSTEST_COREGRAPHICS_LIBRARY}
    )
 endif()
 

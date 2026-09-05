@@ -22,26 +22,27 @@
 #ifndef PRINTOUT_H
 #define PRINTOUT_H
 
-#include <QtPrintSupport/qtprintsupportglobal.h>
-#include <QtPrintSupport/QPrinter>
-#include <QtPrintSupport/QPrintDialog>
-#include <QtPrintSupport/QPrintPreviewDialog>
 #include <QtWidgets>
 
 #include "../editor/editorctrl.h"
-#include "src/core/layout/layoutbase.h"
 
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @class cPrintout
 ///
 /// @brief
-/// Printing support for the new layout engine (Phase 0.6).
-/// Uses the box-based layout with absolute page coordinates for printing.
+/// Printing support entry point. Generates a real PDF via cGUIPDFPrintout
+/// (Quartz/Core Text, no Qt print pipeline involved) and shows it in a
+/// native PDFKit preview window (pdfpreviewwindow.mm) whose own Print
+/// button prints that same PDF -- so preview and print are provably the
+/// same bytes.
 ///
-/// The new layout engine stores all positions in absolute page coordinates
-/// (twips), making printing trivial - we just use pagex/pagey directly
-/// with QPainter coordinate transformation.
+/// Replaces the previous QPrintPreviewDialog/QPrinter-based renderer: that
+/// path recomputed a font-size scale factor from QPrinter::resolution() on
+/// every paint pass, and Qt invokes that pass twice per preview-then-print
+/// session (once for on-screen preview, once more for the committed print)
+/// with no guarantee the two agree -- confirmed to corrupt real printed
+/// pages, not just the interactive preview window.
 ///
 /////////////////////////////////////////////////////////////////////////////
 class cPrintout : public QWidget
@@ -53,23 +54,18 @@ public:
     virtual ~cPrintout(void);
 
     void PrintPreview(void);
+
+    // No separate "print without preview" path any more -- see
+    // KEY_MAPPING.md's [^print-deviation] footnote: the GUI's ^K,P and
+    // File > Print have only ever reached PrintPreview() in practice, and
+    // the preview window's own Print button is the sole print path now
+    // that both are PDF-based. Kept as an alias so any future caller of
+    // the historical PrintDocument() name still gets a working print path.
     void PrintDocument(void);
-
-public slots:
-    void printDocument(QPrinter *printer);
-    void printPage(int pageNum, QPainter *painter);
-
-protected:
-    void DrawLine(const sLineLayout &line, cDocument* document, QPainter *painter);
-    void DrawSegment(const sSegmentLayout &segment, cDocument* document, COORD_T x, COORD_T y,
-                    QPainter *painter);
-    void DrawHeadersFooters(int pageNum, cDocument* document, QPainter *painter);
-    void DrawHeaderFooterLine(const sHeaderFooterLine &hfLine, QPainter *painter);
 
 private:
     cEditorCtrl *mEditor;
-    cLayoutBase *mLayout;
-    double mScale;  ///< Scale factor (pixels per twip) for font conversion
+    QString mTitle;
 };
 
 #endif // PRINTOUT_H
