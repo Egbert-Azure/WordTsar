@@ -17,7 +17,7 @@ All credit for WordTsar's design and implementation goes to Gerald Brandt — th
 
 WordTsar is currently Beta. In practice: I write in it every day — this isn't a project I test and set aside, it's the tool I'm using right now — and it holds up. I'm still finding things as I go, and fixing them as I find them; see `WHATS_NEW.md` for the running list.
 
-This is version **0.10.10 Beta**, macOS only.
+This is version **0.12.0 Beta**, macOS only.
 
 ## Building
 
