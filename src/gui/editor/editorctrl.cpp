@@ -129,6 +129,10 @@
 
 #include "editorctrl.h"
 #include "src/gui/utils/fontutils.h"
+#include "src/gui/utils/maclookup.h"
+
+#include <fstream>
+#include <filesystem>
 #include "src/input/wordtsarinput.h"
 #include "src/input/moderninput.h"
 #include "src/core/include/version.h"
@@ -5789,6 +5793,109 @@ void cEditorCtrl::SpellCheckEnterWord(void)
     cSpellCheck dialog(this, SPELLENTERWORD) ;
     dialog.CheckEnteredWord() ;
     ScrollIntoView() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WordStar 7 ^QJ: looks up the word at the cursor via macOS's native
+/// Look Up popover (same one Safari/TextEdit/Notes show for right-click
+/// "Look Up"), backed by whatever dictionary/thesaurus sources are enabled
+/// in Dictionary.app. No custom synonym UI or parsing -- just anchors the
+/// system popover at the caret.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::Thesaurus(void)
+{
+    if (!mDocument)
+    {
+        return ;
+    }
+
+    // Same Unicode-aware word-boundary extraction as SpellCheckWord().
+    POSITION_T pos = GetCaretDocumentPosition() ;
+    POSITION_T wordStart = mDocument->GetPrevWordPosition(pos + 1) ;
+    POSITION_T wordEnd = mDocument->GetNextWordPosition(pos) ;
+
+    std::string word ;
+    if (wordEnd > wordStart)
+    {
+        word = mDocument->GetBlockText(wordStart, wordEnd) ;
+    }
+
+    if (word.empty())
+    {
+        QMessageBox::information(this, tr("Thesaurus"), tr("No word at cursor position.")) ;
+        return ;
+    }
+
+    QRectF caretRect = GetCaretPosQt() ;
+    void* nsView = reinterpret_cast<void*>(winId()) ;
+    ShowMacDefinitionPopover(nsView, word, caretRect.left(), caretRect.bottom()) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WordStar 7 ^KW: writes the marked block to another file. Prompts
+/// for a filename; if it already exists, prompts to Overwrite, Append, or
+/// Cancel (matching the classic keyboard command's own O/A/Esc prompt).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::WriteBlockToFile(void)
+{
+    if (!mDocument || mDocument->mBlockSet == false)
+    {
+        ShowError("Write Block", "No block is marked.") ;
+        return ;
+    }
+
+    std::string filename = PromptForSaveFile() ;
+    if (filename.empty())
+    {
+        return ;
+    }
+
+    std::ios_base::openmode mode = std::ios::out ;
+
+    if (std::filesystem::exists(filename))
+    {
+        QMessageBox box(this) ;
+        box.setWindowTitle(tr("Write Block")) ;
+        box.setText(tr("\"%1\" already exists.").arg(QString::fromStdString(filename))) ;
+        QPushButton* overwriteBtn = box.addButton(tr("Overwrite"), QMessageBox::DestructiveRole) ;
+        QPushButton* appendBtn = box.addButton(tr("Append"), QMessageBox::AcceptRole) ;
+        box.addButton(QMessageBox::Cancel) ;
+        box.exec() ;
+
+        if (box.clickedButton() == appendBtn)
+        {
+            mode = std::ios::out | std::ios::app ;
+        }
+        else if (box.clickedButton() != overwriteBtn)
+        {
+            return ;  // Cancel
+        }
+    }
+
+    POSITION_T start = 0, end = 0 ;
+    mDocument->GetBlock(start, end) ;
+    std::string text = mDocument->GetBlockText(start, end + 1) ;
+
+    std::ofstream file(filename, mode) ;
+    if (!file.is_open())
+    {
+        ShowError("Write Block", "Could not write to \"" + filename + "\".") ;
+        return ;
+    }
+    file << text ;
+    file.close() ;
 }
 
 

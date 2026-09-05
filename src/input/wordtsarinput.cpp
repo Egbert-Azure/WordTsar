@@ -598,6 +598,7 @@ cWordStarInput::cWordStarInput(cEditorBase *editor)
     mControlOMode = false ;
     mControlPMode = false ;
     mControlQMode = false ;
+    mControlKZMode = false ;
     mWaitingForHelpTarget = false ;
     mWaitingForHelpChordTarget = false ;
     mHelpChordPrefix = 0 ;
@@ -614,7 +615,8 @@ cWordStarInput::~cWordStarInput(void)
 
 bool cWordStarInput::CheckControlMode(void)
 {
-    return mControlMMode || mControlKMode || mControlOMode || mControlPMode || mControlQMode ;
+    return mControlMMode || mControlKMode || mControlOMode || mControlPMode || mControlQMode
+        || mControlKZMode ;
 }
 
 
@@ -707,13 +709,14 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
         // with its stale HELP_NONE construction default the first time
         // Escape is pressed in a session that never entered one.
         bool hadActiveChord = mControlMMode || mControlKMode || mControlOMode
-                            || mControlPMode || mControlQMode ;
+                            || mControlPMode || mControlQMode || mControlKZMode ;
 
         mControlMMode = false ;
         mControlKMode = false ;
         mControlOMode = false ;
         mControlPMode = false ;
         mControlQMode = false ;
+        mControlKZMode = false ;
         mWaitingForHelpTarget = false ;
         mWaitingForHelpChordTarget = false ;
         if(hadActiveChord == true)
@@ -728,6 +731,15 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
     {
         mEditor->mHelpDisplay = mOldHelpStatus ;
         OnControlMChar(ch) ;
+        handled = true ;
+    }
+    else if(mControlKZMode == true)
+    {
+        // Sub-mode of ^K (waiting for A/D after ^K,Z) -- checked ahead of
+        // mControlKMode since OnControlKChar('z') already cleared that flag
+        // before setting this one, so there's no ordering conflict either way.
+        mControlKZMode = false ;
+        OnControlKZChar(ch) ;
         handled = true ;
     }
     else if(mControlKMode == true)
@@ -1103,13 +1115,14 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
             // conditional -- mOldHelpStatus is only meaningful once a real
             // chord has actually been entered.
             bool hadActiveChord = mControlMMode || mControlKMode || mControlOMode
-                                || mControlPMode || mControlQMode ;
+                                || mControlPMode || mControlQMode || mControlKZMode ;
 
             mControlMMode = false ;
             mControlKMode = false ;
             mControlOMode = false ;
             mControlPMode = false ;
             mControlQMode = false ;
+            mControlKZMode = false ;
             mWaitingForHelpTarget = false ;
             mWaitingForHelpChordTarget = false ;
             if(hadActiveChord == true)
@@ -1145,13 +1158,14 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
                 // F1 was pressed in a fresh session (mOldHelpStatus still
                 // held its HELP_NONE construction default).
                 bool hadActiveChord = mControlMMode || mControlKMode || mControlOMode
-                                    || mControlPMode || mControlQMode ;
+                                    || mControlPMode || mControlQMode || mControlKZMode ;
 
                 mControlMMode = false ;
                 mControlKMode = false ;
                 mControlOMode = false ;
                 mControlPMode = false ;
                 mControlQMode = false ;
+                mControlKZMode = false ;
                 mWaitingForHelpChordTarget = false ;
                 if(hadActiveChord == true)
                 {
@@ -1591,15 +1605,22 @@ bool cWordStarInput::OnControlKChar(char ch)
             mEditor->SetPreviousBlock() ;
             break ;
 
+        case 'w' :          // Write block to file (real WordStar 7 ^KW)
+            mEditor->WriteBlockToFile() ;
+            break ;
+
+        case 'z' :          // Sort block, waits for A (ascending) or D (descending)
+            mControlKZMode = true ;
+            retval = true ;
+            break ;
+
         case 'o' :
         case 'e' :
         case 'j' :
         case '\\' :
         case 'l' :
         case 'f' :
-        case 'w' :
         case 'm' :
-        case 'z' :
         case 'n' :
         case 'i' :
         case 'a' :
@@ -1620,6 +1641,34 @@ bool cWordStarInput::OnControlKChar(char ch)
     
 
     return retval ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  ch [in] - the key pressed after ^K,Z
+///
+/// @return nothing
+///
+/// @brief
+/// Real WordStar 7 ^KZ,A/^KZ,D: sorts the marked block ascending or
+/// descending. Any other key cancels quietly, matching Escape's own
+/// cancel-without-complaint behavior for a pending chord.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordStarInput::OnControlKZChar(char ch)
+{
+    ch = tolower(ch) ;
+
+    if (ch == 'a')
+    {
+        mEditor->SortBlock(true) ;
+    }
+    else if (ch == 'd')
+    {
+        mEditor->SortBlock(false) ;
+    }
+    // Any other key: silently cancel, same as Escape would.
 }
 
 
@@ -1683,15 +1732,21 @@ void cWordStarInput::OnControlOChar(char ch)
             mEditor->ToggleWordWrap() ;
             break ;
 
+        case 'v' :          // Center text vertically (real WordStar 7 ^OV)
+            mEditor->CenterTextVertically() ;
+            break ;
+
+        case 'g' :          // Temporary indent (real WordStar 7 ^OG)
+            mEditor->TemporaryIndent() ;
+            break ;
+
         case 'l' :
-        case 'g' :
         case 'x' :
         case 'i' :
         case 'o' :
         case 'u' :
         case 'f' :
         case 's' :
-        case 'v' :
         case 'e' :
         case 'h' :
         case 'a' :
@@ -1860,9 +1915,12 @@ void cWordStarInput::OnControlQChar(char ch)
             mEditor->GotoLastFindandReplace() ;
             break ;
 
+        case 'j' :          // Thesaurus (real WordStar 7 ^QJ)
+            mEditor->Thesaurus() ;
+            break ;
+
         case '<' :
         case 'm' :
-        case 'j' :
         case 'w' :
         case 'z' :
             {

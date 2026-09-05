@@ -178,6 +178,8 @@ public:
     void SpellCheckWord(void) override;
     void SpellCheckEnterWord(void) override;
     void WordCountBlock(void) override;
+    void Thesaurus(void) override;
+    void WriteBlockToFile(void) override;
     void Undo(void) override;
     void Redo(void) override;
     void ToggleShowControl(void) override;

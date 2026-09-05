@@ -2,6 +2,26 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.12.0 Beta (2026-09-05)
+
+### Print Preview and Print now use Apple's own PDF viewer
+
+Fixed: printing from the GUI could cut off or misalign a page. Print Preview and Print now build a real PDF and show it in Apple's built-in PDF viewer, with zoom, page navigation, and its own Print button.
+
+### Five new writing tools
+
+- **Thesaurus (^Q J)** — look up synonyms for the word at the cursor.
+- **Write Block to File (^K W)** — save a marked block to its own file, without touching the rest of the document.
+- **Sort Block (^K Z, then A or D)** — sort the paragraphs in a marked block alphabetically, ascending or descending. (Descending can misplace one character if the block sits with no other text directly before or after it; ascending, and whole-document blocks either way, are unaffected.)
+- **Temporary Indent (^O G)** — indent the current paragraph one more tab stop; press again to add another, or move past the paragraph to return to normal.
+- **Center Text Vertically (^O V)** — center the text between the cursor and the next page break vertically on the page.
+
+### Other fixes and changes
+
+- Fixed: a paragraph with word wrap turned off (`.aw off`) could run past the bottom of the page without starting a new one.
+- Fixed: a page break could land in the wrong place partway through a paragraph that mixed different font sizes.
+- Fixed: quitting the app after opening or saving a file elsewhere could silently change your Default Directory preference to that folder.
+
 ## 0.11.0 Beta (2026-09-04)
 
 ### Menu items now match the keyboard, in both keyboard modes

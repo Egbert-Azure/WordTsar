@@ -1,7 +1,7 @@
 //////////////////////////////////////////////////////////////////////////////
 //
 // WordTsar - Wordstar clone for modern systems http://wordtsar.ca
-// Copyright (C) 2018 Gerald Brandt
+// Copyright (C) 2026 Egbert H. Schroeer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
@@ -18,18 +18,27 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef VERSION_H
-#define VERSION_H
+#import <AppKit/AppKit.h>
 
-//Software Status
-static const char STATUS[] =  "Beta";
-static const char STATUS_SHORT[] =  "b";
+#include "maclookup.h"
 
-//Standard Version Type
-static const long MAJOR  = 0;
-static const long MINOR  = 12;
-static const long BUILD  = 0;
+void ShowMacDefinitionPopover(void* nsViewPtr, const std::string& word, double x, double y)
+{
+    @autoreleasepool
+    {
+        if (!nsViewPtr || word.empty())
+        {
+            return;
+        }
 
-static const char FULLVERSION_STRING [] = "0.12.0";
+        NSView* view = (__bridge NSView*)nsViewPtr;
+        NSString* nsWord = [NSString stringWithUTF8String:word.c_str()];
+        if (!nsWord)
+        {
+            return;
+        }
 
-#endif //VERSION_H
+        NSAttributedString* attrString = [[NSAttributedString alloc] initWithString:nsWord];
+        [view showDefinitionForAttributedString:attrString atPoint:NSMakePoint(x, y)];
+    }
+}

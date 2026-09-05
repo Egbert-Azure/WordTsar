@@ -91,6 +91,7 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     ../src/test/test-baseeditor.cpp
     ../src/test/test-wsfontclassifier.cpp
     ../src/test/test-guiprinter.cpp
+    ../src/test/test-cheapwins.cpp
     ../src/test/test-spellcheck.cpp
     ../src/test/test-rtf.cpp
     ../src/test/test-docxwriter.cpp
@@ -141,9 +142,11 @@ if (APPLE)
   target_sources(WSTest PRIVATE
     ../src/core/spellcheck/macspellcheck.mm
     # cPrintout::PrintPreview() (part of WORDTSAR_ALL_SOURCES above) calls
-    # ShowPDFPrintPreview(), defined here -- not picked up by the
-    # WORDTSAR_GUI_SOURCES *.cpp/*.h glob since this is a .mm file.
+    # ShowPDFPrintPreview(), and cEditorCtrl::Thesaurus() calls
+    # ShowMacDefinitionPopover() -- both defined here, not picked up by the
+    # WORDTSAR_GUI_SOURCES *.cpp/*.h glob since these are .mm files.
     ../src/gui/print/pdfpreviewwindow.mm
+    ../src/gui/utils/maclookup.mm
   )
 endif()
 

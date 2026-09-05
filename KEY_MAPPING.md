@@ -187,9 +187,11 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | " | ^K," | Alt+K," | Convert block to uppercase |
 | ' | ^K,' | Alt+K,' | Convert block to lowercase |
 | . | ^K,. | Alt+K,. | Convert block to sentence case |
+| Z,A / Z,D | ^K,Z,A / ^K,Z,D | -- | Sort block ascending/descending (WS only) |
 | ? | ^K,? | Alt+K,? | Word/character count for block |
 | 0-9 | ^K,0-9 | Alt+K,0-9 | Save cursor position to marker |
 | R | ^K,R | -- | Insert file at cursor (WS only) |
+| W | ^K,W | -- | Write block to file (WS only) |
 | S | ^K,S | -- | Save current file (WS only) |
 | T | ^K,T | -- | Save file with new name (WS only) |
 | D | ^K,D | -- | Save, clear document, reset (WS only) |
@@ -221,6 +223,7 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | L | ^Q,L | -- | Spell check entire document (WS only) |
 | N | ^Q,N | -- | Spell check current word (WS only) |
 | O | ^Q,O | -- | Add word to dictionary (WS only) |
+| J | ^Q,J | -- | Look up synonyms for word at cursor (WS only) |
 | Space/DEL | ^Q,Space | Alt+Q,Space | Delete to start of line |
 | Y | ^Q,Y | Alt+Q,Y | Delete to end of line |
 | T | ^Q,T | Alt+Q,T | Delete to specified character |
@@ -232,6 +235,7 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 |-----|----------|--------|-------------|
 | D | ^O,D | Alt+O,D | Toggle control code display |
 | C | ^O,C | Alt+O,C | Insert center tab stop |
+| V | ^O,V | -- | Center text vertically on the page (WS only) |
 | ] | ^O,] | Alt+O,] | Insert right-aligned tab stop |
 | T | ^O,T | Alt+O,T | Toggle page/continuous mode (GUI); center view (TUI) |
 | J | ^O,J | Alt+O,J | Toggle justification on/off |
@@ -239,6 +243,7 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | > | ^O,> | Alt+O,> | Right align paragraph (bracketed) |
 | = | ^O,= | Alt+O,= | Center paragraph (bracketed) |
 | + | ^O,+ | Alt+O,+ | Justify paragraph (bracketed) |
+| G | ^O,G | -- | Temporary indent (WS only) |
 | Y | ^O,Y | Alt+O,Y | Open page layout dialog |
 | P | ^O,P | -- | Print preview (WS only) |
 | ? | ^O,? | -- | Display status/memory info (WS only) |
@@ -642,6 +647,7 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^K? | Word count block | Count words in block | Yes |
 | ^K0-9 | Set marker 0-9 | Set position marker 0-9 | Yes |
 | ^KR | Insert file at cursor | Insert file at cursor | Yes |
+| ^KW | Write block to disk | Write marked block to a file | Yes |
 | ^KS | Save file | Save file | Yes |
 | ^KT | Save as | Save file as | Yes |
 | ^KD | Save and clear | Save file and clear editor | Yes |
@@ -654,9 +660,8 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^K\ | Fax | -- | No |
 | ^KL | Change drive/directory | -- | No |
 | ^KF | Run DOS command | -- | No |
-| ^KW | Write block to disk | -- | No |
 | ^KM | Block math | -- | No |
-| ^KZ | Sort block | -- | No |
+| ^KZ | Sort block | Sort block, ascending (^KZA) or descending (^KZD) | Yes |
 | ^KN | Column mode on | -- | No |
 | ^KI | Column replace on | -- | No |
 | ^KA | Copy between windows | -- | No |
@@ -681,14 +686,14 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^O+ | Justify paragraph | Justify paragraph (bracketed) | Yes |
 | ^OL | Set left margin | -- | No |
 | ^OR | Set right margin | -- | No |
-| ^OG | Temporary indent | -- | No |
+| ^OG | Temporary indent | Indent current paragraph one more tab stop, reverting after it | Yes |
 | ^OX | Release margin | -- | No |
 | ^OI | Set/clear tabs | -- | No |
 | ^OO | Ruler from text | -- | No |
 | ^OU | Column layout | -- | No |
 | ^OF | Paragraph styles | -- | No |
 | ^OS | Set line spacing | -- | No |
-| ^OV | Vertically center | -- | No |
+| ^OV | Vertically center | Center cursor-to-page-break text on the page | Yes |
 | ^OE | Soft hyphen | -- | No |
 | ^OH | Auto-hyphenation off | -- | No |
 | ^OA | Auto-align off | -- | No |
@@ -731,7 +736,7 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^QT | Delete to character | Delete to specified character | Yes |
 | ^Q< | Next style | -- | No |
 | ^QM | Math | -- | No |
-| ^QJ | Thesaurus | -- | No |
+| ^QJ | Thesaurus | Look up synonyms for word at cursor | Yes |
 | ^QW | Scroll up repeat | -- | No |
 | ^QZ | Scroll down repeat | -- | No |
 

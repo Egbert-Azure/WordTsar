@@ -3254,6 +3254,130 @@ void cWSEditorCtrl::SpellCheckEnterWord(void)
 /// @return nothing
 ///
 /// @brief
+/// Real WordStar 7 ^QJ: looks up the word at the cursor. The TUI has no
+/// inline popover surface, so this shells out to `open dict://<word>` --
+/// the same "launch the real macOS app" pattern already used for TUI print
+/// preview (LaunchPDFViewer() in tuiprintout.cpp) -- opening Dictionary.app
+/// to that word, with whatever thesaurus sources are enabled there.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::Thesaurus(void)
+{
+    if (mHost == nullptr || mDocument == nullptr)
+    {
+        return;
+    }
+
+    POSITION_T pos = GetCaretDocumentPosition();
+    POSITION_T wordStart = mDocument->GetPrevWordPosition(pos + 1);
+    POSITION_T wordEnd = mDocument->GetNextWordPosition(pos);
+
+    std::string word;
+    if (wordEnd > wordStart)
+    {
+        word = mDocument->GetBlockText(wordStart, wordEnd);
+    }
+
+    // Trim trailing non-word characters, same approach as SpellCheckWord().
+    {
+        std::u32string codepoints = unicode::utf8::decode(word);
+        while ((codepoints.empty() == false)
+            && (unicode::is_alphabetic(codepoints.back()) == 0)
+            && (codepoints.back() != U'\''))
+        {
+            codepoints.pop_back();
+        }
+        word = unicode::utf8::encode(codepoints);
+    }
+
+    if (word.empty() == true)
+    {
+        ShowMessage("Thesaurus", "No word at the cursor.");
+        return;
+    }
+
+    // Refuse anything outside a plain word's character set before it ever
+    // reaches the shell below -- word-boundary detection should already
+    // guarantee this, but the command is built by string concatenation, so
+    // this is the actual injection guard, not just a sanity check.
+    for (char ch : word)
+    {
+        bool ok = std::isalnum(static_cast<unsigned char>(ch))
+               || (ch == '\'') || (ch == '-')
+               || (static_cast<unsigned char>(ch) >= 0x80);  // UTF-8 continuation/lead bytes
+        if (!ok)
+        {
+            ShowMessage("Thesaurus", "No word at the cursor.");
+            return;
+        }
+    }
+
+    std::string cmd = "open \"dict://" + word + "\" &";
+    [[maybe_unused]] int ret = std::system(cmd.c_str());
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WordStar 7 ^KW: writes the marked block to another file. Prompts
+/// for a filename; if it already exists, prompts to Overwrite, Append, or
+/// Cancel (matching the classic keyboard command's own O/A/Esc prompt).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::WriteBlockToFile(void)
+{
+    if (mHost == nullptr || mDocument == nullptr || mDocument->mBlockSet == false)
+    {
+        ShowError("Write Block", "No block is marked.");
+        return;
+    }
+
+    std::string filename = PromptForSaveFile();
+    if (filename.empty())
+    {
+        return;
+    }
+
+    std::ios_base::openmode mode = std::ios::out;
+
+    if (std::filesystem::exists(filename))
+    {
+        int choice = wsdialogs::ThreeChoice(mHost, "Write Block",
+                                            "\"" + filename + "\" already exists.",
+                                            "Overwrite", "Append", "Cancel");
+        if (choice == 1)
+        {
+            mode = std::ios::out | std::ios::app;
+        }
+        else if (choice != 0)
+        {
+            return;  // Cancel or Escape
+        }
+    }
+
+    POSITION_T start = 0, end = 0;
+    mDocument->GetBlock(start, end);
+    std::string text = mDocument->GetBlockText(start, end + 1);
+
+    std::ofstream file(filename, mode);
+    if (!file.is_open())
+    {
+        ShowError("Write Block", "Could not write to \"" + filename + "\".");
+        return;
+    }
+    file << text;
+    file.close();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
 /// Count words in the marked block (or the whole document) and show the total.
 ///
 /////////////////////////////////////////////////////////////////////////////

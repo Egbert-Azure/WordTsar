@@ -102,6 +102,8 @@ public:
     void SpellCheckEnterWord(void) override;
     void WordCountBlock(void) override;
     void ToggleShowControl(void) override;
+    void Thesaurus(void) override;
+    void WriteBlockToFile(void) override;
 
     // ---- Pure virtual: undo/redo ----
     void Undo(void) override;

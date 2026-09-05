@@ -3103,6 +3103,93 @@ void cEditorBase::GotoSavePosition(int offset)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  ascending [in] - true for A-Z order, false for Z-A
+///
+/// @return nothing
+///
+/// @brief
+/// Real WordStar 7 ^KZ,A/^KZ,D: sorts the marked block's paragraphs as
+/// whole lines (WordTsar has no column-mode selection to sort by a
+/// highlighted sub-range instead, so this always sorts on full line text,
+/// matching WS7's own "if column mode is off" behavior). Block remains
+/// selected after sorting.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::SortBlock(bool ascending)
+{
+    if (!mDocument || mDocument->mBlockSet == false)
+    {
+        return ;
+    }
+
+    CloseTypingGroup() ;
+    mDocument->BeginUndoGroup() ;
+
+    POSITION_T start = 0, end = 0 ;
+    mDocument->GetBlock(start, end) ;
+
+    // GetBlock()'s end (mEndBlock) is the EXCLUSIVE upper bound already --
+    // confirmed directly against test-guieditor.cpp's own UpperCaseBlock
+    // test, which marks an 11-character block via SetPosition(11) (cursor
+    // sitting right after the 11th character) and reads it back with
+    // GetBlockText(0, 11), no +1. (UpperCaseBlock()/LowerCaseBlock()'s own
+    // "+1" and matching comment look like a latent bug of the same shape
+    // this method almost inherited -- not fixed here, flagged separately.)
+    std::string str = mDocument->GetBlockText(start, end) ;
+
+    // Split on the paragraph separator (\r), sort the lines, rejoin with
+    // the same separator. A trailing partial line (block doesn't end on a
+    // paragraph boundary) sorts in place along with the rest.
+    std::vector<std::string> lines ;
+    std::string current ;
+    for (char ch : str)
+    {
+        if (ch == '\r')
+        {
+            lines.push_back(current) ;
+            current.clear() ;
+        }
+        else
+        {
+            current += ch ;
+        }
+    }
+    lines.push_back(current) ;
+
+    if (ascending)
+    {
+        std::sort(lines.begin(), lines.end()) ;
+    }
+    else
+    {
+        std::sort(lines.begin(), lines.end(),
+                   [](const std::string& a, const std::string& b) { return a > b ; }) ;
+    }
+
+    std::string sorted ;
+    for (size_t i = 0 ; i < lines.size() ; i++)
+    {
+        sorted += lines[i] ;
+        if (i + 1 < lines.size())
+        {
+            sorted += '\r' ;
+        }
+    }
+
+    BeginBatchUpdate() ;
+
+    mDocument->DeleteBlock() ;
+    mDocument->SetPosition(start) ;
+    InsertWordStarString(sorted) ;
+    CloseTypingGroup() ;
+
+    EndBatchUpdate() ;
+    mDocument->EndUndoGroup() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
@@ -3333,6 +3420,349 @@ bool cEditorBase::IsOjDotCommand(PARAGRAPH_T para)
     }
 
     return false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  para [in] paragraph number to check
+///
+/// @return true if the paragraph is a .lm (left margin) dot command
+///
+/// @brief
+/// Case-insensitive check for a ".lm" prefix, same pattern as
+/// IsOjDotCommand(). Used by TemporaryIndent() to detect an existing
+/// bracket left by a previous ^OG press on the same paragraph.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::IsLmDotCommand(PARAGRAPH_T para)
+{
+    if (para < 0 || para >= mDocument->GetNumberofParagraphs())
+    {
+        return false ;
+    }
+
+    std::string text = mDocument->GetParagraphText(para) ;
+    if (text.length() < 3)
+    {
+        return false ;
+    }
+
+    if (text[0] == '.' &&
+        (text[1] == 'l' || text[1] == 'L') &&
+        (text[2] == 'm' || text[2] == 'M'))
+    {
+        return true ;
+    }
+
+    return false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  para [in] paragraph number holding a ".lm <value>i" dot command
+///
+/// @return the margin value in twips, or 0 if it can't be parsed
+///
+/// @brief
+/// Reads back the twips value from a ".lm" dot command this same class
+/// wrote (FormatLmDotCommand()). Only needs to understand its own output
+/// format, not general .lm syntax (that's cDotCommandParser's job).
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T cEditorBase::GetLmMarginValue(PARAGRAPH_T para)
+{
+    std::string text = mDocument->GetParagraphText(para) ;
+    // Skip ".lm" and any spaces
+    size_t pos = 3 ;
+    while (pos < text.length() && text[pos] == ' ')
+    {
+        pos++ ;
+    }
+
+    try
+    {
+        double inches = std::stod(text.substr(pos)) ;
+        return static_cast<COORD_T>(inches * TWIPSPERINCH) ;
+    }
+    catch (...)
+    {
+        return 0 ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  twips [in] margin value in twips
+///
+/// @return the ".lm <value>i\r" dot command string
+///
+/// @brief
+/// Formats a left-margin dot command with enough decimal precision
+/// (4 places) that reading it back via GetLmMarginValue() reconstructs
+/// the same twips value -- 1/1440 inch is below any visible threshold.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorBase::FormatLmDotCommand(COORD_T twips)
+{
+    char buffer[32] ;
+    snprintf(buffer, sizeof(buffer), ".lm %.4fi\r", twips / TWIPSPERINCH) ;
+    return std::string(buffer) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WordStar 7 ^OG: indents the current paragraph one more tab stop
+/// than its current left margin, reverting to the original margin after
+/// the paragraph ends -- matching classic WordStar's "press it again to
+/// move one more tab stop to the right" behavior when pressed again while
+/// its own bracket still immediately precedes the paragraph.
+///
+/// Implemented as a .lm bracket around just this paragraph (same shape as
+/// SetParagraphAlignment()'s .oj brackets), rather than tracking a live
+/// "temporary margin" mode -- WordTsar reflows continuously and has no
+/// manual ^B-style "align" step to end that mode against, so the bracket
+/// reverting at the paragraph's own natural end is the direct equivalent.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::TemporaryIndent(void)
+{
+    if (!mDocument || !mLayout)
+    {
+        return ;
+    }
+
+    POSITION_T savedPos = mDocument->GetPosition() ;
+    PARAGRAPH_T para = mDocument->GetParagraphFromPosition(savedPos) ;
+
+    COORD_T baseMargin = mLayout->GetLeftMargin() ;
+    COORD_T currentMargin = baseMargin ;
+    bool hasBracket = (para > 0) && IsLmDotCommand(para - 1) ;
+
+    if (hasBracket)
+    {
+        currentMargin = GetLmMarginValue(para - 1) ;
+    }
+
+    sTabStop next = mLayout->GetNextTabStop(currentMargin) ;
+    COORD_T newMargin = next.position ;
+
+    CloseTypingGroup() ;
+    mDocument->BeginUndoGroup() ;
+    BeginBatchUpdate() ;
+
+    if (hasBracket)
+    {
+        // Replace just the preceding bracket paragraph's value in place --
+        // the restoring .lm after this paragraph (if any) is untouched.
+        POSITION_T precedStart, precedEnd ;
+        mDocument->GetParagraphStartandEnd(para - 1, precedStart, precedEnd) ;
+        POSITION_T precedLen = precedEnd - precedStart + 1 ;
+        mDocument->Delete(precedStart, precedLen) ;
+        savedPos -= precedLen ;
+
+        std::string beforeCmd = FormatLmDotCommand(newMargin) ;
+        mDocument->SetPosition(precedStart) ;
+        mDocument->Insert(beforeCmd) ;
+        savedPos += static_cast<POSITION_T>(beforeCmd.size()) ;
+    }
+    else
+    {
+        // Fresh bracket: .lm <new> before this paragraph, .lm <base> after
+        // it (restoring), around just this one paragraph.
+        POSITION_T paraStart, paraEnd ;
+        mDocument->GetParagraphStartandEnd(para, paraStart, paraEnd) ;
+
+        std::string beforeCmd = FormatLmDotCommand(newMargin) ;
+        mDocument->SetPosition(paraStart) ;
+        mDocument->Insert(beforeCmd) ;
+        savedPos += static_cast<POSITION_T>(beforeCmd.size()) ;
+
+        PARAGRAPH_T textPara = mDocument->GetParagraphFromPosition(savedPos) ;
+        POSITION_T textStart, textEnd ;
+        mDocument->GetParagraphStartandEnd(textPara, textStart, textEnd) ;
+
+        std::string afterCmd = FormatLmDotCommand(baseMargin) ;
+        mDocument->SetPosition(textEnd + 1) ;
+        mDocument->Insert(afterCmd) ;
+    }
+
+    mDocument->SetPosition(savedPos) ;
+    EndBatchUpdate() ;
+    mDocument->EndUndoGroup() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  para [in] paragraph number to check
+///
+/// @return true if the paragraph is a .pa (page break) dot command
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::IsPageBreakDotCommand(PARAGRAPH_T para)
+{
+    if (para < 0 || para >= mDocument->GetNumberofParagraphs())
+    {
+        return false ;
+    }
+
+    std::string text = mDocument->GetParagraphText(para) ;
+    if (text.length() < 3)
+    {
+        return false ;
+    }
+
+    return (text[0] == '.' &&
+            (text[1] == 'p' || text[1] == 'P') &&
+            (text[2] == 'a' || text[2] == 'A')) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WordStar 7 ^OV: centers the text from the cursor to the next page
+/// break vertically in the remaining space on the page. Trailing blank
+/// lines are ignored (per the manual); carriage returns are added above
+/// the text to center it; a page break is inserted at the end of the text
+/// if one isn't already there.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::CenterTextVertically(void)
+{
+    if (!mDocument || !mLayout)
+    {
+        return ;
+    }
+
+    POSITION_T savedPos = mDocument->GetPosition() ;
+    PARAGRAPH_T startPara = mDocument->GetParagraphFromPosition(savedPos) ;
+    PARAGRAPH_T numParas = mDocument->GetNumberofParagraphs() ;
+
+    const sParagraphLayout* startLayout = mLayout->GetParagraphLayout(startPara) ;
+    if (!startLayout || startLayout->lines.empty())
+    {
+        return ;
+    }
+    PAGE_T currentPage = startLayout->lines.front().pagenumber ;
+
+    // Walk forward, counting printable lines per paragraph, stopping at an
+    // explicit .pa, a page-number change (content already overflowed), or
+    // end of document. Track the last non-blank paragraph so trailing
+    // blank lines can be excluded from both the line count and where the
+    // inserted page break goes.
+    PARAGRAPH_T lastNonBlankPara = NOT_SET ;
+    int contentLines = 0 ;
+    int linesSinceLastNonBlank = 0 ;
+    bool hitPageBreakCmd = false ;
+
+    for (PARAGRAPH_T p = startPara ; p < numParas ; p++)
+    {
+        if (IsPageBreakDotCommand(p))
+        {
+            hitPageBreakCmd = true ;
+            break ;
+        }
+
+        const sParagraphLayout* pl = mLayout->GetParagraphLayout(p) ;
+        if (!pl)
+        {
+            break ;
+        }
+
+        int linesThisPara = 0 ;
+        bool overflowed = false ;
+        for (auto& line : pl->lines)
+        {
+            if (!line.isPrintable)
+            {
+                continue ;
+            }
+            if (line.pagenumber != currentPage)
+            {
+                overflowed = true ;
+                break ;
+            }
+            linesThisPara++ ;
+        }
+        if (overflowed)
+        {
+            break ;
+        }
+        if (linesThisPara == 0)
+        {
+            linesThisPara = 1 ;  // blank paragraph still occupies one line
+        }
+
+        if (mDocument->GetParagraphText(p).empty())
+        {
+            linesSinceLastNonBlank += linesThisPara ;
+        }
+        else
+        {
+            contentLines += linesSinceLastNonBlank + linesThisPara ;
+            linesSinceLastNonBlank = 0 ;
+            lastNonBlankPara = p ;
+        }
+    }
+
+    if (lastNonBlankPara == NOT_SET || contentLines <= 0)
+    {
+        return ;  // nothing but blank lines between here and the page break
+    }
+
+    sPageInfo pageInfo = mLayout->GetPageInfo(currentPage) ;
+    COORD_T availableHeight = pageInfo.paperheight - pageInfo.topmargin - pageInfo.bottommargin ;
+    COORD_T lineHeight = mLayout->GetLineHeight() ;
+    if (lineHeight <= 0)
+    {
+        return ;
+    }
+
+    int totalLines = static_cast<int>(availableHeight / lineHeight) ;
+    int blankLinesAbove = (totalLines - contentLines) / 2 ;
+    if (blankLinesAbove <= 0)
+    {
+        return ;  // already fills the page, nothing to center
+    }
+
+    CloseTypingGroup() ;
+    mDocument->BeginUndoGroup() ;
+    BeginBatchUpdate() ;
+
+    // Insert the page break after the content FIRST (only shifts positions
+    // after it, leaving paraStart below untouched), then the blank lines
+    // above the content.
+    if (!hitPageBreakCmd)
+    {
+        POSITION_T lastStart, lastEnd ;
+        mDocument->GetParagraphStartandEnd(lastNonBlankPara, lastStart, lastEnd) ;
+        mDocument->SetPosition(lastEnd + 1) ;
+        mDocument->Insert(".pa\r") ;
+    }
+
+    POSITION_T paraStart, paraEnd ;
+    mDocument->GetParagraphStartandEnd(startPara, paraStart, paraEnd) ;
+    mDocument->SetPosition(paraStart) ;
+    mDocument->Insert(std::string(static_cast<size_t>(blankLinesAbove), '\r')) ;
+
+    if (savedPos >= paraStart)
+    {
+        savedPos += blankLinesAbove ;
+    }
+    mDocument->SetPosition(savedPos) ;
+
+    EndBatchUpdate() ;
+    mDocument->EndUndoGroup() ;
 }
 
 

@@ -153,6 +153,14 @@ public:
     virtual void SpellCheckEnterWord(void) = 0;               // Spell check user-entered word
     virtual void WordCountBlock(void) = 0;                    // Count words in block, display result
     virtual void ToggleShowControl(void) = 0;                 // Toggle control code display mode
+    virtual void Thesaurus(void) = 0;                         // Look up synonyms for the word at cursor (^QJ)
+    virtual void WriteBlockToFile(void) = 0;                  // Write marked block to another file (^KW)
+
+    // Shared (concrete) -- implemented once in editorbase.cpp since they only
+    // need cEditorBase's own document/layout access, no frontend-specific UI.
+    void SortBlock(bool ascending);                           // Sort marked block's paragraphs (^KZ,A/D)
+    void CenterTextVertically(void);                          // Center cursor-to-page-break text on the page (^OV)
+    void TemporaryIndent(void);                                // Indent current paragraph one more tab stop, reverting after it (^OG)
 
     // Pure Virtual - Undo/Redo
     virtual void Undo(void) = 0;                              // Undo last action
@@ -421,6 +429,12 @@ private:
     eJustification GetAlignmentFromEndState(PARAGRAPH_T para);
     eJustification FindNextTextParagraphAlignment(PARAGRAPH_T currentPara);
     std::string AlignmentToDotCommand(eJustification align);
+
+    // Helpers for TemporaryIndent (^OG) and CenterTextVertically (^OV)
+    bool IsLmDotCommand(PARAGRAPH_T para);
+    COORD_T GetLmMarginValue(PARAGRAPH_T para);
+    std::string FormatLmDotCommand(COORD_T twips);
+    bool IsPageBreakDotCommand(PARAGRAPH_T para);
 
     // Hidden Content Skipping
     POSITION_T SkipHiddenParagraphs(POSITION_T pos, int direction);
