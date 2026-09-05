@@ -1319,9 +1319,15 @@ void cWordTsar::WriteConfig(void)
     config.mAutoSaveInterval = mEditor->mAutoSaveIntervalSec ;
     config.mDefaultFormat = mEditor->mDefaultFormat ;
 
-    // Default directory
-    config.mDefaultDirectory = mEditor->mFileDir ;
-
+    // Default directory is a stable preference, only ever changed
+    // explicitly via the Preferences dialog (which saves it itself --
+    // see editorctrl.cpp's config.mDefaultDirectory = ui.mDefaultDirectory
+    // read-back). Do NOT persist mEditor->mFileDir here: it tracks
+    // whatever directory the CURRENT document happens to live in, which
+    // changes on every open/save/autosave -- including a blank/untitled
+    // document autosaving somewhere unexpected -- and would silently
+    // clobber the user's real preference with that transient location on
+    // every quit.
     config.Save() ;
 }
 

@@ -855,7 +855,14 @@ void cWSWordTsar::WriteConfig(void)
     config.mCaretBlinkRate = mEditor->mCaretBlinkRate;
     config.mAutoSaveInterval = mEditor->mAutoSaveIntervalSec;
     config.mDefaultFormat = mEditor->mDefaultFormat;
-    config.mDefaultDirectory = mEditor->mFileDir;
+    // Default directory is a stable preference, only ever changed
+    // explicitly via System Preferences (which saves it itself). Do NOT
+    // persist mEditor->mFileDir here: it tracks whatever directory the
+    // CURRENT document happens to live in, which changes on every
+    // open/save/autosave -- including a blank/untitled document autosaving
+    // somewhere unexpected -- and would silently clobber the user's real
+    // preference with that transient location on every quit. (config.Load()
+    // above already carries the on-disk value forward unchanged.)
     config.mShortName = mEditor->mShortName;
     config.mLongName = mEditor->mLongName;
 
