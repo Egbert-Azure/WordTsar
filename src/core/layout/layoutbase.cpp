@@ -1972,6 +1972,31 @@ COORD_T cLayoutBase::ComputeCurrentLineHeight(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  font [in] - font descriptor for the line about to start
+///
+/// @return line height in twips for a line started under the given font
+///
+/// @brief
+/// Same formula as ComputeCurrentLineHeight() (.LH override if set, else
+/// font-metric line spacing, times the .LS multiplier), but for an explicit
+/// font rather than mLayoutState's current font. Used for page-break
+/// look-aheads inside WordWrapSegmentsIntoLines(): by the time that loop
+/// runs, BuildParagraphSegments() has already walked the whole paragraph,
+/// so mLayoutState's font tracking reflects the paragraph's LAST character,
+/// not the font of the segment about to start the next line.
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T cLayoutBase::ComputeLineHeightForFont(const std::string& font) const
+{
+    COORD_T baseHeight = (mLayoutState->GetLineHeight() == NOT_SET)
+        ? GetFontLineSpacing(font)
+        : mLayoutState->GetLineHeight();
+    return baseHeight * mLayoutState->GetModifiers().linespace;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return true if auto-leading mode enabled, false otherwise
 ///
 /// @brief
@@ -4571,8 +4596,12 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                         SaveLine(paragraphNum, currentLine);
                     }
 
-                    // Check for page break
-                    if (NeedNewPage(currentLine.lineheight))
+                    // Check for page break. Uses this tab segment's own font
+                    // (the segment about to start the new line), not
+                    // currentLine.lineheight (the line just finished) --
+                    // those can differ if the font changed at this wrap
+                    // point, which would size the look-ahead wrong.
+                    if (NeedNewPage(ComputeLineHeightForFont(segment.font)))
                     {
                         IncrementPageAndCreateBox();
                     }
@@ -4716,9 +4745,11 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                 FinalizeLine(currentLine, maxLineWidth);
                 SaveLine(paragraphNum, currentLine);
 
-                // Check for page break
-                // Check for page break
-                if (NeedNewPage(currentLine.lineheight))
+                // Check for page break. Uses seg2's own font (the segment
+                // continuing onto the new line), not currentLine.lineheight
+                // (the line just finished) -- those can differ if the font
+                // changed at this word-split wrap point.
+                if (NeedNewPage(ComputeLineHeightForFont(seg2.font)))
                 {
                     IncrementPageAndCreateBox();
                 }
@@ -4842,8 +4873,13 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                         FinalizeLine(currentLine, maxLineWidth);
                         SaveLine(paragraphNum, currentLine);
 
-                        // Check for page break
-                        if (NeedNewPage(currentLine.lineheight))
+                        // Check for page break. Uses the font of the segment
+                        // that will actually head the new line (the front of
+                        // pushBack, already fully built above), not
+                        // currentLine.lineheight (the line just finished) --
+                        // those can differ if the font changed at this
+                        // backtracked wrap point.
+                        if (NeedNewPage(ComputeLineHeightForFont(pushBack.front().font)))
                         {
                             IncrementPageAndCreateBox();
                         }
@@ -4892,6 +4928,12 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                             }
                         }
 
+                        // Font of whatever will actually head the new line,
+                        // for the page-break look-ahead below -- may differ
+                        // from currentLine.lineheight (the line just
+                        // finished) if the font changes at this wrap point.
+                        std::string nextLineFont = segment.font;
+
                         if (charSplit > 0)
                         {
                             auto [seg1, seg2] = SplitSegmentAtPosition(
@@ -4900,13 +4942,21 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                             currentLine.segments.push_back(seg1);
                             currentLineWidth += seg1.totalWidth;
                             remainingSegments.push_front(seg2);
+                            nextLineFont = seg2.font;
                         }
                         else
                         {
-                            // Can't fit even one grapheme - forced overflow
+                            // Can't fit even one grapheme - forced overflow.
+                            // segment itself lands on THIS line, so the next
+                            // line starts with whatever now leads the queue
+                            // (if anything is left).
                             currentLine.linestart = segment.startPosition;
                             currentLine.segments.push_back(segment);
                             currentLineWidth += segmentWidth;
+                            if (!remainingSegments.empty())
+                            {
+                                nextLineFont = remainingSegments.front().font;
+                            }
                         }
 
                         // Finalize line immediately
@@ -4914,7 +4964,7 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                         SaveLine(paragraphNum, currentLine);
 
                         // Check for page break
-                        if (NeedNewPage(currentLine.lineheight))
+                        if (NeedNewPage(ComputeLineHeightForFont(nextLineFont)))
                         {
                             IncrementPageAndCreateBox();
                         }
@@ -4943,8 +4993,12 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                         FinalizeLine(currentLine, maxLineWidth);
                         SaveLine(paragraphNum, currentLine);
 
-                        // Check for page break
-                        if (NeedNewPage(currentLine.lineheight))
+                        // Check for page break. Uses this segment's own font
+                        // (it's what re-processes onto the new line below),
+                        // not currentLine.lineheight (the line just
+                        // finished) -- those can differ if the font changed
+                        // at this wrap point.
+                        if (NeedNewPage(ComputeLineHeightForFont(segment.font)))
                         {
                             IncrementPageAndCreateBox();
                         }

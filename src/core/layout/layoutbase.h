@@ -398,6 +398,14 @@ protected:
     // two can't drift apart.
     COORD_T ComputeCurrentLineHeight(void) const;
 
+    // Same formula as ComputeCurrentLineHeight(), but for an explicit font
+    // descriptor rather than the layout state's current font. Needed for
+    // page-break look-aheads taken mid-paragraph, where mLayoutState's font
+    // tracking has already advanced past BuildParagraphSegments() to the
+    // paragraph's last character and no longer reflects the font of the
+    // segment about to start the next line.
+    COORD_T ComputeLineHeightForFont(const std::string& font) const;
+
     // ----- Segment Helpers -----
     void MarkControlCodesInSegment(sSegmentLayout& segment, const std::vector<std::string>& graphemes);
     void MarkSegmentIfInRange(sSegmentLayout& segment, POSITION_T paragraphStart);
