@@ -92,7 +92,7 @@ private:
     // Render a single segment (lineHeight = max segment height in the line, for baseline alignment)
     void RenderSegment(CGContextRef ctx, const sSegmentLayout& segment,
                         COORD_T lineX, COORD_T lineY, COORD_T lineHeight,
-                        double pageHeightPt, bool isLastSegmentOfLine = false);
+                        double pageHeightPt);
 
     // Load and cache a sized Core Text font from its descriptor string
     CTFontRef GetOrLoadFont(const std::string& descriptor);

@@ -1122,8 +1122,6 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
 
         for (const sSegmentLayout& seg : line->segments)
         {
-            bool isLastSegmentOfLine = (&seg == &line->segments.back());
-
             sColor segFg = mEditor->mTextColour;
             sColor segBg = mEditor->mBGroundColour;
 
@@ -1262,10 +1260,11 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
                 if (g == "\xC2\xAD")
                 {
                     // Soft hyphen (real ^OE character): invisible (0
-                    // columns) unless it's the last character on the last
-                    // segment of this line -- i.e. word wrap actually broke
-                    // here -- or reveal codes is on, matching the GUI.
-                    bool isLineBreakHere = isLastSegmentOfLine && (gi + 1 == graphemes.size());
+                    // columns) unless word wrap actually broke the line
+                    // here (decided once in WordWrapSegmentsIntoLines(),
+                    // not re-derived here) or reveal codes is on, matching
+                    // the GUI.
+                    bool isLineBreakHere = seg.explicitHyphenAtBreak && (gi + 1 == graphemes.size());
                     if (isLineBreakHere || showCtl == SHOW_ALL)
                     {
                         cells.push_back("-");

@@ -267,6 +267,12 @@ struct sSegmentLayout
     // already reserves its width -- see WordWrapSegmentsIntoLines()).
     bool autoHyphen;
 
+    // True when word wrap broke the line at a real soft hyphen (^OE) that
+    // is this segment's last grapheme -- render it as "-" instead of its
+    // normal invisible/reveal-codes form. Decided once here rather than
+    // re-derived per render path from line/segment/grapheme indices.
+    bool explicitHyphenAtBreak;
+
     // Tab segment -- this segment IS a tab (self-contained, replaces old 3-segment pattern)
     bool isTab;                             // True if this segment represents a tab character
     POSITION_T tabDocPosition;              // Document position of tab (for GetTab call)
@@ -281,6 +287,7 @@ struct sSegmentLayout
                         hasControlCodes(false),
                         totalWidth(0),
                         autoHyphen(false),
+                        explicitHyphenAtBreak(false),
                         isTab(false), tabDocPosition(0), tabWidth(0), tabType(TAB_TAB), tabStopType(TAB_TAB)
     {
         textcolor.red = -1;

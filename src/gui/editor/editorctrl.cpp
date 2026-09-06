@@ -2375,14 +2375,11 @@ void cEditorCtrl::DrawLine(QPainter& painter, const sLineLayout& line, const QCo
         }
     }
 
-    for (size_t i = 0; i < line.segments.size(); ++i)
+    for (const auto& segment : line.segments)
     {
-        const auto& segment = line.segments[i];
-        bool isLastSegmentOfLine = (i + 1 == line.segments.size());
-
         // All segments use line.pagex as base coordinate
         // Their position[] arrays already contain correct continuous offsets
-        DrawSegment(painter, segment, line.pagex, lineY, maxAscent, line.pagenumber, fgOverride, isLastSegmentOfLine);
+        DrawSegment(painter, segment, line.pagex, lineY, maxAscent, line.pagenumber, fgOverride);
     }
 }
 
@@ -2485,7 +2482,7 @@ void cEditorCtrl::DrawControlCodeBackgrounds(QPainter& painter, const sSegmentLa
 /// Draws a segment with its glyphs.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, COORD_T lineX, COORD_T lineY, COORD_T maxAscent, PAGE_T pageNumber, const QColor& fgOverride, bool isLastSegmentOfLine)
+void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, COORD_T lineX, COORD_T lineY, COORD_T maxAscent, PAGE_T pageNumber, const QColor& fgOverride)
 {
     if (!mDocument || segment.position.empty() || segment.GetGraphemeCount() == 0)
     {
@@ -2574,12 +2571,13 @@ void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, 
 
         // Soft hyphen (U+00AD, real ^OE character): invisible in normal
         // flow (mLayout->GetDisplayCharacter() handles reveal-codes
-        // display), except when it's the last character on the last
-        // segment of this line -- i.e. word wrap actually broke here --
-        // in which case it prints as a real hyphen, same as real WS7.
+        // display), except when word wrap actually broke the line here
+        // (decided once in WordWrapSegmentsIntoLines(), not re-derived
+        // from line/segment position here), in which case it prints as a
+        // real hyphen, same as real WS7.
         if (graphemes[i] == "\xC2\xAD")
         {
-            bool isLineBreakHere = isLastSegmentOfLine && (i + 1 == graphemes.size());
+            bool isLineBreakHere = segment.explicitHyphenAtBreak && (i + 1 == graphemes.size());
             displayGrapheme = isLineBreakHere ? "-" : mLayout->GetDisplayCharacter(docPos, graphemes[i], pageNumber);
 
             QString glyph = QString::fromStdString(displayGrapheme);

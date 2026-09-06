@@ -2,6 +2,10 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.13.0 Beta (2026-09-07)
+.hy auto-hyphenation implemented which makes it look right instead of leaving rivers of whitespace
+^OE soft hyphen, ^OH auto-hyphenation toggle
+
 ## 0.12.0 Beta (2026-09-05)
 
 ### Print Preview and Print now use Apple's own PDF viewer

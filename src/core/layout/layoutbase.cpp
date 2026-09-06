@@ -4824,42 +4824,41 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                         }
                     }
 
-                    POSITION_T bestHyphen = -1;
-                    bool haveExplicitHyphen = false;
+                    // Both hyphen sources reduce to the same question: of a
+                    // list of segment-relative split indices (ascending),
+                    // which is the widest one whose text-before-it plus a
+                    // rendered hyphen glyph still fits? Candidates are
+                    // ascending, so the first that doesn't fit means none
+                    // wider will either.
+                    auto pickBestFittingCandidate = [&](const std::vector<POSITION_T>& candidates) -> POSITION_T
+                    {
+                        POSITION_T best = -1;
+                        for (POSITION_T splitIndexInSegment : candidates)
+                        {
+                            COORD_T widthBeforeBreak =
+                                (splitIndexInSegment < static_cast<POSITION_T>(segment.position.size()))
+                                    ? segment.position[splitIndexInSegment]
+                                    : segment.totalWidth;
+                            if (widthBeforeBreak + hyphenGlyphWidth <= availableSpace)
+                            {
+                                best = splitIndexInSegment;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        return best;
+                    };
+
+                    // Explicit soft hyphens (^OE, literal U+00AD) within the
+                    // word, as segment-relative indices.
+                    std::vector<POSITION_T> explicitCandidates;
                     for (POSITION_T p = segStart; p < wordEnd; ++p)
                     {
-                        if (p >= static_cast<POSITION_T>(graphemes.size()) || graphemes[p] != "\xC2\xAD")
+                        if (p < static_cast<POSITION_T>(graphemes.size()) && graphemes[p] == "\xC2\xAD")
                         {
-                            continue;
-                        }
-                        haveExplicitHyphen = true;
-
-                        POSITION_T splitIndexInSegment = p - segStart;
-                        COORD_T widthBeforeHyphen;
-                        if (splitIndexInSegment <= 0)
-                        {
-                            widthBeforeHyphen = 0;
-                        }
-                        else if (splitIndexInSegment < static_cast<POSITION_T>(segment.position.size()))
-                        {
-                            widthBeforeHyphen = segment.position[splitIndexInSegment];
-                        }
-                        else
-                        {
-                            widthBeforeHyphen = segment.totalWidth;
-                        }
-
-                        // The soft hyphen's own measured width is 0 (forced
-                        // at segmentation time), so widthBeforeHyphen already
-                        // covers the real text up to it -- add the glyph it
-                        // renders as when deciding whether it fits.
-                        if (widthBeforeHyphen + hyphenGlyphWidth <= availableSpace)
-                        {
-                            bestHyphen = p;  // fits; keep looking for a later (wider) one
-                        }
-                        else
-                        {
-                            break;  // candidates are ascending; a later one only needs more room
+                            explicitCandidates.push_back(p - segStart);
                         }
                     }
 
@@ -4871,11 +4870,12 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                     POSITION_T splitAt = -1;
                     bool isAutoHyphen = false;
 
-                    if (bestHyphen >= segStart)
+                    POSITION_T bestExplicit = pickBestFittingCandidate(explicitCandidates);
+                    if (bestExplicit >= 0)
                     {
-                        splitAt = bestHyphen + 1;
+                        splitAt = segStart + bestExplicit + 1;
                     }
-                    else if (!haveExplicitHyphen && mLayoutState->IsHyphenationEnabled())
+                    else if (explicitCandidates.empty() && mLayoutState->IsHyphenationEnabled())
                     {
                         // No explicit soft hyphen in this word -- try the
                         // dictionary. Real WS7 only auto-hyphenates when the
@@ -4901,8 +4901,8 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                             }
                         }
 
+                        std::vector<POSITION_T> autoCandidates;
                         cHyphenator hyphenator(mLayoutState->GetHyphenationLanguage());
-                        POSITION_T bestAuto = -1;
                         for (size_t offset : hyphenator.HyphenationPoints(wordText))
                         {
                             auto boundaryIt = std::find(graphemeUtf16Boundary.begin(), graphemeUtf16Boundary.end(),
@@ -4913,29 +4913,16 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                             }
                             POSITION_T splitIndexInSegment =
                                 static_cast<POSITION_T>(boundaryIt - graphemeUtf16Boundary.begin()) + 1;
-                            if (splitIndexInSegment <= 0 || splitIndexInSegment >= (wordEnd - segStart))
+                            if (splitIndexInSegment > 0 && splitIndexInSegment < (wordEnd - segStart))
                             {
-                                continue;
-                            }
-
-                            COORD_T widthBeforeBreak =
-                                (splitIndexInSegment < static_cast<POSITION_T>(segment.position.size()))
-                                    ? segment.position[splitIndexInSegment]
-                                    : segment.totalWidth;
-
-                            if (widthBeforeBreak + hyphenGlyphWidth <= availableSpace)
-                            {
-                                bestAuto = segStart + splitIndexInSegment;  // fits; keep looking for wider
-                            }
-                            else
-                            {
-                                break;  // cHyphenator returns candidates in ascending order
+                                autoCandidates.push_back(splitIndexInSegment);
                             }
                         }
 
-                        if (bestAuto >= segStart)
+                        POSITION_T bestAuto = pickBestFittingCandidate(autoCandidates);
+                        if (bestAuto >= 0)
                         {
-                            splitAt = bestAuto;  // no real character to consume
+                            splitAt = segStart + bestAuto;  // no real character to consume
                             isAutoHyphen = true;
                         }
                     }
@@ -4951,6 +4938,7 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                         auto [seg1, seg2] = SplitSegmentAtPosition(segment, splitAt);
                         seg1.totalWidth += hyphenGlyphWidth;
                         seg1.autoHyphen = isAutoHyphen;
+                        seg1.explicitHyphenAtBreak = !isAutoHyphen;
 
                         if (currentLine.segments.empty())
                         {

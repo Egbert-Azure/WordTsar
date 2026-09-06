@@ -587,10 +587,9 @@ void cTUIPrintout::RenderLine(CGContextRef ctx, const sLineLayout& line, double 
     }
 
     // Render each segment in the line
-    for (size_t i = 0; i < line.segments.size(); ++i)
+    for (const auto& segment : line.segments)
     {
-        bool isLastSegmentOfLine = (i + 1 == line.segments.size());
-        RenderSegment(ctx, line.segments[i], line.pagex, line.pagey, lineHeight, pageHeightPt, isLastSegmentOfLine);
+        RenderSegment(ctx, segment, line.pagex, line.pagey, lineHeight, pageHeightPt);
     }
 }
 
@@ -621,7 +620,7 @@ void cTUIPrintout::RenderLine(CGContextRef ctx, const sLineLayout& line, double 
 /////////////////////////////////////////////////////////////////////////////
 void cTUIPrintout::RenderSegment(CGContextRef ctx, const sSegmentLayout& segment,
                                   COORD_T lineX, COORD_T lineY, COORD_T lineHeight,
-                                  double pageHeightPt, bool isLastSegmentOfLine)
+                                  double pageHeightPt)
 {
     // Skip empty segments
     if (!mDocument || segment.position.empty() || segment.GetGraphemeCount() == 0)
@@ -651,12 +650,13 @@ void cTUIPrintout::RenderSegment(CGContextRef ctx, const sSegmentLayout& segment
     {
         std::string displayGrapheme = graphemes[i];
 
-        // Soft hyphen (U+00AD, real ^OE character): invisible unless it's
-        // the last character on the last segment of this line -- i.e. word
-        // wrap actually broke here -- matching the on-screen renderer.
+        // Soft hyphen (U+00AD, real ^OE character): invisible unless word
+        // wrap actually broke the line here (decided once in
+        // WordWrapSegmentsIntoLines(), not re-derived here), matching the
+        // on-screen renderer.
         if (graphemes[i] == "\xC2\xAD")
         {
-            if (!isLastSegmentOfLine || i + 1 != graphemes.size())
+            if (!segment.explicitHyphenAtBreak || i + 1 != graphemes.size())
             {
                 continue;
             }
