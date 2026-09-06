@@ -99,6 +99,7 @@ constexpr CHAR_T SAVE_CHAR = 1 ;                    ///< dummy character in the 
 constexpr CHAR_T HARD_RETURN = 13 ;
 constexpr CHAR_T SPACE = 32 ;
 constexpr CHAR_T MARKER_CHAR = 127 ;
+constexpr CHAR_T SOFT_HYPHEN = 0x00AD ;             ///< optional/soft hyphen (^OE), invisible unless a line breaks there
 // constexpr CHAR_T NODELETE_MARKER_CHAR = 15 ;     ///< this overrides enum eModifiers STYLE_CTRL_O
 
 constexpr COORD_T DEFAULT_CARET_WIDTH  = 30 ;    ///< default insert-mode caret width in twips

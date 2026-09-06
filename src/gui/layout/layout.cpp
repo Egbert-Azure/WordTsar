@@ -415,9 +415,21 @@ sSegmentLayout cLayout::CreateTabSegment(PARAGRAPH_T paragraph, POSITION_T start
 void cLayout::AddGraphemeToSegment(sSegmentLayout& seg, COORD_T& currentX,
                                      const std::string& grapheme)
 {
-    // Map HARD_RETURN to space for measurement (CR has undefined width in fonts)
-    std::string measureText = (grapheme.size() == 1 && grapheme[0] == HARD_RETURN) ? " " : grapheme;
-    COORD_T glyphWidth = GetTextWidth(measureText);
+    COORD_T glyphWidth ;
+
+    if (grapheme == "\xC2\xAD")
+    {
+        // Soft hyphen (U+00AD): invisible/zero-width in normal flow.
+        // WordWrapSegmentsIntoLines() accounts for a real hyphen glyph's
+        // width only when it actually chooses to break the line here.
+        glyphWidth = 0 ;
+    }
+    else
+    {
+        // Map HARD_RETURN to space for measurement (CR has undefined width in fonts)
+        std::string measureText = (grapheme.size() == 1 && grapheme[0] == HARD_RETURN) ? " " : grapheme;
+        glyphWidth = GetTextWidth(measureText);
+    }
 
     // Store position (relative to segment start, base-0)
     seg.position.push_back(currentX);

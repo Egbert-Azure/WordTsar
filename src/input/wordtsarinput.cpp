@@ -454,6 +454,15 @@ const char *LookupOChordHelp(char lower)
         case '+' :
             return "^O+ - Justify paragraph\n\n"
                    "Sets the current paragraph's alignment to fully justified." ;
+        case 'e' :
+            return "^OE - Insert soft hyphen\n\n"
+                   "Marks a hyphenation point inside a word. Invisible unless the "
+                   "word actually breaks there at the end of a line, in which case "
+                   "it prints as a hyphen. Works whether auto-hyphenation is on or off." ;
+        case 'h' :
+            return "^OH - Toggle auto-hyphenation\n\n"
+                   "Turns automatic end-of-line hyphenation on or off for the rest "
+                   "of the document (on by default)." ;
         case 'l' :
         case 'g' :
         case 'x' :
@@ -463,8 +472,6 @@ const char *LookupOChordHelp(char lower)
         case 'f' :
         case 's' :
         case 'v' :
-        case 'e' :
-        case 'h' :
         case 'a' :
         case 'w' :
         case ' ' :
@@ -1747,14 +1754,20 @@ void cWordStarInput::OnControlOChar(char ch)
         case 'u' :
         case 'f' :
         case 's' :
-        case 'e' :
-        case 'h' :
         case 'a' :
         case ' ' :
         case 'b' :
             {
                 mEditor->Preferences() ;
             }
+            break ;
+
+        case 'e' :          // Insert soft hyphen (real WordStar 7 ^OE)
+            mEditor->InsertSoftHyphen() ;
+            break ;
+
+        case 'h' :          // Toggle auto-hyphenation (real WordStar 7 ^OH)
+            mEditor->ToggleHyphenation() ;
             break ;
 
         case 'k' :

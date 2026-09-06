@@ -270,7 +270,7 @@ private:
     void DrawContinuousMode(QPainter& painter, COORD_T viewportHeight);
     void DrawPageMode(QPainter& painter, COORD_T viewportHeight);
     void DrawLine(QPainter& painter, const sLineLayout& line, const QColor& fgOverride = QColor());
-    void DrawSegment(QPainter& painter, const sSegmentLayout& segment, COORD_T lineX, COORD_T lineY, COORD_T maxAscent, PAGE_T pageNumber, const QColor& fgOverride = QColor());
+    void DrawSegment(QPainter& painter, const sSegmentLayout& segment, COORD_T lineX, COORD_T lineY, COORD_T maxAscent, PAGE_T pageNumber, const QColor& fgOverride = QColor(), bool isLastSegmentOfLine = false);
     void DrawControlCodeBackgrounds(QPainter& painter, const sSegmentLayout& segment, const std::vector<std::string>& graphemes, COORD_T lineX, COORD_T lineY);
     void DrawPageBackground(QPainter& painter, PAGE_T pageNumber, COORD_T pageYOffset, COORD_T paperWidth, COORD_T paperHeight);
     void DrawPageShadow(QPainter& painter, COORD_T pageYOffset, COORD_T paperWidth, COORD_T paperHeight);

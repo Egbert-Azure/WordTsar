@@ -338,7 +338,7 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
             }
             if (cmdCode == "HY")  // Auto-Hyphenation
             {
-                return DOT_NOTIMPLEMENTED;
+                return ParseHyphenation(upperCmd);
             }
             break;
         }
@@ -1282,6 +1282,57 @@ eDotCommandStatus cDotCommandParser::ParseWordWrap(const std::string& command)
     {
         // .aw with no parameter defaults to "on"
         mLayoutState->SetWordWrapEnabled(true);
+    }
+    else
+    {
+        // Unknown parameter
+        return DOT_ERROR;
+    }
+
+    return DOT_GOOD;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  command [in] full dot command string (.hy on or .hy off)
+///
+/// @return DOT_GOOD if parsed successfully, DOT_ERROR otherwise
+///
+/// @brief
+/// Parses .HY (auto-hyphenation on/off). Real WS7 defaults hyphenation to
+/// on, unlike word wrap's .aw which this otherwise mirrors exactly.
+///
+/////////////////////////////////////////////////////////////////////////////
+eDotCommandStatus cDotCommandParser::ParseHyphenation(const std::string& command)
+{
+    std::string param = command.substr(3);
+
+    // Trim whitespace
+    param.erase(0, param.find_first_not_of(" \t"));
+    if (!param.empty())
+    {
+        param.erase(param.find_last_not_of(" \t") + 1);
+    }
+
+    // Convert to uppercase for case-insensitive comparison
+    for (size_t i = 0; i < param.length(); i++)
+    {
+        param[i] = toupper(param[i]);
+    }
+
+    // Check for "off" or "OFF"
+    if (param.find("OFF") != std::string::npos)
+    {
+        mLayoutState->SetHyphenationEnabled(false);
+    }
+    else if (param.find("ON") != std::string::npos)
+    {
+        mLayoutState->SetHyphenationEnabled(true);
+    }
+    else if (param.empty())
+    {
+        // .hy with no parameter defaults to "on"
+        mLayoutState->SetHyphenationEnabled(true);
     }
     else
     {

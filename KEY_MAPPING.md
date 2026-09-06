@@ -248,6 +248,8 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | P | ^O,P | -- | Print preview (WS only) |
 | ? | ^O,? | -- | Display status/memory info (WS only) |
 | B | ^O,B | -- | Screen Settings dialog (WS only) |
+| E | ^O,E | -- | Insert soft hyphen (WS only) |
+| H | ^O,H | -- | Toggle auto-hyphenation on/off (WS only) |
 
 ### P Chord -- Style and Print Formatting
 

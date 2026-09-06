@@ -64,6 +64,7 @@ protected:
     eDotCommandStatus ParseLineHeight(const std::string& command);
     eDotCommandStatus ParsePageNumber(const std::string& command);
     eDotCommandStatus ParseWordWrap(const std::string& command);
+    eDotCommandStatus ParseHyphenation(const std::string& command);
     eDotCommandStatus ParsePrinterOrientation(const std::string& command);
     eDotCommandStatus ParseOmitPageNumbers(const std::string& command);
     eDotCommandStatus ParsePrintPageNumbers(const std::string& command);

@@ -84,6 +84,9 @@
 #include "pagemanager.h"
 #include "headerfootermanager.h"
 #include "src/core/document/document.h"
+#include "src/core/hyphenation/hyphenator.h"
+#include "unicodelib.h"
+#include "unicodelib_encodings.h"
 #include <sstream>
 #include <iomanip>
 #include <limits>
@@ -956,6 +959,7 @@ void cLayoutBase::SaveParagraphEndState(PARAGRAPH_T para)
     mParagraphLayout[para].endState.justify = mLayoutState->GetModifiers().justify;
     mParagraphLayout[para].endState.linespace = mLayoutState->GetModifiers().linespace;
     mParagraphLayout[para].endState.wordWrap = mLayoutState->IsWordWrapEnabled();
+    mParagraphLayout[para].endState.hyphenation = mLayoutState->IsHyphenationEnabled();
 
     // Margin end state
     mParagraphLayout[para].endState.leftMargin = mLayoutState->GetLeftMargin();
@@ -4794,7 +4798,194 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
             }
             else
             {
-                // No word boundary to split at within this segment.
+                // No word boundary to split at within this segment. Before
+                // falling back to cross-segment backtracking or a raw
+                // character split, see if this word carries an explicit
+                // soft hyphen (^OE, stored as a literal U+00AD) that fits.
+                // These are always honored as break points, independent of
+                // the .hy auto-hyphenation flag below.
+                if (segment.length > 0 && !segment.position.empty())
+                {
+                    POSITION_T segStart = segment.startPosition;
+                    POSITION_T segEnd = segStart + segment.length;
+                    COORD_T hyphenGlyphWidth = GetTextWidth("-", segment.font);
+
+                    // A segment is a formatting run, not necessarily a
+                    // single word -- clip to the segment's FIRST word only.
+                    // (Later words in the same run belong to a future wrap
+                    // decision, not this one.)
+                    POSITION_T wordEnd = segEnd;
+                    for (POSITION_T ws : wordStarts)
+                    {
+                        if (ws > segStart && ws < segEnd)
+                        {
+                            wordEnd = ws;  // wordStarts is ascending -- first match is closest
+                            break;
+                        }
+                    }
+
+                    POSITION_T bestHyphen = -1;
+                    bool haveExplicitHyphen = false;
+                    for (POSITION_T p = segStart; p < wordEnd; ++p)
+                    {
+                        if (p >= static_cast<POSITION_T>(graphemes.size()) || graphemes[p] != "\xC2\xAD")
+                        {
+                            continue;
+                        }
+                        haveExplicitHyphen = true;
+
+                        POSITION_T splitIndexInSegment = p - segStart;
+                        COORD_T widthBeforeHyphen;
+                        if (splitIndexInSegment <= 0)
+                        {
+                            widthBeforeHyphen = 0;
+                        }
+                        else if (splitIndexInSegment < static_cast<POSITION_T>(segment.position.size()))
+                        {
+                            widthBeforeHyphen = segment.position[splitIndexInSegment];
+                        }
+                        else
+                        {
+                            widthBeforeHyphen = segment.totalWidth;
+                        }
+
+                        // The soft hyphen's own measured width is 0 (forced
+                        // at segmentation time), so widthBeforeHyphen already
+                        // covers the real text up to it -- add the glyph it
+                        // renders as when deciding whether it fits.
+                        if (widthBeforeHyphen + hyphenGlyphWidth <= availableSpace)
+                        {
+                            bestHyphen = p;  // fits; keep looking for a later (wider) one
+                        }
+                        else
+                        {
+                            break;  // candidates are ascending; a later one only needs more room
+                        }
+                    }
+
+                    // Paragraph-relative position where seg2 will start, and
+                    // whether the break point is a real document character
+                    // (explicit ^OE, consumed into seg1) or a dictionary
+                    // candidate with no backing character (rendered as a
+                    // synthetic glyph -- see sSegmentLayout::autoHyphen).
+                    POSITION_T splitAt = -1;
+                    bool isAutoHyphen = false;
+
+                    if (bestHyphen >= segStart)
+                    {
+                        splitAt = bestHyphen + 1;
+                    }
+                    else if (!haveExplicitHyphen && mLayoutState->IsHyphenationEnabled())
+                    {
+                        // No explicit soft hyphen in this word -- try the
+                        // dictionary. Real WS7 only auto-hyphenates when the
+                        // word doesn't already carry its own soft hyphen(s).
+                        //
+                        // cHyphenator's offsets are UTF-16 code-unit indices
+                        // (CoreFoundation), which don't line up 1:1 with
+                        // grapheme indices for multi-codepoint grapheme
+                        // clusters (e.g. combining marks). Track each
+                        // grapheme's cumulative UTF-16 length so a returned
+                        // offset maps back to a real grapheme boundary, or
+                        // is discarded if it lands mid-grapheme.
+                        std::string wordText;
+                        std::vector<POSITION_T> graphemeUtf16Boundary;
+                        size_t utf16Count = 0;
+                        for (POSITION_T p = segStart; p < wordEnd; ++p)
+                        {
+                            if (p < static_cast<POSITION_T>(graphemes.size()))
+                            {
+                                wordText += graphemes[p];
+                                utf16Count += unicode::to_utf16(graphemes[p]).size();
+                                graphemeUtf16Boundary.push_back(static_cast<POSITION_T>(utf16Count));
+                            }
+                        }
+
+                        cHyphenator hyphenator(mLayoutState->GetHyphenationLanguage());
+                        POSITION_T bestAuto = -1;
+                        for (size_t offset : hyphenator.HyphenationPoints(wordText))
+                        {
+                            auto boundaryIt = std::find(graphemeUtf16Boundary.begin(), graphemeUtf16Boundary.end(),
+                                                         static_cast<POSITION_T>(offset));
+                            if (boundaryIt == graphemeUtf16Boundary.end())
+                            {
+                                continue;  // mid-grapheme -- not a usable split point
+                            }
+                            POSITION_T splitIndexInSegment =
+                                static_cast<POSITION_T>(boundaryIt - graphemeUtf16Boundary.begin()) + 1;
+                            if (splitIndexInSegment <= 0 || splitIndexInSegment >= (wordEnd - segStart))
+                            {
+                                continue;
+                            }
+
+                            COORD_T widthBeforeBreak =
+                                (splitIndexInSegment < static_cast<POSITION_T>(segment.position.size()))
+                                    ? segment.position[splitIndexInSegment]
+                                    : segment.totalWidth;
+
+                            if (widthBeforeBreak + hyphenGlyphWidth <= availableSpace)
+                            {
+                                bestAuto = segStart + splitIndexInSegment;  // fits; keep looking for wider
+                            }
+                            else
+                            {
+                                break;  // cHyphenator returns candidates in ascending order
+                            }
+                        }
+
+                        if (bestAuto >= segStart)
+                        {
+                            splitAt = bestAuto;  // no real character to consume
+                            isAutoHyphen = true;
+                        }
+                    }
+
+                    if (splitAt > segStart)
+                    {
+                        // Split so the break point -- rendered as a hyphen
+                        // glyph, see DrawSegment()/GetDisplayCharacter() --
+                        // ends this line; the word's remainder starts the
+                        // next line. For an explicit soft hyphen it's
+                        // consumed (splitAt is past it); for a dictionary
+                        // break there's nothing to consume.
+                        auto [seg1, seg2] = SplitSegmentAtPosition(segment, splitAt);
+                        seg1.totalWidth += hyphenGlyphWidth;
+                        seg1.autoHyphen = isAutoHyphen;
+
+                        if (currentLine.segments.empty())
+                        {
+                            currentLine.linestart = seg1.startPosition;
+                        }
+                        currentLine.segments.push_back(seg1);
+                        currentLineWidth += seg1.totalWidth;
+
+                        FinalizeLine(currentLine, maxLineWidth);
+                        SaveLine(paragraphNum, currentLine);
+
+                        if (NeedNewPage(ComputeLineHeightForFont(seg2.font)))
+                        {
+                            IncrementPageAndCreateBox();
+                        }
+
+                        currentLine = CreateLine(paragraphNum);
+                        currentLineWidth = 0;
+                        maxLineWidth = baseBoxWidth;
+                        lastBreakWordPos = -1;
+                        lastBreakSegIdx = -1;
+
+                        if (mLayoutState->IsFirstLineOfParagraph() && mLayoutState->IsValidParagraphMargin())
+                        {
+                            COORD_T pm = mLayoutState->GetParagraphMargin();
+                            COORD_T lm = mLayoutState->GetLeftMargin();
+                            currentLine.pagex += (pm - lm);
+                            maxLineWidth = mBoxRight - currentLine.pagex;
+                        }
+
+                        remainingSegments.push_front(seg2);
+                        continue;  // done with this segment -- skip the backtrack/char-split fallback below
+                    }
+                }
+
                 // Try cross-segment backtracking: if we have a valid break
                 // point in a previously committed segment, backtrack to it
                 // instead of wrapping at the segment boundary (which may be
@@ -5413,6 +5604,7 @@ void cLayoutBase::SaveFormattingCheckpoint(PARAGRAPH_T para)
 
     // Other formatting state
     cp.wordWrapEnabled = mLayoutState->IsWordWrapEnabled();
+    cp.hyphenationEnabled = mLayoutState->IsHyphenationEnabled();
     cp.pageNumberOffset = mLayoutState->GetPageNumberOffset();
     cp.pageNumFormat = mLayoutState->GetPageNumFormat();
     cp.printPageNumbers = mLayoutState->ShouldPrintPageNumbers();
@@ -5476,6 +5668,7 @@ void cLayoutBase::RestoreFormattingCheckpoint(const sFormattingCheckpoint& cp)
 
     // Other formatting state
     mLayoutState->SetWordWrapEnabled(cp.wordWrapEnabled);
+    mLayoutState->SetHyphenationEnabled(cp.hyphenationEnabled);
     mLayoutState->SetPageNumberOffset(cp.pageNumberOffset);
     mLayoutState->SetPageNumFormat(cp.pageNumFormat);
     mLayoutState->SetPrintPageNumbers(cp.printPageNumbers);
@@ -5543,6 +5736,7 @@ bool cLayoutBase::UpdateCheckpointIfNeeded(PARAGRAPH_T para)
     newCp.lineHeight = mLayoutState->GetLineHeight();
     newCp.autoLeading = mLayoutState->IsAutoLeading();
     newCp.wordWrapEnabled = mLayoutState->IsWordWrapEnabled();
+    newCp.hyphenationEnabled = mLayoutState->IsHyphenationEnabled();
     newCp.pageNumberOffset = mLayoutState->GetPageNumberOffset();
     newCp.pageNumFormat = mLayoutState->GetPageNumFormat();
     newCp.printPageNumbers = mLayoutState->ShouldPrintPageNumbers();
@@ -6547,6 +6741,24 @@ void cLayoutBase::SetFilename(const std::string& filename)
 void cLayoutBase::SetFileDir(const std::string& dir)
 {
     mFileDir = dir;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  language [in] hyphenation dictionary language (e.g. "de_DE")
+///
+/// @return nothing
+///
+/// @brief
+/// Sets the language used for automatic hyphenation (.hy). Pushed by
+/// cEditorBase whenever mSpellCheckLanguage changes, so hyphenation and
+/// spell check always agree on language.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::SetHyphenationLanguage(const std::string& language)
+{
+    mLayoutState->SetHyphenationLanguage(language);
 }
 
 

@@ -2378,10 +2378,11 @@ void cEditorCtrl::DrawLine(QPainter& painter, const sLineLayout& line, const QCo
     for (size_t i = 0; i < line.segments.size(); ++i)
     {
         const auto& segment = line.segments[i];
+        bool isLastSegmentOfLine = (i + 1 == line.segments.size());
 
         // All segments use line.pagex as base coordinate
         // Their position[] arrays already contain correct continuous offsets
-        DrawSegment(painter, segment, line.pagex, lineY, maxAscent, line.pagenumber, fgOverride);
+        DrawSegment(painter, segment, line.pagex, lineY, maxAscent, line.pagenumber, fgOverride, isLastSegmentOfLine);
     }
 }
 
@@ -2484,7 +2485,7 @@ void cEditorCtrl::DrawControlCodeBackgrounds(QPainter& painter, const sSegmentLa
 /// Draws a segment with its glyphs.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, COORD_T lineX, COORD_T lineY, COORD_T maxAscent, PAGE_T pageNumber, const QColor& fgOverride)
+void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, COORD_T lineX, COORD_T lineY, COORD_T maxAscent, PAGE_T pageNumber, const QColor& fgOverride, bool isLastSegmentOfLine)
 {
     if (!mDocument || segment.position.empty() || segment.GetGraphemeCount() == 0)
     {
@@ -2571,6 +2572,21 @@ void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, 
         std::string displayGrapheme = graphemes[i];
         bool isControlCode = false;
 
+        // Soft hyphen (U+00AD, real ^OE character): invisible in normal
+        // flow (mLayout->GetDisplayCharacter() handles reveal-codes
+        // display), except when it's the last character on the last
+        // segment of this line -- i.e. word wrap actually broke here --
+        // in which case it prints as a real hyphen, same as real WS7.
+        if (graphemes[i] == "\xC2\xAD")
+        {
+            bool isLineBreakHere = isLastSegmentOfLine && (i + 1 == graphemes.size());
+            displayGrapheme = isLineBreakHere ? "-" : mLayout->GetDisplayCharacter(docPos, graphemes[i], pageNumber);
+
+            QString glyph = QString::fromStdString(displayGrapheme);
+            painter.drawText(QPointF(x, y), glyph);
+            continue;
+        }
+
         if (!graphemes[i].empty() && (graphemes[i][0] == MARKER_CHAR || graphemes[i][0] == REPLACE_CHAR || graphemes[i][0] == SAVE_CHAR))
         {
             isControlCode = true;
@@ -2617,6 +2633,27 @@ void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, 
         {
             painter.setPen(textColor);
         }
+    }
+
+    // Automatic hyphenation (.hy): word wrap chose a dictionary break point
+    // ending this segment, but no real document character backs the glyph
+    // (see WordWrapSegmentsIntoLines()) -- draw it once, right after the
+    // segment's real content. totalWidth already reserves its width.
+    if (segment.autoHyphen && !segment.position.empty())
+    {
+        COORD_T hyphenGlyphWidth = mLayout->GetTextWidth("-", segment.font);
+        COORD_T x = lineX + segment.position[0] + segment.totalWidth - hyphenGlyphWidth;
+        COORD_T y = lineY + maxAscent;
+        COORD_T rollAmount = mLayout->GetSubSuperRoll();
+        if (segment.isSubscript)
+        {
+            y += rollAmount;
+        }
+        else if (segment.isSuperscript)
+        {
+            y -= rollAmount;
+        }
+        painter.drawText(QPointF(x, y), QString::fromLatin1("-"));
     }
 }
 
@@ -8700,6 +8737,10 @@ void cEditorCtrl::SystemPreferences(void)
         SetMeasurement(config.mMeasurement);
         SetCodePage(static_cast<eCodePage>(config.mCodePage));
         mSpellCheckLanguage = config.mSpellCheckLanguage;
+        if (mLayout != nullptr)
+        {
+            mLayout->SetHyphenationLanguage(mSpellCheckLanguage);
+        }
         mSpellCheckDotCommands = config.mSpellCheckDotCommands;
         mCaretBlinkRate = config.mCaretBlinkRate;
         mAutoSaveIntervalSec = config.mAutoSaveInterval;

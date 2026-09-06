@@ -1240,6 +1240,10 @@ void cWordTsar::ReadConfig(void)
 
     // Configurable editor settings
     mEditor->mSpellCheckLanguage = config.mSpellCheckLanguage ;
+    if (mEditor->GetLayout() != nullptr)
+    {
+        mEditor->GetLayout()->SetHyphenationLanguage(config.mSpellCheckLanguage) ;
+    }
     mEditor->mSpellCheckDotCommands = config.mSpellCheckDotCommands ;
     mEditor->mCaretBlinkRate = config.mCaretBlinkRate ;
     mEditor->mAutoSaveIntervalSec = config.mAutoSaveInterval ;
@@ -2867,6 +2871,15 @@ void cWordTsar::ToggleRevealCodes(void)
         mRevealCodesEditor->SetTextColour(mEditor->GetTextColour()) ;
         mRevealCodesEditor->SetHighlightColour(mEditor->GetHighlightColour()) ;
         mRevealCodesEditor->SetDotColour(mEditor->GetDotColour()) ;
+
+        // Reveal-codes pane gets its own fresh cLayout() (separate from
+        // mEditor's) -- push the document's hyphenation language into it too,
+        // or it silently falls back to the "en_US" default and hyphenates
+        // the same paragraph differently from the main pane.
+        if (mRevealCodesEditor->GetLayout() != nullptr)
+        {
+            mRevealCodesEditor->GetLayout()->SetHyphenationLanguage(mEditor->mSpellCheckLanguage) ;
+        }
 
         // Wire up siblings for bidirectional caret sync
         mEditor->SetSiblingEditor(mRevealCodesEditor) ;

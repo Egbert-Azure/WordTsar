@@ -102,7 +102,7 @@ private:
     // Render a single segment (lineHeight = max segment height in the line, for baseline alignment)
     void RenderSegment(CGContextRef ctx, const sSegmentLayout& segment,
                         COORD_T lineX, COORD_T lineY, COORD_T lineHeight,
-                        double pageHeightPt);
+                        double pageHeightPt, bool isLastSegmentOfLine = false);
 
     // Resolve a segment's font descriptor to a sized Core Text font, via
     // Qt/FontUtils' existing descriptor parsing (same family match Qt uses

@@ -130,6 +130,10 @@ public:
     void SetDoNewPage(bool do_new_page);
     bool IsWordWrapEnabled(void) const;
     void SetWordWrapEnabled(bool enabled);
+    bool IsHyphenationEnabled(void) const;
+    void SetHyphenationEnabled(bool enabled);
+    const std::string& GetHyphenationLanguage(void) const;
+    void SetHyphenationLanguage(const std::string& language);
     bool IsLandscapeMode(void) const;
     void SetLandscapeMode(bool landscape);
     bool ShouldPrintPageNumbers(void) const;
@@ -197,6 +201,12 @@ private:
     std::string mCurrentFont;
     std::string mDefaultFont;
 
+    // Auto-hyphenation dictionary language (e.g. "de_DE") -- mirrors the
+    // document's spell-check language (cEditorBase::mSpellCheckLanguage);
+    // not part of sFormattingCheckpoint since it's a stable document-wide
+    // setting, not per-paragraph dot-command state.
+    std::string mHyphenationLanguage;
+
     // Control code visibility
     eShowControl mShowControl;
 
@@ -221,6 +231,7 @@ private:
     std::vector<sPageNumOverride> mPageNumOverrides;
     bool mDoNewPage;
     bool mWordWrapEnabled;
+    bool mHyphenationEnabled;
     bool mLandscapeMode;
     bool mPrintPageNumbers;
     COORD_T mPageNumberColumn;

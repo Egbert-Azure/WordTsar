@@ -706,6 +706,10 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
 
     // Shared [editor]/[user] settings (match the GUI's ReadConfig).
     mEditor->mSpellCheckLanguage = config.mSpellCheckLanguage;
+    if (mEditor->GetLayout() != nullptr)
+    {
+        mEditor->GetLayout()->SetHyphenationLanguage(config.mSpellCheckLanguage);
+    }
     mEditor->mSpellCheckDotCommands = config.mSpellCheckDotCommands;
     mEditor->mCaretBlinkRate = config.mCaretBlinkRate;
     mEditor->mAutoSaveIntervalSec = config.mAutoSaveInterval;

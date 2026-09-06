@@ -1426,7 +1426,12 @@ void cRTFParser::FormatControlSymbol(cRTFControlSymbol *symbol)
 
         case '-' :
         {
-            // Optional/soft hyphen -- skip (not needed for display)
+            // Optional/soft hyphen -- insert Unicode soft hyphen U+00AD,
+            // same as \~ above. Now a real, honored break point (see
+            // WordWrapSegmentsIntoLines()), not just a display no-op.
+            DoChanges() ;
+            mDocument->Insert(0x00AD) ;
+            mFirstColumn = false ;
             break ;
         }
 

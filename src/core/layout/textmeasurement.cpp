@@ -89,11 +89,21 @@ std::string cTextMeasurement::GetDisplayCharacter(POSITION_T documentPos,
                                                   cDocument* doc,
                                                   eShowControl showControl) const
 {
-    (void)showControl;  // Parameter available for future use
-
     if (grapheme.empty())
     {
         return grapheme;
+    }
+
+    // Soft hyphen (U+00AD, "\xC2\xAD" in UTF-8) is invisible in normal
+    // flow -- its width is already forced to 0 during measurement
+    // (BuildParagraphSegments()), and a visible hyphen glyph is only ever
+    // drawn when word wrap actually breaks a line there (a separate,
+    // line-final check the paint loops make themselves, since this
+    // function has no notion of line boundaries). Under reveal codes, show
+    // it as a real hyphen so it can be found and deleted.
+    if (grapheme == "\xC2\xAD")
+    {
+        return (showControl == SHOW_ALL) ? "-" : "";
     }
 
     // Handle REPLACE_CHAR (block-begin marker) FIRST

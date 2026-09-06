@@ -587,9 +587,10 @@ void cTUIPrintout::RenderLine(CGContextRef ctx, const sLineLayout& line, double 
     }
 
     // Render each segment in the line
-    for (const auto& segment : line.segments)
+    for (size_t i = 0; i < line.segments.size(); ++i)
     {
-        RenderSegment(ctx, segment, line.pagex, line.pagey, lineHeight, pageHeightPt);
+        bool isLastSegmentOfLine = (i + 1 == line.segments.size());
+        RenderSegment(ctx, line.segments[i], line.pagex, line.pagey, lineHeight, pageHeightPt, isLastSegmentOfLine);
     }
 }
 
@@ -620,7 +621,7 @@ void cTUIPrintout::RenderLine(CGContextRef ctx, const sLineLayout& line, double 
 /////////////////////////////////////////////////////////////////////////////
 void cTUIPrintout::RenderSegment(CGContextRef ctx, const sSegmentLayout& segment,
                                   COORD_T lineX, COORD_T lineY, COORD_T lineHeight,
-                                  double pageHeightPt)
+                                  double pageHeightPt, bool isLastSegmentOfLine)
 {
     // Skip empty segments
     if (!mDocument || segment.position.empty() || segment.GetGraphemeCount() == 0)
@@ -650,8 +651,19 @@ void cTUIPrintout::RenderSegment(CGContextRef ctx, const sSegmentLayout& segment
     {
         std::string displayGrapheme = graphemes[i];
 
+        // Soft hyphen (U+00AD, real ^OE character): invisible unless it's
+        // the last character on the last segment of this line -- i.e. word
+        // wrap actually broke here -- matching the on-screen renderer.
+        if (graphemes[i] == "\xC2\xAD")
+        {
+            if (!isLastSegmentOfLine || i + 1 != graphemes.size())
+            {
+                continue;
+            }
+            displayGrapheme = "-";
+        }
         // Handle MARKER_CHAR (control codes stored in document)
-        if (!graphemes[i].empty() && graphemes[i][0] == MARKER_CHAR)
+        else if (!graphemes[i].empty() && graphemes[i][0] == MARKER_CHAR)
         {
             // Calculate document position for variable expansion
             POSITION_T paragraphStart = 0;
@@ -712,6 +724,32 @@ void cTUIPrintout::RenderSegment(CGContextRef ctx, const sSegmentLayout& segment
         }
 
         DrawGrapheme(ctx, ctFont, segment.textcolor, displayGrapheme, pdfX, pdfY);
+    }
+
+    // Automatic hyphenation (.hy): word wrap chose a dictionary break point
+    // ending this segment, but no real document character backs the glyph
+    // (see WordWrapSegmentsIntoLines()) -- draw it once, right after the
+    // segment's real content. totalWidth already reserves its width.
+    if (segment.autoHyphen && !segment.position.empty())
+    {
+        COORD_T hyphenGlyphWidth = mLayout->GetTextWidth("-", segment.font);
+        COORD_T glyphX = lineX + segment.position[0] + segment.totalWidth - hyphenGlyphWidth;
+        double pdfX = TwipsToPoints(glyphX);
+        double pdfY;
+        if (segment.isSubscript)
+        {
+            pdfY = pageHeightPt - TwipsToPoints(lineY + lineHeight + mLayout->GetSubSuperRoll()
+                                                 - segment.segmentheight / 2);
+        }
+        else if (segment.isSuperscript)
+        {
+            pdfY = pageHeightPt - TwipsToPoints(lineY + lineHeight - mLayout->GetSubSuperRoll());
+        }
+        else
+        {
+            pdfY = pageHeightPt - TwipsToPoints(lineY + segment.segmentheight);
+        }
+        DrawGrapheme(ctx, ctFont, segment.textcolor, "-", pdfX, pdfY);
     }
 
     // Draw underline if the font descriptor has the underline flag set

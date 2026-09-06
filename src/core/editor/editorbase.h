@@ -258,6 +258,7 @@ public:
     void InsertWordStarString(const std::string& text);
     void InsertCenterTab(void);
     void InsertRightTab(void);
+    void InsertSoftHyphen(void);                               // Insert optional/soft hyphen at cursor (^OE)
 
     // Delete Line Operations
     void DeleteLine(void);
@@ -291,6 +292,7 @@ public:
     // Formatting
     void ToggleJustification(void);
     void ToggleWordWrap(void);
+    void ToggleHyphenation(void);
     void SetAlignment(eJustification align) ;
     void SetParagraphAlignment(eJustification align) ;
 

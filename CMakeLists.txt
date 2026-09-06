@@ -220,6 +220,7 @@ set(SOURCES
     src/main.cpp
     src/third-party/chillout/src/chillout/posix/posixcrashhandler.cpp
     src/core/spellcheck/macspellcheck.mm
+    src/core/hyphenation/hyphenator_mac.mm
     # Native PDFKit print-preview window and ^QJ Thesaurus Look Up popover --
     # both .mm, so not picked up by the WORDTSAR_GUI_SOURCES *.cpp/*.h glob
     # in cmake/sources.cmake.
@@ -251,6 +252,7 @@ if(BUILD_TUI)
         src/third-party/chillout/src/chillout/common/common.cpp
         src/third-party/chillout/src/chillout/posix/posixcrashhandler.cpp
         src/core/spellcheck/macspellcheck.mm
+        src/core/hyphenation/hyphenator_mac.mm
     )
 
     # Print preview (PDF via Quartz/Core Text) -- the printout is
@@ -313,6 +315,7 @@ if(BUILD_TUI)
         src/third-party/chillout/src/chillout/common/common.cpp
         src/third-party/chillout/src/chillout/posix/posixcrashhandler.cpp
         src/core/spellcheck/macspellcheck.mm
+        src/core/hyphenation/hyphenator_mac.mm
     )
 
     target_include_directories(WSTuiTest PRIVATE

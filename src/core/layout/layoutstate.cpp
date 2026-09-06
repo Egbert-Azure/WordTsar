@@ -125,6 +125,8 @@ cLayoutState::cLayoutState(void)
     mPageNumFormat = PAGE_NUM_ARABIC; // Default: 1, 2, 3, ...
     mDoNewPage = false;
     mWordWrapEnabled = true;         // Word wrap enabled by default
+    mHyphenationEnabled = true;      // Auto-hyphenation enabled by default (real WS7 default)
+    mHyphenationLanguage = "en_US";  // Overwritten from the document's spell-check language
     mLandscapeMode = false;          // Portrait orientation by default
     mPrintPageNumbers = true;        // Auto page numbering enabled by default
     mPageNumberColumn = 0;            // 0 = centered (the default)
@@ -627,6 +629,26 @@ bool cLayoutState::IsWordWrapEnabled(void) const
 void cLayoutState::SetWordWrapEnabled(bool enabled)
 {
     mWordWrapEnabled = enabled;
+}
+
+bool cLayoutState::IsHyphenationEnabled(void) const
+{
+    return mHyphenationEnabled;
+}
+
+void cLayoutState::SetHyphenationEnabled(bool enabled)
+{
+    mHyphenationEnabled = enabled;
+}
+
+const std::string& cLayoutState::GetHyphenationLanguage(void) const
+{
+    return mHyphenationLanguage;
+}
+
+void cLayoutState::SetHyphenationLanguage(const std::string& language)
+{
+    mHyphenationLanguage = language;
 }
 
 bool cLayoutState::IsLandscapeMode(void) const

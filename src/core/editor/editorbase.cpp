@@ -2492,6 +2492,23 @@ void cEditorBase::InsertRightTab(void)
     mDocument->InsertTab(tab);
 }
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Insert an optional/soft hyphen (real WordStar 7 ^OE) at the caret
+/// position. Stored as a literal U+00AD (SOFT_HYPHEN), the same way RTF's
+/// \~ non-breaking space is stored as a literal U+00A0 -- invisible in
+/// normal flow, and only rendered as a hyphen if a line actually breaks
+/// there (see WordWrapSegmentsIntoLines()).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::InsertSoftHyphen(void)
+{
+    mDocument->Insert(SOFT_HYPHEN);
+}
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -3274,6 +3291,59 @@ void cEditorBase::ToggleWordWrap(void)
 
     // Build the dot command string
     std::string dotCmd = isWrapped ? ".aw off\r" : ".aw on\r";
+
+    // Move to start of current paragraph
+    POSITION_T paraStart, paraEnd;
+    mDocument->GetParagraphStartandEnd(para, paraStart, paraEnd);
+    mDocument->SetPosition(paraStart);
+
+    // Insert dot command (the \r creates a new paragraph)
+    mDocument->Insert(dotCmd);
+
+    // Restore caret position (shifted by inserted graphemes)
+    // All ASCII, so byte count = grapheme count
+    POSITION_T offset = static_cast<POSITION_T>(dotCmd.size());
+    mDocument->SetPosition(savedPos + offset);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Toggle auto-hyphenation (real WordStar 7's ^OH) by inserting a .hy on or
+/// .hy off dot command on a new line before the current paragraph.
+/// Preserves caret position (stays at same place in text). Mirrors
+/// ToggleWordWrap() exactly, except hyphenation defaults to on (real WS7's
+/// own default).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::ToggleHyphenation(void)
+{
+    if (!mDocument || !mLayout)
+    {
+        return;
+    }
+
+    // Get current paragraph and caret position
+    POSITION_T savedPos = mDocument->GetPosition();
+    PARAGRAPH_T para = mDocument->GetParagraphFromPosition(savedPos);
+
+    // Determine current hyphenation state from previous paragraph's endState
+    // For paragraph 0: default is on (hyphenation=true)
+    bool isHyphenated = true;
+    if (para > 0)
+    {
+        const sParagraphLayout* prevPara = mLayout->GetParagraphLayout(para - 1);
+        if (prevPara)
+        {
+            isHyphenated = prevPara->endState.hyphenation;
+        }
+    }
+
+    // Build the dot command string
+    std::string dotCmd = isHyphenated ? ".hy off\r" : ".hy on\r";
 
     // Move to start of current paragraph
     POSITION_T paraStart, paraEnd;

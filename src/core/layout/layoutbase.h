@@ -105,6 +105,7 @@ struct sFormattingCheckpoint
 
     // Other formatting state
     bool wordWrapEnabled;
+    bool hyphenationEnabled;
     PAGE_T pageNumberOffset;
     ePageNumberFormat pageNumFormat;
     bool printPageNumbers;
@@ -139,6 +140,7 @@ struct sFormattingCheckpoint
                modifiers == other.modifiers &&
                lineHeight == other.lineHeight && autoLeading == other.autoLeading &&
                wordWrapEnabled == other.wordWrapEnabled &&
+               hyphenationEnabled == other.hyphenationEnabled &&
                pageNumberOffset == other.pageNumberOffset &&
                pageNumFormat == other.pageNumFormat &&
                printPageNumbers == other.printPageNumbers &&
@@ -257,6 +259,7 @@ public:
     void SetIsHelp(bool isHelp);
     void SetFilename(const std::string& filename);
     void SetFileDir(const std::string& dir);
+    void SetHyphenationLanguage(const std::string& language);
     void SetDocument(cDocument* doc);
 
     // ----- Query Methods - Margin Getters -----

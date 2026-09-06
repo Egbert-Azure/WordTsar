@@ -67,6 +67,7 @@ struct sModifierParagraph
     bool superscript, subscript, strikethrough;    // Attributes at the end of the paragraph
     bool right, left, justify, center;             // Attributes at the end of the paragraph
     bool wordWrap;                                 // Word wrap (.aw) state at the end of the paragraph
+    bool hyphenation;                              // Auto-hyphenation (.hy) state at the end of the paragraph
     double linespace;
 
     // Margin state at end of paragraph (for identical full/partial layout)
@@ -80,6 +81,7 @@ struct sModifierParagraph
                            superscript(false), subscript(false), strikethrough(false),
                            right(false), left(true), justify(false), center(false),
                            wordWrap(true),
+                           hyphenation(true),
                            linespace(1.0),
                            leftMargin(0), rightMargin(9360), paragraphMargin(0),
                            validParagraphMargin(false)
@@ -258,6 +260,13 @@ struct sSegmentLayout
     // Measurement fields (Step 1 - WORDWRAP.md)
     COORD_T totalWidth;                     // Total width of segment (for quick access)
 
+    // Automatic hyphenation (.hy): true when word wrap chose a dictionary
+    // hyphenation point ending this segment. Unlike an explicit soft hyphen
+    // (^OE), no real document character backs the glyph, so the paint code
+    // draws one extra "-" after this segment's real content (totalWidth
+    // already reserves its width -- see WordWrapSegmentsIntoLines()).
+    bool autoHyphen;
+
     // Tab segment -- this segment IS a tab (self-contained, replaces old 3-segment pattern)
     bool isTab;                             // True if this segment represents a tab character
     POSITION_T tabDocPosition;              // Document position of tab (for GetTab call)
@@ -271,6 +280,7 @@ struct sSegmentLayout
                         isSubscript(false), isSuperscript(false), segmentheight(0),
                         hasControlCodes(false),
                         totalWidth(0),
+                        autoHyphen(false),
                         isTab(false), tabDocPosition(0), tabWidth(0), tabType(TAB_TAB), tabStopType(TAB_TAB)
     {
         textcolor.red = -1;

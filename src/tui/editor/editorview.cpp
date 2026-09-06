@@ -488,7 +488,13 @@ int cWSEditorView::GraphemeColumns(POSITION_T docPos, const std::string& graphem
 {
     unsigned char c = grapheme.empty() ? 0 : static_cast<unsigned char>(grapheme[0]);
     bool isMarker = (c == MARKER) || (c == REPLACE) || (c == SAVE);
-    if (isMarker == false)
+    // Soft hyphen (U+00AD, real ^OE character): normally invisible (0
+    // columns), same as its 0-twips width in AddGraphemeToSegment(). Under
+    // reveal codes it shows as "-" (1 column), via the same
+    // GetDisplayCharacter() path markers already use below.
+    bool isSoftHyphen = (grapheme == "\xC2\xAD");
+
+    if (isMarker == false && isSoftHyphen == false)
     {
         return 1;
     }
@@ -496,19 +502,22 @@ int cWSEditorView::GraphemeColumns(POSITION_T docPos, const std::string& graphem
     cLayoutBase* layout = mEditor->GetLayout();
     if (layout == nullptr)
     {
-        return 1;
+        return isSoftHyphen ? 0 : 1;
     }
 
     std::string disp = layout->GetDisplayCharacter(docPos, grapheme, pagenumber);
     if (disp.empty() == true)
     {
-        return 1;
+        // Soft hyphen is normally invisible (0 columns); every other
+        // marker defaults to 1 to stay visible if GetDisplayCharacter()
+        // ever returns nothing unexpected.
+        return isSoftHyphen ? 0 : 1;
     }
 
     int width = static_cast<int>(wordstartui::cUtf8Helper::SplitGraphemes(disp).size());
     if (width < 1)
     {
-        width = 1;
+        width = isSoftHyphen ? 0 : 1;
     }
     return width;
 }
@@ -1113,6 +1122,8 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
 
         for (const sSegmentLayout& seg : line->segments)
         {
+            bool isLastSegmentOfLine = (&seg == &line->segments.back());
+
             sColor segFg = mEditor->mTextColour;
             sColor segBg = mEditor->mBGroundColour;
 
@@ -1248,7 +1259,19 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
                 // expand to several columns (e.g. a font tag "<name size>"); a
                 // terminator paints one blank; anything else is the grapheme.
                 std::vector<std::string> cells;
-                if (isMarker == true)
+                if (g == "\xC2\xAD")
+                {
+                    // Soft hyphen (real ^OE character): invisible (0
+                    // columns) unless it's the last character on the last
+                    // segment of this line -- i.e. word wrap actually broke
+                    // here -- or reveal codes is on, matching the GUI.
+                    bool isLineBreakHere = isLastSegmentOfLine && (gi + 1 == graphemes.size());
+                    if (isLineBreakHere || showCtl == SHOW_ALL)
+                    {
+                        cells.push_back("-");
+                    }
+                }
+                else if (isMarker == true)
                 {
                     std::string disp = layout->GetDisplayCharacter(docPos, g, line->pagenumber);
                     if (disp.empty() == true)
@@ -1292,6 +1315,21 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
                 }
 
                 docPos++;
+            }
+
+            // Automatic hyphenation (.hy): word wrap chose a dictionary
+            // break point ending this segment, but no real document
+            // character backs the glyph (see WordWrapSegmentsIntoLines())
+            // -- draw one extra cell right after the segment's real content.
+            if (seg.autoHyphen == true)
+            {
+                int sc = col - hs;
+                if ((sc >= 0) && (sc < textCols))
+                {
+                    screen.PutCell(screenRow, mBounds.col + sc, "-",
+                                   StyleFor(segFg, segBg, wordstartui::CELL_ATTR_NONE));
+                }
+                col++;
             }
         }
 

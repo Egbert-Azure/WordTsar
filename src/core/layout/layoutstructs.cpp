@@ -311,6 +311,11 @@ bool sSegmentLayout::IsEqualTo(const sSegmentLayout& other) const
         return false;
     }
 
+    if (autoHyphen != other.autoHyphen)
+    {
+        return false;
+    }
+
     // Check tab fields
     if (isTab != other.isTab)
     {
