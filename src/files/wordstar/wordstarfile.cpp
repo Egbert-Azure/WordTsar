@@ -365,6 +365,8 @@ cWordstarFile::cWordstarFile(cEditorBase *editor)
     
     mInIndex = false ;
     mExtendedChar = false;
+    mLastChar = 0 ;
+    mExtStartPosition = 0 ;
     mInVariable = false ;
     mVariableChar = 0 ;
 }
@@ -1355,8 +1357,8 @@ std::string cWordstarFile::GetExtensions(void)
 void cWordstarFile::HandleChar(unsigned char c, size_t loop)
 {
     bool insert = true ;
-    static unsigned char last = 0 ;
-    static size_t position = 0 ;
+    unsigned char& last = mLastChar ;
+    size_t& position = mExtStartPosition ;
 
     if(mExtendedChar == true)            // we've seen a STYLE_EXTSTART
     {

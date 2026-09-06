@@ -146,6 +146,8 @@ private:
     std::string mIndexWord ;               ///< the word we need to index
 
     bool mExtendedChar ;                ///< true if we've seen a STYLE_EXTSTART recently
+    unsigned char mLastChar ;           ///< HandleChar()'s previous character, per-instance (was a function-local static, leaking across separate LoadFile() calls in the same process)
+    size_t mExtStartPosition ;          ///< HandleChar()'s position when the current extended-char sequence started, per-instance (same reason)
 
     // Variable detection state machine (&X& patterns)
     bool mInVariable ;                  ///< true if we've seen the opening '&'

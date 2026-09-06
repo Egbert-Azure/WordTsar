@@ -1413,6 +1413,10 @@ bool cWordStarInput::OnControlKChar(char ch)
             
         case 'd' :          // save file and clear buffer
             // API CHANGE: Access document through GetDocument()
+            // Nothing blocks the close unless a save below actually fails --
+            // a document with no unsaved changes has nothing to save, so it
+            // must still clear the buffer like real WordStar 7's ^KD does.
+            retval = true ;
             if(mEditor->GetDocument() && mEditor->GetDocument()->mChanged)
             {
                 if(mEditor->mFileSet != false)      // if we have a directory, we have a valid file name
@@ -1423,12 +1427,11 @@ bool cWordStarInput::OnControlKChar(char ch)
                     if(ok == false)
                     {
                         mEditor->ShowError("Error", "File Save failed") ;
+                        retval = false ;
                     }
                     else
                     {
                         mEditor->GetDocument()->mChanged = false ;
-
-                        retval = true ;
                     }
                 }
                 else
