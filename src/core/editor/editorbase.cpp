@@ -2992,7 +2992,10 @@ void cEditorBase::SentenceCaseBlock(void)
     POSITION_T end = 0;
     mDocument->GetBlock(start, end);
 
-    std::string str = mDocument->GetBlockText(start, end + 1);
+    // GetBlock()'s end (mEndBlock) is already the exclusive upper bound
+    // (see SortBlock()'s comment above, confirmed against the same test
+    // this function's own test suite uses) -- no +1 here.
+    std::string str = mDocument->GetBlockText(start, end);
 
     str = mDocument->SentenceCase(str) ;
 
