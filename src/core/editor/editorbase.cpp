@@ -2936,8 +2936,10 @@ void cEditorBase::LowerCaseBlock(void)
     POSITION_T end = 0;
     mDocument->GetBlock(start, end);
 
-    // Get block text (GetBlockText uses half-open interval, so pass end+1)
-    std::string str = mDocument->GetBlockText(start, end + 1);
+    // GetBlock()'s end (mEndBlock) is already the exclusive upper bound
+    // (see SortBlock()'s comment above, confirmed against the same test
+    // this function's own test suite uses) -- no +1 here.
+    std::string str = mDocument->GetBlockText(start, end);
 
     // Convert to lowercase via cDocument (Unicode-aware)
     str = mDocument->LowerCase(str) ;

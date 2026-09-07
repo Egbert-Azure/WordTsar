@@ -4965,6 +4965,23 @@ TEST_CASE("P1 Auxiliary: LowerCaseBlock - Convert block to lowercase")
         std::string text = doc->GetBlockText(0, 11);
         CHECK(text == "HELLO WORLD");
     }
+
+    SUBCASE("Character right after the block is not duplicated")
+    {
+        // Block covers only "ABC"; the paragraph's hard return at index 3
+        // is the character immediately after the block and must survive
+        // untouched -- not pulled into the block text and reinserted.
+        doc->Insert("ABC\r");
+        doc->SetPosition(0);
+        doc->SetBeginBlock();
+        doc->SetPosition(3);
+        doc->SetEndBlock();
+
+        editor.LowerCaseBlock();
+
+        CHECK(doc->GetTextSize() == 4);
+        CHECK(doc->GetNumberofParagraphs() == 1);
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////
