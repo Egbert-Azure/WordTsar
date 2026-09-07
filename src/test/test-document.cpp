@@ -7460,7 +7460,12 @@ TEST_CASE("Insert(string): undo of a CRLF line ending removes exactly one hard r
     doc.Undo() ;
     CHECK(doc.GetTextSize() == sizeBeforeCRLF) ;
     CHECK(doc.GetNumberofParagraphs() == parasBeforeCRLF) ;
-    CHECK(doc.GetBlockText(0, sizeBeforeCRLF) == "HeadTail") ;
+
+    // GetBlockText(0, GetTextSize()) includes the document's trailing
+    // MARKER_CHAR (an internal end-of-document control byte), so the
+    // expected literal must include it too.
+    std::string expected = std::string("HeadTail") + static_cast<char>(MARKER_CHAR) ;
+    CHECK(doc.GetBlockText(0, sizeBeforeCRLF) == expected) ;
 }
 
 TEST_CASE("Document Listener - Registration")
