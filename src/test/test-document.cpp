@@ -7436,6 +7436,33 @@ TEST_CASE("Insert(string): multi-paragraph insert batches one notification and o
     doc.RemoveListener(&listener) ;
 }
 
+TEST_CASE("Insert(string): undo of a CRLF line ending removes exactly one hard return")
+{
+    cDocument doc ;
+
+    doc.SetPosition(0) ;
+    doc.Insert(std::string("HeadTail")) ;
+
+    POSITION_T sizeBeforeCRLF = doc.GetTextSize() ;
+    PARAGRAPH_T parasBeforeCRLF = doc.GetNumberofParagraphs() ;
+
+    doc.SetPosition(4) ;
+    doc.Insert(std::string("X\r\nY")) ;
+
+    // CRLF collapses to a single hard return: 3 characters actually
+    // inserted (X, one hard return, Y), not 4.
+    REQUIRE(doc.GetTextSize() == sizeBeforeCRLF + 3) ;
+    REQUIRE(doc.GetNumberofParagraphs() == parasBeforeCRLF + 1) ;
+
+    // Undo must remove exactly those 3 characters -- not 4, which is what
+    // the uncollapsed codepoint count would wrongly record, eating one
+    // extra character out of the following "Tail" text.
+    doc.Undo() ;
+    CHECK(doc.GetTextSize() == sizeBeforeCRLF) ;
+    CHECK(doc.GetNumberofParagraphs() == parasBeforeCRLF) ;
+    CHECK(doc.GetBlockText(0, sizeBeforeCRLF) == "HeadTail") ;
+}
+
 TEST_CASE("Document Listener - Registration")
 {
     cDocument doc ;
