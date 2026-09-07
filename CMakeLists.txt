@@ -289,6 +289,27 @@ if(BUILD_TUI)
         -Wno-deprecated-declarations
         -Wunused-parameter -Wunused-variable
     )
+
+    # ws is a bare CLI binary with no bundle to carry a Finder/Dock/Spotlight
+    # icon. Wrap it in a minimal .app whose only job is opening Terminal and
+    # running the real ws binary (at its deployed location, $HOME/bin/ws) --
+    # gives the TUI a proper icon and Launchpad presence without changing
+    # anything about how ws itself works or is invoked from a shell.
+    if(APPLE)
+        set(WS_LAUNCHER_APP "${CMAKE_CURRENT_BINARY_DIR}/WS.app")
+        add_custom_command(TARGET ws POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E remove_directory "${WS_LAUNCHER_APP}"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${CMAKE_SOURCE_DIR}/packaging/macos/WS.app" "${WS_LAUNCHER_APP}"
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    "${CMAKE_SOURCE_DIR}/src/gui/images/icon-tui.icns"
+                    "${WS_LAUNCHER_APP}/Contents/Resources/icon.icns"
+            COMMAND chmod +x "${WS_LAUNCHER_APP}/Contents/MacOS/WS"
+            COMMAND codesign --force --deep -s - "${WS_LAUNCHER_APP}"
+            COMMENT "Building WS.app terminal launcher for ws"
+            VERBATIM
+        )
+    endif()
 endif()
 
 
@@ -406,6 +427,11 @@ qt_add_resources(WordTsar "resources"
         ${resources_resource_files}
 )
 
+# macOS app bundle icon
+set(WORDTSAR_ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/gui/images/icon.icns")
+target_sources(WordTsar PRIVATE ${WORDTSAR_ICON_FILE})
+set_source_files_properties(${WORDTSAR_ICON_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
 # macOS app bundle settings
 set_target_properties(WordTsar PROPERTIES
     MACOSX_BUNDLE TRUE
@@ -413,6 +439,7 @@ set_target_properties(WordTsar PROPERTIES
     MACOSX_BUNDLE_EXECUTABLE_NAME "WordTsar"
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.wordtsar.WordTsar"
     MACOSX_BUNDLE_BUNDLE_NAME "WordTsar"
+    MACOSX_BUNDLE_ICON_FILE "icon.icns"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${WORDTSAR_VERSION_MAJOR}.${WORDTSAR_VERSION_MINOR}.${WORDTSAR_VERSION_BUILD}"
     MACOSX_BUNDLE_BUNDLE_VERSION "${WORDTSAR_VERSION_MAJOR}.${WORDTSAR_VERSION_MINOR}.${WORDTSAR_VERSION_BUILD}"
 )

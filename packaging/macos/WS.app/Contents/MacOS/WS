@@ -1,0 +1,10 @@
+#!/bin/bash
+osascript <<OSA
+tell application "Terminal"
+    activate
+    set wsTab to do script "$HOME/bin/ws"
+    set font size of wsTab to 20
+    set number of columns of wsTab to 120
+    set number of rows of wsTab to 40
+end tell
+OSA
