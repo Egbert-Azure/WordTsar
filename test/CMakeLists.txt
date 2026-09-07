@@ -141,6 +141,10 @@ endif()
 if (APPLE)
   target_sources(WSTest PRIVATE
     ../src/core/spellcheck/macspellcheck.mm
+    # src/core/hyphenation/hyphenator.cpp calls macHyphenationPoints() and
+    # macFreeHyphenationPoints(), defined here -- not picked up by the
+    # WORDTSAR_GUI_SOURCES *.cpp/*.h glob since this is a .mm file.
+    ../src/core/hyphenation/hyphenator_mac.mm
     # cPrintout::PrintPreview() (part of WORDTSAR_ALL_SOURCES above) calls
     # ShowPDFPrintPreview(), and cEditorCtrl::Thesaurus() calls
     # ShowMacDefinitionPopover() -- both defined here, not picked up by the
