@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt6
+        run: brew install qt@6
+
+      - name: Cache third-party deps
+        uses: actions/cache@v4
+        with:
+          path: third-party
+          key: third-party-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TUI=ON -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt@6 -DWORDTSAR_AUTO_INCREMENT_BUILD=OFF
+
+      - name: Build
+        run: cmake --build build -j3
+
+      - name: Configure tests
+        run: cmake -S test -B test/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt@6
+
+      - name: Build tests
+        run: cmake --build test/build -j3
+
+      - name: Run tests
+        working-directory: test
+        env:
+          QT_TESTING: 1
+          QT_QPA_PLATFORM: offscreen
+        run: ./build/WSTest.app/Contents/MacOS/WSTest
+        
