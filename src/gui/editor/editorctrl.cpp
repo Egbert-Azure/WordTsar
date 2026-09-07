@@ -4844,6 +4844,10 @@ void cEditorCtrl::ClipboardPaste(void)
 
     const QClipboard* clipboard = QApplication::clipboard();
     const QMimeData* mimeData = clipboard->mimeData();
+    if (!mimeData)
+    {
+        return;
+    }
 
     // Check for RTF formatted content first (preserves formatting from other apps)
     QStringList formats = mimeData->formats();
