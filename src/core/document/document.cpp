@@ -706,7 +706,13 @@ void cDocument::Insert(const std::string &text)
 
     for(size_t loop = 0; loop < codepoints.size() ; ++loop)
     {
-        if(codepoints[loop] == 10)
+        // Skip \r that is part of a \r\n sequence (Windows line ending).
+        // \n alone (Unix) and \r alone (old Mac) are both handled below.
+        if(codepoints[loop] == 13 && loop + 1 < codepoints.size() && codepoints[loop + 1] == 10)
+        {
+            continue;
+        }
+        if(codepoints[loop] == 10 || codepoints[loop] == 13)
         {
             Insert(static_cast<CHAR_T>(HARD_RETURN)) ;
         }
