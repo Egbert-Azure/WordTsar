@@ -731,8 +731,13 @@ void cDocument::Insert(const std::string &text)
         std::vector<sUndoCharInfo> chars ;
         for (size_t loop = 0 ; loop < codepoints.size() ; ++loop)
         {
+            // Skip \r that is part of a \r\n sequence to match the insert loop.
+            if (codepoints[loop] == 13 && loop + 1 < codepoints.size() && codepoints[loop + 1] == 10)
+            {
+                continue;
+            }
             sUndoCharInfo charInfo ;
-            if (codepoints[loop] == 10)
+            if (codepoints[loop] == 10 || codepoints[loop] == 13)
             {
                 charInfo.codepoint = HARD_RETURN ;
             }
