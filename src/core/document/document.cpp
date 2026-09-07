@@ -706,7 +706,13 @@ void cDocument::Insert(const std::string &text)
 
     for(size_t loop = 0; loop < codepoints.size() ; ++loop)
     {
-        if(codepoints[loop] == 10)
+        if(codepoints[loop] == 13 && loop + 1 < codepoints.size() && codepoints[loop + 1] == 10)
+        {
+            // CRLF line ending: emit a single hard return, not two
+            Insert(static_cast<CHAR_T>(HARD_RETURN)) ;
+            ++loop ;
+        }
+        else if(codepoints[loop] == 10)
         {
             Insert(static_cast<CHAR_T>(HARD_RETURN)) ;
         }
@@ -3997,6 +4003,74 @@ POSITION_T cDocument::GetWordEndPosition(POSITION_T pos)
     }
 
     return paraStart + relPos;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  pos         [IN]  document position of the caret
+/// @param  wordStart   [OUT] position of the first character of the word
+/// @param  wordEnd     [OUT] position just past the last character of the word
+///
+/// @return bool - true if a word touches the caret, false otherwise
+///
+/// @brief
+/// Find the start/end of the word touching the caret, for spell-checking
+/// the word at the cursor. Checks the character to the right of the caret
+/// first (caret before or inside a word), then the character to the left
+/// (caret just after a word). Unlike GetNextWordPosition/GetPrevWordPosition,
+/// which jump to a neighboring word and silently fall back to the caret's
+/// own position when no such neighbor exists in the paragraph, this looks
+/// only at the word actually touching the caret.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDocument::GetWordBoundsAtPosition(POSITION_T pos, POSITION_T &wordStart, POSITION_T &wordEnd)
+{
+    PARAGRAPH_T para = GetParagraphFromPosition(pos);
+    std::string text = GetParagraphText(para);
+    std::u32string utf32 = unicode::utf8::decode(text);
+
+    POSITION_T size = static_cast<POSITION_T>(utf32.length());
+    POSITION_T paraStart = mParagraphData[para].index;
+    POSITION_T relPos = pos - paraStart;
+
+    auto isWordChar = [](char32_t ch) -> bool
+    {
+        return unicode::is_alphabetic(ch) || unicode::is_number(ch) || ch == U'_';
+    };
+
+    POSITION_T relStart = relPos;
+    POSITION_T relEnd = relPos;
+
+    if (relPos < size && isWordChar(utf32[static_cast<size_t>(relPos)]))
+    {
+        // caret is before or inside a word: scan right then left from it
+        while (relEnd < size && isWordChar(utf32[static_cast<size_t>(relEnd)]))
+        {
+            relEnd++;
+        }
+        while (relStart > 0 && isWordChar(utf32[static_cast<size_t>(relStart - 1)]))
+        {
+            relStart--;
+        }
+    }
+    else if (relPos > 0 && isWordChar(utf32[static_cast<size_t>(relPos - 1)]))
+    {
+        // caret is just past a word: scan left from it
+        while (relStart > 0 && isWordChar(utf32[static_cast<size_t>(relStart - 1)]))
+        {
+            relStart--;
+        }
+    }
+    else
+    {
+        return false;
+    }
+
+    wordStart = paraStart + relStart;
+    wordEnd = paraStart + relEnd;
+
+    return true;
 }
 
 

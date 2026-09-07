@@ -259,20 +259,20 @@ void cSpellCheck::CheckDocument(void)
 ///
 /// @brief
 /// Check the word at the current cursor position. Uses
-/// GetPrevWordPosition/GetNextWordPosition for proper Unicode word
-/// boundary detection. If misspelled, shows the spell check dialog
-/// with suggestions and all button options.
+/// GetWordBoundsAtPosition() to find the word actually touching the
+/// caret. If misspelled, shows the spell check dialog with suggestions
+/// and all button options.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cSpellCheck::CheckWord(void)
 {
     POSITION_T pos = mEditor->GetCaretDocumentPosition() ;
 
-    // Find word boundaries using Unicode word boundary detection
-    POSITION_T wordStart = mEditor->GetDocument()->GetPrevWordPosition(pos + 1) ;
-    POSITION_T wordEnd = mEditor->GetDocument()->GetNextWordPosition(pos) ;
+    // Find word boundaries of the word touching the caret
+    POSITION_T wordStart = 0 ;
+    POSITION_T wordEnd = 0 ;
 
-    if (wordStart >= wordEnd)
+    if (!mEditor->GetDocument()->GetWordBoundsAtPosition(pos, wordStart, wordEnd))
     {
         QMessageBox::information(mEditor, "Spell Check", "No word at cursor position.") ;
         return ;

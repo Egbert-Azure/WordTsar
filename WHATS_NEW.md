@@ -5,6 +5,8 @@ Release history for WordTsar, in reverse chronological order.
 ## 0.13.0 Beta (2026-09-07)
 .hy auto-hyphenation implemented which makes it look right instead of leaving rivers of whitespace
 ^OE soft hyphen, ^OH auto-hyphenation toggle
+Fixed: pasting from the system clipboard in the terminal UI (^K[) could leave a stray empty paragraph behind when the copied text used Windows-style line endings.
+Fixed: GUI Spell Check could show the wrong word for a word near the start or end of a paragraph — truncated, or with a stray character from the neighboring word.
 
 ## 0.12.0 Beta (2026-09-05)
 

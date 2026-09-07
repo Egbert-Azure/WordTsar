@@ -377,6 +377,7 @@ public:
     POSITION_T GetNextWordPosition(POSITION_T pos) ;
     POSITION_T GetPrevWordPosition(POSITION_T pos) ;
     POSITION_T GetWordEndPosition(POSITION_T pos) ;
+    bool GetWordBoundsAtPosition(POSITION_T pos, POSITION_T &wordStart, POSITION_T &wordEnd) ;
 
     // --- Font Navigation ---
     POSITION_T GetNextFontTagPosition(void) ;
