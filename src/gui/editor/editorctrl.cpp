@@ -5925,7 +5925,7 @@ void cEditorCtrl::WriteBlockToFile(void)
 
     POSITION_T start = 0, end = 0 ;
     mDocument->GetBlock(start, end) ;
-    std::string text = mDocument->GetBlockText(start, end + 1) ;
+    std::string text = mDocument->GetBlockText(start, end) ;
 
     std::ofstream file(filename, mode) ;
     if (!file.is_open())
