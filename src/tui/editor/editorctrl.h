@@ -103,7 +103,7 @@ public:
     void WordCountBlock(void) override;
     void ToggleShowControl(void) override;
     void Thesaurus(void) override;
-    void WriteBlockToFile(void) override;
+    eFileExistsChoice ConfirmOverwriteOrAppend(const std::string& filename) override;
 
     // ---- Pure virtual: undo/redo ----
     void Undo(void) override;

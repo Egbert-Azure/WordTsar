@@ -83,6 +83,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <limits>
 #include <random>
 
@@ -3699,6 +3700,60 @@ bool cEditorBase::IsPageBreakDotCommand(PARAGRAPH_T para)
     return (text[0] == '.' &&
             (text[1] == 'p' || text[1] == 'P') &&
             (text[2] == 'a' || text[2] == 'A')) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Real WordStar 7 ^KW: writes the marked block to another file. Prompts
+/// for a filename; if it already exists, prompts to Overwrite, Append, or
+/// Cancel (matching the classic keyboard command's own O/A/Esc prompt).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::WriteBlockToFile(void)
+{
+    if (!mDocument || mDocument->mBlockSet == false)
+    {
+        ShowError("Write Block", "No block is marked.") ;
+        return ;
+    }
+
+    std::string filename = PromptForSaveFile() ;
+    if (filename.empty())
+    {
+        return ;
+    }
+
+    std::ios_base::openmode mode = std::ios::out ;
+
+    if (std::filesystem::exists(filename))
+    {
+        eFileExistsChoice choice = ConfirmOverwriteOrAppend(filename) ;
+        if (choice == eFileExistsChoice::Append)
+        {
+            mode = std::ios::out | std::ios::app ;
+        }
+        else if (choice != eFileExistsChoice::Overwrite)
+        {
+            return ;  // Cancel or Escape
+        }
+    }
+
+    POSITION_T start = 0, end = 0 ;
+    mDocument->GetBlock(start, end) ;
+    std::string text = mDocument->GetBlockText(start, end) ;
+
+    std::ofstream file(filename, mode) ;
+    if (!file.is_open())
+    {
+        ShowError("Write Block", "Could not write to \"" + filename + "\".") ;
+        return ;
+    }
+    file << text ;
+    file.close() ;
 }
 
 

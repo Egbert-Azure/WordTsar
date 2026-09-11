@@ -131,7 +131,6 @@
 #include "src/gui/utils/fontutils.h"
 #include "src/gui/utils/maclookup.h"
 
-#include <fstream>
 #include <filesystem>
 #include "src/input/wordtsarinput.h"
 #include "src/input/moderninput.h"
@@ -5879,62 +5878,34 @@ void cEditorCtrl::Thesaurus(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return nothing
+/// @param  filename [in] - the file WriteBlockToFile() is about to write to
+///
+/// @return Overwrite, Append, or Cancel per the user's choice
 ///
 /// @brief
-/// Real WordStar 7 ^KW: writes the marked block to another file. Prompts
-/// for a filename; if it already exists, prompts to Overwrite, Append, or
-/// Cancel (matching the classic keyboard command's own O/A/Esc prompt).
+/// ^KW's own O/A/Esc prompt when the target file already exists, styled for
+/// the GUI. cEditorBase::WriteBlockToFile() calls this and handles the rest.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::WriteBlockToFile(void)
+cEditorBase::eFileExistsChoice cEditorCtrl::ConfirmOverwriteOrAppend(const std::string& filename)
 {
-    if (!mDocument || mDocument->mBlockSet == false)
+    QMessageBox box(this) ;
+    box.setWindowTitle(tr("Write Block")) ;
+    box.setText(tr("\"%1\" already exists.").arg(QString::fromStdString(filename))) ;
+    QPushButton* overwriteBtn = box.addButton(tr("Overwrite"), QMessageBox::DestructiveRole) ;
+    QPushButton* appendBtn = box.addButton(tr("Append"), QMessageBox::AcceptRole) ;
+    box.addButton(QMessageBox::Cancel) ;
+    box.exec() ;
+
+    if (box.clickedButton() == appendBtn)
     {
-        ShowError("Write Block", "No block is marked.") ;
-        return ;
+        return eFileExistsChoice::Append ;
     }
-
-    std::string filename = PromptForSaveFile() ;
-    if (filename.empty())
+    if (box.clickedButton() == overwriteBtn)
     {
-        return ;
+        return eFileExistsChoice::Overwrite ;
     }
-
-    std::ios_base::openmode mode = std::ios::out ;
-
-    if (std::filesystem::exists(filename))
-    {
-        QMessageBox box(this) ;
-        box.setWindowTitle(tr("Write Block")) ;
-        box.setText(tr("\"%1\" already exists.").arg(QString::fromStdString(filename))) ;
-        QPushButton* overwriteBtn = box.addButton(tr("Overwrite"), QMessageBox::DestructiveRole) ;
-        QPushButton* appendBtn = box.addButton(tr("Append"), QMessageBox::AcceptRole) ;
-        box.addButton(QMessageBox::Cancel) ;
-        box.exec() ;
-
-        if (box.clickedButton() == appendBtn)
-        {
-            mode = std::ios::out | std::ios::app ;
-        }
-        else if (box.clickedButton() != overwriteBtn)
-        {
-            return ;  // Cancel
-        }
-    }
-
-    POSITION_T start = 0, end = 0 ;
-    mDocument->GetBlock(start, end) ;
-    std::string text = mDocument->GetBlockText(start, end) ;
-
-    std::ofstream file(filename, mode) ;
-    if (!file.is_open())
-    {
-        ShowError("Write Block", "Could not write to \"" + filename + "\".") ;
-        return ;
-    }
-    file << text ;
-    file.close() ;
+    return eFileExistsChoice::Cancel ;
 }
 
 

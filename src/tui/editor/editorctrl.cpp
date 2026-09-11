@@ -46,7 +46,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <set>
 #include <vector>
 
@@ -3319,57 +3318,34 @@ void cWSEditorCtrl::Thesaurus(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return nothing
+/// @param  filename [in] - the file WriteBlockToFile() is about to write to
+///
+/// @return Overwrite, Append, or Cancel per the user's choice
 ///
 /// @brief
-/// Real WordStar 7 ^KW: writes the marked block to another file. Prompts
-/// for a filename; if it already exists, prompts to Overwrite, Append, or
-/// Cancel (matching the classic keyboard command's own O/A/Esc prompt).
+/// ^KW's own O/A/Esc prompt when the target file already exists, styled for
+/// the TUI. cEditorBase::WriteBlockToFile() calls this and handles the rest.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cWSEditorCtrl::WriteBlockToFile(void)
+cEditorBase::eFileExistsChoice cWSEditorCtrl::ConfirmOverwriteOrAppend(const std::string& filename)
 {
-    if (mHost == nullptr || mDocument == nullptr || mDocument->mBlockSet == false)
+    if (mHost == nullptr)
     {
-        ShowError("Write Block", "No block is marked.");
-        return;
+        return eFileExistsChoice::Cancel;
     }
 
-    std::string filename = PromptForSaveFile();
-    if (filename.empty())
+    int choice = wsdialogs::ThreeChoice(mHost, "Write Block",
+                                        "\"" + filename + "\" already exists.",
+                                        "Overwrite", "Append", "Cancel");
+    if (choice == 1)
     {
-        return;
+        return eFileExistsChoice::Append;
     }
-
-    std::ios_base::openmode mode = std::ios::out;
-
-    if (std::filesystem::exists(filename))
+    if (choice == 0)
     {
-        int choice = wsdialogs::ThreeChoice(mHost, "Write Block",
-                                            "\"" + filename + "\" already exists.",
-                                            "Overwrite", "Append", "Cancel");
-        if (choice == 1)
-        {
-            mode = std::ios::out | std::ios::app;
-        }
-        else if (choice != 0)
-        {
-            return;  // Cancel or Escape
-        }
+        return eFileExistsChoice::Overwrite;
     }
-
-    POSITION_T start = 0, end = 0;
-    mDocument->GetBlock(start, end);
-    std::string text = mDocument->GetBlockText(start, end);
-
-    std::ofstream file(filename, mode);
-    if (!file.is_open())
-    {
-        ShowError("Write Block", "Could not write to \"" + filename + "\".");
-        return;
-    }
-    file << text;
-    file.close();
+    return eFileExistsChoice::Cancel;
 }
 
 

@@ -154,13 +154,19 @@ public:
     virtual void WordCountBlock(void) = 0;                    // Count words in block, display result
     virtual void ToggleShowControl(void) = 0;                 // Toggle control code display mode
     virtual void Thesaurus(void) = 0;                         // Look up synonyms for the word at cursor (^QJ)
-    virtual void WriteBlockToFile(void) = 0;                  // Write marked block to another file (^KW)
+
+    // Pure Virtual - Write Block to File overwrite/append prompt (^KW's own
+    // O/A/Esc choice, styled per frontend); WriteBlockToFile() below is the
+    // shared, non-UI part.
+    enum class eFileExistsChoice { Overwrite, Append, Cancel };
+    virtual eFileExistsChoice ConfirmOverwriteOrAppend(const std::string& filename) = 0;
 
     // Shared (concrete) -- implemented once in editorbase.cpp since they only
     // need cEditorBase's own document/layout access, no frontend-specific UI.
     void SortBlock(bool ascending);                           // Sort marked block's paragraphs (^KZ,A/D)
     void CenterTextVertically(void);                          // Center cursor-to-page-break text on the page (^OV)
     void TemporaryIndent(void);                                // Indent current paragraph one more tab stop, reverting after it (^OG)
+    void WriteBlockToFile(void);                               // Write marked block to another file (^KW)
 
     // Pure Virtual - Undo/Redo
     virtual void Undo(void) = 0;                              // Undo last action
