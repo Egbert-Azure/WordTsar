@@ -941,42 +941,6 @@ bool cWSEditorCtrl::HasPendingLayout(void) const
 /// @return nothing
 ///
 /// @brief
-/// Undo the last document change.
-///
-/////////////////////////////////////////////////////////////////////////////
-void cWSEditorCtrl::Undo(void)
-{
-    if (mDocument)
-    {
-        CloseTypingGroup();
-        mDocument->Undo();
-    }
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @return nothing
-///
-/// @brief
-/// Redo the last undone document change.
-///
-/////////////////////////////////////////////////////////////////////////////
-void cWSEditorCtrl::Redo(void)
-{
-    if (mDocument)
-    {
-        CloseTypingGroup();
-        mDocument->Redo();
-    }
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @return nothing
-///
-/// @brief
 /// Cycle the control-code display mode SHOW_ALL to SHOW_DOT to SHOW_NONE and
 /// relayout, since showing/hiding control codes changes the layout.
 ///

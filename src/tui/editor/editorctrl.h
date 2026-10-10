@@ -106,8 +106,6 @@ public:
     eFileExistsChoice ConfirmOverwriteOrAppend(const std::string& filename) override;
 
     // ---- Pure virtual: undo/redo ----
-    void Undo(void) override;
-    void Redo(void) override;
 
     // ---- Pure virtual: file operations ----
     void LayoutDocument(bool force) override;

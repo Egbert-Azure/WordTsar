@@ -186,8 +186,7 @@ public:
     void WordCountBlock(void) override;
     void Thesaurus(void) override;
     eFileExistsChoice ConfirmOverwriteOrAppend(const std::string& filename) override;
-    void Undo(void) override;
-    void Redo(void) override;
+    void UpdateAfterUndoRedo(void) override;
     void ToggleShowControl(void) override;
     void LayoutDocument(bool force) override;
     bool IsBusy(void) const;

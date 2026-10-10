@@ -2537,24 +2537,24 @@ TEST_CASE("Editor Undo closes the typing group before undoing")
     editor.InsertText("abc");               // typing group still open
     CHECK(doc->GetParagraphText(0) == "abcine\r");
 
-    editor.Undo();
+    CHECK(editor.Undo());
     CHECK(doc->GetParagraphText(0) == "ine\r");
 
-    editor.Redo();
+    CHECK(editor.Redo());
     CHECK(doc->GetParagraphText(0) == "abcine\r");
 
-    editor.Undo();
+    CHECK(editor.Undo());
     CHECK(doc->GetParagraphText(0) == "ine\r");
 
     // typing after an undo starts a new step
     doc->SetPosition(0);
     editor.InsertText("xy");
-    editor.Undo();
+    CHECK(editor.Undo());
     CHECK(doc->GetParagraphText(0) == "ine\r");
 
-    editor.Undo();
+    CHECK(editor.Undo());
     CHECK(doc->GetParagraphText(0) == "Line\r");
-    editor.Undo();
+    CHECK_FALSE(editor.Undo());
 }
 
 
@@ -3100,7 +3100,7 @@ TEST_CASE("Reveal codes: an alignment tab is deletable in every mode and undo re
         CHECK(doc->GetTextSize() == size - 1);
         CHECK(doc->GetCharNoAdvance(0) == "c");
 
-        editor.Undo();
+        CHECK(editor.Undo());
         editor.PerformPostCommandUpdate();
         CHECK(doc->GetTextSize() == size);
         CHECK(doc->GetControlChar(0) == STYLE_TAB);
@@ -3133,4 +3133,29 @@ TEST_CASE("GetStatus word count follows the document")
     doc->Insert("one more\r");
     editor.GetStatus(status);
     CHECK(status.wordcount == 4);
+}
+
+
+TEST_CASE("Editor Undo and Redo report whether a step was undone or redone")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    doc->ClearUndoHistory();
+
+    // nothing to undo or redo
+    CHECK_FALSE(editor.Undo());
+    CHECK_FALSE(editor.Redo());
+
+    editor.InsertText("abc");
+    CHECK(doc->GetParagraphText(0) == "abc\x7f");
+
+    CHECK(editor.Undo());
+    CHECK(doc->GetParagraphText(0) == "\x7f");
+    CHECK_FALSE(editor.Undo());
+
+    CHECK(editor.Redo());
+    CHECK(doc->GetParagraphText(0) == "abc\x7f");
+    CHECK_FALSE(editor.Redo());
 }

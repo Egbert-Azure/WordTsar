@@ -6133,73 +6133,26 @@ cEditorBase::eFileExistsChoice cEditorCtrl::ConfirmOverwriteOrAppend(const std::
 /// @return nothing
 ///
 /// @brief
-/// Undo the last editing operation. Closes any active typing group first
-/// so that word-level grouping is finalized, then calls cDocument::Undo()
-/// and updates layout and display.
+/// Refresh the display after cEditorBase::Undo() or Redo() changed the
+/// document: caret from the document position, full re-layout, scroll, and
+/// the sibling (reveal codes) editor, which is not notified during undo/redo.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::Undo(void)
+void cEditorCtrl::UpdateAfterUndoRedo(void)
 {
-    if (!mDocument)
+    // update caret from document position
+    mCaretDocumentPosition = mDocument->GetPosition() ;
+
+    LayoutDocument(true) ;
+    CalculateCaretPosition() ;
+    ScrollIntoView() ;
+    update() ;
+
+    // Notify sibling -- notifications suppressed during undo/redo
+    if (mSiblingEditor != nullptr)
     {
-        return ;
-    }
-
-    CloseTypingGroup() ;
-
-    if (mDocument->Undo())
-    {
-        // update caret from document position
-        mCaretDocumentPosition = mDocument->GetPosition() ;
-
-        LayoutDocument(true) ;
-        CalculateCaretPosition() ;
-        ScrollIntoView() ;
-        update() ;
-
-        // Notify sibling -- notifications suppressed during undo/redo
-        if (mSiblingEditor != nullptr)
-        {
-            mSiblingEditor->LayoutDocument(true) ;
-            mSiblingEditor->PerformPostCommandUpdate() ;
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @return nothing
-///
-/// @brief
-/// Redo the last undone operation. Closes any active typing group first,
-/// then calls cDocument::Redo() and updates layout and display.
-///
-/////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::Redo(void)
-{
-    if (!mDocument)
-    {
-        return ;
-    }
-
-    CloseTypingGroup() ;
-
-    if (mDocument->Redo())
-    {
-        // update caret from document position
-        mCaretDocumentPosition = mDocument->GetPosition() ;
-
-        LayoutDocument(true) ;
-        CalculateCaretPosition() ;
-        ScrollIntoView() ;
-        update() ;
-
-        // Notify sibling -- notifications suppressed during undo/redo
-        if (mSiblingEditor != nullptr)
-        {
-            mSiblingEditor->LayoutDocument(true) ;
-            mSiblingEditor->PerformPostCommandUpdate() ;
-        }
+        mSiblingEditor->LayoutDocument(true) ;
+        mSiblingEditor->PerformPostCommandUpdate() ;
     }
 }
 

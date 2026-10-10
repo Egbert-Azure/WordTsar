@@ -317,6 +317,60 @@ void cEditorBase::MarkDocumentSaved(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return true if a step was undone, false if there was nothing to undo
+///
+/// @brief
+/// Undo the last step. Closes the typing group first, so undo right after
+/// typing removes the typed text (not an older step) and typing afterwards
+/// starts a new step.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::Undo(void)
+{
+    if (!mDocument)
+    {
+        return false ;
+    }
+
+    CloseTypingGroup() ;
+    if (!mDocument->Undo())
+    {
+        return false ;
+    }
+
+    UpdateAfterUndoRedo() ;
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true if a step was redone, false if there was nothing to redo
+///
+/// @brief
+/// Redo the last undone step (closing the typing group first, like Undo()).
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::Redo(void)
+{
+    if (!mDocument)
+    {
+        return false ;
+    }
+
+    CloseTypingGroup() ;
+    if (!mDocument->Redo())
+    {
+        return false ;
+    }
+
+    UpdateAfterUndoRedo() ;
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief

@@ -169,9 +169,10 @@ public:
     void TemporaryIndent(void);                                // Indent current paragraph one more tab stop, reverting after it (^OG)
     void WriteBlockToFile(void);                               // Write marked block to another file (^KW)
 
-    // Pure Virtual - Undo/Redo
-    virtual void Undo(void) = 0;                              // Undo last action
-    virtual void Redo(void) = 0;                              // Redo last undone action
+    // Undo/Redo (the frontend refreshes its display in UpdateAfterUndoRedo)
+    bool Undo(void);                                          // Undo last action; false if nothing to undo
+    bool Redo(void);                                          // Redo last undone action; false if nothing to redo
+    virtual void UpdateAfterUndoRedo(void) {}                 // Re-layout and repaint after an undo or redo
 
     // Pure Virtual - File Operations
     virtual void LayoutDocument(bool force) = 0;              // Layout document (platform-specific refresh)
