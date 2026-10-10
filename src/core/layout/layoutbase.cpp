@@ -155,7 +155,7 @@ cLayoutBase::cLayoutBase(void)
     mDotCommandParser = new cDotCommandParser(mLayoutState, mDocument, mCurrentPage, mLogicalPageNumber, this);
 
     // Create header/footer manager (depends on mLayoutState and 'this' for text mMeasurement)
-    mHeaderFooterManager = new cHeaderFooterManager(mLayoutState, this);
+    mHeaderFooterManager = new cHeaderFooterManager(this);
 
     // Paragraph tracking
     mCurrentParagraph = 0;
@@ -371,10 +371,6 @@ void cLayoutBase::LayoutDocument(cDocument* doc, std::function<void(int)> progre
     mParagraphLayout.clear();
     mFormattingCheckpoints.clear();
 
-    // Clear header/footer storage
-    mHeaderFooterManager->Reset();
-    mHeaderFooterManager->SetFooterValue(0);
-
     // Reset state
     mCurrentBoxIndex = NOT_SET;
 
@@ -505,14 +501,6 @@ void cLayoutBase::LayoutDocument(cDocument* doc, std::function<void(int)> progre
 #ifdef LAYOUT_TIMER
     phaseTimer.start();
 #endif
-
-    // After all paragraphs are laid out, insert headers/footers for all pages
-    // This must be done after parsing all dot commands to ensure templates are populated
-    // Page box is created by LayoutParagraph() on the first paragraph (dot or text)
-    for (PAGE_T page = 1; page <= mCurrentPage; page++)
-    {
-        InsertHeadersFooters(page);
-    }
 
     // Calculate screenYTop and screenYBottom for all boxes
     // This must be done after all lines are laid out so that screeny values are final
@@ -1128,7 +1116,20 @@ bool cLayoutBase::LayoutDotCommandParagraph(PARAGRAPH_T para, const std::string&
     dotTimer.start();
 #endif
 
+    // A header / footer command stores its definition on this paragraph while parsing
+    mParagraphLayout[para].hasHeaderFooter = false;
     eDotCommandStatus parseResult = ParseDotCommand(text);
+
+    // Automatic page number settings (.PG / .OP / .PC) apply to the page they are on
+    for (int boxIndex : GetBoxesOnPage(mCurrentPage))
+    {
+        sBoxes* pageBox = mPageManager->GetBoxByIndexMutable(boxIndex);
+        if (pageBox != nullptr)
+        {
+            pageBox->pageInfo.printPageNumbers = mLayoutState->ShouldPrintPageNumbers();
+            pageBox->pageInfo.pageNumberColumn = mLayoutState->GetPageNumberColumn();
+        }
+    }
 
 #ifdef LAYOUT_TIMER
     mDotCommandTimeNs += dotTimer.time_elapsed_nanoseconds();
@@ -1163,6 +1164,8 @@ bool cLayoutBase::LayoutDotCommandParagraph(PARAGRAPH_T para, const std::string&
     // Preserve pageBreak flag that might have been set by ParseDotCommand (.PA)
     // ParseDotCommand sets mParagraphLayout[para].pageBreak directly, so we must copy it
     dotPara.pageBreak = mParagraphLayout[para].pageBreak;
+    dotPara.hasHeaderFooter = mParagraphLayout[para].hasHeaderFooter;
+    dotPara.headerFooter = mParagraphLayout[para].headerFooter;
 
     // Replace existing entry with dot command layout
     mParagraphLayout[para] = dotPara;
@@ -1230,6 +1233,9 @@ bool cLayoutBase::LayoutTextParagraph(PARAGRAPH_T para, const sParagraphLayout& 
     // Clear existing lines before re-layout
     // WordWrapParagraph() adds to existing lines, so we must clear first
     mParagraphLayout[para].lines.clear();
+
+    // A text paragraph defines no header / footer
+    mParagraphLayout[para].hasHeaderFooter = false;
 
     // CRITICAL: Set paragraph number for equality checks
     // This must be set BEFORE WordWrap, because WordWrap modifies the paragraph structure
@@ -1383,6 +1389,12 @@ bool cLayoutBase::CreatePageBox(PAGE_T page)
     if (box != nullptr)
     {
         box->pageStartY = mScreenY - mBoxTop;
+
+        // Page offset and automatic page number settings in effect for this
+        // page (used to place its headers / footers)
+        box->pageInfo.pageoffset = (page % 2 == 0) ? mLayoutState->GetPageOffsetEven() : mLayoutState->GetPageOffsetOdd();
+        box->pageInfo.printPageNumbers = mLayoutState->ShouldPrintPageNumbers();
+        box->pageInfo.pageNumberColumn = mLayoutState->GetPageNumberColumn();
     }
 
     return result;
@@ -2351,10 +2363,6 @@ void cLayoutBase::ShrinkToFit(void)
     if (mPageManager)
     {
         mPageManager->ShrinkToFit();
-    }
-    if (mHeaderFooterManager)
-    {
-        mHeaderFooterManager->ShrinkToFit();
     }
 }
 
@@ -3707,6 +3715,9 @@ sPageInfo cLayoutBase::GetPageInfo(PAGE_T page)
     info.rightmargin = mLayoutState->GetRightMargin();
     info.headermargin = mLayoutState->GetHeaderMargin();
     info.footermargin = mLayoutState->GetFooterMargin();
+    info.pageoffset = (page % 2 == 0) ? mLayoutState->GetPageOffsetEven() : mLayoutState->GetPageOffsetOdd();
+    info.printPageNumbers = mLayoutState->ShouldPrintPageNumbers();
+    info.pageNumberColumn = mLayoutState->GetPageNumberColumn();
 
     return info;
 }
@@ -5684,10 +5695,6 @@ void cLayoutBase::ResetFormattingState(void)
     // Reset conditional page break
     mLayoutState->SetDoNewPage(false);
 
-    // Reset header/footer tracking
-    mHeaderFooterManager->SetHeaderValue(0);
-    mHeaderFooterManager->SetFooterValue(0);
-
     // Reset subscript/superscript roll to default (3/48 inch = 90 twips)
     mLayoutState->SetSubSuperRoll(90);
 
@@ -5759,8 +5766,6 @@ void cLayoutBase::SaveFormattingCheckpoint(PARAGRAPH_T para)
     cp.paperHeight = mLayoutState->GetPaperHeight();
 
     // Header/footer tracking
-    cp.headerValue = mHeaderFooterManager->GetHeaderValue();
-    cp.footerValue = mHeaderFooterManager->GetFooterValue();
 
     mFormattingCheckpoints.push_back(cp);
 }
@@ -5823,8 +5828,6 @@ void cLayoutBase::RestoreFormattingCheckpoint(const sFormattingCheckpoint& cp)
     mLayoutState->SetPaperHeight(cp.paperHeight);
 
     // Header/footer tracking
-    mHeaderFooterManager->SetHeaderValue(cp.headerValue);
-    mHeaderFooterManager->SetFooterValue(cp.footerValue);
 }
 
 
@@ -5885,8 +5888,6 @@ bool cLayoutBase::UpdateCheckpointIfNeeded(PARAGRAPH_T para)
     newCp.subSuperRoll = mLayoutState->GetSubSuperRoll();
     newCp.paperWidth = mLayoutState->GetPaperWidth();
     newCp.paperHeight = mLayoutState->GetPaperHeight();
-    newCp.headerValue = mHeaderFooterManager->GetHeaderValue();
-    newCp.footerValue = mHeaderFooterManager->GetFooterValue();
 
     // Find existing checkpoint at this boundary
     for (size_t i = 0; i < mFormattingCheckpoints.size(); ++i)
@@ -6251,32 +6252,27 @@ eDotCommandStatus cLayoutBase::ParseHeader(const std::string& command)
     // Check for H1-H5
     if (cmd == "HE" || cmd == "H1")
     {
-        mHeaderFooterManager->SetHeaderValue(1);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 1);
         return DOT_GOOD;
     }
     else if (cmd == "H2")
     {
-        mHeaderFooterManager->SetHeaderValue(2);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 2);
         return DOT_GOOD;
     }
     else if (cmd == "H3")
     {
-        mHeaderFooterManager->SetHeaderValue(3);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 3);
         return DOT_GOOD;
     }
     else if (cmd == "H4")
     {
-        mHeaderFooterManager->SetHeaderValue(4);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 4);
         return DOT_GOOD;
     }
     else if (cmd == "H5")
     {
-        mHeaderFooterManager->SetHeaderValue(5);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 5);
         return DOT_GOOD;
     }
 
@@ -6324,32 +6320,27 @@ eDotCommandStatus cLayoutBase::ParseFooter(const std::string& command)
     // Check for F1-F5
     if (cmd == "FO" || cmd == "F1")
     {
-        mHeaderFooterManager->SetFooterValue(1);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 1);
         return DOT_GOOD;
     }
     else if (cmd == "F2")
     {
-        mHeaderFooterManager->SetFooterValue(2);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 2);
         return DOT_GOOD;
     }
     else if (cmd == "F3")
     {
-        mHeaderFooterManager->SetFooterValue(3);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 3);
         return DOT_GOOD;
     }
     else if (cmd == "F4")
     {
-        mHeaderFooterManager->SetFooterValue(4);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 4);
         return DOT_GOOD;
     }
     else if (cmd == "F5")
     {
-        mHeaderFooterManager->SetFooterValue(5);
-        HandleHeaderFooterText(command, cmd);
+        HandleHeaderFooterText(command, cmd, 5);
         return DOT_GOOD;
     }
 
@@ -6359,41 +6350,95 @@ eDotCommandStatus cLayoutBase::ParseFooter(const std::string& command)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  text [in] - Full command text including header/footer content
-/// @param  command [in] - Command identifier (HE, H1, FO, F1, etc.)
-///
-/// @return nothing
-///
-/// @brief
-/// Extracts and stores header or footer text from command.
-///
-/// Format: .HE[E|O] text   or   .FO[E|O] text
-///
-/// The third character (after the command) determines page type:
-///   E or e = Even pages only
-///   O or o = Odd pages only
-///   (space or other) = Both pages
-///
-/// Stores the text in the appropriate array (regular, even, or odd).
-///
-/////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////
-///
 /// @param  text [in] raw dot command text (e.g., ".HE Header Text")
 /// @param  command [in] uppercase command (e.g., "HE", "H1", "F2")
+/// @param  number [in] header / footer number (1-5 for H1-H5 / F1-F5)
 ///
 /// @return nothing
 ///
 /// @brief
-/// Processes header/footer dot command text and stores it for later rendering.
+/// Processes header/footer dot command text and stores its definition on the
+/// paragraph being laid out. Delegates to cHeaderFooterManager.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::HandleHeaderFooterText(const std::string& text, const std::string& command, int number)
+{
+    mHeaderFooterManager->HandleHeaderFooterText(text, command, number);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the explicit .LH line height in twips, or 0 when the line height
+///         is automatic (from the font)
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T cLayoutBase::ExplicitLineHeight(void) const
+{
+    if (mLayoutState->GetLineHeight() == NOT_SET)
+    {
+        return 0;
+    }
+    return mLayoutState->GetLineHeight();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  definition [in] header / footer definition parsed from the current paragraph
+///
+/// @return nothing
+///
+/// @brief
+/// Store a header / footer definition on the paragraph being laid out, so
+/// incremental layout keeps it current with the paragraph.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::StoreHeaderFooterDefinition(const sHeaderFooterDefinition& definition)
+{
+    PARAGRAPH_T para = mCurrentParagraph;
+    if (para < 0 || para >= static_cast<PARAGRAPH_T>(mParagraphLayout.size()))
+    {
+        return;
+    }
+    mParagraphLayout[static_cast<size_t>(para)].hasHeaderFooter = true;
+    mParagraphLayout[static_cast<size_t>(para)].headerFooter = definition;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  page [in] page number (1-based)
+///
+/// @return the page's header lines (slot 1 first), empty when none applies
+///
+/// @brief
+/// Builds the header lines of one page from the definitions in effect for
+/// it. Delegates to cHeaderFooterManager.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::vector<sHeaderFooterLine> cLayoutBase::GetPageHeaders(PAGE_T page)
+{
+    return mHeaderFooterManager->GetPageLines(page, true);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  page [in] page number (1-based)
+///
+/// @return the page's footer lines (slot 1 first), empty when none applies
+///
+/// @brief
+/// Builds the footer lines of one page from the definitions in effect for
+/// it, or the automatic page number line (.PG / .PC) when it has no footer.
 /// Delegates to cHeaderFooterManager.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cLayoutBase::HandleHeaderFooterText(const std::string& text, const std::string& command)
+std::vector<sHeaderFooterLine> cLayoutBase::GetPageFooters(PAGE_T page)
 {
-    mHeaderFooterManager->HandleHeaderFooterText(text, command);
+    return mHeaderFooterManager->GetPageLines(page, false);
 }
-
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -6700,52 +6745,6 @@ std::vector<sLineLayout> cLayoutBase::LayoutDotCommandText(PARAGRAPH_T para, boo
 }
 
 
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @param  page [in] page number to insert headers/footers for
-///
-/// @return nothing
-///
-/// @brief
-/// Inserts headers and footers for specified page.
-/// Delegates to cHeaderFooterManager.
-///
-/////////////////////////////////////////////////////////////////////////////
-void cLayoutBase::InsertHeadersFooters(PAGE_T page)
-{
-    mHeaderFooterManager->InsertHeadersFooters(page);
-}
-
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @return reference to page headers map
-///
-/// @brief
-/// Returns map of page numbers to their header lines.
-/// Delegates to cHeaderFooterManager.
-///
-/////////////////////////////////////////////////////////////////////////////
-const std::map<PAGE_T, std::vector<sHeaderFooterLine>>& cLayoutBase::GetPageHeaders(void) const
-{
-    return mHeaderFooterManager->GetPageHeaders();
-}
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @return reference to page footers map
-///
-/// @brief
-/// Returns map of page numbers to their footer lines.
-/// Delegates to cHeaderFooterManager.
-///
-/////////////////////////////////////////////////////////////////////////////
-const std::map<PAGE_T, std::vector<sHeaderFooterLine>>& cLayoutBase::GetPageFooters(void) const
-{
-    return mHeaderFooterManager->GetPageFooters();
-}
 
 /////////////////////////////////////////////////////////////////////////////
 ///

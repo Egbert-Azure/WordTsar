@@ -32,6 +32,36 @@
 #include <QPainter>
 #include <QApplication>
 
+// Headers / footers of every page of a layout, by page (pages without lines are left out)
+static std::map<PAGE_T, std::vector<sHeaderFooterLine>> AllPageHeaders(cLayoutBase& layout)
+{
+    std::map<PAGE_T, std::vector<sHeaderFooterLine>> all;
+    for (PAGE_T page = 1; page <= layout.GetNumberOfPages(); ++page)
+    {
+        std::vector<sHeaderFooterLine> lines = layout.GetPageHeaders(page);
+        if (lines.empty() == false)
+        {
+            all[page] = std::move(lines);
+        }
+    }
+    return all;
+}
+
+static std::map<PAGE_T, std::vector<sHeaderFooterLine>> AllPageFooters(cLayoutBase& layout)
+{
+    std::map<PAGE_T, std::vector<sHeaderFooterLine>> all;
+    for (PAGE_T page = 1; page <= layout.GetNumberOfPages(); ++page)
+    {
+        std::vector<sHeaderFooterLine> lines = layout.GetPageFooters(page);
+        if (lines.empty() == false)
+        {
+            all[page] = std::move(lines);
+        }
+    }
+    return all;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief
@@ -5202,7 +5232,7 @@ TEST_CASE("Layout2 - Simple Header Parsing" * doctest::may_fail())
 
     // Headers appear on pages AFTER they are defined
     // Header defined on page 1, should appear on page 2
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
     CHECK(headers.find(2) != headers.end());
 
     if (headers.find(2) != headers.end())
@@ -5240,7 +5270,7 @@ TEST_CASE("Layout2 - Simple Footer Parsing" * doctest::may_fail())
 
     // Footers appear on pages AFTER they are defined
     // Footer defined on page 1, should appear on page 2
-    const auto& footers = layout.GetPageFooters();
+    const auto& footers = AllPageFooters(layout);
     CHECK(footers.find(2) != footers.end());
 
     if (footers.find(2) != footers.end())
@@ -5277,7 +5307,7 @@ TEST_CASE("Layout2 - Even/Odd Header Selection" * doctest::may_fail())
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
 
     // Page 1 should NOT have headers (definition page)
     CHECK(headers.find(1) == headers.end());
@@ -5339,7 +5369,7 @@ TEST_CASE("Layout2 - Multiple Headers Stacking" * doctest::may_fail())
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
 
     // Page 1 should NOT have headers (definition page)
     CHECK(headers.find(1) == headers.end());
@@ -5387,7 +5417,7 @@ TEST_CASE("Layout2 - Header Position Verification")
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
 
     // Verify header exists and has valid Y position
     if (headers.find(1) != headers.end() && headers.at(1).size() > 0)
@@ -5413,7 +5443,7 @@ TEST_CASE("Layout2 - Footer Position Verification")
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& footers = layout.GetPageFooters();
+    const auto& footers = AllPageFooters(layout);
 
     // Verify footer exists and has valid Y position
     if (footers.find(1) != footers.end() && footers.at(1).size() > 0)
@@ -5440,8 +5470,8 @@ TEST_CASE("Layout2 - No Headers/Footers By Default" * doctest::may_fail())
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
-    const auto& footers = layout.GetPageFooters();
+    const auto& headers = AllPageHeaders(layout);
+    const auto& footers = AllPageFooters(layout);
 
     // Verify no headers or footers created for page 1
     if (!headers.empty() && headers.find(1) != headers.end())
@@ -5667,7 +5697,7 @@ TEST_CASE("Layout2 - Header with # shows page number (Arabic)")
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
 
     // Verify page 2 has header (headers appear AFTER definition)
     REQUIRE(headers.find(2) != headers.end());
@@ -5705,7 +5735,7 @@ TEST_CASE("Layout2 - Header with # and .pn 5 offset")
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
 
     // Verify page 2 has header with "Page 6" (physical page 2 = 5 + 1)
     REQUIRE(headers.find(2) != headers.end());
@@ -5741,7 +5771,7 @@ TEST_CASE("Layout2 - Header with # and .pn i (Roman lowercase)")
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
 
     // Verify page 2 has header with "Page ii"
     REQUIRE(headers.find(2) != headers.end());
@@ -5777,7 +5807,7 @@ TEST_CASE("Layout2 - Header with # and .pn I (Roman uppercase)")
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
 
     // Verify page 2 has header with "Page II"
     REQUIRE(headers.find(2) != headers.end());
@@ -5812,7 +5842,7 @@ TEST_CASE("Layout2 - Multiple # in header")
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
 
     // Verify page 2 has header
     REQUIRE(headers.find(2) != headers.end());
@@ -5855,7 +5885,7 @@ TEST_CASE("Layout2 - .pn mid-document changes format")
     layout.SetDocument(&doc);
     layout.LayoutDocument(&doc);
 
-    const auto& headers = layout.GetPageHeaders();
+    const auto& headers = AllPageHeaders(layout);
 
     // Page 2: .pn i on page 2 means page 2 becomes "i" (logical 1)
     // Header from first .he: "Page i\r" = 7 chars (P-a-g-e-space-i-\r)
@@ -6838,6 +6868,7 @@ TEST_CASE("CalculateViewport - Viewport height calculation" * doctest::may_fail(
 #include "src/gui/editor/editorctrl.h"
 #include "src/core/document/document.h"
 #include <QScrollBar>
+
 
 /////////////////////////////////////////////////////////////////////////////
 //

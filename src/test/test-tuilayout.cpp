@@ -378,3 +378,135 @@ TEST_CASE("TUI layout - reveal codes never change the layout")
 
     layout.ShutdownFontSystem();
 }
+
+
+TEST_CASE("TUI layout - header / footer lines use the default font, not the end-of-document font")
+{
+    cDocument doc;
+    cLayout layout;
+    REQUIRE(layout.InitializeFontSystem());
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_NONE);
+
+    doc.Insert("Plain first line\r");
+    doc.Insert(".he Page Header\r.fo Page Footer\r");
+    for (int i = 0; i < 150; i++)
+    {
+        doc.Insert("Body text line for the TUI header font test.\r");
+    }
+    sInternalFonts big;
+    big.fontname = "Courier New";
+    big.name = "Courier New";
+    big.size = 18.0;
+    big.haveWSFont = false;
+    doc.InsertFont(big);
+    doc.BeginBold();
+    doc.Insert("big bold text left open\r");
+    layout.LayoutDocument(&doc);
+    REQUIRE(layout.GetNumberOfPages() >= 2);
+
+    const sLineLayout* first = layout.GetLineByRawLineNumber(layout.GetFirstLineOfParagraph(0));
+    REQUIRE(first != nullptr);
+    REQUIRE(first->segments.empty() == false);
+    std::string defaultFont = first->segments.front().font;
+
+    const auto& headers = layout.GetPageHeaders(2);
+    const auto& footers = layout.GetPageFooters(2);
+    REQUIRE(headers.empty() == false);
+    REQUIRE(footers.empty() == false);
+    for (const sSegmentLayout& seg : headers[0].line.segments)
+    {
+        CHECK(seg.font == defaultFont);
+    }
+    for (const sSegmentLayout& seg : footers[0].line.segments)
+    {
+        CHECK(seg.font == defaultFont);
+    }
+
+    layout.ShutdownFontSystem();
+}
+
+
+TEST_CASE("TUI layout - building header / footer lines leaves the layout state unchanged")
+{
+    cDocument doc;
+    cLayout layout;
+    REQUIRE(layout.InitializeFontSystem());
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_NONE);
+
+    sInternalFonts big;
+    big.fontname = "Courier New";
+    big.name = "Courier New";
+    big.size = 20.0;
+    big.haveWSFont = false;
+
+    // Header with its own font / bold codes; body formatting left open at the end
+    doc.Insert(".he Start ");
+    doc.InsertFont(big);
+    doc.BeginBold();
+    doc.Insert("Big Bold #\r");
+    doc.Insert(".fo Footer #\r");
+    for (int i = 0; i < 150; i++)
+    {
+        doc.Insert("Body text line for the TUI header state test.\r");
+    }
+    big.size = 18.0;
+    doc.InsertFont(big);
+    doc.BeginItalics();
+    doc.Insert("big italic text left open\r");
+    for (int i = 0; i < 150; i++)
+    {
+        doc.Insert("More body text in the open font.\r");
+    }
+    layout.WaitForFontEnumeration();
+    layout.LayoutDocument(&doc);
+    REQUIRE(layout.GetNumberOfPages() >= 4);
+
+    // Fonts and positions of every line of every paragraph
+    auto snapshot = [&](void)
+    {
+        std::vector<std::string> result;
+        for (PARAGRAPH_T para = 0; para < layout.GetNumberOfParagraphs(); ++para)
+        {
+            const sParagraphLayout* paraLayout = layout.GetParagraphLayout(para);
+            REQUIRE(paraLayout != nullptr);
+            for (const sLineLayout& line : paraLayout->lines)
+            {
+                std::string text = std::to_string(para) + ":" + std::to_string(line.pagenumber) + ":" +
+                                   std::to_string(line.pagey);
+                for (const sSegmentLayout& seg : line.segments)
+                {
+                    text += "|" + seg.font;
+                    for (COORD_T pos : seg.position)
+                    {
+                        text += "," + std::to_string(pos);
+                    }
+                }
+                result.push_back(text);
+            }
+        }
+        return result;
+    };
+
+    std::string plainBefore = layout.GetFontWithFormatting(false, false, false);
+    std::vector<sHeaderFooterLine> headers = layout.GetPageHeaders(2);
+    REQUIRE(headers.empty() == false);
+    REQUIRE(headers[0].line.segments.empty() == false);
+    CHECK(headers[0].line.segments.back().font.find("|20.0|1|") != std::string::npos);
+    CHECK(layout.GetFontWithFormatting(false, false, false) == plainBefore);
+
+    // Building in the middle of an incremental layout does not change it
+    std::vector<std::string> expected = snapshot();
+    PAGE_T pages = layout.GetNumberOfPages();
+    for (PARAGRAPH_T para = 0; para < layout.GetNumberOfParagraphs(); ++para)
+    {
+        layout.LayoutParagraph(para);
+        PAGE_T page = (para % pages) + 1;
+        layout.GetPageHeaders(page);
+        layout.GetPageFooters(page);
+    }
+    CHECK(snapshot() == expected);
+
+    layout.ShutdownFontSystem();
+}

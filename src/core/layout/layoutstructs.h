@@ -116,6 +116,9 @@ struct sPageInfo
     COORD_T rightmargin;            // pages's right margin (real margin size, not width of print space i.e. 1440 for 1 inch margin)
     COORD_T headermargin;           // page's header margin
     COORD_T footermargin;           // page's footer margin
+    COORD_T pageoffset = 0;         // page offset (odd / even) when the page started
+    bool printPageNumbers = false;  // automatic page numbers (.PG) in effect when the page started
+    COORD_T pageNumberColumn = 0;   // column of the automatic page number (.PC), 0 = centered
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -390,16 +393,13 @@ struct sLineLayout
     POSITION_T linestart;                   // Start position in paragraph (grapheme index, paragraph-relative)
     POSITION_T documentPosition;            // Absolute document position where line starts (used for caret navigation)
 
-    // Header/footer template use only; not compared in IsEqualTo().
-    bool appliesSamePage;
-
     // Constructor
     sLineLayout() : left(true), center(false), right(false), justify(false),
                      centerLine(false), rightLine(false),
                      pagex(0), pagey(0), screeny(0),
                      pagenumber(0), pageLineNumber(0), contentLineNumber(0), rawLineNumber(0),
                      lineheight(0), cumalativeheight(0), isPrintable(true),
-                     boxIndex(-1), linestart(0), documentPosition(0), appliesSamePage(false) {}
+                     boxIndex(-1), linestart(0), documentPosition(0) {}
 
     // Equality comparison for layout change detection (Phase 4: incremental layout)
     bool IsEqualTo(PARAGRAPH_T paragraphNum, LINE_T lineNum, const sLineLayout& other) const;
@@ -409,6 +409,43 @@ struct sLineLayout
     COORD_T DecorationWidth(void) const;
     COORD_T LayoutEndX(void) const;
 };
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @enum eHeaderFooterSide
+///
+/// @brief
+/// Pages a header / footer definition applies to (.HE / .HEE / .HEO).
+///
+/////////////////////////////////////////////////////////////////////////////
+enum eHeaderFooterSide
+{
+    HF_SIDE_BOTH,
+    HF_SIDE_EVEN,
+    HF_SIDE_ODD
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @struct sHeaderFooterDefinition
+///
+/// @brief
+/// One stored header / footer definition (a .HE / .FO / .Hn / .Fn command)
+/// with the settings in effect where it was defined.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sHeaderFooterDefinition
+{
+    PAGE_T page = 0;                        // Page holding the definition
+    POSITION_T startPos = 0;                // Position of the text within the defining paragraph
+    COORD_T lineHeight = 0;                 // Explicit .LH at the definition (0 = automatic)
+    eHeaderFooterSide side = HF_SIDE_BOTH;  // Pages it applies to
+    bool isHeader = true;                   // Header (.HE / .Hn) or footer (.FO / .Fn)
+    int number = 0;                         // Slot 1-5 (H1-H5 / F1-F5)
+    bool appliesSamePage = false;           // Defined on a page's first line: applies to that page too
+};
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -460,6 +497,10 @@ struct sParagraphLayout
     COORD_T endCumulativeHeight;            // Cumulative height after this paragraph
     COORD_T endScreenY;                     // Continuous screen Y after this paragraph
     COORD_T endBoxY;                        // Box fill position (relative to box.top) after this paragraph
+
+    // Header / footer defined by this paragraph (.HE / .FO / .Hn / .Fn)
+    bool hasHeaderFooter = false;
+    sHeaderFooterDefinition headerFooter;
 
     // Constructor
     sParagraphLayout() : number(0), pageBreak(false),

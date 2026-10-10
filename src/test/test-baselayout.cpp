@@ -18,6 +18,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include <numeric>
 #include "doctest.h"
 
 #include "src/gui/layout/layout.h"
@@ -28,6 +29,53 @@
 #include "src/core/layout/layoutstate.h"
 #include "src/core/include/config.h"
 #include <QApplication>
+
+// Headers / footers of every page of a layout, by page (pages without lines are left out)
+namespace
+{
+
+// Joined grapheme text of every header (or footer) line on a page
+std::string HeaderFooterText(const std::vector<sHeaderFooterLine>& lines)
+{
+    std::string text;
+    for (const sHeaderFooterLine& line : lines)
+    {
+        text = std::accumulate(line.graphemes.begin(), line.graphemes.end(), text);
+        text += "|";
+    }
+    return text;
+}
+
+}
+
+static std::map<PAGE_T, std::vector<sHeaderFooterLine>> AllPageHeaders(cLayoutBase& layout)
+{
+    std::map<PAGE_T, std::vector<sHeaderFooterLine>> all;
+    for (PAGE_T page = 1; page <= layout.GetNumberOfPages(); ++page)
+    {
+        std::vector<sHeaderFooterLine> lines = layout.GetPageHeaders(page);
+        if (lines.empty() == false)
+        {
+            all[page] = std::move(lines);
+        }
+    }
+    return all;
+}
+
+static std::map<PAGE_T, std::vector<sHeaderFooterLine>> AllPageFooters(cLayoutBase& layout)
+{
+    std::map<PAGE_T, std::vector<sHeaderFooterLine>> all;
+    for (PAGE_T page = 1; page <= layout.GetNumberOfPages(); ++page)
+    {
+        std::vector<sHeaderFooterLine> lines = layout.GetPageFooters(page);
+        if (lines.empty() == false)
+        {
+            all[page] = std::move(lines);
+        }
+    }
+    return all;
+}
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -4327,6 +4375,7 @@ TEST_CASE("Subscript/Superscript Segment Attributes")
 #include <sstream>
 #include <iomanip>
 
+
 // External globals
 extern QApplication *gApp;
 
@@ -8530,7 +8579,7 @@ TEST_CASE("Layout - Even/odd headers with .HEE and .HEO")
     CHECK(layout->GetNumberOfPages() >= 3);
 
     // Headers should be generated
-    const auto& headers = layout->GetPageHeaders();
+    const auto& headers = AllPageHeaders(*layout);
     CHECK(!headers.empty());
 }
 
@@ -8545,7 +8594,7 @@ TEST_CASE("Layout - .HE at top of page 1 applies to page 1 itself (WS7: before a
     doc->Insert("Body text on page one\r");
     layout->LayoutDocument(doc);
 
-    const auto& headers = layout->GetPageHeaders();
+    const auto& headers = AllPageHeaders(*layout);
     auto it = headers.find(1);
     REQUIRE(it != headers.end());
     CHECK(!it->second.empty());
@@ -8566,7 +8615,7 @@ TEST_CASE("Layout - .HE after body text on a page defers to the next page")
     layout->LayoutDocument(doc);
 
     CHECK(layout->GetNumberOfPages() >= 2);
-    const auto& headers = layout->GetPageHeaders();
+    const auto& headers = AllPageHeaders(*layout);
     CHECK(headers.find(1) == headers.end());
     auto it2 = headers.find(2);
     REQUIRE(it2 != headers.end());
@@ -8583,7 +8632,7 @@ TEST_CASE("Layout - .pg on with no .fo defined synthesizes an automatic page num
     doc->Insert("Body text on page one\r");
     layout->LayoutDocument(doc);
 
-    const auto& footers = layout->GetPageFooters();
+    const auto& footers = AllPageFooters(*layout);
     auto it = footers.find(1);
     REQUIRE(it != footers.end());
     CHECK(!it->second.empty());
@@ -8600,7 +8649,7 @@ TEST_CASE("Layout - a real .fo footer suppresses the automatic page number")
     doc->Insert("Body text on page one\r");
     layout->LayoutDocument(doc);
 
-    const auto& footers = layout->GetPageFooters();
+    const auto& footers = AllPageFooters(*layout);
     auto it = footers.find(1);
     REQUIRE(it != footers.end());
     // Only the one real .FO line -- no duplicate automatic page number appended.
@@ -8618,7 +8667,7 @@ TEST_CASE("Layout - .op omits the automatic page number")
     doc->Insert("Body text on page one\r");
     layout->LayoutDocument(doc);
 
-    const auto& footers = layout->GetPageFooters();
+    const auto& footers = AllPageFooters(*layout);
     auto it = footers.find(1);
     if (it != footers.end())
     {
@@ -8635,7 +8684,7 @@ TEST_CASE("Layout - .pc n shifts the automatic page number away from centered")
 
     doc->Insert("Body text on page one\r");
     layout->LayoutDocument(doc);
-    const auto& centeredFooters = layout->GetPageFooters();
+    const auto& centeredFooters = AllPageFooters(*layout);
     REQUIRE(centeredFooters.find(1) != centeredFooters.end());
     REQUIRE(!centeredFooters.at(1).empty());
     COORD_T centeredX = centeredFooters.at(1)[0].line.pagex;
@@ -8647,7 +8696,7 @@ TEST_CASE("Layout - .pc n shifts the automatic page number away from centered")
     doc2->Insert(".PC 1\"\r");
     doc2->Insert("Body text on page one\r");
     layout2->LayoutDocument(doc2);
-    const auto& shiftedFooters = layout2->GetPageFooters();
+    const auto& shiftedFooters = AllPageFooters(*layout2);
     REQUIRE(shiftedFooters.find(1) != shiftedFooters.end());
     REQUIRE(!shiftedFooters.at(1).empty());
     COORD_T shiftedX = shiftedFooters.at(1)[0].line.pagex;
@@ -10001,7 +10050,7 @@ TEST_CASE("Layout L10a: Even/odd footers stored and retrieved correctly")
     CHECK(layout->GetNumberOfPages() >= 3);
 
     // Footers should be generated
-    const auto& footers = layout->GetPageFooters();
+    const auto& footers = AllPageFooters(*layout);
     CHECK(!footers.empty());
 }
 
@@ -10021,7 +10070,7 @@ TEST_CASE("Layout L10b: Header with tab-separated alignment")
     layout->LayoutDocument(doc);
 
     CHECK(layout->GetNumberOfPages() >= 2);
-    const auto& headers = layout->GetPageHeaders();
+    const auto& headers = AllPageHeaders(*layout);
     CHECK(!headers.empty());
 }
 
@@ -13211,3 +13260,1005 @@ TEST_CASE("Reveal codes: the end-of-file marker is never displayed")
         }
     }
 }
+
+TEST_CASE("Headers and footers survive re-layout")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert(".he Top Header\r");
+    doc->Insert(".h2 Second Header\r");
+    doc->Insert(".fo Bottom Footer\r");
+    doc->Insert(".f3 Third Footer\r");
+    for (int i = 0; i < 150; i++)
+    {
+        doc->Insert("Body text for the header re-layout test.\r");
+    }
+    layout->LayoutDocument(doc);
+    REQUIRE(layout->GetNumberOfPages() >= 2);
+
+    // headers / footers apply from the page after the one that defines them
+    auto checkAllPages = [&](const std::string& header)
+    {
+        for (PAGE_T page = 2; page <= layout->GetNumberOfPages(); ++page)
+        {
+            CAPTURE(page);
+            std::string headers = HeaderFooterText(layout->GetPageHeaders(page));
+            std::string footers = HeaderFooterText(layout->GetPageFooters(page));
+            CHECK(headers.find(header) != std::string::npos);
+            CHECK(headers.find("Second Header") != std::string::npos);
+            CHECK(footers.find("Bottom Footer") != std::string::npos);
+            CHECK(footers.find("Third Footer") != std::string::npos);
+        }
+    };
+
+    SUBCASE("first layout")
+    {
+        checkAllPages("Top Header");
+    }
+
+    SUBCASE("second full layout")
+    {
+        layout->LayoutDocument(doc);
+        checkAllPages("Top Header");
+    }
+
+    SUBCASE("incremental re-layout after a body edit")
+    {
+        doc->SetPosition(doc->GetTextSize() - 10);
+        editor.InsertText("x");
+        editor.PerformPostCommandUpdate();
+        layout->LayoutDocument(doc);
+        checkAllPages("Top Header");
+    }
+
+    SUBCASE("editing the header line re-lays it out with the new text")
+    {
+        doc->SetPosition(4);                    // before "Top"
+        editor.InsertText("New ");
+        editor.PerformPostCommandUpdate();
+        layout->LayoutDocument(doc);
+        checkAllPages("New Top Header");
+    }
+
+    SUBCASE("re-laying out the header paragraph on its own keeps the text")
+    {
+        layout->LayoutParagraph(0);
+        layout->LayoutDocument(doc);
+        checkAllPages("Top Header");
+    }
+}
+
+
+TEST_CASE("Header / footer numbers: redefinition and all five slots")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    auto body = [&](int lines)
+    {
+        for (int i = 0; i < lines; i++)
+        {
+            doc->Insert("Body text line for header numbering.\r");
+        }
+    };
+
+    SUBCASE("redefining the same header number later replaces it on later pages only")
+    {
+        doc->Insert(".he First Header\r");
+        body(120);
+        doc->Insert(".pa\r");
+        doc->Insert(".he Second Header\r");
+        body(120);
+        layout->LayoutDocument(doc);
+        PAGE_T pages = layout->GetNumberOfPages();
+        REQUIRE(pages >= 5);
+
+        std::string last = HeaderFooterText(layout->GetPageHeaders(pages));
+        CHECK(last.find("Second Header") != std::string::npos);
+        CHECK(last.find("First Header") == std::string::npos);
+        CHECK(HeaderFooterText(layout->GetPageHeaders(2)).find("First Header") != std::string::npos);
+
+        // the same result on a second layout
+        layout->LayoutDocument(doc);
+        CHECK(HeaderFooterText(layout->GetPageHeaders(pages)).find("Second Header") != std::string::npos);
+        CHECK(HeaderFooterText(layout->GetPageHeaders(2)).find("First Header") != std::string::npos);
+    }
+
+    SUBCASE("H1-H5 and F1-F5 are independent slots")
+    {
+        doc->Insert(".h1 HeadOne\r.h2 HeadTwo\r.h3 HeadThree\r.h4 HeadFour\r.h5 HeadFive\r");
+        doc->Insert(".f1 FootOne\r.f2 FootTwo\r.f3 FootThree\r.f4 FootFour\r.f5 FootFive\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 2);
+
+        std::string headers = HeaderFooterText(layout->GetPageHeaders(2));
+        std::string footers = HeaderFooterText(layout->GetPageFooters(2));
+        for (const char* text : { "HeadOne", "HeadTwo", "HeadThree", "HeadFour", "HeadFive" })
+        {
+            CAPTURE(text);
+            CHECK(headers.find(text) != std::string::npos);
+        }
+        for (const char* text : { "FootOne", "FootTwo", "FootThree", "FootFour", "FootFive" })
+        {
+            CAPTURE(text);
+            CHECK(footers.find(text) != std::string::npos);
+        }
+        CHECK(layout->GetPageHeaders(2).size() == 5);
+        CHECK(layout->GetPageFooters(2).size() == 5);
+    }
+
+    SUBCASE("a header command does not leak its number into a following footer")
+    {
+        doc->Insert(".h3 OnlyHeaderThree\r");
+        doc->Insert(".fo PlainFooter\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 2);
+        CHECK(layout->GetPageHeaders(2).size() == 1);
+        CHECK(layout->GetPageFooters(2).size() == 1);
+        CHECK(HeaderFooterText(layout->GetPageFooters(2)).find("PlainFooter") != std::string::npos);
+    }
+
+    SUBCASE("even / odd variants of a numbered header")
+    {
+        doc->Insert(".h2e EvenTwo\r.h2o OddTwo\r");
+        body(250);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 4);
+        CHECK(HeaderFooterText(layout->GetPageHeaders(2)).find("EvenTwo") != std::string::npos);
+        CHECK(HeaderFooterText(layout->GetPageHeaders(3)).find("OddTwo") != std::string::npos);
+        CHECK(HeaderFooterText(layout->GetPageHeaders(4)).find("EvenTwo") != std::string::npos);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Headers and footers are placed with the geometry of their own page
+/// (margins, page offset, line height in effect when the page started), not
+/// the state left at the end of the layout.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Header / footer placement uses each page's own geometry")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    auto body = [&](int lines)
+    {
+        for (int i = 0; i < lines; i++)
+        {
+            doc->Insert("Body text line for header geometry.\r");
+        }
+    };
+
+    // every page: headers / footers are placed with that page's pageInfo and
+    // stacked by each line's own line height
+    auto checkPage = [&](PAGE_T page)
+    {
+        CAPTURE(page);
+        sPageInfo info = layout->GetPageInfo(page);
+        const auto& headers = layout->GetPageHeaders(page);
+        const auto& footers = layout->GetPageFooters(page);
+        REQUIRE(headers.size() == 2);
+        REQUIRE(footers.size() == 2);
+
+        CHECK(headers[0].line.lineheight > 0);
+        CHECK(headers[0].line.pagey == info.topmargin - info.headermargin);
+        CHECK(headers[1].line.pagey - headers[0].line.pagey == headers[0].line.lineheight);
+        CHECK(headers[0].line.pagex == info.pageoffset + info.leftmargin);
+
+        COORD_T footerBottom = info.paperheight - info.bottommargin + info.footermargin;
+        CHECK(footers[0].line.pagey == footerBottom - footers[0].line.lineheight);
+        CHECK(footers[1].line.pagey == footers[0].line.pagey - footers[1].line.lineheight);
+        CHECK(footers[0].line.pagex == info.pageoffset + info.leftmargin);
+    };
+
+    SUBCASE("explicit line height changed partway through (the header keeps its definition's .lh)")
+    {
+        doc->Insert(".lh 24\r.he Head One\r.h2 Head Two\r.fo Foot One\r.f2 Foot Two\r");
+        body(120);
+        doc->Insert(".pa\r.lh 12\r");
+        body(120);
+        layout->LayoutDocument(doc);
+        PAGE_T pages = layout->GetNumberOfPages();
+        REQUIRE(pages >= 4);
+
+        for (PAGE_T page = 2; page <= pages; ++page)
+        {
+            checkPage(page);
+        }
+
+        // .lh is in 1/48 inch (30 twips): the headers were defined under .lh 24 (720),
+        // so the later .lh 12 does not change them
+        CHECK(layout->GetPageHeaders(2)[0].line.lineheight == 720);
+        CHECK(layout->GetPageFooters(2)[0].line.lineheight == 720);
+        CHECK(layout->GetPageHeaders(pages)[0].line.lineheight == 720);
+        CHECK(layout->GetPageFooters(pages)[0].line.lineheight == 720);
+    }
+
+    SUBCASE("margins and page offset changed partway through")
+    {
+        doc->Insert(".he Head One\r.h2 Head Two\r.fo Foot One\r.f2 Foot Two\r");
+        body(120);
+        doc->Insert(".pa\r.mt 2i\r.mb 2i\r.po 2i\r");
+        body(120);
+        layout->LayoutDocument(doc);
+        PAGE_T pages = layout->GetNumberOfPages();
+        REQUIRE(pages >= 4);
+
+        for (PAGE_T page = 2; page <= pages; ++page)
+        {
+            checkPage(page);
+        }
+
+        sPageInfo early = layout->GetPageInfo(2);
+        sPageInfo late = layout->GetPageInfo(pages);
+        CHECK(early.topmargin == 1440);
+        CHECK(late.topmargin == 2880);
+        CHECK(early.bottommargin == 1440);
+        CHECK(late.bottommargin == 2880);
+        CHECK(early.pageoffset == 1440);
+        CHECK(late.pageoffset == 2880);
+
+        // the early page's header / footer are not moved by the later changes
+        CHECK(layout->GetPageHeaders(2)[0].line.pagey == 1440 - early.headermargin);
+        CHECK(layout->GetPageHeaders(2)[0].line.pagex == 1440 + early.leftmargin);
+        CHECK(layout->GetPageHeaders(pages)[0].line.pagex == 2880 + late.leftmargin);
+    }
+
+    SUBCASE("automatic line height: each header / footer line uses its own font")
+    {
+        sInternalFonts bigFont;
+        bigFont.fontname = "Courier New";
+        bigFont.name = "Courier New";
+        bigFont.size = 24.0;
+        bigFont.haveWSFont = false;
+        sInternalFonts normalFont = bigFont;
+        normalFont.size = 12.0;
+
+        // the big font is switched back inside the header line (fonts carry over)
+        doc->Insert(".he ");
+        doc->InsertFont(bigFont);
+        doc->Insert("Big Header");
+        doc->InsertFont(normalFont);
+        doc->Insert("\r");
+        doc->Insert(".h2 Plain Header\r.fo Foot One\r.f2 Foot Two\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 2);
+
+        checkPage(2);
+
+        const auto& headers = layout->GetPageHeaders(2);
+        const auto& footers = layout->GetPageFooters(2);
+        COORD_T plainHeight = layout->GetFontLineSpacing(headers[1].line.segments.front().font);
+        CHECK(headers[1].line.lineheight == plainHeight);
+        CHECK(footers[0].line.lineheight == plainHeight);
+        CHECK(headers[0].line.lineheight > plainHeight);
+
+        // the plain second header sits one big-font line below the first
+        CHECK(headers[1].line.pagey - headers[0].line.pagey == headers[0].line.lineheight);
+    }
+
+    SUBCASE("explicit line height applies to a header in a large font")
+    {
+        sInternalFonts bigFont;
+        bigFont.fontname = "Courier New";
+        bigFont.name = "Courier New";
+        bigFont.size = 24.0;
+        bigFont.haveWSFont = false;
+
+        doc->Insert(".lh 10\r.he ");
+        doc->InsertFont(bigFont);
+        doc->Insert("Big Header\r");
+        doc->Insert(".h2 Plain Header\r.fo Foot One\r.f2 Foot Two\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 2);
+
+        checkPage(2);
+        CHECK(layout->GetPageHeaders(2)[0].line.lineheight == 300);
+        CHECK(layout->GetPageHeaders(2)[1].line.lineheight == 300);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// .lh is not retroactive: it applies to the lines after it only, including
+/// on the same page; lines above it keep their height.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE(".lh affects only the lines after it")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    // paragraphs 0-2 "A", 3 ".lh 24", 4-6 "B", 7 ".lh +6", 8-9 "C", 10 ".ls 2", 11 "D"
+    doc->Insert("A one\rA two\rA three\r");
+    doc->Insert(".lh 24\r");
+    doc->Insert("B one\rB two\rB three\r");
+    doc->Insert(".lh +6\r");
+    doc->Insert("C one\rC two\r");
+    doc->Insert(".ls 2\r");
+    doc->Insert("D one\r");
+    layout->SetShowControl(SHOW_NONE);
+    layout->LayoutDocument(doc);
+
+    auto lineOf = [&](PARAGRAPH_T para) -> const sLineLayout*
+    {
+        return layout->GetLineByRawLineNumber(layout->GetFirstLineOfParagraph(para));
+    };
+    auto heightOf = [&](PARAGRAPH_T para)
+    {
+        const sLineLayout* line = lineOf(para);
+        REQUIRE(line != nullptr);
+        return line->lineheight;
+    };
+
+    COORD_T automatic = heightOf(0);
+
+    SUBCASE("lines before the first .lh keep the automatic height")
+    {
+        CHECK(automatic > 0);
+        CHECK(automatic != 720);
+        CHECK(heightOf(1) == automatic);
+        CHECK(heightOf(2) == automatic);
+    }
+
+    SUBCASE("lines after .lh 24 are 720 twips (24 / 48 inch)")
+    {
+        CHECK(heightOf(4) == 720);
+        CHECK(heightOf(5) == 720);
+        CHECK(heightOf(6) == 720);
+    }
+
+    SUBCASE("a relative .lh +6 applies from its position (30 / 48 inch)")
+    {
+        CHECK(heightOf(8) == 900);
+        CHECK(heightOf(9) == 900);
+        CHECK(heightOf(6) == 720);
+    }
+
+    SUBCASE(".ls 2 doubles the lines after it, using the current .lh")
+    {
+        CHECK(heightOf(11) == 1800);
+        CHECK(heightOf(9) == 900);
+    }
+
+    SUBCASE("lines follow each other with their own heights on the same page")
+    {
+        REQUIRE(lineOf(2)->pagenumber == lineOf(4)->pagenumber);
+        CHECK(lineOf(1)->pagey - lineOf(0)->pagey == automatic);
+        CHECK(lineOf(4)->pagey - lineOf(2)->pagey == automatic);
+        CHECK(lineOf(5)->pagey - lineOf(4)->pagey == 720);
+    }
+
+    SUBCASE("the same without .lh: nothing before it changes")
+    {
+        cEditorCtrl plainEditor;
+        cDocument* plain = plainEditor.GetDocument();
+        cLayout* plainLayout = dynamic_cast<cLayout*>(plainEditor.GetLayout());
+        plain->Insert("A one\rA two\rA three\r");
+        plainLayout->SetShowControl(SHOW_NONE);
+        plainLayout->LayoutDocument(plain);
+        for (PARAGRAPH_T para = 0; para < 3; ++para)
+        {
+            const sLineLayout* line = plainLayout->GetLineByRawLineNumber(plainLayout->GetFirstLineOfParagraph(para));
+            REQUIRE(line != nullptr);
+            CHECK(line->lineheight == heightOf(para));
+            CHECK(line->pagey == lineOf(para)->pagey);
+        }
+    }
+
+    SUBCASE("incremental re-layout after an edit keeps each line's height")
+    {
+        doc->SetPosition(doc->GetTextSize() - 3);
+        editor.InsertText("x");
+        editor.PerformPostCommandUpdate();
+        CHECK(heightOf(0) == automatic);
+        CHECK(heightOf(5) == 720);
+        CHECK(heightOf(9) == 900);
+
+        // an edit above the .lh re-lays out from there and keeps both sides
+        doc->SetPosition(2);
+        editor.InsertText("y");
+        editor.PerformPostCommandUpdate();
+        CHECK(heightOf(0) == automatic);
+        CHECK(heightOf(4) == 720);
+        CHECK(heightOf(8) == 900);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Header / footer lines use only the document default font and their own
+/// codes; their codes don't leak out; the .lh in effect at their definition
+/// applies.
+///
+/////////////////////////////////////////////////////////////////////////////
+namespace
+{
+
+sInternalFonts MakeTestFont(double size)
+{
+    sInternalFonts font;
+    font.fontname = "Courier New";
+    font.name = "Courier New";
+    font.size = size;
+    font.haveWSFont = false;
+    return font;
+}
+
+// Font descriptors of every segment of a page's header (or footer) lines
+std::vector<std::string> SegmentFonts(const std::vector<sHeaderFooterLine>& lines, size_t index)
+{
+    std::vector<std::string> fonts;
+    if (index < lines.size())
+    {
+        std::transform(lines[index].line.segments.begin(), lines[index].line.segments.end(),
+                       std::back_inserter(fonts),
+                       [](const sSegmentLayout& seg) { return seg.font; });
+    }
+    return fonts;
+}
+
+}
+
+TEST_CASE("Header / footer lines use only the default font and their own codes")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetShowControl(SHOW_NONE);
+
+    auto body = [&](int lines)
+    {
+        for (int i = 0; i < lines; i++)
+        {
+            doc->Insert("Body text line for header font rules.\r");
+        }
+    };
+
+    // the default font as the layout writes it: the font of a plain body paragraph
+    auto defaultFontOf = [&](PARAGRAPH_T plainParagraph)
+    {
+        const sLineLayout* line = layout->GetLineByRawLineNumber(layout->GetFirstLineOfParagraph(plainParagraph));
+        REQUIRE(line != nullptr);
+        REQUIRE(line->segments.empty() == false);
+        return line->segments.front().font;
+    };
+
+    SUBCASE("formatting left open at the end of the document does not reach headers / footers")
+    {
+        doc->Insert(".he Page Header\r.fo Page Footer\r");
+        body(150);
+        sInternalFonts big = MakeTestFont(18.0);
+        doc->InsertFont(big);
+        doc->BeginBold();
+        doc->Insert("big bold text left open\r");
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 2);
+
+        std::string defaultFont = defaultFontOf(2);
+        for (PAGE_T page = 2; page <= layout->GetNumberOfPages(); ++page)
+        {
+            CAPTURE(page);
+            for (const std::string& font : SegmentFonts(layout->GetPageHeaders(page), 0))
+            {
+                CHECK(font == defaultFont);
+            }
+            for (const std::string& font : SegmentFonts(layout->GetPageFooters(page), 0))
+            {
+                CHECK(font == defaultFont);
+            }
+        }
+    }
+
+    SUBCASE("a font change before .he does not affect the header")
+    {
+        sInternalFonts big = MakeTestFont(18.0);
+        sInternalFonts normal = MakeTestFont(12.0);
+        doc->Insert("Plain first line\r");
+        doc->InsertFont(big);
+        doc->Insert("Big text before the header\r");
+        doc->Insert(".he Page Header\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 2);
+        std::string defaultFont = defaultFontOf(0);
+        std::vector<std::string> fonts = SegmentFonts(layout->GetPageHeaders(2), 0);
+        REQUIRE(fonts.empty() == false);
+        for (const std::string& font : fonts)
+        {
+            CHECK(font == defaultFont);
+        }
+        UNUSED_ARGUMENT(normal);
+    }
+
+    SUBCASE("codes inside a header line apply to that line only")
+    {
+        sInternalFonts big = MakeTestFont(20.0);
+        doc->Insert("Plain first line\r");
+        doc->Insert(".he Start ");
+        doc->InsertFont(big);
+        doc->BeginBold();
+        doc->Insert("Big Bold\r");
+        doc->Insert(".h2 Second Header\r");
+        doc->Insert(".fo Plain Footer\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 2);
+
+        std::string defaultFont = defaultFontOf(0);
+        std::vector<std::string> first = SegmentFonts(layout->GetPageHeaders(2), 0);
+        REQUIRE(first.size() >= 2);
+        CHECK(first.front() == defaultFont);
+        CHECK(first.back().find("|20.0|1|") != std::string::npos);
+
+        // the next header and the footer start fresh
+        std::vector<std::string> second = SegmentFonts(layout->GetPageHeaders(2), 1);
+        std::vector<std::string> footer = SegmentFonts(layout->GetPageFooters(2), 0);
+        REQUIRE(second.empty() == false);
+        REQUIRE(footer.empty() == false);
+        for (const std::string& font : second)
+        {
+            CHECK(font == defaultFont);
+        }
+        for (const std::string& font : footer)
+        {
+            CHECK(font == defaultFont);
+        }
+    }
+
+    SUBCASE("header codes do not leak into the body layout")
+    {
+        doc->Insert("Body before\r");
+        layout->LayoutDocument(doc);
+        const sLineLayout* before = layout->GetLineByRawLineNumber(0);
+        REQUIRE(before != nullptr);
+        std::string bodyFont = before->segments.front().font;
+
+        doc->SetPosition(0);
+        sInternalFonts huge = MakeTestFont(22.0);
+        doc->Insert(".he ");
+        doc->InsertFont(huge);
+        doc->BeginBold();
+        doc->Insert("Open header codes\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        layout->LayoutDocument(doc);            // a second pass starts after the headers were built
+        PARAGRAPH_T lastPara = doc->GetNumberofParagraphs() - 1;
+        const sLineLayout* last = layout->GetLineByRawLineNumber(layout->GetFirstLineOfParagraph(lastPara - 1));
+        REQUIRE(last != nullptr);
+        CHECK(last->segments.front().font.find("|22.0|") == std::string::npos);
+
+        // the body after the header paragraph is laid out in the default font
+        const sLineLayout* firstBody = layout->GetLineByRawLineNumber(layout->GetFirstLineOfParagraph(1));
+        REQUIRE(firstBody != nullptr);
+        CHECK(firstBody->segments.front().font == bodyFont);
+    }
+
+    SUBCASE("the .lh in effect at the definition applies; a later .lh does not")
+    {
+        doc->Insert(".lh 24\r.he Head One\r.h2 Head Two\r.fo Foot One\r");
+        body(60);
+        doc->Insert(".lh 12\r");
+        body(200);
+        layout->LayoutDocument(doc);
+        PAGE_T pages = layout->GetNumberOfPages();
+        REQUIRE(pages >= 4);
+
+        for (PAGE_T page = 2; page <= pages; ++page)
+        {
+            CAPTURE(page);
+            const auto& headers = layout->GetPageHeaders(page);
+            const auto& footers = layout->GetPageFooters(page);
+            CHECK(headers[0].line.lineheight == 720);
+            CHECK(headers[1].line.pagey - headers[0].line.pagey == 720);
+            CHECK(footers[0].line.lineheight == 720);
+        }
+    }
+
+    SUBCASE("a .lh set only after the header is defined does not affect it")
+    {
+        doc->Insert(".he Head One\r.fo Foot One\r");
+        body(20);
+        doc->Insert(".lh 30\r");
+        body(200);
+        layout->LayoutDocument(doc);
+        PAGE_T pages = layout->GetNumberOfPages();
+        REQUIRE(pages >= 3);
+        COORD_T automatic = layout->GetFontLineSpacing(defaultFontOf(2));
+        CHECK(layout->GetPageHeaders(pages)[0].line.lineheight == automatic);
+        CHECK(layout->GetPageFooters(pages)[0].line.lineheight == automatic);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// A header / footer stays in effect until it is redefined: every page shows
+/// the latest definition made on an earlier page.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Header / footer redefinition keeps earlier pages")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetShowControl(SHOW_NONE);
+
+    auto body = [&](int lines)
+    {
+        for (int i = 0; i < lines; i++)
+        {
+            doc->Insert("Body text line for header redefinition.\r");
+        }
+    };
+    // page of the first line of the last paragraph so far
+    auto pageOfLastParagraph = [&]()
+    {
+        PARAGRAPH_T para = doc->GetNumberofParagraphs() - 1;
+        const sLineLayout* line = layout->GetLineByRawLineNumber(layout->GetFirstLineOfParagraph(para));
+        REQUIRE(line != nullptr);
+        return line->pagenumber;
+    };
+    auto headerOn = [&](PAGE_T page)
+    {
+        return HeaderFooterText(layout->GetPageHeaders(page));
+    };
+    auto footerOn = [&](PAGE_T page)
+    {
+        return HeaderFooterText(layout->GetPageFooters(page));
+    };
+
+    SUBCASE("each page shows the definition in effect before it")
+    {
+        doc->Insert(".he First Header\r.fo First Footer\r");
+        body(120);
+        doc->Insert(".pa\r.he Second Header\r.fo Second Footer\r");
+        body(120);
+        doc->Insert(".pa\r.he Third Header\r");
+        body(60);
+        layout->LayoutDocument(doc);
+
+        // definition pages
+        PAGE_T pages = layout->GetNumberOfPages();
+        REQUIRE(pages >= 6);
+        PAGE_T secondPage = 0;
+        PAGE_T thirdPage = 0;
+        // (dot lines have no layout line: use the first body paragraph after the definition)
+        auto definitionPage = [&](const std::string& prefix)
+        {
+            PAGE_T found = 0;
+            bool seen = false;
+            for (PARAGRAPH_T para = 0; para < doc->GetNumberofParagraphs() && found == 0; ++para)
+            {
+                std::string text = doc->GetParagraphText(para);
+                if (text.rfind(prefix, 0) == 0)
+                {
+                    seen = true;
+                }
+                else if (seen && text.empty() == false && text[0] != '.')
+                {
+                    const sLineLayout* line = layout->GetLineByRawLineNumber(layout->GetFirstLineOfParagraph(para));
+                    if (line != nullptr)
+                    {
+                        found = line->pagenumber;
+                    }
+                }
+            }
+            return found;
+        };
+        secondPage = definitionPage(".he Second");
+        thirdPage = definitionPage(".he Third");
+        REQUIRE(secondPage > 2);
+        REQUIRE(thirdPage > secondPage);
+
+        for (PAGE_T page = 2; page <= pages; ++page)
+        {
+            CAPTURE(page);
+            // a definition ahead of the page's text applies to that page
+            if (page < secondPage)
+            {
+                CHECK(headerOn(page).find("First Header") != std::string::npos);
+                CHECK(footerOn(page).find("First Footer") != std::string::npos);
+            }
+            else if (page < thirdPage)
+            {
+                CHECK(headerOn(page).find("Second Header") != std::string::npos);
+                CHECK(footerOn(page).find("Second Footer") != std::string::npos);
+            }
+            else
+            {
+                CHECK(headerOn(page).find("Third Header") != std::string::npos);
+                CHECK(footerOn(page).find("Second Footer") != std::string::npos);
+            }
+            CHECK(layout->GetPageHeaders(page).size() == 1);
+            CHECK(layout->GetPageFooters(page).size() == 1);
+        }
+
+        // the same after a second full layout (no duplicates, same pages)
+        layout->LayoutDocument(doc);
+        CHECK(headerOn(2).find("First Header") != std::string::npos);
+        CHECK(headerOn(pages).find("Third Header") != std::string::npos);
+        CHECK(layout->GetPageHeaders(2).size() == 1);
+    }
+
+    SUBCASE("editing a header line: incremental re-layout updates the pages")
+    {
+        doc->Insert(".he Old Header\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 2);
+        REQUIRE(headerOn(2).find("Old Header") != std::string::npos);
+
+        doc->SetPosition(4);                    // before "Old"
+        editor.InsertText("New ");
+        editor.PerformPostCommandUpdate();
+        CHECK(headerOn(2).find("New Old Header") != std::string::npos);
+    }
+
+    // incremental re-layout as the editor's idle pass does it: from a paragraph to the end
+    auto relayoutFrom = [&](PARAGRAPH_T from)
+    {
+        layout->InvalidateCheckpointsFrom(from);
+        for (PARAGRAPH_T para = from; para < doc->GetNumberofParagraphs(); ++para)
+        {
+            layout->LayoutParagraph(para);
+        }
+    };
+
+    SUBCASE("inserting paragraphs above a definition: no stale or duplicate definitions")
+    {
+        doc->Insert(".he First Header\r");
+        body(120);
+        doc->Insert(".pa\r.he Second Header\r");
+        body(120);
+        layout->LayoutDocument(doc);
+        PAGE_T pages = layout->GetNumberOfPages();
+        REQUIRE(pages >= 4);
+
+        doc->SetPosition(0);
+        doc->Insert("New first line\rAnother new line\r");
+        relayoutFrom(0);
+        CHECK(headerOn(2).find("First Header") != std::string::npos);
+        CHECK(layout->GetPageHeaders(2).size() == 1);
+        PAGE_T newPages = layout->GetNumberOfPages();
+        CHECK(headerOn(newPages).find("Second Header") != std::string::npos);
+        CHECK(layout->GetPageHeaders(newPages).size() == 1);
+    }
+
+    SUBCASE("deleting or rewriting a definition removes it")
+    {
+        doc->Insert(".he Gone Header\r.fo Kept Footer\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        REQUIRE(headerOn(2).find("Gone Header") != std::string::npos);
+
+        // turn the .he line into body text
+        doc->SetPosition(0);
+        doc->Delete(0, 1);
+        relayoutFrom(0);
+        CHECK(layout->GetPageHeaders(2).empty());
+        CHECK(footerOn(2).find("Kept Footer") != std::string::npos);
+
+        // and delete the footer paragraph entirely
+        POSITION_T footerStart = 0;
+        POSITION_T footerEnd = 0;
+        doc->GetParagraphStartandEnd(1, footerStart, footerEnd);
+        REQUIRE(doc->GetParagraphText(1).rfind(".fo", 0) != std::string::npos);
+        doc->Delete(footerStart, footerEnd - footerStart + 1);
+        relayoutFrom(1);
+        // only the automatic page number is left
+        CHECK(footerOn(2) == "2|");
+    }
+
+    SUBCASE("a page added by typing gets the header in effect")
+    {
+        doc->Insert(".he Page Header\r");
+        body(40);
+        layout->LayoutDocument(doc);
+        PAGE_T before = layout->GetNumberOfPages();
+
+        PARAGRAPH_T from = doc->GetNumberofParagraphs() - 1;
+        doc->SetPosition(doc->GetTextSize() - 1);
+        for (int i = 0; i < 120; i++)
+        {
+            doc->Insert("More text typed at the end of the document.\r");
+        }
+        relayoutFrom(from);
+        PAGE_T after = layout->GetNumberOfPages();
+        REQUIRE(after > before);
+        for (PAGE_T page = 2; page <= after; ++page)
+        {
+            CAPTURE(page);
+            CHECK(headerOn(page).find("Page Header") != std::string::npos);
+        }
+    }
+
+    SUBCASE("two definitions on one page: the later one applies from the next page")
+    {
+        doc->Insert(".he Early\r.he Late\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetNumberOfPages() >= 2);
+        CHECK(headerOn(2).find("Late") != std::string::npos);
+        CHECK(headerOn(2).find("Early") == std::string::npos);
+    }
+
+    SUBCASE("numbered slots are independent")
+    {
+        doc->Insert(".h1 One A\r.h2 Two A\r");
+        body(120);
+        doc->Insert(".pa\r.h2 Two B\r");
+        body(120);
+        layout->LayoutDocument(doc);
+        PAGE_T pages = layout->GetNumberOfPages();
+        REQUIRE(pages >= 4);
+        CHECK(headerOn(2).find("One A") != std::string::npos);
+        CHECK(headerOn(2).find("Two A") != std::string::npos);
+        CHECK(headerOn(pages).find("One A") != std::string::npos);
+        CHECK(headerOn(pages).find("Two B") != std::string::npos);
+        CHECK(headerOn(pages).find("Two A") == std::string::npos);
+    }
+
+    SUBCASE("even / odd and plain definitions: the latest applicable one wins")
+    {
+        doc->Insert(".hee Even Early\r.heo Odd Early\r");
+        body(150);
+        doc->Insert(".pa\r.he Both Later\r");
+        body(150);
+        layout->LayoutDocument(doc);
+        PAGE_T pages = layout->GetNumberOfPages();
+        REQUIRE(pages >= 6);
+        CHECK(headerOn(2).find("Even Early") != std::string::npos);
+        CHECK(headerOn(3).find("Odd Early") != std::string::npos);
+        CHECK(headerOn(pages).find("Both Later") != std::string::npos);
+        CHECK(headerOn(pages - 1).find("Both Later") != std::string::npos);
+        UNUSED_ARGUMENT(pageOfLastParagraph);
+    }
+}
+
+
+
+TEST_CASE("Header / footer lines for every page are built quickly on a large document")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetShowControl(SHOW_NONE);
+
+    doc->Insert(".he Header on every page\r.h2 Second header line\r.fo Footer on every page\r");
+    for (int i = 0; i < 12000; i++)
+    {
+        doc->Insert("Body text line for the large header rebuild test.\r");
+    }
+    layout->LayoutDocument(doc);
+    REQUIRE(layout->GetNumberOfPages() >= 200);
+
+    PARAGRAPH_T para = doc->GetNumberofParagraphs() / 2;
+    layout->LayoutParagraph(para);
+
+    PAGE_T pages = layout->GetNumberOfPages();
+    size_t headerLines = 0;
+    size_t footerLines = 0;
+    auto start = std::chrono::steady_clock::now();
+    for (PAGE_T page = 1; page <= pages; ++page)
+    {
+        headerLines += layout->GetPageHeaders(page).size();
+        footerLines += layout->GetPageFooters(page).size();
+    }
+    auto elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    MESSAGE("header / footer lines for " << pages << " pages: " << elapsed << " ms");
+    CHECK(headerLines == static_cast<size_t>(2 * pages));
+    CHECK(footerLines == static_cast<size_t>(pages));
+    CHECK(elapsed < 500.0);
+}
+
+
+TEST_CASE("Building header / footer lines leaves the layout state unchanged")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetShowControl(SHOW_NONE);
+
+    // Header with its own font / bold codes; body formatting left open at the end
+    doc->Insert(".he Start ");
+    sInternalFonts headerFont = MakeTestFont(20.0);
+    doc->InsertFont(headerFont);
+    doc->BeginBold();
+    doc->Insert("Big Bold #\r");
+    doc->Insert(".fo Footer #\r");
+    for (int i = 0; i < 150; i++)
+    {
+        doc->Insert("Body text line for the header state test.\r");
+    }
+    sInternalFonts bodyFont = MakeTestFont(18.0);
+    doc->InsertFont(bodyFont);
+    doc->BeginItalics();
+    doc->Insert("big italic text left open\r");
+    for (int i = 0; i < 150; i++)
+    {
+        doc->Insert("More body text in the open font.\r");
+    }
+    layout->LayoutDocument(doc);
+    REQUIRE(layout->GetNumberOfPages() >= 4);
+
+    // Fonts and positions of every line of every paragraph
+    auto snapshot = [&](void)
+    {
+        std::vector<std::string> result;
+        for (PARAGRAPH_T para = 0; para < layout->GetNumberOfParagraphs(); ++para)
+        {
+            const sParagraphLayout* paraLayout = layout->GetParagraphLayout(para);
+            REQUIRE(paraLayout != nullptr);
+            for (const sLineLayout& line : paraLayout->lines)
+            {
+                std::string text = std::to_string(para) + ":" + std::to_string(line.pagenumber) + ":" +
+                                   std::to_string(line.pagey);
+                for (const sSegmentLayout& seg : line.segments)
+                {
+                    text += "|" + seg.font;
+                    text = std::accumulate(seg.position.begin(), seg.position.end(), text,
+                        [](const std::string& acc, COORD_T pos) { return acc + "," + std::to_string(pos); });
+                }
+                result.push_back(text);
+            }
+        }
+        return result;
+    };
+
+    SUBCASE("the current font and formatting are the same after building")
+    {
+        QFont fontBefore = layout->GetFont();
+        std::string plainBefore = layout->GetFontWithFormatting(false, false, false);
+
+        std::vector<sHeaderFooterLine> headers = layout->GetPageHeaders(2);
+        std::vector<sHeaderFooterLine> footers = layout->GetPageFooters(2);
+        REQUIRE(headers.empty() == false);
+        REQUIRE(footers.empty() == false);
+        CHECK(SegmentFonts(headers, 0).back().find("|20.0|1|") != std::string::npos);
+
+        CHECK(layout->GetFont() == fontBefore);
+        CHECK(layout->GetFontWithFormatting(false, false, false) == plainBefore);
+    }
+
+    SUBCASE("building in the middle of an incremental layout does not change it")
+    {
+        std::vector<std::string> expected = snapshot();
+        PAGE_T pages = layout->GetNumberOfPages();
+        for (PARAGRAPH_T para = 0; para < layout->GetNumberOfParagraphs(); ++para)
+        {
+            layout->LayoutParagraph(para);
+            PAGE_T page = (para % pages) + 1;
+            layout->GetPageHeaders(page);
+            layout->GetPageFooters(page);
+        }
+        CHECK(snapshot() == expected);
+    }
+}
+
+

@@ -185,25 +185,14 @@ void cGUIPDFPrintout::RenderHeadersFooters(CGContextRef ctx, PAGE_T pageNum, dou
         return;
     }
 
-    const auto& allHeaders = mLayout->GetPageHeaders();
-    const auto& allFooters = mLayout->GetPageFooters();
-
-    auto headerIt = allHeaders.find(pageNum);
-    if (headerIt != allHeaders.end())
+    for (const auto& hfLine : mLayout->GetPageHeaders(pageNum))
     {
-        for (const auto& hfLine : headerIt->second)
-        {
-            RenderHeaderFooterLine(ctx, hfLine, pageHeightPt);
-        }
+        RenderHeaderFooterLine(ctx, hfLine, pageHeightPt);
     }
 
-    auto footerIt = allFooters.find(pageNum);
-    if (footerIt != allFooters.end())
+    for (const auto& hfLine : mLayout->GetPageFooters(pageNum))
     {
-        for (const auto& hfLine : footerIt->second)
-        {
-            RenderHeaderFooterLine(ctx, hfLine, pageHeightPt);
-        }
+        RenderHeaderFooterLine(ctx, hfLine, pageHeightPt);
     }
 }
 

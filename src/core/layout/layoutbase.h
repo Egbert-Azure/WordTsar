@@ -124,10 +124,6 @@ struct sFormattingCheckpoint
     COORD_T paperWidth;
     COORD_T paperHeight;
 
-    // Header/footer tracking values
-    int headerValue;
-    int footerValue;
-
     // Equality comparison (ignores paragraph field -- compares formatting state only)
     bool operator==(const sFormattingCheckpoint& other) const
     {
@@ -151,8 +147,7 @@ struct sFormattingCheckpoint
                paragraphSpacingAfter == other.paragraphSpacingAfter &&
                doNewPage == other.doNewPage &&
                subSuperRoll == other.subSuperRoll &&
-               paperWidth == other.paperWidth && paperHeight == other.paperHeight &&
-               headerValue == other.headerValue && footerValue == other.footerValue;
+               paperWidth == other.paperWidth && paperHeight == other.paperHeight;
     }
 };
 
@@ -324,8 +319,8 @@ public:
     PAGE_T GetNumberOfPages(void) const;
 
     // ----- Query Methods - Header/Footer Access -----
-    const std::map<PAGE_T, std::vector<sHeaderFooterLine>>& GetPageHeaders(void) const;
-    const std::map<PAGE_T, std::vector<sHeaderFooterLine>>& GetPageFooters(void) const;
+    std::vector<sHeaderFooterLine> GetPageHeaders(PAGE_T page);
+    std::vector<sHeaderFooterLine> GetPageFooters(PAGE_T page);
 
     // ----- Query Methods - Control Code Visibility -----
     eShowControl GetShowControl(void) const;
@@ -389,8 +384,9 @@ public:
 
 protected:
     // ----- Header/Footer Layout Helpers -----
-    void HandleHeaderFooterText(const std::string& text, const std::string& command);
-    void InsertHeadersFooters(PAGE_T page);
+    void HandleHeaderFooterText(const std::string& text, const std::string& command, int number);
+    void StoreHeaderFooterDefinition(const sHeaderFooterDefinition& definition);
+    COORD_T ExplicitLineHeight(void) const;
 
     // ----- Dot Command Display -----
     std::vector<sLineLayout> LayoutDotCommandText(PARAGRAPH_T para, bool isComment);

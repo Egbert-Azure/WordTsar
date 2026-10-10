@@ -22,14 +22,13 @@
 #define HEADERFOOTERMANAGER_H
 
 #include <array>
-#include <map>
+#include <deque>
 #include <vector>
 #include <string>
 #include "layoutstructs.h"
 #include "src/core/include/config.h"
 
 // Forward declarations
-class cLayoutState;
 class cLayoutBase;
 
 #define MAX_HEADER_FOOTER 5
@@ -54,80 +53,23 @@ struct sHeaderFooterLine
 class cHeaderFooterManager
 {
 public:
-    cHeaderFooterManager(cLayoutState* state, cLayoutBase* layout);
+    cHeaderFooterManager(cLayoutBase* layout);
     ~cHeaderFooterManager(void);
 
-    // Header/Footer text storage
-    void HandleHeaderFooterText(const std::string& text, const std::string& command);
+    // Definition parsing (.HE / .FO / .Hn / .Fn)
+    void HandleHeaderFooterText(const std::string& text, const std::string& command, int number);
 
-    // Layout generation
-    sHeaderFooterLine LayoutHeaderFooterText(const std::string& text, COORD_T ypos, PAGE_T page,
-                                              PARAGRAPH_T sourceParagraph, POSITION_T sourceStartPos);
-    void InsertHeadersFooters(PAGE_T page);
-
-    // Access for rendering
-    const std::map<PAGE_T, std::vector<sHeaderFooterLine>>& GetPageHeaders(void) const;
-    const std::map<PAGE_T, std::vector<sHeaderFooterLine>>& GetPageFooters(void) const;
-
-    // Current tracking
-    int GetHeaderValue(void) const;
-    int GetFooterValue(void) const;
-    void SetHeaderValue(int value);
-    void SetFooterValue(int value);
-
-    // Reset for new layout
-    void Reset(void);
-
-    // Memory compaction
-    void ShrinkToFit(void);
+    // Lines of one page, built on demand
+    std::vector<sHeaderFooterLine> GetPageLines(PAGE_T page, bool isHeader);
 
 private:
-    // .pg with no real footer defined for this page: synthesizes a plain
-    // page-number line at footerY, positioned per .pc (0 = centered).
-    void InsertAutomaticPageNumber(PAGE_T page, COORD_T footerY);
-
-    // Storage arrays for header/footer templates
-    std::array<sLineLayout, MAX_HEADER_FOOTER> mStoreHeader;      // Regular headers (both pages)
-    std::array<sLineLayout, MAX_HEADER_FOOTER> mStoreHeaderEven;  // Even page headers
-    std::array<sLineLayout, MAX_HEADER_FOOTER> mStoreHeaderOdd;   // Odd page headers
-    std::array<sLineLayout, MAX_HEADER_FOOTER> mStoreFooter;      // Regular footers (both pages)
-    std::array<sLineLayout, MAX_HEADER_FOOTER> mStoreFooterEven;  // Even page footers
-    std::array<sLineLayout, MAX_HEADER_FOOTER> mStoreFooterOdd;   // Odd page footers
-
-    // Storage arrays for header/footer text (for re-layout with page numbers)
-    std::array<std::string, MAX_HEADER_FOOTER> mStoreHeaderText;      // Regular headers text
-    std::array<std::string, MAX_HEADER_FOOTER> mStoreHeaderEvenText;  // Even page headers text
-    std::array<std::string, MAX_HEADER_FOOTER> mStoreHeaderOddText;   // Odd page headers text
-    std::array<std::string, MAX_HEADER_FOOTER> mStoreFooterText;      // Regular footers text
-    std::array<std::string, MAX_HEADER_FOOTER> mStoreFooterEvenText;  // Even page footers text
-    std::array<std::string, MAX_HEADER_FOOTER> mStoreFooterOddText;   // Odd page footers text
-
-    // Storage arrays for document position context (for control code lookup)
-    // Paragraph number where header/footer was defined
-    std::array<PARAGRAPH_T, MAX_HEADER_FOOTER> mStoreHeaderParagraph;
-    std::array<PARAGRAPH_T, MAX_HEADER_FOOTER> mStoreHeaderEvenParagraph;
-    std::array<PARAGRAPH_T, MAX_HEADER_FOOTER> mStoreHeaderOddParagraph;
-    std::array<PARAGRAPH_T, MAX_HEADER_FOOTER> mStoreFooterParagraph;
-    std::array<PARAGRAPH_T, MAX_HEADER_FOOTER> mStoreFooterEvenParagraph;
-    std::array<PARAGRAPH_T, MAX_HEADER_FOOTER> mStoreFooterOddParagraph;
-    // Starting position within paragraph (after ".HE " prefix)
-    std::array<POSITION_T, MAX_HEADER_FOOTER> mStoreHeaderStartPos;
-    std::array<POSITION_T, MAX_HEADER_FOOTER> mStoreHeaderEvenStartPos;
-    std::array<POSITION_T, MAX_HEADER_FOOTER> mStoreHeaderOddStartPos;
-    std::array<POSITION_T, MAX_HEADER_FOOTER> mStoreFooterStartPos;
-    std::array<POSITION_T, MAX_HEADER_FOOTER> mStoreFooterEvenStartPos;
-    std::array<POSITION_T, MAX_HEADER_FOOTER> mStoreFooterOddStartPos;
-
-    // Current header/footer tracking
-    int mHeaderValue;                  // Current header number (0 = none, 1-5 = H1-H5)
-    int mFooterValue;                  // Current footer number (0 = none, 1-5 = F1-F5)
-
-    // Per-page rendered headers/footers (with pre-rendered graphemes)
-    std::map<PAGE_T, std::vector<sHeaderFooterLine>> mPageHeaders;
-    std::map<PAGE_T, std::vector<sHeaderFooterLine>> mPageFooters;
+    sHeaderFooterLine LayoutHeaderFooterText(const sHeaderFooterDefinition& definition, PARAGRAPH_T paragraph,
+                                             COORD_T ypos, PAGE_T page);
+    sHeaderFooterLine AutomaticPageNumber(PAGE_T page, COORD_T footerBottom);
+    std::array<PARAGRAPH_T, MAX_HEADER_FOOTER> SelectDefinitions(PAGE_T page, bool isHeader) const;
+    COORD_T HeaderFooterLineHeight(const sHeaderFooterDefinition& definition, const std::deque<sSegmentLayout>& segments) const;
 
     // References (NOT owned)
-    cLayoutState* mLayoutState;
     cLayoutBase* mLayoutBase;
 };
 

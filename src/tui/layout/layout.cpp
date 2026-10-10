@@ -832,7 +832,12 @@ std::vector<sSegmentLayout> cLayout::BuildHeaderFooterSegments(
     // scan format, so earlier pages keep their own format)
     std::string pageNumStr = FormatPageNumber(page, mLayoutState->GetPageNumFormatForPage(page));
 
-    // Apply initial font state
+    // Start in the default font, plain, default colour; the layout state and
+    // font are restored before returning
+    cLayoutState savedState = *mLayoutState;
+    sTUIFontInfo savedFontInfo = mCurrentFontInfo;
+    mLayoutState->SetCurrentFont(mLayoutState->GetDefaultFont());
+    mLayoutState->ResetFormattingState();
     UpdateCurrentFont();
 
     // Calculate line height from TUI font metrics (already in twips)
@@ -981,6 +986,12 @@ std::vector<sSegmentLayout> cLayout::BuildHeaderFooterSegments(
 
     // Save final segment if it has content
     FlushSegmentIfNonEmpty(segments, currentSegment, currentX);
+
+    // Restore the layout state and font
+    *mLayoutState = savedState;
+    mCurrentFontInfo = savedFontInfo;
+    mTUITextMeasurement->SetFont(mCurrentFontInfo.name, mCurrentFontInfo.size,
+                                 mCurrentFontInfo.bold, mCurrentFontInfo.italic);
 
     return segments;
 }

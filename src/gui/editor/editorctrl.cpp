@@ -3011,27 +3011,17 @@ void cEditorCtrl::DrawHeadersFooters(
         return;
     }
 
-    const auto& allHeaders = mLayout->GetPageHeaders();
-    const auto& allFooters = mLayout->GetPageFooters();
-
-    auto headerIt = allHeaders.find(page);
-    if (headerIt != allHeaders.end())
+    // Built for this page from the definitions in effect for it
+    for (const auto& hfLine : mLayout->GetPageHeaders(page))
     {
-        for (const auto& hfLine : headerIt->second)
-        {
-            COORD_T screenY = hfLine.line.pagey + pageScreenY;
-            DrawHeaderFooterLine(painter, hfLine, screenY);
-        }
+        COORD_T screenY = hfLine.line.pagey + pageScreenY;
+        DrawHeaderFooterLine(painter, hfLine, screenY);
     }
 
-    auto footerIt = allFooters.find(page);
-    if (footerIt != allFooters.end())
+    for (const auto& hfLine : mLayout->GetPageFooters(page))
     {
-        for (const auto& hfLine : footerIt->second)
-        {
-            COORD_T screenY = hfLine.line.pagey + pageScreenY;
-            DrawHeaderFooterLine(painter, hfLine, screenY);
-        }
+        COORD_T screenY = hfLine.line.pagey + pageScreenY;
+        DrawHeaderFooterLine(painter, hfLine, screenY);
     }
 }
 
