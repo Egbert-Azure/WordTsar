@@ -9120,25 +9120,22 @@ TEST_CASE("SuppressNotify getter and setter")
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief
-/// Test SetWordCount and GetWordCount round-trip
+/// Test GetWordCount counts the words of the document
 ///
 /////////////////////////////////////////////////////////////////////////////
-TEST_CASE("WordCount getter and setter")
+TEST_CASE("WordCount of the document")
 {
     cDocument doc ;
     doc.SetShowControl(SHOW_ALL) ;
 
-    // default should be 0
+    // an empty document has no words
     CHECK(doc.GetWordCount() == 0) ;
 
-    doc.SetWordCount(42) ;
-    CHECK(doc.GetWordCount() == 42) ;
+    doc.Insert("One two three\r") ;
+    CHECK(doc.GetWordCount() == 3) ;
 
-    doc.SetWordCount(0) ;
-    CHECK(doc.GetWordCount() == 0) ;
-
-    doc.SetWordCount(999999) ;
-    CHECK(doc.GetWordCount() == 999999) ;
+    doc.Insert("four\r") ;
+    CHECK(doc.GetWordCount() == 4) ;
 }
 
 
@@ -10568,4 +10565,191 @@ TEST_CASE("Markers: hidden block, raw NUL and SOH, and clear")
         CHECK(doc.mStartBlock == NOT_SET) ;
         CHECK(doc.mBlockSet == false) ;
     }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// GetWordCount counts Unicode words (UAX #29) per paragraph, skips dot
+/// commands and comments, and ignores formatting codes.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("GetWordCount - Unicode words, dot commands and control codes")
+{
+    cDocument doc ;
+
+    SUBCASE("an empty document has no words")
+    {
+        CHECK(doc.GetWordCount() == 0) ;
+    }
+
+    SUBCASE("plain words across paragraphs")
+    {
+        doc.Insert("One two three\rfour five\r") ;
+        CHECK(doc.GetWordCount() == 5) ;
+    }
+
+    SUBCASE("punctuation, leading and trailing spaces are not words")
+    {
+        doc.Insert("  Hello,   world!  -- ... \r") ;
+        CHECK(doc.GetWordCount() == 2) ;
+    }
+
+    SUBCASE("contractions, abbreviations and numbers are one word each")
+    {
+        doc.Insert("don't e.g. 3.14\r") ;
+        CHECK(doc.GetWordCount() == 3) ;
+    }
+
+    SUBCASE("accented text, emoji and CJK")
+    {
+        doc.Insert("Caf\xC3\xA9 na\xC3\xAFve \xF0\x9F\x8E\x89\r") ;              // Cafe naive (accented), emoji
+        CHECK(doc.GetWordCount() == 2) ;
+
+        doc.Insert("\xE4\xB8\xAD\xE6\x96\x87\r") ;                                // two CJK ideographs
+        CHECK(doc.GetWordCount() == 4) ;
+    }
+
+    SUBCASE("dot command and comment paragraphs count 0")
+    {
+        doc.Insert(".lm 10\r.. a comment with words\rText here\r") ;
+        CHECK(doc.GetWordCount() == 2) ;
+    }
+
+    SUBCASE("a paragraph is counted once its leading dot is deleted")
+    {
+        doc.Insert(".. hidden words\rText\r") ;
+        CHECK(doc.GetWordCount() == 1) ;
+
+        doc.Delete(0, 2) ;
+        CHECK(doc.GetWordCount() == 3) ;
+    }
+
+    SUBCASE("formatting codes inside and between words do not change the count")
+    {
+        doc.Insert("wo") ;
+        doc.Insert(static_cast<CHAR_T>(STYLE_BOLD)) ;
+        doc.Insert("rd ") ;
+        doc.Insert(static_cast<CHAR_T>(STYLE_UNDERLINE)) ;
+        doc.Insert("two") ;
+        doc.Insert(static_cast<CHAR_T>(STYLE_UNDERLINE)) ;
+        doc.Insert(" three") ;
+        doc.InsertVariable(VAR_DATE) ;
+        doc.Insert("\r") ;
+        CHECK(doc.GetWordCount() == 3) ;
+    }
+
+    SUBCASE("tabs separate words")
+    {
+        sWSTab tab ;
+        tab.abstabsize = 0 ;
+        tab.size = 0 ;
+        tab.tabsize = 0 ;
+        tab.type = TAB_TAB ;
+
+        doc.Insert("one") ;
+        doc.InsertTab(tab) ;
+        doc.Insert("two\r") ;
+        CHECK(doc.GetWordCount() == 2) ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// GetWordCount follows every kind of text change: typing, deleting,
+/// splitting and merging paragraphs, undo / redo, and loading.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("GetWordCount - follows edits")
+{
+    cDocument doc ;
+    doc.Insert("alpha beta\rgamma delta\r") ;
+    REQUIRE(doc.GetWordCount() == 4) ;
+
+    SUBCASE("typing a word")
+    {
+        doc.SetPosition(5) ;
+        doc.Insert(" more") ;
+        CHECK(doc.GetWordCount() == 5) ;
+    }
+
+    SUBCASE("deleting a word")
+    {
+        doc.Delete(0, 6) ;
+        CHECK(doc.GetWordCount() == 3) ;
+    }
+
+    SUBCASE("splitting a word into two paragraphs")
+    {
+        doc.SetPosition(2) ;
+        doc.Insert("\r") ;
+        CHECK(doc.GetWordCount() == 5) ;
+    }
+
+    SUBCASE("merging two paragraphs joins the touching words")
+    {
+        doc.Delete(10, 1) ;                                   // the first hard return
+        CHECK(doc.GetWordCount() == 3) ;                       // "alpha betagamma delta"
+    }
+
+    SUBCASE("undo and redo")
+    {
+        doc.SetPosition(0) ;
+        doc.Insert("new words ") ;
+        REQUIRE(doc.GetWordCount() == 6) ;
+
+        REQUIRE(doc.Undo()) ;
+        CHECK(doc.GetWordCount() == 4) ;
+
+        REQUIRE(doc.Redo()) ;
+        CHECK(doc.GetWordCount() == 6) ;
+    }
+
+    SUBCASE("a multi-paragraph insert")
+    {
+        doc.SetPosition(0) ;
+        doc.Insert("one\rtwo three\rfour\r") ;
+        CHECK(doc.GetWordCount() == 8) ;
+    }
+
+    SUBCASE("while loading, the last total is returned")
+    {
+        doc.SetLoading(true) ;
+        doc.SetPosition(0) ;
+        doc.Insert("loaded text here\r") ;
+        CHECK(doc.GetWordCount() == 4) ;
+
+        doc.SetLoading(false) ;
+        CHECK(doc.GetWordCount() == 7) ;
+    }
+
+    SUBCASE("Clear")
+    {
+        doc.Clear() ;
+        CHECK(doc.GetWordCount() == 0) ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// GetWordCount(start, end) counts the words in a range (a block).
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("GetWordCount - range")
+{
+    cDocument doc ;
+    doc.Insert("one two three\r.. comment words\rfour five\r") ;
+
+    CHECK(doc.GetWordCount(0, doc.GetTextSize()) == 5) ;          // the comment is skipped
+    CHECK(doc.GetWordCount(0, 7) == 2) ;                           // "one two"
+    CHECK(doc.GetWordCount(4, 5) == 1) ;                           // part of a word is a word
+    CHECK(doc.GetWordCount(3, 4) == 0) ;                           // a space
+    CHECK(doc.GetWordCount(8, 33) == 2) ;                          // "three" ... "four", across paragraphs
+    CHECK(doc.GetWordCount(5, 5) == 0) ;
+    CHECK(doc.GetWordCount(7, 3) == 0) ;
 }

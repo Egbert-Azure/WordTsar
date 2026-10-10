@@ -325,9 +325,6 @@ void cEditorCtrl::Init(void)
     connect(mCaretTimer, &QTimer::timeout, this, &cEditorCtrl::OnCaretTimer);
     mCaretTimer->start(mCaretBlinkRate);
 
-    // Start word count timer (base class background thread)
-    StartWordCountTimer();
-
     // Create auto-save timer
     mAutoSaveTimer = new QTimer(this);
     mAutoSaveTimer->setSingleShot(false);  // Repeating timer
@@ -4996,15 +4993,12 @@ void cEditorCtrl::WordCountBlock(void)
 
     if (mDocument->mBlockSet == true)
     {
-        words = WordCount(mDocument->mStartBlock, mDocument->mEndBlock);
+        words = mDocument->GetWordCount(mDocument->mStartBlock, mDocument->mEndBlock);
     }
     else
     {
-        words = WordCount(0, 0);  // Count entire document
+        words = mDocument->GetWordCount();  // Count entire document
     }
-
-    // Store result for testing access
-    mLastWordCount = words;
 
     // Skip dialog if running in test mode (QT_TESTING environment variable set)
     const char* qtTesting = std::getenv("QT_TESTING");

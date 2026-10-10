@@ -358,9 +358,6 @@ public:
     bool GetShowBoxOutlines(void) const;
 
     // Word Count
-    long WordCount(POSITION_T start, POSITION_T end);
-    void StartWordCountTimer(void);
-    void StopWordCountTimer(void);
 
     // Status Bar
     void GetStatus(sStatus& status);
@@ -430,7 +427,6 @@ private:
     void ParseFontDescriptor(const std::string& fontDescriptor, const sLineLayout& line);
 
     // Word Count Timer
-    void WordCountTimerThreadFunc(void);
 
     // Text Helpers
     void CheckAndReplaceVariable(void);
@@ -469,7 +465,6 @@ public:
     std::string mBackupFileName;        // Backup filename (derived from mFileName)
     std::string mBackupUuid;            // Unique ID for untitled document temp backups
     bool mInsertMode;                   // Insert vs overwrite mode
-    long mLastWordCount;                // Cached word count (updated by timer)
     std::string mShortName;             // User's short name (config [user])
     std::string mLongName;              // User's long name (config [user])
     bool mAlwaysDot;                    // Preference: always show dot commands
@@ -600,8 +595,6 @@ protected:
 
 private:
     // Word Count Timer
-    std::atomic<bool> mWordCountTimerRunning;
-    std::thread mWordCountTimerThread;
 };
 
 #endif // EDITORBASE_H

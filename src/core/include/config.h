@@ -120,7 +120,6 @@ constexpr long long MAX_TEXT_FILE_SIZE = 256LL * 1024 * 1024;   ///< reject plai
 
 // Timer intervals (in milliseconds)
 constexpr int STATUS_UPDATE_INTERVAL_MS = 200;      ///< Status bar update frequency (5 times per second)
-constexpr int WORD_COUNT_INTERVAL_MS = 5000;        ///< Word count update frequency (every 5 seconds)
 constexpr int AUTO_SAVE_INTERVAL_MS = 60000;        ///< Auto-save backup frequency (every 1 minute)
 
 

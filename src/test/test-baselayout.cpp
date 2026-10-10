@@ -8048,19 +8048,18 @@ TEST_CASE("Layout - GetVariableExpansion covers all variable types")
         CHECK(result == "/tmp/f.txt");
     }
 
-    SUBCASE("VAR_WORD_COUNT default returns 0")
+    SUBCASE("VAR_WORD_COUNT counts the document")
     {
-        // Word count is a cached value, defaults to 0
+        // "Hello World\r" from the setup above
         std::string result = layout->GetVariableExpansion(VAR_WORD_COUNT);
-        CHECK(result == "0");
+        CHECK(result == "2");
     }
 
-    SUBCASE("VAR_WORD_COUNT with cached count")
+    SUBCASE("VAR_WORD_COUNT follows the document")
     {
-        // Set cached word count and verify expansion uses it
-        doc->SetWordCount(42);
+        doc->Insert("one two three four five six\r");
         std::string result = layout->GetVariableExpansion(VAR_WORD_COUNT);
-        CHECK(result == "42");
+        CHECK(result == "8");
     }
 }
 

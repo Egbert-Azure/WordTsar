@@ -134,6 +134,7 @@ struct sParagraphData
     std::vector<VariablePair> variable ;                 ///< variable expansions (&@&, &#&, etc.)
 
     cGraphemeOffsets offsets;                              ///< compact grapheme boundary cache
+    long words = -1 ;                                    ///< word count, -1 = not counted since the last text change
 };
 
 
@@ -360,8 +361,8 @@ public:
     eShowControl GetShowControl(void) ;
 
     // --- Word Count ---
-    void SetWordCount(long count) ;
-    long GetWordCount(void) const ;
+    long GetWordCount(void) ;
+    long GetWordCount(POSITION_T start, POSITION_T end) ;
 
     // --- Memory ---
     sDocumentMemoryUsage GetMemoryUsage(void) const ;
@@ -442,6 +443,7 @@ private:
     std::string foldGrapheme(const std::string &grapheme) ;
     POSITION_T graphemeSearch(const std::vector<std::string> &haystackGraphemes, const std::vector<std::string> &haystackFolded, const std::vector<std::string> &needleGraphemes, const std::vector<std::string> &needleFolded, bool wildcard, bool casecmp, bool reverse, size_t startGrapheme) ;
     bool isExtendedWordBoundary(const char32_t *s32, size_t len, size_t pos) ;
+    long CountWords(PARAGRAPH_T para, POSITION_T from, POSITION_T to) ;
 
     // --- Listener Notification (suppressed during loading and undo/redo) ---
     void NotifyChanged(PARAGRAPH_T fromParagraph) ;
@@ -512,7 +514,7 @@ private:
     eShowControl mShowControl ;
 
     // --- Word Count ---
-    long mWordCount ;                                   ///< cached word count for VAR_WORD_COUNT variable
+    long mWordCount ;                                   ///< document word count (sum of the paragraph counts)
 
     // --- Clipboard ---
     std::vector<sUndoCharInfo> mCopyBuffer ;                  ///< the buffer used for copy/paste (with metadata)

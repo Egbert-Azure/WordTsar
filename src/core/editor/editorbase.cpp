@@ -122,7 +122,6 @@ std::string cEditorBase::DefaultFileDir(void)
 cEditorBase::cEditorBase(void)
     : mFileName("Unknown.ws")
     , mInsertMode(true)
-    , mLastWordCount(0)
     , mShortName("")
     , mLongName("")
     , mAlwaysDot(true)
@@ -207,7 +206,6 @@ cEditorBase::cEditorBase(void)
     , mStatusMessage("")
     , mStatusMessageTimer(0)
     , mStatusBusy(false)
-    , mWordCountTimerRunning(false)
 {
     // sDisplaySettings constructor already sets defaults:
     // - mode = DISPLAY_CONTINUOUS
@@ -247,7 +245,6 @@ cEditorBase::cEditorBase(void)
 cEditorBase::~cEditorBase(void)
 {
     // Stop word count timer thread if running
-    StopWordCountTimer();
 }
 
 
@@ -4809,129 +4806,6 @@ bool cEditorBase::GetShowBoxOutlines(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  start [in] start position for word count
-/// @param  end [in] end position for word count (0 = entire document)
-///
-/// @return long - number of words counted
-///
-/// @brief
-/// Count words in a range of text. If end == 0, counts entire document
-/// (skipping dot command paragraphs). Treats punctuation as word
-/// separators but preserves apostrophes (closer to MS Word behavior).
-///
-/////////////////////////////////////////////////////////////////////////////
-long cEditorBase::WordCount(POSITION_T start, POSITION_T end)
-{
-    if (!mDocument)
-    {
-        return 0;
-    }
-
-    std::string text;
-
-    // Punctuation characters treated as word separators
-    // (do not break apostrophes -- closer to MS Word word count)
-    std::string punctuation = "\\.()[]{},;:?+-*=/&~|\"<>!\r\n\t";
-    punctuation += static_cast<char>(HARD_RETURN);
-
-    if (end == 0)
-    {
-        // Count entire document
-        ssize_t paras = mDocument->GetNumberofParagraphs();
-        for (ssize_t loop = 0; loop < paras; loop++)
-        {
-            std::string paraText = mDocument->GetParagraphText(loop);
-            if (!paraText.empty())
-            {
-                // Skip dot command paragraphs
-                if (paraText[0] == '.')
-                {
-                    continue;
-                }
-                text += paraText;
-            }
-        }
-    }
-    else
-    {
-        // Count block
-        text = mDocument->GetBlockText(start, end);
-    }
-
-    // Replace punctuation with spaces
-    for (size_t i = 0; i < text.size(); i++)
-    {
-        unsigned char ch = static_cast<unsigned char>(text[i]);
-        if (punctuation.find(static_cast<char>(ch)) != std::string::npos)
-        {
-            text[i] = ' ';
-        }
-    }
-
-    // Count words by counting space-to-non-space transitions
-    bool space = false;
-    long wordcount = 1;
-
-    for (char c : text)
-    {
-        if (c == ' ' && space == false)
-        {
-            space = true;
-            ++wordcount;
-        }
-        else if (c != ' ')
-        {
-            space = false;
-        }
-    }
-
-    return wordcount;
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @return nothing
-///
-/// @brief
-/// Start the background word count timer thread. The thread wakes every
-/// second and fires a word count update every WORD_COUNT_INTERVAL_MS
-/// (5 seconds). Safe to call multiple times (no-op if already running).
-///
-/////////////////////////////////////////////////////////////////////////////
-void cEditorBase::StartWordCountTimer(void)
-{
-    if (mWordCountTimerRunning.load())
-    {
-        return;
-    }
-
-    mWordCountTimerRunning.store(true);
-    mWordCountTimerThread = std::thread(&cEditorBase::WordCountTimerThreadFunc, this);
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @return nothing
-///
-/// @brief
-/// Stop the background word count timer thread and wait for it to finish.
-/// Safe to call multiple times (no-op if not running).
-///
-/////////////////////////////////////////////////////////////////////////////
-void cEditorBase::StopWordCountTimer(void)
-{
-    mWordCountTimerRunning.store(false);
-    if (mWordCountTimerThread.joinable())
-    {
-        mWordCountTimerThread.join();
-    }
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
 /// @param  sStatus& status [out] - Status structure to populate
 ///
 /// @return nothing
@@ -4984,7 +4858,7 @@ void cEditorBase::GetStatus(sStatus& status)
     if (mDocument)
     {
         status.charcount = mDocument->GetTextSize();
-        status.wordcount = mLastWordCount;  // Updated by OnWordCountTimer() every 5 seconds
+        status.wordcount = mDocument->GetWordCount();
     }
     else
     {
@@ -6124,49 +5998,6 @@ void cEditorBase::ParseFontDescriptor(const std::string& fontDescriptor, const s
         mStatusBold = false;
         mStatusItalic = false;
         mStatusUnderline = false;
-    }
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @return nothing
-///
-/// @brief
-/// Background thread function for periodic word count updates.
-/// Sleeps in 100ms increments (checking mWordCountTimerRunning each
-/// time for quick shutdown), and updates mLastWordCount every
-/// WORD_COUNT_INTERVAL_MS milliseconds.
-///
-/////////////////////////////////////////////////////////////////////////////
-void cEditorBase::WordCountTimerThreadFunc(void)
-{
-    constexpr int SLEEP_INTERVAL_MS = 100;
-    int elapsedMs = 0;
-
-    while (mWordCountTimerRunning.load())
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_INTERVAL_MS));
-
-        if (!mWordCountTimerRunning.load())
-        {
-            break;
-        }
-
-        elapsedMs += SLEEP_INTERVAL_MS;
-        if (elapsedMs >= WORD_COUNT_INTERVAL_MS)
-        {
-            elapsedMs = 0;
-
-            // Don't count during document loading
-            if (mDocument && !mDocument->GetLoading())
-            {
-                mLastWordCount = WordCount(0, 0);
-
-                // Store word count on document for variable expansion
-                mDocument->SetWordCount(mLastWordCount);
-            }
-        }
     }
 }
 

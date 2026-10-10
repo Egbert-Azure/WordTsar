@@ -91,6 +91,7 @@
 
 #include <string>
 #include <algorithm>
+#include <numeric>
 #include <thread>
 #include <regex>
 
@@ -643,6 +644,9 @@ void cDocument::Insert(CHAR_T ch)
         }
     }
 
+    // the paragraph's word count is stale
+    paraiter->words = -1 ;
+
     // refresh our grapheme offsets
     SaveOffsets(currentparagraphnumber, offsets);
 
@@ -910,6 +914,7 @@ bool cDocument::Delete(POSITION_T position, POSITION_T length)
                 end = grapheme.size() ;
             }
             paraiter->buffer.erase(bstart, bstart + end) ;
+            paraiter->words = -1 ;
 
             // refresh our grapheme offsets
             SaveOffsets(currentparagraphnumber, offsets);
@@ -2688,32 +2693,184 @@ eShowControl cDocument::GetShowControl(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  count [in] - word count to store
+/// @param  s32 [in] - text (UTF-32)
+/// @param  l   [in] - length of the text
 ///
-/// @return nothing
-///
-/// @brief
-/// Set cached word count for VAR_WORD_COUNT variable expansion.
+/// @return size_t - length of the Unicode word segment (UAX #29) at the
+///         start of the text
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cDocument::SetWordCount(long count)
+static size_t WordLength(const char32_t *s32, size_t l)
 {
-    mWordCount = count ;
+    size_t i = 1 ;
+    while(i < l && !unicode::is_word_boundary(s32, l, i))
+    {
+        i++ ;
+    }
+    return std::min(i, l) ;
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return long - cached word count
+/// @return long - number of words in the document
 ///
 /// @brief
-/// Get cached word count for VAR_WORD_COUNT variable expansion.
+/// Get the document word count. Recounts only the paragraphs changed since
+/// they were last counted, then adds up the paragraph counts. While a file
+/// is loading, returns the last total.
 ///
 /////////////////////////////////////////////////////////////////////////////
-long cDocument::GetWordCount(void) const
+long cDocument::GetWordCount(void)
 {
+    if(mIsLoading == true)
+    {
+        return mWordCount ;
+    }
+
+    for(PARAGRAPH_T para = 0; para < std::ssize(mParagraphData); para++)
+    {
+        sParagraphData &paragraph = mParagraphData[static_cast<size_t>(para)] ;
+        if(paragraph.words < 0)
+        {
+            paragraph.words = CountWords(para, 0, std::ssize(paragraph.buffer)) ;
+        }
+    }
+
+    mWordCount = std::accumulate(mParagraphData.begin(), mParagraphData.end(), 0L,
+        [](long total, const sParagraphData &paragraph)
+        {
+            return total + paragraph.words ;
+        }) ;
+
     return mWordCount ;
 }
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  start [in] - first document position
+/// @param  end   [in] - end document position (not included)
+///
+/// @return long - number of words in [start, end)
+///
+/// @brief
+/// Count the words in a document range (e.g. a block), with the same rules
+/// as GetWordCount().
+///
+/////////////////////////////////////////////////////////////////////////////
+long cDocument::GetWordCount(POSITION_T start, POSITION_T end)
+{
+    start = std::max(start, static_cast<POSITION_T>(0)) ;
+    end = std::min(end, GetTextSize()) ;
+    if(end <= start)
+    {
+        return 0 ;
+    }
+
+    PARAGRAPH_T first = GetParagraphFromPosition(start) ;
+    PARAGRAPH_T last = GetParagraphFromPosition(end - 1) ;
+
+    long words = 0 ;
+    for(PARAGRAPH_T para = first; para <= last; para++)
+    {
+        POSITION_T paraStart = mParagraphData[static_cast<size_t>(para)].index ;
+        words += CountWords(para, start - paraStart, end - paraStart) ;
+    }
+
+    return words ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  para [in] - paragraph to count
+/// @param  from [in] - first paragraph-relative grapheme index
+/// @param  to   [in] - end paragraph-relative grapheme index (not included)
+///
+/// @return long - number of words in the graphemes [from, to) of the paragraph
+///
+/// @brief
+/// Count Unicode words (UAX #29 word boundaries). Dot command and comment
+/// paragraphs count 0. Tabs, non-breaking spaces, line / page breaks and
+/// hard returns separate words; all other control codes (formatting, fonts,
+/// colors, variables, notes) are removed. A segment is a word when it holds
+/// a letter, number or ideograph.
+///
+/////////////////////////////////////////////////////////////////////////////
+long cDocument::CountWords(PARAGRAPH_T para, POSITION_T from, POSITION_T to)
+{
+    const sParagraphData &paragraph = mParagraphData[static_cast<size_t>(para)] ;
+    const std::string &buffer = paragraph.buffer ;
+
+    if(buffer.empty() == false && buffer.front() == '.')
+    {
+        return 0 ;
+    }
+
+    std::vector<POSITION_T> offsets ;
+    GetParagraphGraphemeOffsets(para, offsets) ;
+
+    POSITION_T count = std::ssize(offsets) ;
+    from = std::max(from, static_cast<POSITION_T>(0)) ;
+    to = std::min(to, count) ;
+
+    // the text with control codes removed or turned into separators
+    std::u32string text ;
+    text.reserve(buffer.size()) ;
+    for(POSITION_T loop = from; loop < to; loop++)
+    {
+        POSITION_T byteStart = offsets[static_cast<size_t>(loop)] ;
+        POSITION_T byteEnd = std::ssize(buffer) ;
+        if(loop + 1 < count)
+        {
+            byteEnd = offsets[static_cast<size_t>(loop + 1)] ;
+        }
+
+        CHAR_T ch = static_cast<CHAR_T>(buffer[static_cast<size_t>(byteStart)]) ;
+        if(byteEnd - byteStart == 1 && ch == MARKER_CHAR)
+        {
+            eModifiers code = GetControlChar(paragraph.index + loop) ;
+            if(code == STYLE_TAB || code == STYLE_NOBREAK_SPACE || code == STYLE_RETURN ||
+               code == STYLE_LINEFEED || code == STYLE_FORMFEED)
+            {
+                text += U' ' ;
+            }
+        }
+        else if(byteEnd - byteStart == 1 && ch == HARD_RETURN)
+        {
+            text += U' ' ;
+        }
+        else
+        {
+            unicode::utf8::decode(buffer.data() + byteStart, static_cast<size_t>(byteEnd - byteStart), text) ;
+        }
+    }
+
+    // count the word segments that hold a letter, number or ideograph
+    long words = 0 ;
+    size_t length = text.size() ;
+    size_t start = 0 ;
+    while(start < length)
+    {
+        size_t end = start + WordLength(text.data() + start, length - start) ;
+
+        auto first = text.begin() + static_cast<std::ptrdiff_t>(start) ;
+        auto last = text.begin() + static_cast<std::ptrdiff_t>(end) ;
+        if(std::any_of(first, last, [](char32_t cp) { return unicode::is_alphabetic(cp) || unicode::is_number(cp) ; }))
+        {
+            words++ ;
+        }
+
+        start = end ;
+    }
+
+    return words ;
+}
+
+
+
+
 
 
 
@@ -5330,6 +5487,7 @@ void cDocument::DeleteParagraph(POSITION_T position)
 
             // merge the two paragraphs
             paraiter->buffer.insert(paraiter->buffer.end(), paraiternext->buffer.begin(), paraiternext->buffer.end()) ;
+            paraiter->words = -1 ;
             // offsets are not merged here -- SaveOffsets() recalculates them below
             paraiter->color.insert(paraiter->color.end(), paraiternext->color.begin(), paraiternext->color.end()) ;
             paraiter->font.insert(paraiter->font.end(), paraiternext->font.begin(), paraiternext->font.end()) ;
@@ -5430,6 +5588,7 @@ void cDocument::InsertParagraph(POSITION_T position, POSITION_T offset, PARAGRAP
         data.buffer = paraiter->buffer ;
         data.buffer.erase(data.buffer.begin(), data.buffer.begin() + offset) ;
         paraiter->buffer.erase(paraiter->buffer.begin() + offset, paraiter->buffer.end()) ;
+        paraiter->words = -1 ;
 
 
         auto iter = mParagraphData.begin() ;
@@ -5463,6 +5622,7 @@ void cDocument::InsertParagraph(POSITION_T position, POSITION_T offset, PARAGRAP
         data.buffer = paraiter->buffer ;
         data.buffer.erase(data.buffer.begin(), data.buffer.begin() + offset) ;
         paraiter->buffer.erase(paraiter->buffer.begin() + offset, paraiter->buffer.end()) ;
+        paraiter->words = -1 ;
 
         mParagraphData.push_back(data) ;
 
@@ -5508,6 +5668,7 @@ void cDocument::InsertParagraph(POSITION_T position, POSITION_T offset, PARAGRAP
         data.buffer = paraiter->buffer ;
         data.buffer.erase(data.buffer.begin(), data.buffer.begin() + offset) ;
         paraiter->buffer.erase(paraiter->buffer.begin() + offset, paraiter->buffer.end()) ;
+        paraiter->words = -1 ;
 
         auto iter = mParagraphData.begin() ;
         std::advance(iter, para) ;

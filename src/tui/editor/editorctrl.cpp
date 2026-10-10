@@ -201,9 +201,6 @@ cWSEditorCtrl::cWSEditorCtrl(void)
 
     // Initialize caret position
     CalculateCaretPosition();
-
-    // Start word count timer (base class background thread)
-    StartWordCountTimer();
 }
 
 
@@ -218,8 +215,6 @@ cWSEditorCtrl::cWSEditorCtrl(void)
 /////////////////////////////////////////////////////////////////////////////
 cWSEditorCtrl::~cWSEditorCtrl(void)
 {
-    StopWordCountTimer();
-
     delete mInput;
     mInput = nullptr;
 
@@ -3402,14 +3397,12 @@ void cWSEditorCtrl::WordCountBlock(void)
 
     if (mDocument->GetBlock(start, end) == true)
     {
-        words = WordCount(start, end);
+        words = mDocument->GetWordCount(start, end);
     }
     else
     {
-        words = WordCount(0, 0);
+        words = mDocument->GetWordCount();
     }
-
-    mLastWordCount = words;
 
     ShowMessage("Word Count", "Word Count: " + std::to_string(words));
 }

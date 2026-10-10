@@ -1573,11 +1573,10 @@ TEST_CASE("WordCount skips dot commands")
     doc->Insert("Hello World\r");
     layout->LayoutDocument(doc);
 
-    // WordCount(0,0) counts the whole document, skipping dot commands
-    long count = editor.WordCount(0, 0);
+    // the whole document is counted, skipping dot commands
+    long count = doc->GetWordCount();
     // "Hello World\r" counted, ".ss1\r" skipped
-    // The algorithm starts at 1 and increments on each space/punctuation transition
-    CHECK(count >= 2);  // at least "Hello" and "World"
+    CHECK(count == 2);
 
     // compare with a document that has no dot commands
     cEditorCtrl editor2;
@@ -1587,7 +1586,7 @@ TEST_CASE("WordCount skips dot commands")
     doc2->Insert("Hello World\r");
     layout2->LayoutDocument(doc2);
 
-    long countNoDot = editor2.WordCount(0, 0);
+    long countNoDot = doc2->GetWordCount();
 
     // the count with dot command skipped should equal count without dot commands
     CHECK(count == countNoDot);
@@ -1612,8 +1611,8 @@ TEST_CASE("WordCount with range")
     layout->LayoutDocument(doc);
 
     // count words in the full text range
-    long count = editor.WordCount(0, doc->GetTextSize());
-    CHECK(count >= 3);  // at least "One", "Two", "Three"
+    long count = doc->GetWordCount(0, doc->GetTextSize());
+    CHECK(count == 3);  // "One", "Two", "Three"
 }
 
 
@@ -3106,4 +3105,32 @@ TEST_CASE("Reveal codes: an alignment tab is deletable in every mode and undo re
         CHECK(doc->GetTextSize() == size);
         CHECK(doc->GetControlChar(0) == STYLE_TAB);
     }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// The status bar word count is the document word count, current after
+/// each edit, with dot commands skipped.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("GetStatus word count follows the document")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+
+    sStatus status;
+    editor.GetStatus(status);
+    CHECK(status.wordcount == 0);
+
+    doc->Insert(".ss1\rHello World\r");
+    editor.GetStatus(status);
+    CHECK(status.wordcount == 2);
+
+    doc->Insert("one more\r");
+    editor.GetStatus(status);
+    CHECK(status.wordcount == 4);
 }
