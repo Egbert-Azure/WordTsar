@@ -2030,7 +2030,7 @@ void cEditorBase::InsertText(const std::string& text)
         // Overwrite real graphemes, applying per-type rules to control markers:
         //   - format/tab/variable markers: delete (Delete() cleans up the tables)
         //   - font/color markers: stop and insert in front (preserve the marker)
-        //   - footnote/endnote anchors and saved positions: jump over (preserve)
+        //   - footnote/endnote anchors: jump over (preserve)
         //   - line end / document end: stop
         POSITION_T pos = mDocument->GetPosition();
         size_t remaining = graphemesToInsert;
@@ -2040,11 +2040,6 @@ void cEditorBase::InsertText(const std::string& text)
             if (ch.empty() || ch[0] == HARD_RETURN || ch[0] == STYLE_EOF)
             {
                 break;  // line end or document end
-            }
-            if (ch[0] == SAVE_CHAR)
-            {
-                pos++;  // jump over a saved-position bookmark (non-deletable)
-                continue;
             }
             if (ch[0] == MARKER_CHAR)
             {
@@ -2839,19 +2834,8 @@ void cEditorBase::ToggleHideBlock(void)
         return;
     }
 
-    if (mDocument->mBlockSet == true)
-    {
-        // Block is visible - hide it
-        mDocument->mBlockSet = false;
-    }
-    else
-    {
-        // Block is hidden - show it if positions are set
-        if (mDocument->mStartBlock != NOT_SET && mDocument->mEndBlock != NOT_SET)
-        {
-            mDocument->mBlockSet = true;
-        }
-    }
+    // Hides a highlighted block (and its markers) or shows a hidden one
+    mDocument->ToggleHideBlock();
 
     // Repaint to update block highlighting
     Repaint();
@@ -5362,6 +5346,9 @@ void cEditorBase::LoadFileState(const std::string& filepath)
         return;
     }
 
+    // The loaded document starts without markers
+    mDocument->ClearMarkers();
+
     // Build companion file path: dir/.ws-filename
     std::filesystem::path path(filepath);
     std::filesystem::path companion = path.parent_path() / (".ws-" + path.filename().string());
@@ -5378,42 +5365,52 @@ void cEditorBase::LoadFileState(const std::string& filepath)
     mDocument->SetPosition(pos);
 
     // Restore 10 saved positions
-    mDocument->mSavePosition[0] = ini.GetLongValue("internal", "save1", NOT_SET);
-    mDocument->mSavePosition[1] = ini.GetLongValue("internal", "save2", NOT_SET);
-    mDocument->mSavePosition[2] = ini.GetLongValue("internal", "save3", NOT_SET);
-    mDocument->mSavePosition[3] = ini.GetLongValue("internal", "save4", NOT_SET);
-    mDocument->mSavePosition[4] = ini.GetLongValue("internal", "save5", NOT_SET);
-    mDocument->mSavePosition[5] = ini.GetLongValue("internal", "save6", NOT_SET);
-    mDocument->mSavePosition[6] = ini.GetLongValue("internal", "save7", NOT_SET);
-    mDocument->mSavePosition[7] = ini.GetLongValue("internal", "save8", NOT_SET);
-    mDocument->mSavePosition[8] = ini.GetLongValue("internal", "save9", NOT_SET);
-    mDocument->mSavePosition[9] = ini.GetLongValue("internal", "save10", NOT_SET);
-
-    // Format migration: saved positions of 0 become NOT_SET (old format compatibility)
     for (int loop = 0; loop < 10; loop++)
     {
-        if (mDocument->mSavePosition[loop] == 0)
-        {
-            mDocument->mSavePosition[loop] = NOT_SET;
-        }
+        std::string key = "save" + std::to_string(loop + 1);
+        mDocument->mSavePosition[loop] = ini.GetLongValue("internal", key.c_str(), NOT_SET);
     }
 
     // Restore block selection state
     mDocument->mStartBlock = ini.GetLongValue("internal", "blockstart", NOT_SET);
     mDocument->mEndBlock = ini.GetLongValue("internal", "blockend", NOT_SET);
     mDocument->mBlockSet = ini.GetBoolValue("internal", "blockactive", false);
+    mDocument->mBlockHidden = ini.GetBoolValue("internal", "blockhidden", false);
 
-    // Format migration: block positions of 0 become NOT_SET when block is inactive
-    if (mDocument->mBlockSet == false)
+    // Old format (no markerformat key): 0 meant "not set"
+    if (ini.GetLongValue("internal", "markerformat", 1) < 2)
     {
-        if (mDocument->mStartBlock == 0)
+        std::replace(std::begin(mDocument->mSavePosition), std::end(mDocument->mSavePosition),
+                     static_cast<POSITION_T>(0), static_cast<POSITION_T>(NOT_SET));
+        if (mDocument->mBlockSet == false)
         {
-            mDocument->mStartBlock = NOT_SET;
+            if (mDocument->mStartBlock == 0)
+            {
+                mDocument->mStartBlock = NOT_SET;
+            }
+            if (mDocument->mEndBlock == 0)
+            {
+                mDocument->mEndBlock = NOT_SET;
+            }
         }
-        if (mDocument->mEndBlock == 0)
+    }
+
+    // Drop positions outside the document (the EOF position is the last valid one)
+    POSITION_T lastPos = mDocument->GetTextSize() - 1;
+    auto validate = [lastPos](POSITION_T &marker)
+    {
+        if (marker < 0 || marker > lastPos)
         {
-            mDocument->mEndBlock = NOT_SET;
+            marker = NOT_SET;
         }
+    };
+    std::for_each(std::begin(mDocument->mSavePosition), std::end(mDocument->mSavePosition), validate);
+    validate(mDocument->mStartBlock);
+    validate(mDocument->mEndBlock);
+    if (mDocument->mStartBlock == NOT_SET || mDocument->mEndBlock <= mDocument->mStartBlock)
+    {
+        mDocument->mBlockSet = false;
+        mDocument->mBlockHidden = false;
     }
 
     // Restore display mode (0 = continuous, 1 = page)
@@ -5460,21 +5457,20 @@ void cEditorBase::SaveFileState(const std::string& filepath)
     ini.SetLongValue("internal", "cursor", pos);
 
     // Save 10 saved positions
-    ini.SetLongValue("internal", "save1", mDocument->mSavePosition[0]);
-    ini.SetLongValue("internal", "save2", mDocument->mSavePosition[1]);
-    ini.SetLongValue("internal", "save3", mDocument->mSavePosition[2]);
-    ini.SetLongValue("internal", "save4", mDocument->mSavePosition[3]);
-    ini.SetLongValue("internal", "save5", mDocument->mSavePosition[4]);
-    ini.SetLongValue("internal", "save6", mDocument->mSavePosition[5]);
-    ini.SetLongValue("internal", "save7", mDocument->mSavePosition[6]);
-    ini.SetLongValue("internal", "save8", mDocument->mSavePosition[7]);
-    ini.SetLongValue("internal", "save9", mDocument->mSavePosition[8]);
-    ini.SetLongValue("internal", "save10", mDocument->mSavePosition[9]);
+    for (int loop = 0; loop < 10; loop++)
+    {
+        std::string key = "save" + std::to_string(loop + 1);
+        ini.SetLongValue("internal", key.c_str(), mDocument->mSavePosition[loop]);
+    }
 
     // Save block selection state
     ini.SetLongValue("internal", "blockstart", mDocument->mStartBlock);
     ini.SetLongValue("internal", "blockend", mDocument->mEndBlock);
     ini.SetBoolValue("internal", "blockactive", mDocument->mBlockSet);
+    ini.SetBoolValue("internal", "blockhidden", mDocument->mBlockHidden);
+
+    // Marker positions are text positions (no marker characters in the text)
+    ini.SetLongValue("internal", "markerformat", 2);
 
     // Save display mode (0 = continuous, 1 = page)
     ini.SetLongValue("internal", "displayMode", static_cast<int>(GetDisplayMode()));
@@ -5850,7 +5846,9 @@ void cEditorBase::ResolveCaretGlyph(sCaretCalcState& state)
             if (graphemeDocPos >= state.offsetInPara)
             {
                 // Found it! Use this glyph's X position and segment height
-                state.caretX = state.caretLine->pagex + segment.position[i] ;
+                // Display X: layout X plus the inline markers drawn before it
+                state.caretX = state.caretLine->pagex + segment.position[i] +
+                               state.caretLine->DecorationOffset(segIdx, i) ;
                 state.caretSegmentHeight = segment.segmentheight ;
 
                 // Calculate glyph width for overwrite mode
@@ -5897,7 +5895,8 @@ void cEditorBase::ResolveCaretGlyph(sCaretCalcState& state)
         if (lastSegment.GetGraphemeCount() > 0)
         {
             size_t lastGlyphIdx = lastSegment.GetGraphemeCount() - 1 ;
-            state.caretX = state.caretLine->pagex + lastSegment.position[lastGlyphIdx] ;
+            state.caretX = state.caretLine->pagex + lastSegment.position[lastGlyphIdx] +
+                           state.caretLine->DecorationOffset(lastSegIdx, lastGlyphIdx) ;
             // Calculate width of last glyph
             state.caretGlyphWidth = lastSegment.totalWidth - lastSegment.position[lastGlyphIdx] ;
             if (state.caretGlyphWidth <= 0)

@@ -2374,11 +2374,11 @@ void cEditorCtrl::DrawLine(QPainter& painter, const sLineLayout& line, const QCo
         }
     }
 
-    for (const auto& segment : line.segments)
+    for (size_t segmentIndex = 0; segmentIndex < line.segments.size(); ++segmentIndex)
     {
         // All segments use line.pagex as base coordinate
         // Their position[] arrays already contain correct continuous offsets
-        DrawSegment(painter, segment, line.pagex, lineY, maxAscent, line.pagenumber, fgOverride);
+        DrawSegment(painter, line, segmentIndex, lineY, maxAscent, fgOverride);
     }
 }
 
@@ -2405,8 +2405,11 @@ void cEditorCtrl::DrawLine(QPainter& painter, const sLineLayout& line, const QCo
 /// by segment.hasControlCodes and segment.controlCodeIndices.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::DrawControlCodeBackgrounds(QPainter& painter, const sSegmentLayout& segment, const std::vector<std::string>& graphemes, COORD_T lineX, COORD_T lineY)
+void cEditorCtrl::DrawControlCodeBackgrounds(QPainter& painter, const sLineLayout& line, size_t segmentIndex, const std::vector<std::string>& graphemes, COORD_T lineY)
 {
+    const sSegmentLayout& segment = line.segments[segmentIndex];
+    COORD_T lineX = line.pagex;
+
     if (!segment.hasControlCodes || segment.controlCodeIndices.empty())
     {
         return;
@@ -2431,7 +2434,7 @@ void cEditorCtrl::DrawControlCodeBackgrounds(QPainter& painter, const sSegmentLa
             continue;
         }
 
-        COORD_T glyphX = lineX + segment.position[idx];
+        COORD_T glyphX = lineX + segment.position[idx] + line.DecorationOffset(segmentIndex, idx);
         COORD_T glyphWidth;
 
         if (idx + 1 < segment.position.size())
@@ -2470,6 +2473,44 @@ void cEditorCtrl::DrawControlCodeBackgrounds(QPainter& painter, const sSegmentLa
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  painter      [in/out] QPainter to draw with (segment font already set)
+/// @param  line         [in] line of the segment
+/// @param  segmentIndex [in] segment whose markers are drawn
+/// @param  lineY        [in] line Y position in TWIPS (screen coordinates)
+/// @param  maxAscent    [in] line baseline offset
+///
+/// @return nothing
+///
+/// @brief
+/// Draws the block / place markers of a segment (<B>, <K>, <0>..<9>) with
+/// the control code highlight, just before the marked grapheme.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::DrawMarkers(QPainter& painter, const sLineLayout& line, size_t segmentIndex, COORD_T lineY, COORD_T maxAscent)
+{
+    const sSegmentLayout& segment = line.segments[segmentIndex];
+    for (const sSegmentMarker& marker : segment.markers)
+    {
+        if (marker.kind != DECORATION_MARKER || marker.index >= segment.position.size())
+        {
+            continue;
+        }
+
+        COORD_T x = line.pagex + segment.position[marker.index] + line.DecorationOffset(segmentIndex, marker.index) - marker.width;
+
+        painter.save();
+        painter.setPen(QPen(mBGroundColour, 2));
+        painter.setBrush(QBrush(mHighlightColour));
+        painter.drawRoundedRect(QRectF(x, lineY, marker.width, segment.segmentheight), 30.0, 30.0);
+        painter.setPen(mHighlightFgColour);
+        painter.drawText(QPointF(x, lineY + maxAscent), QString::fromStdString(marker.text));
+        painter.restore();
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  painter [in/out] QPainter to draw with
 /// @param  segment [in] segment to draw
 /// @param  lineX [in] line X position
@@ -2481,8 +2522,12 @@ void cEditorCtrl::DrawControlCodeBackgrounds(QPainter& painter, const sSegmentLa
 /// Draws a segment with its glyphs.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, COORD_T lineX, COORD_T lineY, COORD_T maxAscent, PAGE_T pageNumber, const QColor& fgOverride)
+void cEditorCtrl::DrawSegment(QPainter& painter, const sLineLayout& line, size_t segmentIndex, COORD_T lineY, COORD_T maxAscent, const QColor& fgOverride)
 {
+    const sSegmentLayout& segment = line.segments[segmentIndex];
+    COORD_T lineX = line.pagex;
+    PAGE_T pageNumber = line.pagenumber;
+
     if (!mDocument || segment.position.empty() || segment.GetGraphemeCount() == 0)
     {
         return;
@@ -2498,7 +2543,7 @@ void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, 
     }
 
     // Draw control code backgrounds FIRST (before text)
-    DrawControlCodeBackgrounds(painter, segment, graphemes, lineX, lineY);
+    DrawControlCodeBackgrounds(painter, line, segmentIndex, graphemes, lineY);
 
     // Get paragraph start position (for MARKER_CHAR document position lookup)
     POSITION_T paragraphStart = 0;
@@ -2541,9 +2586,12 @@ void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, 
     }
     painter.setPen(textColor);
 
+    // Block / place markers drawn over the layout
+    DrawMarkers(painter, line, segmentIndex, lineY, maxAscent);
+
     for (size_t i = 0; i < graphemes.size(); ++i)
     {
-        COORD_T x = lineX + segment.position[i];
+        COORD_T x = lineX + segment.position[i] + line.DecorationOffset(segmentIndex, i);
 
         // Calculate absolute document position for this grapheme
         POSITION_T docPos = paragraphStart + segment.startPosition + i;
@@ -2584,7 +2632,7 @@ void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, 
             continue;
         }
 
-        if (!graphemes[i].empty() && (graphemes[i][0] == MARKER_CHAR || graphemes[i][0] == REPLACE_CHAR || graphemes[i][0] == SAVE_CHAR))
+        if (!graphemes[i].empty() && graphemes[i][0] == MARKER_CHAR)
         {
             isControlCode = true;
 
@@ -2639,7 +2687,8 @@ void cEditorCtrl::DrawSegment(QPainter& painter, const sSegmentLayout& segment, 
     if (segment.autoHyphen && !segment.position.empty())
     {
         COORD_T hyphenGlyphWidth = mLayout->GetTextWidth("-", segment.font);
-        COORD_T x = lineX + segment.position[0] + segment.totalWidth - hyphenGlyphWidth;
+        COORD_T x = lineX + segment.position[0] + segment.totalWidth - hyphenGlyphWidth +
+                    line.DecorationOffset(segmentIndex, segment.position.size());
         COORD_T y = lineY + maxAscent;
         COORD_T rollAmount = mLayout->GetSubSuperRoll();
         if (segment.isSubscript)
@@ -4140,8 +4189,10 @@ void cEditorCtrl::GenerateHighlightRects(void)
             COORD_T maxRight = 0;  // Track rightmost edge
 
             // Process each segment in visible line
-            for (const auto& segment : line.segments)
+            for (size_t blockSegIdx = 0; blockSegIdx < line.segments.size(); ++blockSegIdx)
             {
+                const sSegmentLayout& segment = line.segments[blockSegIdx];
+
                 // Skip unmarked segments
                 if (!segment.isBlock)
                 {
@@ -4154,8 +4205,10 @@ void cEditorCtrl::GenerateHighlightRects(void)
                     continue;
                 }
 
-                // Calculate segment bounding rectangle
-                COORD_T segmentX = line.pagex + segment.position[0];
+                // Calculate segment bounding rectangle (display X: includes the
+                // place markers drawn inside the block)
+                COORD_T segmentX = line.pagex + segment.position[0] +
+                                   line.DecorationOffset(blockSegIdx, 0) - segment.GetMarkerWidth(0);
                 COORD_T segmentY = ScreenYToViewportY(&line);
                 COORD_T segmentWidth = 0;
                 COORD_T segmentHeight = segment.segmentheight;
@@ -4207,6 +4260,14 @@ void cEditorCtrl::GenerateHighlightRects(void)
                             segmentWidth = metrics.horizontalAdvance(glyph);
                         }
                     }
+                }
+
+                // Markers inside the segment widen the display span
+                segmentWidth += segment.GetMarkerWidth(0);
+                if (segment.position.size() > 1)
+                {
+                    size_t lastIndex = segment.position.size() - 1;
+                    segmentWidth += line.DecorationOffset(blockSegIdx, lastIndex) - line.DecorationOffset(blockSegIdx, 0);
                 }
 
                 // Create rectangle

@@ -1659,7 +1659,8 @@ TEST_CASE("Block Select")
         CHECK(set == false) ;
         CHECK(start == 4) ;
         CHECK(end == NOT_SET) ;
-        CHECK(document.GetCharNoAdvance(4)[0] == 0) ;
+        // a block marker is a position only: no character is inserted
+        CHECK(document.GetCharNoAdvance(4)[0] == ' ') ;
     }
 
     SUBCASE("Block Select in paragraph")
@@ -1672,17 +1673,14 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 4) ;
-        CHECK(end == 9) ;
+        CHECK(end == 10) ;
     }
 
     SUBCASE("Block Select, end marked before start (^KK then ^KB, order independence)")
     {
         // Classic WordStar lets either block boundary be marked first. Mirrors
-        // "Block Select in paragraph" above but with ^KK/^KB reversed; end position
-        // is 9 rather than 10 because that test's begin-first marker insertion
-        // shifts the buffer by one before its SetPosition(10) is issued, whereas
-        // here no marker is ever inserted (see cDocument::SetEndBlock/SetBeginBlock).
-        document.SetPosition(9) ;
+        // "Block Select in paragraph" above but with ^KK/^KB reversed.
+        document.SetPosition(10) ;
         document.SetEndBlock() ;
         document.SetPosition(4) ;
         document.SetBeginBlock() ;
@@ -1690,7 +1688,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 4) ;
-        CHECK(end == 9) ;
+        CHECK(end == 10) ;
     }
 
     SUBCASE("Delete Character 1")
@@ -1704,7 +1702,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 3) ;
-        CHECK(end == 8) ;
+        CHECK(end == 9) ;
     }
 
     SUBCASE("Delete Character 2")
@@ -1718,7 +1716,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 21) ;
-        CHECK(end == 26) ;
+        CHECK(end == 27) ;
     }
 
     SUBCASE("Delete Character 3")
@@ -1732,7 +1730,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 4) ;
-        CHECK(end == 8) ;
+        CHECK(end == 9) ;
     }
 
     SUBCASE("Delete Paragraph 1")
@@ -1746,7 +1744,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 21) ;
-        CHECK(end == 26) ;
+        CHECK(end == 27) ;
     }
 
     SUBCASE("Delete Paragraph 2")
@@ -1760,7 +1758,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 33) ;
-        CHECK(end == 36) ;
+        CHECK(end == 37) ;
     }
 
     SUBCASE("Insert Character 1")
@@ -1775,7 +1773,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 5) ;
-        CHECK(end == 10) ;
+        CHECK(end == 11) ;
     }
 
     SUBCASE("Insert Character 2")
@@ -1790,7 +1788,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 23) ;
-        CHECK(end == 28) ;
+        CHECK(end == 29) ;
     }
 
     SUBCASE("Insert Character 3")
@@ -1805,7 +1803,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 4) ;
-        CHECK(end == 10) ;
+        CHECK(end == 11) ;
     }
 
     // insert paragraph after paragraph 1
@@ -1821,7 +1819,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 23) ;
-        CHECK(end == 28) ;
+        CHECK(end == 29) ;
     }
 
     // insert paragraph after paragraph 2
@@ -1837,7 +1835,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 22) ;
-        CHECK(end == 28) ;
+        CHECK(end == 29) ;
     }
 
     // proper previous block
@@ -1858,7 +1856,7 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 4) ;
-        CHECK(end == 27) ;
+        CHECK(end == 28) ;
     }
 
     // current block not set
@@ -1877,14 +1875,14 @@ TEST_CASE("Block Select")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 22) ;
-        CHECK(end == 27) ;
+        CHECK(end == 28) ;
 
         document.SetPreviousBlock() ;
 
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 22) ;
-        CHECK(end == 27) ;
+        CHECK(end == 28) ;
     }
 
     // copy block
@@ -1903,7 +1901,7 @@ TEST_CASE("Block Select")
 
         document.CopyBlock() ;
 
-        std::string copy = two.substr(7, 5) ;
+        std::string copy = two.substr(7, 6) ;
         std::string newone = one.insert(4, copy) ;
         CHECK(document.GetParagraphText(0) == newone) ;
         CHECK(document.GetParagraphText(1) == two) ;
@@ -1924,7 +1922,7 @@ TEST_CASE("Block Select")
 
         document.DeleteBlock() ;
 
-        two.erase(7, 5) ;
+        two.erase(7, 6) ;
         CHECK(document.GetParagraphText(1) == two) ;
     }
 
@@ -1943,9 +1941,9 @@ TEST_CASE("Block Select")
 
         document.MoveBlock() ;
 
-        std::string copy = two.substr(7, 5) ;
+        std::string copy = two.substr(7, 6) ;
         std::string newone = one.insert(4, copy) ;
-        two.erase(7, 5) ;
+        two.erase(7, 6) ;
         CHECK(document.GetParagraphText(0) == newone) ;
         CHECK(document.GetParagraphText(1) == two) ;
     }
@@ -1985,7 +1983,7 @@ TEST_CASE("Block Select")
         CHECK(document.mBlockSet == false) ;
         CHECK(document.mStartBlock == NOT_SET) ;
         CHECK(document.mEndBlock == NOT_SET) ;
-        CHECK(document.GetTextSize() == sizeBeforeCut - 5) ;
+        CHECK(document.GetTextSize() == sizeBeforeCut - 6) ;
     }
 
     SUBCASE("Cut from non-zero start, caret at block start")
@@ -2003,7 +2001,7 @@ TEST_CASE("Block Select")
         CHECK(document.mBlockSet == false) ;
         CHECK(document.mStartBlock == NOT_SET) ;
         CHECK(document.mEndBlock == NOT_SET) ;
-        CHECK(document.GetTextSize() == sizeBeforeCut - 5) ;
+        CHECK(document.GetTextSize() == sizeBeforeCut - 6) ;
     }
 
     SUBCASE("Cut from non-zero start, caret before block")
@@ -2021,7 +2019,7 @@ TEST_CASE("Block Select")
         CHECK(document.mBlockSet == false) ;
         CHECK(document.mStartBlock == NOT_SET) ;
         CHECK(document.mEndBlock == NOT_SET) ;
-        CHECK(document.GetTextSize() == sizeBeforeCut - 5) ;
+        CHECK(document.GetTextSize() == sizeBeforeCut - 6) ;
     }
 
     SUBCASE("Cut from non-zero start, caret after block")
@@ -2035,11 +2033,11 @@ TEST_CASE("Block Select")
         document.SetPosition(14) ;
         document.Cut() ;
 
-        CHECK(document.GetPosition() == 9) ;
+        CHECK(document.GetPosition() == 8) ;
         CHECK(document.mBlockSet == false) ;
         CHECK(document.mStartBlock == NOT_SET) ;
         CHECK(document.mEndBlock == NOT_SET) ;
-        CHECK(document.GetTextSize() == sizeBeforeCut - 5) ;
+        CHECK(document.GetTextSize() == sizeBeforeCut - 6) ;
     }
 
     SUBCASE("Delete at mStartBlock position does not over-decrement mStartBlock")
@@ -2094,7 +2092,7 @@ TEST_CASE("GetPreviousBlock Test")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 5) ;
-        CHECK(end == 9) ;
+        CHECK(end == 10) ;
 
         // Previous block should still not be set
         prevSet = document.GetPreviousBlock(prevStart, prevEnd) ;
@@ -2127,7 +2125,7 @@ TEST_CASE("GetPreviousBlock Test")
         set = document.GetBlock(start, end) ;
         CHECK(set == true) ;
         CHECK(start == 25) ;
-        CHECK(end == 29) ;
+        CHECK(end == 30) ;
 
         // Verify previous block holds the first block
         prevSet = document.GetPreviousBlock(prevStart, prevEnd) ;
@@ -2259,25 +2257,26 @@ TEST_CASE("Saved Positions Test")
 
     SUBCASE("Set Position")
     {
+        POSITION_T size = document.GetTextSize() ;
+        std::string before = document.GetCharNoAdvance(4) ;
+
         document.SetPosition(4) ;
         document.SetSavePosition(1) ;
 
+        // a place marker is a position only: no text, no undo step
         CHECK(document.mSavePosition[1] == 4) ;
-        CHECK(document.GetCharNoAdvance(4)[0] == SAVE_CHAR) ;
+        CHECK(document.GetTextSize() == size) ;
+        CHECK(document.GetCharNoAdvance(4) == before) ;
     }
 
-    SUBCASE("Set to same position")
+    SUBCASE("Set to same position removes the marker")
     {
         document.SetPosition(4) ;
         document.SetSavePosition(1) ;
         CHECK(document.mSavePosition[1] == 4) ;
-        CHECK(document.GetCharNoAdvance(4)[0] == SAVE_CHAR) ;
 
-        // we test for position 5 since saving a position adds a char to the buffere
-        document.SetPosition(5) ;
         document.SetSavePosition(1) ;
         CHECK(document.mSavePosition[1] == NOT_SET) ;
-        CHECK(document.GetCharNoAdvance(4)[0] != SAVE_CHAR) ;
     }
 
     SUBCASE("Change position")
@@ -2285,47 +2284,49 @@ TEST_CASE("Saved Positions Test")
         document.SetPosition(4) ;
         document.SetSavePosition(1) ;
         CHECK(document.mSavePosition[1] == 4) ;
-        CHECK(document.GetCharNoAdvance(4)[0] == SAVE_CHAR) ;
 
         document.SetPosition(10) ;
         document.SetSavePosition(1) ;
-        CHECK(document.GetCharNoAdvance(4)[0] != SAVE_CHAR) ;
-
-        // check position 9, since removing old position removed a char from buffer
-        CHECK(document.mSavePosition[1] == 9) ;
-        CHECK(document.GetCharNoAdvance(9)[0] == SAVE_CHAR) ;
+        CHECK(document.mSavePosition[1] == 10) ;
     }
 
-    SUBCASE("SetBeginBlock at SetSavePosition location preserves save marker")
+    SUBCASE("SetBeginBlock at a place marker keeps the marker")
     {
-        // Capture the byte SetSavePosition writes into the buffer in a clean
-        // scenario; that is the "save marker" character for this build,
-        // regardless of which codepoint the implementation picks.
         document.SetPosition(4) ;
         document.SetSavePosition(0) ;
         REQUIRE(document.mSavePosition[0] == 4) ;
-        std::string saveMarker = document.GetCharNoAdvance(4) ;
-
-        // Toggle the bookmark off so the document is back to a clean state.
-        document.SetPosition(5) ;
-        document.SetSavePosition(0) ;
-        REQUIRE(document.mSavePosition[0] == NOT_SET) ;
-
-        // Bug scenario: save bookmark + block start at exactly the same position.
-        document.SetPosition(4) ;
-        document.SetSavePosition(0) ;
-        REQUIRE(document.mSavePosition[0] == 4) ;
-        REQUIRE(document.GetCharNoAdvance(4) == saveMarker) ;
 
         document.SetPosition(4) ;
         document.SetBeginBlock() ;
         document.SetPosition(10) ;
         document.SetEndBlock() ;
 
-        // The block end must not have destroyed the save marker. The bookmark
-        // should still point at a byte holding the save marker character.
-        REQUIRE(document.mSavePosition[0] != NOT_SET) ;
-        CHECK(document.GetCharNoAdvance(document.mSavePosition[0]) == saveMarker) ;
+        CHECK(document.mSavePosition[0] == 4) ;
+        CHECK(document.mStartBlock == 4) ;
+        CHECK(document.mEndBlock == 10) ;
+    }
+
+    SUBCASE("markers follow the text on insert and delete")
+    {
+        document.SetPosition(10) ;
+        document.SetSavePosition(2) ;
+        REQUIRE(document.mSavePosition[2] == 10) ;
+
+        document.SetPosition(0) ;
+        document.Insert("XY") ;
+        CHECK(document.mSavePosition[2] == 12) ;
+
+        document.Delete(0, 2) ;
+        CHECK(document.mSavePosition[2] == 10) ;
+
+        // text inserted at the marker goes after it
+        document.SetPosition(10) ;
+        document.Insert("Z") ;
+        CHECK(document.mSavePosition[2] == 10) ;
+
+        // a marker inside a deleted range moves to its start
+        document.Delete(8, 6) ;
+        CHECK(document.mSavePosition[2] == 8) ;
     }
 }
 
@@ -4285,7 +4286,7 @@ TEST_CASE("Undo Redo System")
         // Select "Hello" (positions 0-4)
         document.SetPosition(0) ;
         document.SetBeginBlock() ;
-        document.SetPosition(6) ; // after marker
+        document.SetPosition(5) ;
         document.SetEndBlock() ;
         document.ClearUndoHistory() ;
 
@@ -4317,7 +4318,7 @@ TEST_CASE("Undo Redo System")
         // Select "Hello" (positions 0-4)
         document.SetPosition(0) ;
         document.SetBeginBlock() ;
-        document.SetPosition(6) ; // after marker
+        document.SetPosition(5) ;
         document.SetEndBlock() ;
         document.ClearUndoHistory() ;
 
@@ -4345,7 +4346,7 @@ TEST_CASE("Undo Redo System")
         // Select "Hello"
         document.SetPosition(0) ;
         document.SetBeginBlock() ;
-        document.SetPosition(6) ; // after marker
+        document.SetPosition(5) ;
         document.SetEndBlock() ;
         document.Copy() ;
         document.ClearUndoHistory() ;
@@ -4374,7 +4375,7 @@ TEST_CASE("Undo Redo System")
         // Select "Hello" (positions 0-4)
         document.SetPosition(0) ;
         document.SetBeginBlock() ;
-        document.SetPosition(6) ; // after marker
+        document.SetPosition(5) ;
         document.SetEndBlock() ;
         document.ClearUndoHistory() ;
 
@@ -5285,7 +5286,7 @@ TEST_CASE("Undo Redo System")
         // Select the block containing the tab (A, tab, B)
         document.SetPosition(0) ;
         document.SetBeginBlock() ;
-        document.SetPosition(4) ;  // after marker shift: 3 chars + marker
+        document.SetPosition(3) ;
         document.SetEndBlock() ;
         document.Copy() ;
 
@@ -5322,7 +5323,7 @@ TEST_CASE("Undo Redo System")
         // Select the block containing the font marker
         document.SetPosition(0) ;
         document.SetBeginBlock() ;
-        document.SetPosition(4) ;  // after marker shift
+        document.SetPosition(3) ;
         document.SetEndBlock() ;
         document.Copy() ;
 
@@ -5357,7 +5358,7 @@ TEST_CASE("Undo Redo System")
         // Select the block containing the color marker
         document.SetPosition(0) ;
         document.SetBeginBlock() ;
-        document.SetPosition(4) ;  // after marker shift
+        document.SetPosition(3) ;
         document.SetEndBlock() ;
         document.Copy() ;
 
@@ -5397,7 +5398,7 @@ TEST_CASE("Undo Redo System")
         // Select the entire content (X, variable, Y)
         document.SetPosition(0) ;
         document.SetBeginBlock() ;
-        document.SetPosition(4) ;  // after marker shift, select X, var, Y
+        document.SetPosition(3) ;
         document.SetEndBlock() ;
         document.Copy() ;
 
@@ -5440,7 +5441,7 @@ TEST_CASE("Undo Redo System")
         // Select and copy
         document.SetPosition(0) ;
         document.SetBeginBlock() ;
-        document.SetPosition(4) ;  // after marker
+        document.SetPosition(3) ;
         document.SetEndBlock() ;
         document.Copy() ;
 
@@ -5551,7 +5552,7 @@ TEST_CASE("Clipboard Operations")
 
         CHECK(blockSet == true);
         CHECK(start == 1);
-        CHECK(end == 4); // End is inclusive in GetBlock
+        CHECK(end == 5); // End is exclusive in GetBlock
     }
 
     SUBCASE("Copy Simple Text Front")
@@ -5578,7 +5579,7 @@ TEST_CASE("Clipboard Operations")
 
         CHECK(blockSet == true);
         CHECK(start == 0);
-        CHECK(end == 4); // End is inclusive in GetBlock
+        CHECK(end == 5); // End is exclusive in GetBlock
     }
 
     SUBCASE("Cut Simple Text")
@@ -5589,7 +5590,7 @@ TEST_CASE("Clipboard Operations")
         // Set a block
         document.SetPosition(6);
         document.SetBeginBlock();
-        document.SetPosition(12);   // we go to 12, since ^KB inserts a char
+        document.SetPosition(11);
         document.SetEndBlock();
         
         POSITION_T originalSize = document.GetTextSize();
@@ -5757,7 +5758,7 @@ TEST_CASE("Clipboard Operations")
         // Copy "A"
         document.SetPosition(0);
         document.SetBeginBlock();
-        document.SetPosition(2);
+        document.SetPosition(1);
         document.SetEndBlock();
         document.Copy();
         
@@ -5769,7 +5770,7 @@ TEST_CASE("Clipboard Operations")
         // Copy "B"
         document.SetPosition(1);
         document.SetBeginBlock();
-        document.SetPosition(3);
+        document.SetPosition(2);
         document.SetEndBlock();
         document.Copy();
         
@@ -8025,7 +8026,7 @@ TEST_CASE("Document Listener - Composite operations delegate to leaf")
         // set up block
         doc.SetPosition(0) ;
         doc.SetBeginBlock() ;
-        doc.SetPosition(6) ;  // after marker shift
+        doc.SetPosition(5) ;
         doc.SetEndBlock() ;
         doc.Copy() ;
 
@@ -9618,13 +9619,11 @@ TEST_CASE("Block selection: SetEndBlock with pos at or before StartBlock")
     doc.SetShowControl(SHOW_ALL) ;
     doc.Insert("Hello\r") ;
 
-    // Set begin block at position 3, which inserts a REPLACE_CHAR marker
+    // Set begin block at position 3
     doc.SetPosition(3) ;
     doc.SetBeginBlock() ;
 
-    // Set end block at same position (3) -- with marker present, the original
-    // position 3 is now at position 4, so position 3 is the marker itself.
-    // This creates an invalid/empty block.
+    // Set end block at the same position (3): an empty block, which is not set.
     doc.SetPosition(3) ;
     doc.SetEndBlock() ;
 
@@ -9668,12 +9667,11 @@ TEST_CASE("Block selection: block spanning multiple paragraphs")
     doc.Insert("Line1\rLine2\rLine3\r") ;
 
     // Select from position 2 (in "Line1") across paragraph boundary into "Line2"
-    // With marker: SetBeginBlock at 2 inserts marker, shifting everything right by 1
     doc.SetPosition(2) ;
     doc.SetBeginBlock() ;
 
-    // Position 10 in the shifted document (originally position 9, in "Line2")
-    doc.SetPosition(10) ;
+    // Position 9 is in "Line2"
+    doc.SetPosition(9) ;
     doc.SetEndBlock() ;
 
     POSITION_T start, end ;
@@ -9696,11 +9694,10 @@ TEST_CASE("Block selection: select entire document")
 
     POSITION_T textSize = doc.GetTextSize() ;
 
-    // Select from 0 to end (with marker shift)
+    // Select from 0 to end
     doc.SetPosition(0) ;
     doc.SetBeginBlock() ;
 
-    // textSize is now shifted by 1 due to marker insertion
     doc.SetPosition(textSize) ;
     doc.SetEndBlock() ;
 
@@ -10449,5 +10446,126 @@ TEST_CASE("Modified state: save point in the undo history")
         doc.Delete(0, 4) ;
         doc.Undo() ;
         CHECK(doc.IsModified() == false) ;
+    }
+}
+
+
+TEST_CASE("Markers never change the text, undo history or modified state")
+{
+    cDocument doc ;
+    doc.Insert("Hello World\r") ;
+    doc.MarkSaved() ;
+    doc.ClearUndoHistory() ;
+    doc.MarkSaved() ;
+    POSITION_T size = doc.GetTextSize() ;
+    std::string before = EofTestDocumentText(doc) ;
+
+    SUBCASE("block and place markers")
+    {
+        doc.SetPosition(0) ;
+        doc.SetBeginBlock() ;
+        doc.SetPosition(5) ;
+        doc.SetEndBlock() ;
+        doc.SetPosition(7) ;
+        doc.SetSavePosition(3) ;
+        doc.ToggleHideBlock() ;
+        doc.ToggleHideBlock() ;
+        doc.UnsetBlock() ;
+
+        CHECK(doc.GetTextSize() == size) ;
+        CHECK(EofTestDocumentText(doc) == before) ;
+        CHECK(doc.CanUndo() == false) ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("block operations undo back to unmodified")
+    {
+        doc.SetPosition(0) ;
+        doc.SetBeginBlock() ;
+        doc.SetPosition(5) ;
+        doc.SetEndBlock() ;
+        CHECK(doc.IsModified() == false) ;
+
+        doc.SetPosition(11) ;
+        doc.BeginUndoGroup() ;
+        doc.CopyBlock() ;
+        doc.EndUndoGroup() ;
+        CHECK(doc.IsModified() == true) ;
+        CHECK(doc.GetTextSize() == size + 5) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == false) ;
+        CHECK(EofTestDocumentText(doc) == before) ;
+
+        doc.BeginUndoGroup() ;
+        doc.DeleteBlock() ;
+        doc.EndUndoGroup() ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(EofTestDocumentText(doc) == before) ;
+        CHECK(doc.IsModified() == false) ;
+    }
+}
+
+
+TEST_CASE("Markers: hidden block, raw NUL and SOH, and clear")
+{
+    cDocument doc ;
+    doc.Insert("ABCDEFGH\r") ;
+
+    SUBCASE("raw NUL and SOH are not inserted as text")
+    {
+        POSITION_T size = doc.GetTextSize() ;
+        doc.SetPosition(2) ;
+        doc.Insert(static_cast<CHAR_T>(0)) ;
+        doc.Insert(static_cast<CHAR_T>(1)) ;
+        CHECK(doc.GetTextSize() == size) ;
+    }
+
+    SUBCASE("hidden block shows no markers and no highlight")
+    {
+        doc.SetPosition(2) ;
+        doc.SetBeginBlock() ;
+        std::vector<sDisplayMarker> markers ;
+        doc.GetDisplayMarkers(0, doc.GetTextSize(), markers) ;
+        REQUIRE(markers.size() == 1) ;
+        CHECK(markers[0].text == "<B>") ;
+        CHECK(markers[0].position == 2) ;
+
+        doc.SetPosition(6) ;
+        doc.SetEndBlock() ;
+        doc.GetDisplayMarkers(0, doc.GetTextSize(), markers) ;
+        CHECK(markers.empty()) ;
+        CHECK(doc.mBlockSet == true) ;
+
+        doc.ToggleHideBlock() ;
+        doc.GetDisplayMarkers(0, doc.GetTextSize(), markers) ;
+        CHECK(markers.empty()) ;
+        CHECK(doc.mBlockSet == false) ;
+        CHECK(doc.mBlockHidden == true) ;
+        POSITION_T start, end ;
+        CHECK(doc.GetBlock(start, end) == false) ;
+    }
+
+    SUBCASE("deleting a whole marked block clears it")
+    {
+        doc.SetPosition(2) ;
+        doc.SetBeginBlock() ;
+        doc.SetPosition(5) ;
+        doc.SetEndBlock() ;
+        doc.Delete(2, 3) ;
+        CHECK(doc.mBlockSet == false) ;
+        CHECK(doc.mStartBlock == NOT_SET) ;
+        CHECK(doc.mEndBlock == NOT_SET) ;
+    }
+
+    SUBCASE("ClearMarkers clears every marker")
+    {
+        doc.SetPosition(1) ;
+        doc.SetSavePosition(7) ;
+        doc.SetBeginBlock() ;
+        doc.ClearMarkers() ;
+        CHECK(doc.mSavePosition[7] == NOT_SET) ;
+        CHECK(doc.mStartBlock == NOT_SET) ;
+        CHECK(doc.mBlockSet == false) ;
     }
 }

@@ -226,6 +226,21 @@ struct sUndoGroup
 };
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @struct sDisplayMarker
+///
+/// @brief
+/// A block or place marker shown inline before the grapheme at position.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sDisplayMarker
+{
+    POSITION_T position ;                               ///< document position the marker is drawn before
+    std::string text ;                                  ///< display text (<B>, <K>, <0>..<9>)
+};
+
+
 class cDocument
 {
     // =================================================================
@@ -323,6 +338,9 @@ public:
     void MoveBlock(void) ;
     void DeleteBlock(void) ;
     void UnsetBlock(void) ;
+    void ToggleHideBlock(void) ;
+    void ClearMarkers(void) ;
+    void GetDisplayMarkers(POSITION_T start, POSITION_T end, std::vector<sDisplayMarker> &markers) ;
 
     // --- Find ---
     POSITION_T FindNext(const std::string &needle, const POSITION_T &start, bool wildcard = false, bool casecmp = false, bool wholeword = false) ;
@@ -428,6 +446,7 @@ private:
     // --- Listener Notification (suppressed during loading and undo/redo) ---
     void NotifyChanged(PARAGRAPH_T fromParagraph) ;
     void NotifyCleared(void) ;
+    void NotifyMarkersChanged(const std::vector<POSITION_T> &positions) ;
 
     // --- Undo Helpers ---
     void RecordAction(eUndoActionType type, POSITION_T position, POSITION_T length,
@@ -449,9 +468,11 @@ public:
     POSITION_T mOldStartBlock ;                         ///< old position where a selected block starts
     POSITION_T mOldEndBlock ;                           ///< old position where a selected block ends
     bool mBlockSet ;                                    ///< true if a block is marked, else false
+    bool mBlockHidden ;                                 ///< true if the block is hidden with ^KH (no highlight, no markers)
     bool mOldBlockSet ;                                 ///< true if a previous block is set, else false
     POSITION_T mSavedBlocks[4] ;                        ///< saved blocks
     bool mSavedBlockSet[2] ;                            ///< saved block flags
+    bool mSavedBlockHidden ;                            ///< saved block hidden flag
 
     // --- Saved Positions ---
     POSITION_T mSavePosition[10] ;                      ///< saved positions

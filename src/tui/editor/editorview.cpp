@@ -29,6 +29,8 @@
 #include "src/input/inputhandler.h"
 #include "src/core/include/config.h"
 
+#include <algorithm>
+#include <numeric>
 #include <string>
 #include <vector>
 #include <cmath>
@@ -44,8 +46,6 @@ namespace
 
 // Control-code markers stored in the document buffer (see config.h).
 const unsigned char MARKER = 127;   // MARKER_CHAR
-const unsigned char REPLACE = 0;    // REPLACE_CHAR
-const unsigned char SAVE = 1;       // SAVE_CHAR
 const unsigned char HARDCR = 13;    // HARD_RETURN
 const unsigned char EOFCH = 26;     // ^Z
 
@@ -439,11 +439,15 @@ int cWSEditorView::LineEndCol(const sLineLayout* line, COORD_T twipsPerCol) cons
 
     int col = LineStartCol(line, twipsPerCol);
     POSITION_T docPos = line->documentPosition;
+    POSITION_T paraStart = line->documentPosition - line->linestart;
 
     for (const sSegmentLayout& seg : line->segments)
     {
+        docPos = paraStart + seg.startPosition;
+
         if (seg.isTab == true)
         {
+            col += MarkerColumns(seg, 0);
             COORD_T currentTwips = static_cast<COORD_T>(col) * twipsPerCol;
             sTabStop nextStop = layout->GetNextTabStop(currentTwips);
             int nextCol = static_cast<int>(nextStop.position / twipsPerCol);
@@ -460,6 +464,7 @@ int cWSEditorView::LineEndCol(const sLineLayout* line, COORD_T twipsPerCol) cons
         seg.GetGraphemes(doc, graphemes);
         for (size_t gi = 0; gi < graphemes.size(); ++gi)
         {
+            col += MarkerColumns(seg, gi);
             col += GraphemeColumns(docPos, graphemes[gi], line->pagenumber);
             docPos++;
         }
@@ -487,7 +492,7 @@ int cWSEditorView::LineEndCol(const sLineLayout* line, COORD_T twipsPerCol) cons
 int cWSEditorView::GraphemeColumns(POSITION_T docPos, const std::string& grapheme, PAGE_T pagenumber) const
 {
     unsigned char c = grapheme.empty() ? 0 : static_cast<unsigned char>(grapheme[0]);
-    bool isMarker = (c == MARKER) || (c == REPLACE) || (c == SAVE);
+    bool isMarker = (c == MARKER);
     // Soft hyphen (U+00AD, real ^OE character): normally invisible (0
     // columns), same as its 0-twips width in AddGraphemeToSegment(). Under
     // reveal codes it shows as "-" (1 column), via the same
@@ -520,6 +525,28 @@ int cWSEditorView::GraphemeColumns(POSITION_T docPos, const std::string& graphem
         width = isSoftHyphen ? 0 : 1;
     }
     return width;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const sSegmentLayout& seg [in] segment of a line
+/// @param  size_t index [in] grapheme index in the segment
+///
+/// @return number of columns of the inline block / place markers drawn
+///         before that grapheme (0 if none)
+///
+/////////////////////////////////////////////////////////////////////////////
+int cWSEditorView::MarkerColumns(const sSegmentLayout& seg, size_t index) const
+{
+    return std::accumulate(seg.markers.begin(), seg.markers.end(), 0,
+        [index](int sum, const sSegmentMarker& marker)
+        {
+            if (marker.index == index && marker.kind == DECORATION_MARKER)
+            {
+                return sum + static_cast<int>(wordstartui::cUtf8Helper::SplitGraphemes(marker.text).size());
+            }
+            return sum;
+        });
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -587,11 +614,15 @@ int cWSEditorView::LogicalColumnAt(const sLineLayout* line, POSITION_T position)
 
     int col = LineStartCol(line, twipsPerCol);
     POSITION_T docPos = line->documentPosition;
+    POSITION_T paraStart = line->documentPosition - line->linestart;
 
     for (const sSegmentLayout& seg : line->segments)
     {
+        docPos = paraStart + seg.startPosition;
+
         if (seg.isTab == true)
         {
+            col += MarkerColumns(seg, 0);
             if (docPos >= position)
             {
                 return col;
@@ -612,6 +643,7 @@ int cWSEditorView::LogicalColumnAt(const sLineLayout* line, POSITION_T position)
         seg.GetGraphemes(doc, graphemes);
         for (size_t gi = 0; gi < graphemes.size(); ++gi)
         {
+            col += MarkerColumns(seg, gi);
             if (docPos >= position)
             {
                 return col;
@@ -753,6 +785,7 @@ POSITION_T cWSEditorView::PositionInLine(const sLineLayout* line, int targetScre
     int targetCol = (targetScreenCol - mBounds.col) + mHorizScroll;
     int col = LineStartCol(line, twipsPerCol);
     POSITION_T docPos = line->documentPosition;
+    POSITION_T paraStart = line->documentPosition - line->linestart;
 
     if (targetCol <= col)
     {
@@ -761,8 +794,12 @@ POSITION_T cWSEditorView::PositionInLine(const sLineLayout* line, int targetScre
 
     for (const sSegmentLayout& seg : line->segments)
     {
+        docPos = paraStart + seg.startPosition;
+
         if (seg.isTab == true)
         {
+            // A click on an inline marker lands on the grapheme it marks
+            col += MarkerColumns(seg, 0);
             COORD_T currentTwips = static_cast<COORD_T>(col) * twipsPerCol;
             sTabStop nextStop = layout->GetNextTabStop(currentTwips);
             int nextCol = static_cast<int>(nextStop.position / twipsPerCol);
@@ -786,6 +823,7 @@ POSITION_T cWSEditorView::PositionInLine(const sLineLayout* line, int targetScre
 
         for (size_t gi = 0; gi < graphemes.size(); ++gi)
         {
+            col += MarkerColumns(seg, gi);
             if (targetCol <= col)
             {
                 return docPos;
@@ -1119,9 +1157,34 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
         int hs = mHorizScroll;
         int col = startCol;
         POSITION_T docPos = line->documentPosition;
+        POSITION_T paraStart = line->documentPosition - line->linestart;
+        sStyle markerStyle = StyleFor(mEditor->mHighlightFgColour, mEditor->mHighlightColour, wordstartui::CELL_ATTR_NONE);
+
+        // Paint inline block / place marker cells, advancing col
+        auto drawMarkers = [&](const sSegmentLayout& markerSeg, size_t index)
+        {
+            for (const sSegmentMarker& marker : markerSeg.markers)
+            {
+                if ((marker.index != index) || (marker.kind != DECORATION_MARKER))
+                {
+                    continue;
+                }
+                for (const std::string& cell : wordstartui::cUtf8Helper::SplitGraphemes(marker.text))
+                {
+                    int sc = col - hs;
+                    if ((sc >= 0) && (sc < textCols))
+                    {
+                        screen.PutCell(screenRow, mBounds.col + sc, cell, markerStyle);
+                    }
+                    col++;
+                }
+            }
+        };
 
         for (const sSegmentLayout& seg : line->segments)
         {
+            docPos = paraStart + seg.startPosition;
+
             sColor segFg = mEditor->mTextColour;
             sColor segBg = mEditor->mBGroundColour;
 
@@ -1145,6 +1208,7 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
 
             if (seg.isTab == true)
             {
+                drawMarkers(seg, 0);
                 int caretSc = col - hs;
                 if ((docPos == caretPos) && (caretSc >= 0) && (caretSc < textCols))
                 {
@@ -1210,6 +1274,7 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
 
             for (size_t gi = 0; gi < graphemes.size(); ++gi)
             {
+                drawMarkers(seg, gi);
                 int startSc = col - hs;
                 if (startSc >= textCols)
                 {
@@ -1236,7 +1301,7 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
                     }
                 }
 
-                bool isMarker = (c == MARKER) || (c == REPLACE) || (c == SAVE);
+                bool isMarker = (c == MARKER);
                 bool isTerminator = (c == HARDCR) || (c == EOFCH);
 
                 bool isSearch = (mEditor->mSearchBlockSet == true) &&

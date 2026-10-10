@@ -205,19 +205,9 @@ TEST_CASE("FindCoordInLine - Position beyond line end")
         POSITION_T pos = line->documentPosition + 1000;
         COORD_T x = layout.FindCoordInLine(pos, lineNum);
 
-        // Should return last coordinate (clamped)
+        // Should return the line end (clamped): just after the last grapheme
         CHECK(x >= 0);
-
-        // Should match last segment's last position (convert to absolute)
-        if (!line->segments.empty())
-        {
-            const auto& lastSeg = line->segments.back();
-            if (!lastSeg.position.empty())
-            {
-                COORD_T absoluteLastX = line->pagex + lastSeg.position.back();
-                CHECK(x == absoluteLastX);
-            }
-        }
+        CHECK(x == line->pagex + line->LayoutEndX() + line->DecorationWidth());
     }
 }
 

@@ -599,38 +599,19 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
     // Track current X position (relative to segment start)
     COORD_T currentX = 0;
 
+    // Inline block / place markers of this paragraph
+    std::vector<sDisplayMarker> markers;
+    GetParagraphDisplayMarkers(paragraphStart, paragraphEnd, markers);
+    size_t nextMarker = 0;
+    std::string pendingMarker;
+
     // Loop through each grapheme
     for (POSITION_T i = 0; i < static_cast<POSITION_T>(graphemes.size()); ++i)
     {
         const std::string& grapheme = graphemes[i];
 
-        // Check for REPLACE_CHAR (block-begin marker) or SAVE_CHAR (^K0..^K9 bookmark)
-        // Both are ALWAYS displayed WITH background (unlike MARKER_CHAR)
-        if (!grapheme.empty() && (grapheme[0] == REPLACE_CHAR || grapheme[0] == SAVE_CHAR))
-        {
-            POSITION_T documentPos = paragraphStart + i;
-
-            // Flush current segment
-            FlushSegmentIfNonEmpty(segments, currentSegment, currentX);
-
-            // Start fresh segment for the marker
-            InitializeSegment(currentSegment, paragraphNum, i, lineHeight);
-            currentX = 0;
-
-            // Get display character and add to segment
-            std::string displayGrapheme = GetDisplayCharacter(documentPos, grapheme);
-            COORD_T glyphWidth = GetTextWidth(displayGrapheme);
-
-            currentSegment.position.push_back(currentX);
-            currentSegment.length++;
-            currentX += glyphWidth;
-
-            // Mark as control code for background drawing
-            currentSegment.hasControlCodes = true;
-            currentSegment.controlCodeIndices.push_back(currentSegment.length - 1);
-
-            continue;
-        }
+        // Inline block / place markers wait for the next displayed grapheme
+        pendingMarker += TakeDisplayMarkers(markers, nextMarker, paragraphStart + i);
 
         // Check if this is a control code
         if (!grapheme.empty() && grapheme[0] == MARKER_CHAR)
@@ -650,6 +631,7 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 sSegmentLayout tabSegment = CreateTabSegment(paragraphNum, i, documentPos, tabInfo, lineHeight);
 
                 // Tab segments always occupy 1 grapheme for caret navigation
+                AddSegmentMarker(tabSegment, pendingMarker);
                 tabSegment.position.push_back(0);
                 tabSegment.length = 1;
 
@@ -684,6 +666,7 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 eVariableType varType = GetDocument()->GetVariable(documentPos);
                 std::string displayGrapheme = GetVariableExpansion(varType);
 
+                AddSegmentMarker(currentSegment, pendingMarker);
                 currentSegment.position.push_back(currentX);
                 currentSegment.length++;
 
@@ -723,6 +706,7 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 std::string displayGrapheme = GetDisplayCharacter(documentPos, grapheme);
                 COORD_T glyphWidth = GetTextWidth(displayGrapheme);
 
+                AddSegmentMarker(currentSegment, pendingMarker);
                 currentSegment.position.push_back(currentX);
                 currentSegment.length++;
                 currentX += glyphWidth;
@@ -734,6 +718,7 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
         else
         {
             // Regular grapheme - use helper
+            AddSegmentMarker(currentSegment, pendingMarker);
             AddGraphemeToSegment(currentSegment, currentX, grapheme);
         }
 
@@ -753,6 +738,24 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 currentX = 0;
             }
         }
+    }
+
+    // Markers after the last displayed grapheme go before the hidden last grapheme (EOF)
+    if (!pendingMarker.empty())
+    {
+        POSITION_T last = static_cast<POSITION_T>(graphemes.size()) - 1;
+        if (currentSegment.length > 0)
+        {
+            currentSegment.totalWidth = currentX;
+            MarkSegmentIfInRange(currentSegment, paragraphStart);
+            segments.push_back(currentSegment);
+            InitializeSegment(currentSegment, paragraphNum, last, lineHeight);
+            currentX = 0;
+        }
+        currentSegment.startPosition = last;
+        AddSegmentMarker(currentSegment, pendingMarker);
+        currentSegment.position.push_back(currentX);
+        currentSegment.length++;
     }
 
     // Save final segment if it has content
@@ -891,12 +894,6 @@ std::vector<sSegmentLayout> cLayout::BuildHeaderFooterSegments(
 
         // Reset escape flag for any other character
         escapeNext = false;
-
-        // Skip block-begin and save-bookmark markers in headers/footers
-        if (!grapheme.empty() && (grapheme[0] == REPLACE_CHAR || grapheme[0] == SAVE_CHAR))
-        {
-            continue;
-        }
 
         // Check if this is a control code (MARKER_CHAR)
         if (!grapheme.empty() && grapheme[0] == MARKER_CHAR)

@@ -957,11 +957,6 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
             std::string str = mDocument->GetChar(loop) ;
             char ch1 = str[0] ;
 
-            // skip any characters we replace on-screen
-            if(ch1 == REPLACE_CHAR || ch1 == SAVE_CHAR)
-            {
-                continue ;
-            }
             if(str.length() == 1)
             {
                 if(ch1 == MARKER_CHAR)

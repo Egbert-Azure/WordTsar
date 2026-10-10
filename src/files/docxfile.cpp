@@ -2331,14 +2331,6 @@ void cDOCXFile::SaveParagraph(pugi::xml_node &body, std::string &text)
     {
         unsigned char byte = static_cast<unsigned char>(text[pos]) ;
 
-        if (byte == static_cast<unsigned char>(REPLACE_CHAR) ||
-            byte == static_cast<unsigned char>(SAVE_CHAR))
-        {
-            pos++ ;
-            mWCurrentPosition++ ;
-            continue ;
-        }
-
         if (byte == static_cast<unsigned char>(MARKER_CHAR))
         {
             unsigned char ch = static_cast<unsigned char>(mDocument->GetControlChar(mWCurrentPosition)) ;
@@ -2586,9 +2578,7 @@ void cDOCXFile::SaveDotCommand(pugi::xml_node &body, std::string &text)
         clean.reserve(rest.size()) ;
         for (unsigned char byte : rest)
         {
-            if (byte != static_cast<unsigned char>(MARKER_CHAR) &&
-               byte != static_cast<unsigned char>(REPLACE_CHAR) &&
-               byte != static_cast<unsigned char>(SAVE_CHAR))
+            if (byte != static_cast<unsigned char>(MARKER_CHAR))
             {
                 clean += static_cast<char>(byte) ;
             }

@@ -2528,7 +2528,7 @@ void cWSWordTsar::DrawRuler(cScreen& screen, int row)
             if (hide == false)
             {
                 COORD_T pageOffset = layout->GetPageOffsetOdd();
-                COORD_T absoluteX = layout->FindCoordInLine(pos, caretLine);
+                COORD_T absoluteX = layout->FindLayoutCoordInLine(pos, caretLine);
                 COORD_T relativeX = absoluteX - pageOffset - leftMargin;
                 int caretCol = static_cast<int>(relativeX / twipsPerCol);
                 if ((caretCol >= 0) && (caretCol < rulerCols))

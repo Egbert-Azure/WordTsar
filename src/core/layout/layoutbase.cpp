@@ -125,6 +125,7 @@ cLayoutBase::cLayoutBase(void)
     mInitialPaperWidth = 0;
     mInitialPaperHeight = 0;
     mActiveParagraph = -1;  // No active paragraph until editor sets it
+    mMarkersVisible = true;
 
     // Current box coordinates (cached from mPageManager for wrapping performance)
     mBoxLeft = 0;
@@ -2586,12 +2587,11 @@ PARAGRAPH_T cLayoutBase::GetCurrentParagraph(void) const
 /// @param  documentPos [in] absolute document position of the grapheme
 /// @param  grapheme [in] original grapheme from document
 ///
-/// @return display character (converted for MARKER_CHAR/REPLACE_CHAR, or original)
+/// @return display character (converted for MARKER_CHAR, or original)
 ///
 /// @brief
 /// Centralizes character replacement logic for display/mMeasurement.
 /// Converts MARKER_CHAR control codes to ASCII (controlType + '@').
-/// Converts REPLACE_CHAR block markers to '<' when at block start.
 /// Returns original grapheme for all other cases.
 ///
 /// @note
@@ -3292,162 +3292,171 @@ LINE_T cLayoutBase::GetLineFromPosition(POSITION_T pos) const
 /// @param  pos [in] - Document position to find
 /// @param  lineNumber [in] - Line number containing the position
 ///
-/// @return COORD_T - X coordinate of position within line (in twips)
+/// @return COORD_T - display X of the position (absolute page twips)
 ///
 /// @brief
-/// Find the X coordinate of a document position within a specific line.
-/// Used for caret positioning and vertical movement.
+/// Display X of a document position: layout X plus the reveal decorations
+/// drawn before it (block / place markers, visible control code badges).
+/// Used for the caret, selection and search highlights.
 ///
 /// @note
-/// If position is beyond end of line, returns coordinate of last position.
+/// A hidden position resolves to the next laid-out grapheme; a position past
+/// the line's last grapheme returns the display X of the line end.
 /// This is a BLACK BOX API method - editor should use this instead of
 /// accessing line internals directly.
 ///
 /////////////////////////////////////////////////////////////////////////////
 COORD_T cLayoutBase::FindCoordInLine(POSITION_T pos, LINE_T lineNumber)
 {
-    // Get the line structure (internal API)
     const sLineLayout* line = GetLineByRawLineNumber(lineNumber);
     if (line == nullptr)
     {
         return 0;
     }
 
-    // Handle empty line
-    if (line->segments.empty())
+    POSITION_T paraStart = line->documentPosition - line->linestart;
+    size_t segmentIndex = 0;
+    size_t index = 0;
+    if (FindGraphemeInLine(*line, pos - paraStart, segmentIndex, index))
     {
-        return line->pagex;
+        return line->pagex + line->segments[segmentIndex].position[index] + line->DecorationOffset(segmentIndex, index);
     }
 
-    // Convert document position to paragraph-relative position
-    PARAGRAPH_T para = GetParagraphFromLine(lineNumber);
-    if (para == NOT_SET)
-    {
-        return line->pagex;
-    }
-
-    // Get paragraph boundaries to convert absolute pos to paragraph-relative
-    POSITION_T paraStart = 0;
-    POSITION_T paraEnd = 0;
-    if (mDocument)
-    {
-        mDocument->GetParagraphStartandEnd(para, paraStart, paraEnd);
-    }
-
-    POSITION_T paraRelativePos = pos - paraStart;
-
-    // Iterate through segments to find position
-    POSITION_T currentPos = line->linestart;
-
-    for (const auto &segment : line->segments)
-    {
-        // Search through this segment's positions
-        for (size_t i = 0; i < segment.position.size(); ++i)
-        {
-            // Check if current position matches what we're looking for
-            if (currentPos == paraRelativePos)
-            {
-                // Return ABSOLUTE coordinate (base-0 segment position + line's pagex)
-                return line->pagex + segment.position[i];
-            }
-
-            // Move to next position
-            currentPos++;
-        }
-    }
-
-    // Position not found or beyond end of line - return last coordinate in line
-    if (!line->segments.empty())
-    {
-        const auto& lastSegment = line->segments.back();
-        if (!lastSegment.position.empty())
-        {
-            // Return ABSOLUTE coordinate (base-0 segment position + line's pagex)
-            return line->pagex + lastSegment.position.back();
-        }
-    }
-
-    return line->pagex;
+    return line->pagex + line->LayoutEndX() + line->DecorationWidth();
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  targetX [in] - X coordinate to find closest position to
+/// @param  line            [in]  line to search
+/// @param  paraRelativePos [in]  paragraph-relative position
+/// @param  segmentIndex    [out] segment of the grapheme found
+/// @param  index           [out] grapheme index in that segment
+///
+/// @return true if the line has a laid-out grapheme at or after the position
+///
+/// @brief
+/// Find the first laid-out grapheme of the line at or after a position. A
+/// hidden control code resolves to the grapheme after it.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cLayoutBase::FindGraphemeInLine(const sLineLayout& line, POSITION_T paraRelativePos,
+                                     size_t& segmentIndex, size_t& index) const
+{
+    for (size_t si = 0; si < line.segments.size(); ++si)
+    {
+        const sSegmentLayout& segment = line.segments[si];
+        for (size_t i = 0; i < segment.position.size(); ++i)
+        {
+            if (segment.startPosition + static_cast<POSITION_T>(i) >= paraRelativePos)
+            {
+                segmentIndex = si;
+                index = i;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  pos [in] - Document position to find
+/// @param  lineNumber [in] - Line number containing the position
+///
+/// @return COORD_T - layout (print) X of the position (absolute page twips)
+///
+/// @brief
+/// Layout X of a document position: where it prints, without the reveal
+/// decorations. Same position rules as FindCoordInLine().
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T cLayoutBase::FindLayoutCoordInLine(POSITION_T pos, LINE_T lineNumber)
+{
+    const sLineLayout* line = GetLineByRawLineNumber(lineNumber);
+    if (line == nullptr)
+    {
+        return 0;
+    }
+
+    POSITION_T paraStart = line->documentPosition - line->linestart;
+    size_t segmentIndex = 0;
+    size_t index = 0;
+    if (FindGraphemeInLine(*line, pos - paraStart, segmentIndex, index))
+    {
+        return line->pagex + line->segments[segmentIndex].position[index];
+    }
+
+    return line->pagex + line->LayoutEndX();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  targetX [in] - display X to find the closest position to
 /// @param  lineNumber [in] - Line number to search
 ///
 /// @return POSITION_T - Document position closest to targetX
 ///
 /// @brief
-/// Find the position in a line that is closest to a given X coordinate.
-/// Uses minimum distance algorithm to find best match.
+/// Find the position in a line closest to a display X (a click or the
+/// sticky caret X). An X on a block / place marker returns the grapheme it
+/// marks; an X on a control code badge returns the control code.
 ///
 /// @note
-/// Skips control codes when mLayoutState->GetShowControl() != SHOW_ALL.
 /// This is a BLACK BOX API method - editor should use this for mouse
 /// clicks and vertical cursor movement instead of accessing line internals.
 ///
 /////////////////////////////////////////////////////////////////////////////
 POSITION_T cLayoutBase::FindPositionInLine(COORD_T targetX, LINE_T lineNumber)
 {
-    // Get the line structure (internal API)
     const sLineLayout* line = GetLineByRawLineNumber(lineNumber);
     if (line == nullptr)
     {
         return 0;
     }
 
-    // Handle edge case: if target line has no segments, return line start as document position
     if (line->segments.empty())
     {
         return line->documentPosition;
     }
 
-    // Get paragraph to convert result to document-absolute position
-    PARAGRAPH_T para = GetParagraphFromLine(lineNumber);
-    if (para == NOT_SET)
-    {
-        return line->documentPosition;
-    }
-
-    // Get paragraph boundaries
-    POSITION_T paraStart = 0;
-    POSITION_T paraEnd = 0;
-    if (mDocument)
-    {
-        mDocument->GetParagraphStartandEnd(para, paraStart, paraEnd);
-    }
-
-    // Find the position in the line closest to targetX
-    // targetX is ABSOLUTE page coordinate, convert to line-relative
-    COORD_T targetXRelative = targetX - line->pagex;
-
-    POSITION_T bestPosition = line->linestart;  // Paragraph-relative
+    POSITION_T paraStart = line->documentPosition - line->linestart;
+    POSITION_T bestPosition = line->linestart;
     COORD_T minDifference = std::numeric_limits<COORD_T>::max();
 
-    POSITION_T currentPosition = line->linestart;
-
-    for (size_t segmentNum = 0; segmentNum < line->segments.size(); ++segmentNum)
+    for (size_t si = 0; si < line->segments.size(); ++si)
     {
-        const auto &segment = line->segments[segmentNum];
-
-        // Find closest position to target X coordinate
-        // segment.position[i] is base-0 (relative to line), compare with targetXRelative
+        const sSegmentLayout& segment = line->segments[si];
         for (size_t i = 0; i < segment.position.size(); ++i)
         {
-            COORD_T diff = std::abs(segment.position[i] - targetXRelative);
+            POSITION_T graphemePos = segment.startPosition + static_cast<POSITION_T>(i);
+            COORD_T displayX = line->pagex + segment.position[i] + line->DecorationOffset(si, i);
+
+            // A click on a marker lands on the grapheme it marks
+            COORD_T markerWidth = segment.GetMarkerWidth(i);
+            if (markerWidth > 0 && targetX >= displayX - markerWidth && targetX < displayX)
+            {
+                return paraStart + graphemePos;
+            }
+
+            // A click on a control code badge lands on the control code
+            COORD_T tagWidth = segment.GetTagWidth(i);
+            if (tagWidth > 0 && targetX >= displayX && targetX < displayX + tagWidth)
+            {
+                return paraStart + graphemePos;
+            }
+
+            COORD_T diff = std::abs(displayX - targetX);
             if (diff < minDifference)
             {
                 minDifference = diff;
-                bestPosition = currentPosition;
+                bestPosition = graphemePos;
             }
-
-            // Move to next position
-            currentPosition++;
         }
     }
 
-    // Convert paragraph-relative position to document-absolute position
     return paraStart + bestPosition;
 }
 
@@ -4081,6 +4090,84 @@ void cLayoutBase::MarkSegmentIfInRange(sSegmentLayout& segment,
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  paragraphStart [in]  first document position of the paragraph
+/// @param  paragraphEnd   [in]  last document position of the paragraph
+/// @param  markers        [out] visible block / place markers, by position
+///
+/// @return nothing
+///
+/// @brief
+/// Get the inline markers of a paragraph from the document. Empty when
+/// markers are hidden (print layout).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::GetParagraphDisplayMarkers(POSITION_T paragraphStart, POSITION_T paragraphEnd,
+                                             std::vector<sDisplayMarker>& markers)
+{
+    markers.clear();
+    if (mDocument == nullptr || mMarkersVisible == false)
+    {
+        return;
+    }
+
+    mDocument->GetDisplayMarkers(paragraphStart, paragraphEnd, markers);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  markers     [in]     paragraph markers from GetParagraphDisplayMarkers()
+/// @param  nextMarker  [in/out] index of the first marker not yet taken
+/// @param  documentPos [in]     document position of the current grapheme
+///
+/// @return the joined text of the markers at documentPos (empty if none)
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cLayoutBase::TakeDisplayMarkers(const std::vector<sDisplayMarker>& markers, size_t& nextMarker,
+                                            POSITION_T documentPos) const
+{
+    std::string text;
+    while (nextMarker < markers.size() && markers[nextMarker].position <= documentPos)
+    {
+        text += markers[nextMarker].text;
+        nextMarker++;
+    }
+    return text;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  segment       [in/out] segment the next grapheme is added to
+/// @param  pendingMarker [in/out] marker text waiting for a displayed grapheme (cleared)
+///
+/// @return nothing
+///
+/// @brief
+/// Add the pending marker text as a decoration before the next grapheme of
+/// the segment. Display only: the layout X does not move.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::AddSegmentMarker(sSegmentLayout& segment, std::string& pendingMarker)
+{
+    if (pendingMarker.empty())
+    {
+        return;
+    }
+
+    sSegmentMarker marker;
+    marker.index = static_cast<size_t>(segment.length);
+    marker.text = pendingMarker;
+    marker.width = GetTextWidth(pendingMarker);
+    marker.kind = DECORATION_MARKER;
+    segment.markers.push_back(marker);
+
+    pendingMarker.clear();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  segment [in/out] - segment to analyze for control codes
 /// @param  graphemes [in] - all graphemes from the paragraph
 ///
@@ -4131,8 +4218,8 @@ void cLayoutBase::MarkControlCodesInSegment(sSegmentLayout& segment,
     {
         const std::string& glyph = graphemes[i];
 
-        // Check if this is a control code (starts with MARKER_CHAR, REPLACE_CHAR or SAVE_CHAR)
-        if (!glyph.empty() && (glyph[0] == MARKER_CHAR || glyph[0] == REPLACE_CHAR || glyph[0] == SAVE_CHAR))
+        // Check if this is a control code (starts with MARKER_CHAR)
+        if (!glyph.empty() && glyph[0] == MARKER_CHAR)
         {
             segment.hasControlCodes = true;
             segment.controlCodeIndices.push_back(segmentIndex);
@@ -4447,6 +4534,21 @@ std::pair<sSegmentLayout, sSegmentLayout> cLayoutBase::SplitSegmentAtPosition(co
         else
         {
             segment2.controlCodeIndices.push_back(idx - static_cast<size_t>(splitIndex));
+        }
+    }
+
+    // Decorations follow their grapheme (a marker at splitIndex starts segment2)
+    for (const sSegmentMarker& marker : segment.markers)
+    {
+        if (marker.index < static_cast<size_t>(splitIndex))
+        {
+            segment1.markers.push_back(marker);
+        }
+        else
+        {
+            sSegmentMarker moved = marker;
+            moved.index = marker.index - static_cast<size_t>(splitIndex);
+            segment2.markers.push_back(moved);
         }
     }
 
@@ -5028,8 +5130,7 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
                         while (checkPos-- > 0)
                         {
                             const std::string& g = graphemes[checkPos];
-                            if (!g.empty() &&
-                                g[0] != MARKER_CHAR && g[0] != REPLACE_CHAR && g[0] != SAVE_CHAR)
+                            if (!g.empty() && g[0] != MARKER_CHAR)
                             {
                                 isCleanBreak = (g == " ");
                                 break;
@@ -6327,10 +6428,27 @@ std::vector<sLineLayout> cLayoutBase::LayoutDotCommandText(PARAGRAPH_T para, boo
     {
         mDocument->GetParagraphGraphemes(para, graphemes, offsets);
     }
+    std::vector<sDisplayMarker> markers;
+    GetParagraphDisplayMarkers(paraStart, paraEnd, markers);
+    size_t nextMarker = 0;
+
     COORD_T currentX = 0;
     for (size_t i = 0; i < graphemes.size(); i++)
     {
         const std::string &glyph = graphemes[i];
+
+        // Inline block / place markers before this grapheme (display only)
+        std::string markerText = TakeDisplayMarkers(markers, nextMarker, paraStart + static_cast<POSITION_T>(i));
+        if (!markerText.empty())
+        {
+            sSegmentMarker marker;
+            marker.index = i;
+            marker.text = markerText;
+            marker.width = GetTextWidth(markerText, fullSegment.font);
+            marker.kind = DECORATION_MARKER;
+            fullSegment.markers.push_back(marker);
+        }
+
         fullSegment.length++;
         fullSegment.position.push_back(currentX);
 
@@ -6513,6 +6631,17 @@ std::vector<sLineLayout> cLayoutBase::LayoutDotCommandText(PARAGRAPH_T para, boo
             lineSegment.totalWidth = (lineEnd < fullSegment.length)
                 ? fullSegment.position[lineEnd] - baseX
                 : totalWidth - baseX;
+
+            // Markers drawn before the graphemes of this line
+            for (const sSegmentMarker& marker : fullSegment.markers)
+            {
+                if (marker.index >= static_cast<size_t>(lineStart) && marker.index < static_cast<size_t>(lineEnd))
+                {
+                    sSegmentMarker lineMarker = marker;
+                    lineMarker.index = marker.index - static_cast<size_t>(lineStart);
+                    lineSegment.markers.push_back(lineMarker);
+                }
+            }
 
             // Copy control code flags for this range
             if (!fullSegment.controlCodeIndices.empty())
@@ -6924,3 +7053,32 @@ void sDisplayList::Build(const sViewport& viewport, const cLayoutBase* layout)
         boxes.push_back(displayBox);
     }
 }
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  visible [in] true to show block / place markers inline
+///
+/// @return nothing
+///
+/// @brief
+/// Show or hide the inline block and place markers. Print layouts hide
+/// them so markers never change the printed page.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::SetMarkersVisible(bool visible)
+{
+    mMarkersVisible = visible;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true if block / place markers are laid out inline
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cLayoutBase::GetMarkersVisible(void) const
+{
+    return mMarkersVisible;
+}
+

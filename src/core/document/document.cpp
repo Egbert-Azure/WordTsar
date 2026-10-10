@@ -430,6 +430,36 @@ void cDocument::NotifyCleared(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  positions [in] old and new marker positions (NOT_SET ignored)
+///
+/// @return nothing
+///
+/// @brief
+/// Notify listeners that block or place markers moved, from the first
+/// paragraph holding one of the given positions.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::NotifyMarkersChanged(const std::vector<POSITION_T> &positions)
+{
+    POSITION_T textSize = GetTextSize() ;
+    POSITION_T first = NOT_SET ;
+    for(POSITION_T pos : positions)
+    {
+        if(pos != NOT_SET && pos >= 0 && pos <= textSize && (first == NOT_SET || pos < first))
+        {
+            first = pos ;
+        }
+    }
+
+    if(first != NOT_SET)
+    {
+        NotifyChanged(GetParagraphFromPosition(std::min(first, textSize - 1))) ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
@@ -475,22 +505,12 @@ void cDocument::Clear(void)
     mUndoDisabled = false ;
     SetPosition(0);
 
-    mBlockSet = false ;
-    mStartBlock = NOT_SET ;
-    mEndBlock = NOT_SET ;
-
-    mOldBlockSet = false ;
-    mOldStartBlock = NOT_SET ;
-    mOldEndBlock = NOT_SET ;
+    ClearMarkers() ;
+    mSavedBlockHidden = false ;
 
     mCPParagraph = 1024 ;           // random number just so it's no 0 to start (see GetParagraphCodepoints())
 
     mWordCount = 0 ;
-
-    for(int loop = 0; loop < 10; loop++)
-    {
-        mSavePosition[loop] = NOT_SET ;
-    }
 
     NotifyCleared() ;
 }
@@ -543,6 +563,13 @@ void cDocument::ShrinkToFit(void)
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::Insert(CHAR_T ch)
 {
+    // raw NUL and STYLE_FONT1 have no text meaning (markers are positions,
+    // fonts go through InsertFont)
+    if(ch == STYLE_NOT_USED1 || ch == STYLE_FONT1)
+    {
+        return ;
+    }
+
     // loading records no undo, so the change is tracked here
     if (mIsLoading)
     {
@@ -575,9 +602,7 @@ void cDocument::Insert(CHAR_T ch)
     // if this is a formatting character, deal with it
     // we insert MARKER_CHAR into the buffer, and read our control char tables to figure out what to do
     // because CP437 uses these values as well
-    // REPLACE_CHAR (block-begin marker) and SAVE_CHAR (^K0..^K9 bookmark) stay
-    // as raw bytes in the buffer
-    bool isControl = (ch <= STYLE_END_OF_STYLES) && (ch != HARD_RETURN) && (ch != SPACE) && (ch != REPLACE_CHAR) && (ch != SAVE_CHAR) ;
+    bool isControl = (ch <= STYLE_END_OF_STYLES) && (ch != HARD_RETURN) && (ch != SPACE) ;
     if(isControl)
     {
         // A control char is always exactly one new grapheme. Shift attribute
@@ -2789,70 +2814,27 @@ void cDocument::Cut(void)
 /// @return nothing
 ///
 /// @brief
-/// Sets the current position as a block start
+/// Sets the current position as the block start. Markers are positions
+/// only: the text, undo history and modified state are not changed.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::SetBeginBlock(void)
 {
-    POSITION_T newstart = GetPosition() ;
+    std::vector<POSITION_T> changed = { mStartBlock, mEndBlock } ;
 
-    // if a block is set, save the info
     if(mBlockSet)
     {
         mOldStartBlock = mStartBlock ;
         mOldEndBlock = mEndBlock ;
         mOldBlockSet = mBlockSet ;
-
-        if(GetCharNoAdvance(mStartBlock)[0] == REPLACE_CHAR)
-        {
-            Delete(mStartBlock, 1) ;
-            if(newstart > mStartBlock)
-            {
-                newstart-- ;
-            }
-        }
     }
 
-    if(mStartBlock != NOT_SET)
-    {
-        if(GetCharNoAdvance(mStartBlock)[0] == REPLACE_CHAR)
-        {
-            Delete(mStartBlock, 1) ;
-            if(newstart > mStartBlock)
-            {
-                newstart-- ;
-            }
-        }
-    }
+    mStartBlock = GetPosition() ;
+    mBlockSet = (mEndBlock != NOT_SET) && (mEndBlock > mStartBlock) ;
+    mBlockHidden = false ;
 
-    if(newstart < 0)
-    {
-        newstart = 0 ;
-    }   
-
-    SetPosition(newstart) ;
-    mStartBlock = newstart ;
-
-    if(mEndBlock > mStartBlock)
-    {
-        mBlockSet = true ;
-    }
-    else
-    {
-        mBlockSet = false ;
-
-        std::string ch = GetCharNoAdvance(mStartBlock) ;
-        if(ch[0] != REPLACE_CHAR)
-        {
-            SetPosition(mStartBlock) ;
-            Insert(REPLACE_CHAR) ;
-            mStartBlock-- ;             // insert increments start block, so put it back where it belongs
-            if(mStartBlock < 0)
-            {
-                mStartBlock = 0 ;
-            }
-        }
-    }
+    changed.push_back(mStartBlock) ;
+    NotifyMarkersChanged(changed) ;
 }
 
 
@@ -2861,12 +2843,14 @@ void cDocument::SetBeginBlock(void)
 /// @return nothing
 ///
 /// @brief
-/// Sets the current position as a block end
+/// Sets the current position as the block end. Markers are positions
+/// only: the text, undo history and modified state are not changed.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::SetEndBlock(void)
 {
-    // if a block is set, save the info
+    std::vector<POSITION_T> changed = { mStartBlock, mEndBlock } ;
+
     if(mBlockSet)
     {
         mOldStartBlock = mStartBlock ;
@@ -2875,38 +2859,11 @@ void cDocument::SetEndBlock(void)
     }
 
     mEndBlock = GetPosition() ;
+    mBlockSet = (mStartBlock != NOT_SET) && (mEndBlock > mStartBlock) ;
+    mBlockHidden = false ;
 
-    if(mEndBlock > mStartBlock && mStartBlock != NOT_SET)
-    {
-        mBlockSet = true ;
-        POSITION_T start  = mStartBlock ;
-        if(GetCharNoAdvance(mStartBlock)[0] == REPLACE_CHAR)
-        {
-            Delete(mStartBlock, 1) ;
-            mStartBlock = start ;
-        }
-    }
-    else
-    {
-        mBlockSet = false ;
-
-        if(mStartBlock != NOT_SET)
-        {
-            std::string ch = GetCharNoAdvance(mStartBlock) ;
-            if(ch[0] != REPLACE_CHAR)
-            {
-                SetPosition(mStartBlock) ;
-                Insert(REPLACE_CHAR) ;
-                mStartBlock-- ;             // insert invrements start block, so put it back where it belongs
-                if(mStartBlock < 0)
-                {
-                    mStartBlock = 0 ;
-                }
-            }
-        }
-    }
-
-    SetPosition(mEndBlock) ;
+    changed.push_back(mEndBlock) ;
+    NotifyMarkersChanged(changed) ;
 }
 
 
@@ -2915,44 +2872,21 @@ void cDocument::SetEndBlock(void)
 /// @return nothing
 ///
 /// @brief
-/// select previous block and make current selection new previous
+/// Swap the current block with the previous block.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::SetPreviousBlock(void)
 {
     if(mOldBlockSet)
     {
-        POSITION_T start, end ;
-        bool set ;
+        std::vector<POSITION_T> changed = { mStartBlock, mEndBlock, mOldStartBlock, mOldEndBlock } ;
 
-        POSITION_T currentpos = GetPosition() ;
+        std::swap(mStartBlock, mOldStartBlock) ;
+        std::swap(mEndBlock, mOldEndBlock) ;
+        std::swap(mBlockSet, mOldBlockSet) ;
+        mBlockHidden = false ;
 
-        start = mStartBlock ;
-        end = mEndBlock ;
-        set = mBlockSet ;
-
-        if(GetCharNoAdvance(start)[0] == REPLACE_CHAR)
-        {
-            Delete(start, 1) ;
-        }
-
-        mStartBlock = mOldStartBlock ;
-        mEndBlock = mOldEndBlock ;
-        mBlockSet = mOldBlockSet ;
-
-        SetPosition(mStartBlock) ;
-        std::string ch = GetCharNoAdvance(mStartBlock) ;
-        if(mBlockSet == false)
-        {
-            SetPosition(mStartBlock) ;
-            Insert(REPLACE_CHAR) ;
-        }
-
-        mOldStartBlock = start ;
-        mOldEndBlock = end ;
-        mOldBlockSet = set ;
-
-        SetPosition(currentpos) ;
+        NotifyMarkersChanged(changed) ;
     }
 }
 
@@ -2963,48 +2897,31 @@ void cDocument::SetPreviousBlock(void)
 /// @return nothing
 ///
 /// @brief
-/// Set or toggle a saved position marker. If a marker already exists
-/// at the current position, it is removed. Otherwise a REPLACE_CHAR
-/// marker is inserted at the current position and the slot is updated.
+/// Set or toggle a place marker. If the marker is already at the current
+/// position it is removed, otherwise it moves to the current position.
+/// The text, undo history and modified state are not changed.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::SetSavePosition(int offset)
 {
-    POSITION_T position = GetPosition() ;
-
-    // if we are already saved at this position, then delete it
-    // add one because we inserted a SAVE_CHAR
-    POSITION_T checkpos = mSavePosition[offset] ;
-    if(checkpos + 1 == position && checkpos != NOT_SET)
+    if(offset < 0 || offset > 9)
     {
-        // remove the saved position
+        return ;
+    }
+
+    POSITION_T position = GetPosition() ;
+    POSITION_T oldpos = mSavePosition[offset] ;
+
+    if(oldpos == position)
+    {
         mSavePosition[offset] = NOT_SET ;
-        if(GetCharNoAdvance(checkpos)[0] == SAVE_CHAR)
-        {
-            Delete(checkpos, 1) ;
-        }
     }
     else
     {
-        // if the position is already set, delete the SAVE_CHAR
-        if(checkpos != NOT_SET)
-        {
-            if(GetCharNoAdvance(checkpos)[0] == SAVE_CHAR)
-            {
-                Delete(checkpos, 1) ;
-            }
-        }
-
-        if(checkpos < position && checkpos != NOT_SET)
-        {
-            position-- ;
-        }
-
-        // save the position
         mSavePosition[offset] = position ;
-        SetPosition(position) ;
-        Insert(SAVE_CHAR) ;
     }
+
+    NotifyMarkersChanged({ oldpos, position }) ;
 }
 
 
@@ -3119,9 +3036,116 @@ void cDocument::DeleteBlock(void)
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::UnsetBlock(void)
 {
+    std::vector<POSITION_T> changed = { mStartBlock, mEndBlock } ;
+
     mStartBlock = NOT_SET ;
     mEndBlock = NOT_SET ;
     mBlockSet = false ;
+    mBlockHidden = false ;
+
+    NotifyMarkersChanged(changed) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Hide a highlighted block, or show a hidden block whose begin and end
+/// are both set. A hidden block shows neither the highlight nor the block
+/// begin and end markers, until ^KB, ^KK or ^KH changes it.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::ToggleHideBlock(void)
+{
+    if(mBlockSet)
+    {
+        mBlockSet = false ;
+        mBlockHidden = true ;
+    }
+    else if(mStartBlock != NOT_SET && mEndBlock != NOT_SET && mEndBlock > mStartBlock)
+    {
+        mBlockSet = true ;
+        mBlockHidden = false ;
+    }
+
+    NotifyMarkersChanged({ mStartBlock, mEndBlock }) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Clear all block and place markers (current and previous block, the ten
+/// place markers). Used when a document is cleared or loaded.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::ClearMarkers(void)
+{
+    mBlockSet = false ;
+    mBlockHidden = false ;
+    mStartBlock = NOT_SET ;
+    mEndBlock = NOT_SET ;
+
+    mOldBlockSet = false ;
+    mOldStartBlock = NOT_SET ;
+    mOldEndBlock = NOT_SET ;
+
+    std::fill(std::begin(mSavePosition), std::end(mSavePosition), static_cast<POSITION_T>(NOT_SET)) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  start   [in]  first document position
+/// @param  end     [in]  last document position (inclusive)
+/// @param  markers [out] visible markers in [start, end], by position
+///
+/// @return nothing
+///
+/// @brief
+/// Get the block and place markers to display in a position range. The
+/// block begin / end markers are displayed while the block is neither
+/// highlighted nor hidden (^KB only, ^KK only, or end before begin).
+/// Markers at one position are ordered <B>, <K>, <0>..<9>.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::GetDisplayMarkers(POSITION_T start, POSITION_T end, std::vector<sDisplayMarker> &markers)
+{
+    markers.clear() ;
+
+    auto inRange = [start, end](POSITION_T pos) -> bool
+    {
+        return pos != NOT_SET && pos >= start && pos <= end ;
+    } ;
+
+    if(mBlockSet == false && mBlockHidden == false)
+    {
+        if(inRange(mStartBlock))
+        {
+            markers.push_back({ mStartBlock, "<B>" }) ;
+        }
+        if(inRange(mEndBlock))
+        {
+            markers.push_back({ mEndBlock, "<K>" }) ;
+        }
+    }
+
+    for(int loop = 0; loop < 10; loop++)
+    {
+        if(inRange(mSavePosition[loop]))
+        {
+            markers.push_back({ mSavePosition[loop], "<" + std::to_string(loop) + ">" }) ;
+        }
+    }
+
+    std::stable_sort(markers.begin(), markers.end(), [](const sDisplayMarker &a, const sDisplayMarker &b)
+    {
+        return a.position < b.position ;
+    }) ;
 }
 
 
@@ -3333,7 +3357,7 @@ std::vector<sUndoCharInfo> cDocument::CaptureCharacters(POSITION_T position, POS
         }
         else if (firstByte < STYLE_END_OF_STYLES && byteLen == 1)
         {
-            // raw control code stored directly (e.g. HARD_RETURN, REPLACE_CHAR)
+            // raw control code stored directly (e.g. HARD_RETURN)
             charInfo.codepoint = static_cast<CHAR_T>(firstByte) ;
         }
         else
@@ -3846,19 +3870,11 @@ size_t cDocument::GetWordPositions(PARAGRAPH_T para, std::vector<POSITION_T> &wo
 
     std::u32string utf32 = unicode::utf8::decode(text) ;
 
-    // Replace MARKER_CHAR, REPLACE_CHAR and SAVE_CHAR with 'A' so the word
-    // boundary algorithm treats them as regular letters (not break points).
-    // Without this, markers create false word boundaries mid-word and can
-    // prevent lines from wrapping at all.
-    for (size_t i = 0; i < utf32.length(); i++)
-    {
-        if (utf32[i] == static_cast<char32_t>(MARKER_CHAR) ||
-            utf32[i] == static_cast<char32_t>(REPLACE_CHAR) ||
-            utf32[i] == static_cast<char32_t>(SAVE_CHAR))
-        {
-            utf32[i] = U'A';
-        }
-    }
+    // Replace MARKER_CHAR with 'A' so the word boundary algorithm treats
+    // control codes as regular letters (not break points). Without this,
+    // they create false word boundaries mid-word and can prevent lines from
+    // wrapping at all.
+    std::replace(utf32.begin(), utf32.end(), static_cast<char32_t>(MARKER_CHAR), U'A') ;
 
     POSITION_T size = utf32.length() ;
 
@@ -4117,9 +4133,7 @@ POSITION_T cDocument::GetWordEndPosition(POSITION_T pos)
         return pos;
     }
 
-    if (utf32[relPos] == static_cast<char32_t>(MARKER_CHAR) ||
-        utf32[relPos] == static_cast<char32_t>(REPLACE_CHAR) ||
-        utf32[relPos] == static_cast<char32_t>(SAVE_CHAR))
+    if (utf32[relPos] == static_cast<char32_t>(MARKER_CHAR))
     {
         return pos;
     }
@@ -4802,6 +4816,7 @@ void cDocument::SaveBlocks(void)
     mSavedBlocks[3] = mOldEndBlock ;
     mSavedBlockSet[0] = mBlockSet ;
     mSavedBlockSet[1] = mOldBlockSet ;
+    mSavedBlockHidden = mBlockHidden ;
 }
 
 
@@ -4815,12 +4830,17 @@ void cDocument::SaveBlocks(void)
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::RestoreBlocks(void)
 {
+    std::vector<POSITION_T> changed = { mStartBlock, mEndBlock, mSavedBlocks[0], mSavedBlocks[1] } ;
+
     mStartBlock = mSavedBlocks[0] ;
     mEndBlock = mSavedBlocks[1] ;
     mOldStartBlock = mSavedBlocks[2] ;
     mOldEndBlock = mSavedBlocks[3] ;
     mBlockSet = mSavedBlockSet[0] ;
     mOldBlockSet = mSavedBlockSet[1] ;
+    mBlockHidden = mSavedBlockHidden ;
+
+    NotifyMarkersChanged(changed) ;
 }
 
 

@@ -2543,7 +2543,7 @@ SUBCASE("Insert with block keeps block (WordStar behavior)")
         // Select "World" (positions 6-11)
         doc->SetPosition(6);
         doc->SetBeginBlock();
-        doc->SetPosition(12);  // Note: marker shifts positions
+        doc->SetPosition(11);
         doc->SetEndBlock();
 
         POSITION_T blockStart = 0;
@@ -3156,7 +3156,7 @@ SUBCASE("CopyBlock copies selected text to caret position")
         // Select "World" (positions 6-11)
         doc->SetPosition(6);
         doc->SetBeginBlock();
-        doc->SetPosition(12);  // Note: marker shifts positions by 1
+        doc->SetPosition(11);
         doc->SetEndBlock();
 
         // Move caret to end of line
@@ -3372,7 +3372,7 @@ SUBCASE("DeleteBlock removes selected text")
         // Select "World " (6 graphemes including space)
         doc->SetPosition(6);
         doc->SetBeginBlock();
-        doc->SetPosition(13);
+        doc->SetPosition(12);
         doc->SetEndBlock();
 
         editor.DeleteBlock();
@@ -4742,12 +4742,10 @@ TEST_CASE("P1 Auxiliary: ToggleHideBlock - Hide visible block")
     doc->SetPosition(11);  // Position at \r
     doc->SetEndBlock();
 
-    // Block should be visible
-    // After SetEndBlock(), marker is deleted and mEndBlock is decremented to 10
-    // Block covers positions 0-10 ("Hello World" without \r)
+    // Block covers positions 0-11 ("Hello World" without \r)
     CHECK(doc->mBlockSet == true);
     CHECK(doc->mStartBlock == 0);
-    CHECK(doc->mEndBlock == 10);
+    CHECK(doc->mEndBlock == 11);
 
     SUBCASE("Hide visible block")
     {
@@ -4756,7 +4754,7 @@ TEST_CASE("P1 Auxiliary: ToggleHideBlock - Hide visible block")
         // Block should be hidden but positions preserved
         CHECK(doc->mBlockSet == false);
         CHECK(doc->mStartBlock == 0);
-        CHECK(doc->mEndBlock == 10);
+        CHECK(doc->mEndBlock == 11);
     }
 
     SUBCASE("Show hidden block")
@@ -4769,7 +4767,7 @@ TEST_CASE("P1 Auxiliary: ToggleHideBlock - Hide visible block")
         editor.ToggleHideBlock();
         CHECK(doc->mBlockSet == true);
         CHECK(doc->mStartBlock == 0);
-        CHECK(doc->mEndBlock == 10);
+        CHECK(doc->mEndBlock == 11);
     }
 
     SUBCASE("Toggle with no block positions set")
@@ -4864,7 +4862,7 @@ TEST_CASE("P1 Auxiliary: UpperCaseBlock - Convert block to uppercase")
         doc->Insert("hello\r");
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        doc->SetPosition(6);                // \r position after marker shift
+        doc->SetPosition(5);
         doc->SetEndBlock();
 
         editor.UpperCaseBlock();
@@ -5395,7 +5393,7 @@ TEST_CASE("P1 Auxiliary: Integration - ToggleHideBlock workflow")
 
         // Block positions should be preserved
         CHECK(doc->mStartBlock == 0);
-        CHECK(doc->mEndBlock == 10);
+        CHECK(doc->mEndBlock == 11);
     }
 }
 
@@ -6427,10 +6425,9 @@ TEST_CASE("P2.3 Block Navigation: MoveCursorStartBlock - Block set")
     SUBCASE("Move to start from end of block")
     {
         // Set block from position 2 to 7 ("llo Wo")
-        // Note: SetBeginBlock inserts marker, SetEndBlock deletes it and decrements end
         doc->SetPosition(2);
         doc->SetBeginBlock();
-        doc->SetPosition(8);  // With marker present, becomes 7 after marker deletion
+        doc->SetPosition(7);
         doc->SetEndBlock();
         REQUIRE(doc->mBlockSet == true);
 
@@ -6576,10 +6573,9 @@ TEST_CASE("P2.3 Block Navigation: MoveCursorEndBlock - Block set")
     SUBCASE("Move to end from start of block")
     {
         // Set block from position 2 to 7 ("llo Wo")
-        // Note: SetBeginBlock inserts marker, SetEndBlock deletes it and decrements end
         doc->SetPosition(2);
         doc->SetBeginBlock();
-        doc->SetPosition(8);  // With marker present, becomes 7 after marker deletion
+        doc->SetPosition(7);
         doc->SetEndBlock();
         REQUIRE(doc->mBlockSet == true);
 
@@ -6603,10 +6599,9 @@ TEST_CASE("P2.3 Block Navigation: MoveCursorEndBlock - Block set")
     SUBCASE("Move to end from outside block")
     {
         // Set block from position 3 to 6 ("lo W")
-        // Note: SetBeginBlock inserts marker, SetEndBlock deletes it and decrements end
         doc->SetPosition(3);
         doc->SetBeginBlock();
-        doc->SetPosition(7);  // With marker, becomes 6 after marker deletion
+        doc->SetPosition(6);
         doc->SetEndBlock();
         REQUIRE(doc->mBlockSet == true);
 
@@ -6624,10 +6619,9 @@ TEST_CASE("P2.3 Block Navigation: MoveCursorEndBlock - Block set")
     SUBCASE("Already at end of block")
     {
         // Set block from position 1 to 8
-        // Note: SetBeginBlock inserts marker, SetEndBlock deletes it and decrements end
         doc->SetPosition(1);
         doc->SetBeginBlock();
-        doc->SetPosition(9);  // With marker, becomes 8 after marker deletion
+        doc->SetPosition(8);
         doc->SetEndBlock();
         REQUIRE(doc->mBlockSet == true);
 
@@ -6664,10 +6658,9 @@ TEST_CASE("P2.3 Block Navigation: MoveCursorEndBlock - Multi-paragraph block")
     SUBCASE("Block spanning multiple paragraphs")
     {
         // Set block from middle of first to middle of third
-        // Note: SetBeginBlock inserts marker, SetEndBlock deletes it and decrements end
         doc->SetPosition(5);   // Middle of "First"
         doc->SetBeginBlock();
-        doc->SetPosition(38);  // With marker, becomes 37 after marker deletion
+        doc->SetPosition(37);
         doc->SetEndBlock();
         REQUIRE(doc->mBlockSet == true);
 
@@ -6729,7 +6722,7 @@ TEST_CASE("P2.2/P2.3 Integration: Line and Block Navigation workflow")
         POSITION_T blockStart = 0, blockEnd = 0;
         doc->GetBlock(blockStart, blockEnd);
         CHECK(blockStart == 11);
-        CHECK(blockEnd == 21);  // Decremented from 22 by SetEndBlock()
+        CHECK(blockEnd == 22);  // Block end at the \r
 
         // Navigate to block start
         doc->SetPosition(0);  // Move away first
@@ -6738,7 +6731,7 @@ TEST_CASE("P2.2/P2.3 Integration: Line and Block Navigation workflow")
 
         // Navigate to block end
         editor.MoveCursorEndBlock();
-        CHECK(doc->GetPosition() == 21);  // Block end (decremented from 22)
+        CHECK(doc->GetPosition() == 22);  // Block end
     }
 }
 
@@ -8556,10 +8549,8 @@ TEST_CASE("P3.5: WordStar Input - Ctrl+K Command Sequences")
         doc->SetPosition(0);
         editor.mInput->HandleKey(CTRL_K, false);
         editor.mInput->HandleKey('B', false);
-        // @ marker inserted at 0, text "Hello World\r" shifts to positions 1-12
 
-        // To select "Hello" (5 chars), need position 6 with marker present
-        doc->SetPosition(6);  // Position 6 with marker
+        doc->SetPosition(5);
         editor.mInput->HandleKey(CTRL_K, false);
         editor.mInput->HandleKey('K', false);
         // SetEndBlock: mEndBlock=6, deletes @, decrements 6 to 5, block=[0,5)
@@ -8791,11 +8782,9 @@ TEST_CASE("P3.5: WordStar Input - Block Operations")
         layout->LayoutDocument(doc);
 
         // Set block around "Hello" (5 characters)
-        // SetBeginBlock inserts marker, shifting text right by 1
-        // So to select positions 0-4, we need SetPosition(6) with marker present
         doc->SetPosition(0);
         doc->SetBeginBlock();  // Inserts @ at 0, text shifts to 1-12
-        doc->SetPosition(6);    // Position 6 with marker = position 5 after deletion
+        doc->SetPosition(5);
         doc->SetEndBlock();     // Deletes @, end becomes 5, block=[0,5)
 
         // Move to end of line (before \r)
@@ -8817,10 +8806,9 @@ TEST_CASE("P3.5: WordStar Input - Block Operations")
         layout->LayoutDocument(doc);
 
         // Set block around "Hello " (6 characters including space)
-        // SetBeginBlock inserts marker, shifting text right by 1
         doc->SetPosition(0);
         doc->SetBeginBlock();  // Inserts @ at 0, text shifts to 1-12
-        doc->SetPosition(7);    // Position 7 with marker = position 6 after deletion
+        doc->SetPosition(6);
         doc->SetEndBlock();     // Deletes @, end becomes 6, block=[0,6)
 
         // Delete block: Ctrl+K,Y
@@ -8925,10 +8913,9 @@ TEST_CASE("P3.5: WordStar Input - Clipboard Operations")
         layout->LayoutDocument(doc);
 
         // Set block around "Hello" (5 characters)
-        // SetBeginBlock inserts marker, shifting text right by 1
         doc->SetPosition(0);
         doc->SetBeginBlock();  // Inserts @ at 0, text shifts to 1-12
-        doc->SetPosition(6);    // Position 6 with marker = position 5 after deletion
+        doc->SetPosition(5);
         doc->SetEndBlock();     // Deletes @, end becomes 5, block=[0,5)
 
         // Copy to clipboard: Ctrl+K,]
@@ -9833,8 +9820,7 @@ TEST_CASE("Undo Redo Editor Level")
         // Select "Hello" (positions 0-4)
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        // After marker insertion, text shifted right by 1
-        doc->SetPosition(6);  // position 6 = original position 5 + 1 for marker
+        doc->SetPosition(5);
         doc->SetEndBlock();
         // Block is [0, 5) = "Hello"
 
@@ -9865,7 +9851,7 @@ TEST_CASE("Undo Redo Editor Level")
         // Select "Hello" (positions 0-4)
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        doc->SetPosition(6);  // after marker
+        doc->SetPosition(5);
         doc->SetEndBlock();
         // Block is [0, 5) = "Hello"
 
@@ -9993,7 +9979,7 @@ TEST_CASE("Listener-driven updates - batch suppression")
         doc->Insert("Hello World\r");
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        doc->SetPosition(6);   // after marker shift, covers "Hello"
+        doc->SetPosition(5);
         doc->SetEndBlock();
 
         // Move cursor to after block
@@ -10021,7 +10007,7 @@ TEST_CASE("Listener-driven updates - Paste fires single notification")
     doc->Insert("Hello\r");
     doc->SetPosition(0);
     doc->SetBeginBlock();
-    doc->SetPosition(6);   // select "Hello" (after marker shift)
+    doc->SetPosition(5);
     doc->SetEndBlock();
     doc->Copy();
 
@@ -10239,7 +10225,7 @@ TEST_CASE("Modern Input - Clipboard (Ctrl+C/X/V)")
         // Set block around "Hello" [0,5)
         doc->SetPosition(0);
         doc->SetBeginBlock();       // Inserts @ at 0, text shifts right
-        doc->SetPosition(6);        // Position 6 with marker
+        doc->SetPosition(5);
         doc->SetEndBlock();         // Deletes @, decrements to 5, block=[0,5)
 
         bool handled = editor.mInput->HandleKey(CTRL_C, false);
@@ -10263,7 +10249,7 @@ TEST_CASE("Modern Input - Clipboard (Ctrl+C/X/V)")
         // Set block around "Hello " [0,6)
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        doc->SetPosition(7);        // 7 with marker
+        doc->SetPosition(6);
         doc->SetEndBlock();         // Becomes 6, block=[0,6)
 
         bool handled = editor.mInput->HandleKey(CTRL_X, false);
@@ -10746,7 +10732,7 @@ TEST_CASE("Modern Input - Mode Switching")
         // Set a block so clipboard copy has something to do
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        doc->SetPosition(6);
+        doc->SetPosition(5);
         doc->SetEndBlock();
 
         editor.mInput->HandleKey(CTRL_C, false);
@@ -11036,7 +11022,7 @@ TEST_CASE("Modern Input - Alt+K Place Markers and Block Ops")
         // Set block around "Hello " [0,6)
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        doc->SetPosition(7);
+        doc->SetPosition(6);
         doc->SetEndBlock();
 
         editor.mInput->HandleKey('k', false, true);
@@ -12067,7 +12053,7 @@ TEST_CASE("WordStar Input - Ctrl+K Extended Block Operations")
         // Set block around "Hello " [0,6)
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        doc->SetPosition(7);
+        doc->SetPosition(6);
         doc->SetEndBlock();
 
         // Move to end of "Test"
@@ -14330,6 +14316,104 @@ TEST_CASE("GUI editor - a failed backup write does not fail the save or the auto
     bool invoked = QMetaObject::invokeMethod(&editor, "OnAutoSaveTimer", Qt::DirectConnection);
     CHECK(invoked);
     CHECK(std::filesystem::is_directory(backupPath));
+
+    CleanupGUIBackupTestDir(dir);
+}
+
+
+// Block and place markers are text positions: they survive a save and reload
+// at the same text positions (they used to be characters in the buffer, so
+// positions drifted by the number of markers before them)
+TEST_CASE("Markers round-trip through save and reload")
+{
+    ensureQApplication();
+    auto dir = MakeGUIBackupTestDir("markerroundtrip");
+    auto file = dir / "marked.ws";
+
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Insert("hello brave new world\r");
+        POSITION_T size = doc->GetTextSize();
+
+        doc->SetPosition(6);
+        doc->SetBeginBlock();
+        doc->SetPosition(17);
+        doc->SetEndBlock();
+        doc->SetPosition(0);
+        doc->SetSavePosition(0);
+        doc->SetPosition(9);
+        doc->SetSavePosition(4);
+
+        // markers are positions only: no text change
+        CHECK(doc->GetTextSize() == size);
+        REQUIRE(editor.SaveFile(file.string()));
+    }
+
+    {
+        cEditorCtrl editor;
+        REQUIRE(editor.LoadFile(file.string()));
+        cDocument* doc = editor.GetDocument();
+
+        CHECK(doc->mStartBlock == 6);
+        CHECK(doc->mEndBlock == 17);
+        CHECK(doc->mBlockSet == true);
+        CHECK(doc->mSavePosition[0] == 0);
+        CHECK(doc->mSavePosition[4] == 9);
+        CHECK(doc->GetBlockText(doc->mStartBlock, doc->mEndBlock) == "brave new w");
+        CHECK(doc->IsModified() == false);
+    }
+
+    CleanupGUIBackupTestDir(dir);
+}
+
+TEST_CASE("Hidden block round-trips and positions outside the document are dropped")
+{
+    ensureQApplication();
+    auto dir = MakeGUIBackupTestDir("markerhidden");
+    auto file = dir / "hidden.ws";
+
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Insert("one two three\r");
+        doc->SetPosition(4);
+        doc->SetBeginBlock();
+        doc->SetPosition(7);
+        doc->SetEndBlock();
+        doc->ToggleHideBlock();
+        REQUIRE(doc->mBlockHidden == true);
+        REQUIRE(editor.SaveFile(file.string()));
+    }
+
+    {
+        cEditorCtrl editor;
+        REQUIRE(editor.LoadFile(file.string()));
+        cDocument* doc = editor.GetDocument();
+        CHECK(doc->mBlockHidden == true);
+        CHECK(doc->mBlockSet == false);
+        CHECK(doc->mStartBlock == 4);
+        CHECK(doc->mEndBlock == 7);
+
+        // ^KH shows it again
+        doc->ToggleHideBlock();
+        CHECK(doc->mBlockSet == true);
+        CHECK(doc->mBlockHidden == false);
+    }
+
+    // the file got shorter outside the editor: positions past its end are dropped
+    {
+        std::ofstream out(file, std::ios::binary | std::ios::trunc);
+        out << "one\r";
+    }
+    {
+        cEditorCtrl editor;
+        REQUIRE(editor.LoadFile(file.string()));
+        cDocument* doc = editor.GetDocument();
+        CHECK(doc->mBlockSet == false);
+        CHECK(doc->mBlockHidden == false);
+        CHECK(doc->mEndBlock == NOT_SET);
+    }
 
     CleanupGUIBackupTestDir(dir);
 }

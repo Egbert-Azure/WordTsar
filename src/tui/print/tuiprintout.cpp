@@ -247,6 +247,7 @@ void cTUIPrintout::PrintPreview(void)
     // Switch to SHOW_NONE so control codes and dot commands are hidden
     mLayout->SetShowControl(SHOW_NONE);
     mLayout->SetActiveParagraph(-1);
+    mLayout->SetMarkersVisible(false);  // block / place markers never print
 
     // Re-layout the document with SHOW_NONE to get clean print output
     mLayout->LayoutDocument(mDocument);
@@ -259,6 +260,7 @@ void cTUIPrintout::PrintPreview(void)
 
     // Restore original show control state
     mLayout->SetShowControl(savedShowControl);
+    mLayout->SetMarkersVisible(true);
 
     // Restore active paragraph from current cursor position
     PARAGRAPH_T curPara = mDocument->GetParagraphFromPosition(mDocument->GetPosition());

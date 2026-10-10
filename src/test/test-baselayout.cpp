@@ -5666,10 +5666,10 @@ TEST_CASE("Segment marking - block selection")
     {
         doc.Insert("Hello World\r");
 
-        // Select entire line (0-11)
+        // Select entire line (0-12, the paragraph including its \r)
         doc.SetPosition(0);
         doc.SetBeginBlock();
-        doc.SetPosition(13);    // set begin block insert a marker char
+        doc.SetPosition(12);
         doc.SetEndBlock();
 
         layout.LayoutDocument(&doc);
@@ -10439,7 +10439,31 @@ TEST_CASE("Layout R2-3b: Tab display with SHOW_NONE (hidden controls)")
     CHECK(display == " ");
 }
 
-TEST_CASE("Layout R2-3c: REPLACE_CHAR block marker display")
+namespace
+{
+
+// Inline markers of the first laid-out line (all segments), as "index:text" strings
+std::vector<std::string> LineMarkers(cLayout* layout, LINE_T rawLine)
+{
+    std::vector<std::string> result;
+    const sLineLayout* line = layout->GetLineByRawLineNumber(rawLine);
+    if (line == nullptr)
+    {
+        return result;
+    }
+    for (const sSegmentLayout& segment : line->segments)
+    {
+        for (const sSegmentMarker& marker : segment.markers)
+        {
+            result.push_back(std::to_string(segment.startPosition + static_cast<POSITION_T>(marker.index)) + ":" + marker.text);
+        }
+    }
+    return result;
+}
+
+}
+
+TEST_CASE("Layout R2-3c: block begin marker is displayed inline, not as text")
 {
     ensureQApplication();
     cEditorCtrl editor;
@@ -10448,21 +10472,29 @@ TEST_CASE("Layout R2-3c: REPLACE_CHAR block marker display")
 
     layout->SetShowControl(SHOW_ALL);
     doc->Insert("Hello World\r");
+    POSITION_T size = doc->GetTextSize();
     layout->LayoutDocument(doc);
 
-    // Set begin block -- inserts REPLACE_CHAR at position 0
-    // After SetBeginBlock, mBlockSet remains false (block not yet complete)
+    // ^KB: a marker position only -- no text is inserted
     doc->SetPosition(0);
     doc->SetBeginBlock();
+    CHECK(doc->GetTextSize() == size);
+    CHECK(doc->GetCharNoAdvance(0) == "H");
 
-    // The REPLACE_CHAR is now at position 0
-    // mStartBlock == 0 and mBlockSet == false -- should display as "<"
-    std::string grapheme = doc->GetCharNoAdvance(0);
-    std::string display = layout->GetDisplayCharacter(0, grapheme);
-    CHECK(display == "<");
+    layout->LayoutDocument(doc);
+    std::vector<std::string> markers = LineMarkers(layout, 0);
+    REQUIRE(markers.size() == 1);
+    CHECK(markers[0] == "0:<B>");
+
+    // the marker is display only: it is not part of the layout
+    const sLineLayout* line = layout->GetLineByRawLineNumber(0);
+    REQUIRE(line != nullptr);
+    CHECK(line->segments.front().position.front() == 0);
+    CHECK(line->segments.front().markers.front().width > 0);
+    CHECK(line->DecorationOffset(0, 0) > 0);
 }
 
-TEST_CASE("Layout R2-3d: REPLACE_CHAR saved position marker")
+TEST_CASE("Layout R2-3d: saved position marker")
 {
     ensureQApplication();
     cEditorCtrl editor;
@@ -11113,8 +11145,7 @@ TEST_CASE("Layout R2-9c: Footer with center and right tabs")
 // R3: Targeted textmeasurement.cpp and layoutbase.cpp coverage boost
 // =========================================================================
 
-// --- textmeasurement.cpp: saved position markers (lines 121-127) ---
-TEST_CASE("Layout R3-1a: GetDisplayCharacter for saved position marker")
+TEST_CASE("Layout R3-1a: place marker is displayed inline before its grapheme")
 {
     ensureQApplication();
     cEditorCtrl editor;
@@ -11123,29 +11154,22 @@ TEST_CASE("Layout R3-1a: GetDisplayCharacter for saved position marker")
 
     layout->SetShowControl(SHOW_ALL);
     doc->Insert("Hello World\r");
+    POSITION_T size = doc->GetTextSize();
 
-    // Set a save position marker at position 3
+    // Set a place marker at position 3 (a position only, no text)
     doc->SetPosition(3);
-    doc->SetSavePosition(5);  // Save slot 5 at document position 3
-
-    // After SetSavePosition: SAVE_CHAR inserted at position 3
-    // mSavePosition[5] stores the position
+    doc->SetSavePosition(5);
     CHECK(doc->mSavePosition[5] == 3);
+    CHECK(doc->GetTextSize() == size);
+    CHECK(doc->GetCharNoAdvance(3) == "l");
 
-    // Re-layout after document change so mDocument is set
     layout->LayoutDocument(doc);
-
-    // Read the actual character at position 3 from the document
-    doc->SetPosition(3);
-    std::string actualChar = doc->GetCharNoAdvance(3);
-    CHECK(actualChar[0] == SAVE_CHAR);
-
-    // Call GetDisplayCharacter with the actual SAVE_CHAR grapheme
-    std::string display = layout->GetDisplayCharacter(3, actualChar);
-    CHECK(display == "5");
+    std::vector<std::string> markers = LineMarkers(layout, 0);
+    REQUIRE(markers.size() == 1);
+    CHECK(markers[0] == "3:<5>");
 }
 
-TEST_CASE("Layout R3-1b: GetDisplayCharacter for saved position slot 0")
+TEST_CASE("Layout R3-1b: place marker slot 0 and 9 and a block marker share a position")
 {
     ensureQApplication();
     cEditorCtrl editor;
@@ -11156,18 +11180,17 @@ TEST_CASE("Layout R3-1b: GetDisplayCharacter for saved position slot 0")
     doc->Insert("ABCDEF\r");
 
     doc->SetPosition(1);
-    doc->SetSavePosition(0);  // Save slot 0 at document position 1
-
+    doc->SetSavePosition(9);
+    doc->SetSavePosition(0);
+    doc->SetBeginBlock();
     CHECK(doc->mSavePosition[0] == 1);
 
-    // Re-layout so mDocument is set
     layout->LayoutDocument(doc);
 
-    std::string actualChar = doc->GetCharNoAdvance(1);
-    CHECK(actualChar[0] == SAVE_CHAR);
-
-    std::string display = layout->GetDisplayCharacter(1, actualChar);
-    CHECK(display == "0");
+    // markers at one position are joined in the order <B>, <K>, <0>..<9>
+    std::vector<std::string> markers = LineMarkers(layout, 0);
+    REQUIRE(markers.size() == 1);
+    CHECK(markers[0] == "1:<B><0><9>");
 }
 
 // --- textmeasurement.cpp: empty grapheme (line 106) ---
@@ -11186,8 +11209,7 @@ TEST_CASE("Layout R3-1c: GetDisplayCharacter with empty grapheme")
     CHECK(display.empty());
 }
 
-// --- textmeasurement.cpp: REPLACE_CHAR fallthrough (line 133) ---
-TEST_CASE("Layout R3-1d: GetDisplayCharacter REPLACE_CHAR not at saved position or block")
+TEST_CASE("Layout R3-1d: block markers are shown only while the block is incomplete or visible")
 {
     ensureQApplication();
     cEditorCtrl editor;
@@ -11195,15 +11217,37 @@ TEST_CASE("Layout R3-1d: GetDisplayCharacter REPLACE_CHAR not at saved position 
     cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
 
     layout->SetShowControl(SHOW_ALL);
-    doc->Insert("Hello\r");
-    layout->LayoutDocument(doc);
+    doc->Insert("Hello World\r");
 
-    // Call GetDisplayCharacter with REPLACE_CHAR at a position that has no save marker
-    // and no block marker -- hits the fallthrough at line 133
-    std::string replaceChar(1, REPLACE_CHAR);
-    std::string display = layout->GetDisplayCharacter(0, replaceChar);
-    // Should return the raw REPLACE_CHAR grapheme (fallthrough)
-    CHECK(display == replaceChar);
+    // ^KB only: <B> is shown
+    doc->SetPosition(2);
+    doc->SetBeginBlock();
+    layout->LayoutDocument(doc);
+    CHECK(LineMarkers(layout, 0) == std::vector<std::string>{"2:<B>"});
+
+    // ^KK completes the block: it is highlighted, so no <B> / <K>
+    doc->SetPosition(8);
+    doc->SetEndBlock();
+    layout->LayoutDocument(doc);
+    CHECK(LineMarkers(layout, 0).empty());
+
+    // ^KH hides it: still no begin / end markers
+    doc->ToggleHideBlock();
+    layout->LayoutDocument(doc);
+    CHECK(LineMarkers(layout, 0).empty());
+    CHECK(doc->mBlockHidden == true);
+
+    // markers are never shown on a print layout
+    doc->ToggleHideBlock();
+    doc->UnsetBlock();
+    doc->SetPosition(4);
+    doc->SetSavePosition(1);
+    layout->SetMarkersVisible(false);
+    layout->LayoutDocument(doc);
+    CHECK(LineMarkers(layout, 0).empty());
+    layout->SetMarkersVisible(true);
+    layout->LayoutDocument(doc);
+    CHECK(LineMarkers(layout, 0) == std::vector<std::string>{"4:<1>"});
 }
 
 // --- layoutbase.cpp: LayoutDocument(nullptr) guard (line 362) ---

@@ -319,11 +319,10 @@ TEST_CASE("GetStatus - Basic fields")
         // Set a block selection: select "Hello World"
         doc->SetPosition(0);
         doc->SetBeginBlock();
-        // After SetBeginBlock, marker inserted at 0, text shifts right
-        // Position at 12 (shifted \r) to select "Hello World"
-        doc->SetPosition(12);
+        // Position at 11 (the \r) to select "Hello World"
+        doc->SetPosition(11);
         doc->SetEndBlock();
-        // After SetEndBlock, marker deleted, block = [0, 11)
+        // block = [0, 11)
 
         editor.GetStatus(status);
         CHECK(status.blockSet == true);
@@ -549,7 +548,6 @@ TEST_CASE("SavePosition and GotoSavePosition")
         editor.CalculateCaretPosition();
 
         // Save marker 1 at position 5
-        // SetSavePosition inserts a REPLACE_CHAR, so position shifts
         editor.SavePosition(1);
 
         // Verify marker 1 is set (not NOT_SET)
@@ -563,10 +561,8 @@ TEST_CASE("SavePosition and GotoSavePosition")
         // Goto marker 1 -- should jump back to saved position
         editor.GotoSavePosition(1);
 
-        // The caret should have moved to the saved position
-        // (exact position may differ due to REPLACE_CHAR insertion/deletion,
-        // but it should NOT be 0 anymore)
-        CHECK(editor.GetCaretDocumentPosition() != 0);
+        // The caret moves back to the place marker
+        CHECK(editor.GetCaretDocumentPosition() == 5);
     }
 
     SUBCASE("Goto unset marker does nothing")
@@ -595,13 +591,7 @@ TEST_CASE("SavePosition and GotoSavePosition")
         // Verify it is set
         CHECK(doc->mSavePosition[2] != NOT_SET);
 
-        // The save inserted a REPLACE_CHAR at position 3, moving the cursor
-        // to position 4 (one past the marker). To toggle off, we need to
-        // be at the saved position + 1 (because of the REPLACE_CHAR).
-        // The document's SetSavePosition handles the toggle logic:
-        // if checkpos + 1 == current position, it removes the marker.
-        // After saving, the cursor is at savedPos + 1 due to the insert.
-        // So saving again immediately should toggle it off.
+        // Saving again at the same position toggles the marker off
         editor.SavePosition(2);
 
         // Marker should now be NOT_SET (toggled off)
@@ -2439,7 +2429,7 @@ TEST_CASE("Overwrite mode control-code rules")
         CHECK(colorMarkers == 1);
     }
 
-    SUBCASE("saved position is jumped over and preserved")
+    SUBCASE("place marker survives overwriting")
     {
         cEditorCtrl editor;
         cDocument* doc = editor.GetDocument();
@@ -2447,24 +2437,16 @@ TEST_CASE("Overwrite mode control-code rules")
 
         doc->Insert("ABC\r");
         doc->SetPosition(1);
-        doc->SetSavePosition(0);   // SAVE_CHAR bookmark at position 1
+        doc->SetSavePosition(0);   // place marker at position 1
         layout->LayoutDocument(doc);
 
         editor.ToggleInsertOverwrite();
         doc->SetPosition(0);
-        editor.InsertText("XY");   // jumps over the bookmark while overwriting
+        editor.InsertText("XY");   // overwrites "AB"
 
-        POSITION_T size = doc->GetTextSize();
-        int saves = 0;
-        for (POSITION_T p = 0; p < size; p++)
-        {
-            std::string g = doc->GetCharNoAdvance(p);
-            if (!g.empty() && g[0] == SAVE_CHAR)
-            {
-                saves++;
-            }
-        }
-        CHECK(saves == 1);
+        // the marker is a position: still set, text overwritten in place
+        CHECK(doc->mSavePosition[0] != NOT_SET);
+        CHECK(doc->GetParagraphText(0) == "XYC\r");
     }
 
     SUBCASE("footnote anchor is jumped over and preserved")

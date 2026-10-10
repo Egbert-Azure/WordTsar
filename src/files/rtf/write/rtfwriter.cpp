@@ -846,13 +846,6 @@ void cRTFWriter::CreateText(std::string &text)
     {
         unsigned char byte = static_cast<unsigned char>(text[pos]) ;
 
-        if (byte == static_cast<unsigned char>(REPLACE_CHAR) ||
-            byte == static_cast<unsigned char>(SAVE_CHAR))
-        {
-            pos++ ;
-            mCurrentPosition++ ;
-            continue ;
-        }
 //        if(text.at(pos) < STYLE_END_OF_STYLES)
         if (byte == static_cast<unsigned char>(MARKER_CHAR))
         {

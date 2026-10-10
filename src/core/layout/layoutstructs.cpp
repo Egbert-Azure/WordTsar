@@ -71,6 +71,9 @@
 #include "layoutbase.h"
 #include "src/core/document/document.h"
 
+#include <algorithm>
+#include <numeric>
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @param  layout [in] - Layout engine to get line data
@@ -305,6 +308,16 @@ bool sSegmentLayout::IsEqualTo(const sSegmentLayout& other) const
         return false;
     }
 
+    // Check inline markers
+    auto markerEqual = [](const sSegmentMarker& a, const sSegmentMarker& b)
+    {
+        return a.index == b.index && a.text == b.text && CoordsEqual(a.width, b.width) && a.kind == b.kind;
+    };
+    if (!std::equal(markers.begin(), markers.end(), other.markers.begin(), other.markers.end(), markerEqual))
+    {
+        return false;
+    }
+
     // Check measurement fields (Step 1 - WORDWRAP.md)
     if (!CoordsEqual(totalWidth, other.totalWidth))
     {
@@ -341,6 +354,50 @@ bool sSegmentLayout::IsEqualTo(const sSegmentLayout& other) const
     // Content equality is verified by paragraph, startPosition, and length
 
     return true;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  index [in] - grapheme index in the segment
+///
+/// @return COORD_T - total width of the block / place markers drawn before
+///         the grapheme at index (0 if none)
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T sSegmentLayout::GetMarkerWidth(size_t index) const
+{
+    return std::accumulate(markers.begin(), markers.end(), static_cast<COORD_T>(0),
+        [index](COORD_T sum, const sSegmentMarker& marker)
+        {
+            if (marker.index == index && marker.kind == DECORATION_MARKER)
+            {
+                return sum + marker.width;
+            }
+            return sum;
+        });
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  index [in] - grapheme index in the segment
+///
+/// @return COORD_T - width of the control code badge drawn for the tag
+///         grapheme at index (0 if it is not a visible tag)
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T sSegmentLayout::GetTagWidth(size_t index) const
+{
+    return std::accumulate(markers.begin(), markers.end(), static_cast<COORD_T>(0),
+        [index](COORD_T sum, const sSegmentMarker& marker)
+        {
+            if (marker.index == index && marker.kind == DECORATION_TAG)
+            {
+                return sum + marker.width;
+            }
+            return sum;
+        });
 }
 
 
@@ -607,3 +664,93 @@ void sDisplayList::Clear(void)
 {
     boxes.clear();
 }
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  segmentIndex [in] - segment of the line
+/// @param  index        [in] - grapheme index in that segment
+///
+/// @return COORD_T - width of the decorations drawn before the grapheme:
+///         every decoration of the earlier segments, this segment's markers
+///         at or before index, and its tags before index
+///
+/// @brief
+/// Display X of a grapheme = layout X (pagex + position[index]) + this
+/// offset. A marker is drawn just before its grapheme; a tag badge is drawn
+/// at its tag, so the tag's own badge pushes the following graphemes.
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T sLineLayout::DecorationOffset(size_t segmentIndex, size_t index) const
+{
+    COORD_T offset = 0;
+    for (size_t si = 0; si < segments.size() && si <= segmentIndex; ++si)
+    {
+        for (const sSegmentMarker& decoration : segments[si].markers)
+        {
+            bool before = (si < segmentIndex) ||
+                          (decoration.kind == DECORATION_MARKER && decoration.index <= index) ||
+                          (decoration.kind == DECORATION_TAG && decoration.index < index);
+            if (before)
+            {
+                offset += decoration.width;
+            }
+        }
+    }
+    return offset;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return COORD_T - total width of all decorations on the line
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T sLineLayout::DecorationWidth(void) const
+{
+    COORD_T width = 0;
+    for (const sSegmentLayout& segment : segments)
+    {
+        width = std::accumulate(segment.markers.begin(), segment.markers.end(), width,
+            [](COORD_T sum, const sSegmentMarker& decoration)
+            {
+                return sum + decoration.width;
+            });
+    }
+    return width;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return COORD_T - line-relative layout X just after the last grapheme of
+///         the line (0 for an empty line)
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T sLineLayout::LayoutEndX(void) const
+{
+    auto last = std::find_if(segments.rbegin(), segments.rend(),
+                             [](const sSegmentLayout& segment)
+                             {
+                                 return segment.position.empty() == false;
+                             });
+    if (last == segments.rend())
+    {
+        return 0;
+    }
+
+    const sSegmentLayout& segment = *last;
+    if (segment.isTab && (segment.tabType == TAB_TAB || segment.tabType == TAB_DECIMAL))
+    {
+        return segment.position.front() + segment.tabWidth;
+    }
+
+    // last grapheme width = segment width less the run up to the last grapheme
+    COORD_T lastWidth = segment.totalWidth - (segment.position.back() - segment.position.front());
+    if (lastWidth < 0)
+    {
+        lastWidth = 0;
+    }
+    return segment.position.back() + lastWidth;
+}
+

@@ -94,8 +94,6 @@ constexpr double FONTSCALE = (TWIPSPERINCH / 72.0)  ;    ///< fontscale based on
 constexpr double FONTSCALE = (TWIPSPERINCH / 96.0)  ;    ///< fontscale based on 96 DPI
 #endif
 
-constexpr CHAR_T REPLACE_CHAR = 0 ;                 ///< dummy character in the buffer for block-begin marker
-constexpr CHAR_T SAVE_CHAR = 1 ;                    ///< dummy character in the buffer for ^K0..^K9 save bookmarks
 constexpr CHAR_T HARD_RETURN = 13 ;
 constexpr CHAR_T SPACE = 32 ;
 constexpr CHAR_T MARKER_CHAR = 127 ;

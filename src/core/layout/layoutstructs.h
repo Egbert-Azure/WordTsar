@@ -224,6 +224,38 @@ struct sTabStop
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @enum eDecorationKind
+///
+/// @brief
+/// What a reveal decoration of a segment is.
+///
+/////////////////////////////////////////////////////////////////////////////
+enum eDecorationKind
+{
+    DECORATION_MARKER,                      // Block / place marker, drawn before its grapheme, never a caret position
+    DECORATION_TAG                          // Visible control code badge (^B, <font>, !, [), drawn at its own grapheme
+};
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @struct sSegmentMarker
+///
+/// @brief
+/// Reveal decoration drawn over the layout: a block / place marker (<B>,
+/// <K>, <0>..<9>) or a visible control code badge. Its width is display
+/// only: never included in position[], totalWidth or tabWidth.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sSegmentMarker
+{
+    size_t index;                           // Grapheme index in the segment (marked grapheme, or the tag itself)
+    std::string text;                       // Display text (several markers at one position are joined)
+    COORD_T width;                          // Display width, not part of the layout
+    eDecorationKind kind = DECORATION_MARKER;   // Marker or tag
+};
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @struct sSegmentLayout
 ///
 /// @brief
@@ -256,6 +288,9 @@ struct sSegmentLayout
     // Control code tracking (for visual display - Phase 3.5)
     bool hasControlCodes;                   // True if this segment contains control codes
     std::vector<size_t> controlCodeIndices; // Which glyphs are control codes (indices into position array)
+
+    // Inline block / place markers (screen only, never caret positions)
+    std::vector<sSegmentMarker> markers;    // Sorted by index; position[index] is after the marker
 
     // Measurement fields (Step 1 - WORDWRAP.md)
     COORD_T totalWidth;                     // Total width of segment (for quick access)
@@ -308,6 +343,10 @@ struct sSegmentLayout
 
     // Equality comparison for layout change detection (Phase 4: incremental layout)
     bool IsEqualTo(const sSegmentLayout& other) const;
+
+    // Total width of the inline markers drawn before grapheme index
+    COORD_T GetMarkerWidth(size_t index) const;
+    COORD_T GetTagWidth(size_t index) const;
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -364,6 +403,11 @@ struct sLineLayout
 
     // Equality comparison for layout change detection (Phase 4: incremental layout)
     bool IsEqualTo(PARAGRAPH_T paragraphNum, LINE_T lineNum, const sLineLayout& other) const;
+
+    // Reveal decorations (display X = layout X + DecorationOffset)
+    COORD_T DecorationOffset(size_t segmentIndex, size_t index) const;
+    COORD_T DecorationWidth(void) const;
+    COORD_T LayoutEndX(void) const;
 };
 
 /////////////////////////////////////////////////////////////////////////////

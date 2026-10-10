@@ -80,7 +80,6 @@
 /// - Control codes (< 32) display as ^X format (e.g., ^B for bold)
 /// - STYLE_TAB displays as >, !, [, or # based on tab type
 /// - STYLE_FONT1 displays as <fontname size>
-/// - REPLACE_CHAR displays as < for block start marker
 /// - All other graphemes are returned unchanged
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -104,35 +103,6 @@ std::string cTextMeasurement::GetDisplayCharacter(POSITION_T documentPos,
     if (grapheme == "\xC2\xAD")
     {
         return (showControl == SHOW_ALL) ? "-" : "";
-    }
-
-    // Handle REPLACE_CHAR (block-begin marker) FIRST
-    // REPLACE_CHAR is 0, which would otherwise be caught by isControlType check (0 < 32)
-    if (grapheme[0] == REPLACE_CHAR)
-    {
-        if (doc &&
-            doc->mStartBlock == documentPos &&
-            doc->mBlockSet == false)
-        {
-            return "<";
-        }
-        return grapheme;
-    }
-
-    // Handle SAVE_CHAR (^K0..^K9 saved-position bookmarks)
-    if (grapheme[0] == SAVE_CHAR)
-    {
-        if (doc)
-        {
-            for (int i = 0; i < 10; i++)
-            {
-                if (doc->mSavePosition[i] == documentPos)
-                {
-                    return std::string(1, '0' + i);
-                }
-            }
-        }
-        return grapheme;
     }
 
     // Handle control codes (two cases):

@@ -31,6 +31,7 @@
 #include "src/core/include/timer.h"
 
 // Forward declarations
+struct sDisplayMarker;
 class cDocument;
 class cDotCommandParser;
 class cPageManager;
@@ -254,6 +255,7 @@ public:
     void SetPageOffsetEven(COORD_T offset);
     void SetShowControl(eShowControl mode);
     void SetActiveParagraph(PARAGRAPH_T para);
+    void SetMarkersVisible(bool visible);
     virtual void SetDefaultFont(const std::string& font);
     virtual void SetDefaultTextColor(const sSeqRGBColor& color);
     void SetIsHelp(bool isHelp);
@@ -292,6 +294,7 @@ public:
     LINE_T GetNumberOfLines(void) const;
     LINE_T GetLineFromPosition(POSITION_T pos) const;
     COORD_T FindCoordInLine(POSITION_T pos, LINE_T lineNumber);
+    COORD_T FindLayoutCoordInLine(POSITION_T pos, LINE_T lineNumber);
     POSITION_T FindPositionInLine(COORD_T targetX, LINE_T lineNumber);
     POSITION_T GetLineStartPosition(LINE_T line);
     POSITION_T GetLineStartDocumentPosition(LINE_T line);
@@ -327,6 +330,7 @@ public:
     // ----- Query Methods - Control Code Visibility -----
     eShowControl GetShowControl(void) const;
     PARAGRAPH_T GetActiveParagraph(void) const;
+    bool GetMarkersVisible(void) const;
     bool GetIsHelp(void) const;
 
     // ----- Query Methods - Line Height -----
@@ -411,6 +415,10 @@ protected:
 
     // ----- Segment Helpers -----
     void MarkControlCodesInSegment(sSegmentLayout& segment, const std::vector<std::string>& graphemes);
+    void GetParagraphDisplayMarkers(POSITION_T paragraphStart, POSITION_T paragraphEnd, std::vector<sDisplayMarker>& markers);
+    std::string TakeDisplayMarkers(const std::vector<sDisplayMarker>& markers, size_t& nextMarker, POSITION_T documentPos) const;
+    void AddSegmentMarker(sSegmentLayout& segment, std::string& pendingMarker);
+    bool FindGraphemeInLine(const sLineLayout& line, POSITION_T paraRelativePos, size_t& segmentIndex, size_t& index) const;
     void MarkSegmentIfInRange(sSegmentLayout& segment, POSITION_T paragraphStart);
 
     // ----- Justification/Tab Helpers -----
@@ -478,6 +486,9 @@ private:
 
     // Active paragraph (caret paragraph) -- exempt from dot command hiding in SHOW_NONE
     PARAGRAPH_T mActiveParagraph;
+
+    // Block / place markers shown inline (false for print layouts)
+    bool mMarkersVisible;
 
     // Margin change tracking handled by cPageManager
 

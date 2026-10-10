@@ -76,6 +76,7 @@ bool cGUIPDFPrintout::GeneratePDF(const std::string& filepath)
     eShowControl savedShowControl = mLayout->GetShowControl();
     mLayout->SetShowControl(SHOW_NONE);
     mLayout->SetActiveParagraph(-1);
+    mLayout->SetMarkersVisible(false);  // block / place markers never print
     mLayout->LayoutDocument(mDocument);
 
     bool result = false;
@@ -130,6 +131,7 @@ bool cGUIPDFPrintout::GeneratePDF(const std::string& filepath)
     }
 
     mLayout->SetShowControl(savedShowControl);
+    mLayout->SetMarkersVisible(true);
     PARAGRAPH_T curPara = mDocument->GetParagraphFromPosition(mDocument->GetPosition());
     mLayout->SetActiveParagraph(curPara);
     mLayout->LayoutDocument(mDocument);
