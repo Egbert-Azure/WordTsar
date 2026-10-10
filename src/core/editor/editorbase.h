@@ -358,8 +358,6 @@ public:
     bool GetShowBoxStats(void) const;
     bool GetShowBoxOutlines(void) const;
 
-    // Word Count
-
     // Status Bar
     void GetStatus(sStatus& status);
     void SetStatusMessage(const std::string& msg, bool busy = false, int durationFrames = 60);
@@ -426,8 +424,6 @@ private:
     POSITION_T FindPositionAtX(const sLineLayout* line, COORD_T targetX);
     POSITION_T FindWordEnd(POSITION_T startPos);
     void ParseFontDescriptor(const std::string& fontDescriptor, const sLineLayout& line);
-
-    // Word Count Timer
 
     // Text Helpers
     void CheckAndReplaceVariable(void);
@@ -593,9 +589,6 @@ protected:
     std::string mStatusMessage;             // Current status message text
     int mStatusMessageTimer;                // Countdown frames to clear message
     bool mStatusBusy;                       // True when busy indicator should be shown
-
-private:
-    // Word Count Timer
 };
 
 #endif // EDITORBASE_H

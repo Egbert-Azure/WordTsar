@@ -5765,8 +5765,6 @@ void cLayoutBase::SaveFormattingCheckpoint(PARAGRAPH_T para)
     cp.paperWidth = mLayoutState->GetPaperWidth();
     cp.paperHeight = mLayoutState->GetPaperHeight();
 
-    // Header/footer tracking
-
     mFormattingCheckpoints.push_back(cp);
 }
 
@@ -5826,8 +5824,6 @@ void cLayoutBase::RestoreFormattingCheckpoint(const sFormattingCheckpoint& cp)
     // Paper dimensions
     mLayoutState->SetPaperWidth(cp.paperWidth);
     mLayoutState->SetPaperHeight(cp.paperHeight);
-
-    // Header/footer tracking
 }
 
 

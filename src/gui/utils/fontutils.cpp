@@ -175,9 +175,6 @@ void RegisterFontFile(const QString& file)
 /// CoreText still finds such a family by name, so its font files are
 /// registered (RegisterFontFile). Each family is looked up once.
 ///
-/// @note Needed alongside RegisterHiddenFonts: a document can ask for a family
-/// before the startup thread has registered it.
-///
 /////////////////////////////////////////////////////////////////////////////
 void RegisterHiddenFamily(const QString& family)
 {
@@ -384,8 +381,5 @@ QFont FontFromDescriptor(const std::string& descriptor)
     return font;
 }
 
-
-#ifdef __APPLE__
-#endif
 
 } // namespace FontUtils

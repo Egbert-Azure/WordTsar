@@ -5513,26 +5513,26 @@ void cDocument::DeleteParagraph(POSITION_T position)
         }
     }
 
-    if(mStartBlock >= position)
+    if(mStartBlock > position)
     {
         mStartBlock -= 1 ;
     }
-    if(mEndBlock >= position)
+    if(mEndBlock > position)
     {
         mEndBlock -= 1 ;
     }
-    if(mOldStartBlock >= position)
+    if(mOldStartBlock > position)
     {
         mOldStartBlock -= 1 ;
     }
-    if(mOldEndBlock >= position)
+    if(mOldEndBlock > position)
     {
         mOldEndBlock -= 1 ;
     }
     
     for(int loop = 0; loop <  10; loop++)
     {
-        if(mSavePosition[loop] >= position)
+        if(mSavePosition[loop] > position)
         {
             mSavePosition[loop] -= 1 ;
         }
@@ -5949,7 +5949,7 @@ void cDocument::DecrementAttributes(POSITION_T position, POSITION_T length, bool
             mBlockSet = false ;
         }
 
-        if(orgpos <= mOldStartBlock)
+        if(orgpos < mOldStartBlock)
         {
             mOldStartBlock-- ;
         }

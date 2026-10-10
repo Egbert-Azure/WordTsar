@@ -237,14 +237,13 @@ cEditorBase::cEditorBase(void)
 /// @return nothing
 ///
 /// @brief
-/// Destructor. Stops word count timer thread. cEditorBase does not own
+/// Destructor. cEditorBase does not own
 /// layout or document; subclasses may own additional resources and must
 /// clean up in their own destructors.
 ///
 /////////////////////////////////////////////////////////////////////////////
 cEditorBase::~cEditorBase(void)
 {
-    // Stop word count timer thread if running
 }
 
 

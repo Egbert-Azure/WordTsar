@@ -10753,3 +10753,49 @@ TEST_CASE("GetWordCount - range")
     CHECK(doc.GetWordCount(5, 5) == 0) ;
     CHECK(doc.GetWordCount(7, 3) == 0) ;
 }
+
+
+TEST_CASE("Deleting a hard return keeps the markers at the join")
+{
+    cDocument doc;
+    doc.Insert("ab\rcd");
+    doc.SetPosition(0);
+    doc.SetBeginBlock();
+    doc.SetPosition(2);
+    doc.SetEndBlock();
+    doc.SetPosition(2);
+    doc.SetSavePosition(1);
+
+    REQUIRE(doc.Delete(2, 1));
+
+    POSITION_T start = 0;
+    POSITION_T end = 0;
+    REQUIRE(doc.GetBlock(start, end));
+    CHECK(start == 0);
+    CHECK(end == 2);
+    CHECK(doc.GetBlockText(start, end) == "ab");
+}
+
+TEST_CASE("Deleting at the previous block start keeps the previous block start")
+{
+    cDocument doc;
+    doc.Insert("abcdef");
+    doc.SetPosition(2);
+    doc.SetBeginBlock();
+    doc.SetPosition(4);
+    doc.SetEndBlock();
+    // a second begin marker moves the block to the previous block
+    doc.SetPosition(0);
+    doc.SetBeginBlock();
+
+    POSITION_T start = 0;
+    POSITION_T end = 0;
+    REQUIRE(doc.GetPreviousBlock(start, end));
+    REQUIRE(start == 2);
+    REQUIRE(end == 4);
+
+    REQUIRE(doc.Delete(2, 1));
+    REQUIRE(doc.GetPreviousBlock(start, end));
+    CHECK(start == 2);
+    CHECK(end == 3);
+}
