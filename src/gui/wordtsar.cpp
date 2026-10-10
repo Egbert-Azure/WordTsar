@@ -415,9 +415,11 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
     mEditor->SetFrame(this) ;
     mEditor->SetScrollbar(mScrollbar) ;  // Connect scrollbar to editor
 
-    // Set editor font (hideous font, but what Wordstar defaulted to)
+    // Set editor font (hideous font, but what Wordstar defaulted to), as the
+    // layout's "Name|Size|Bold|Italic|Underline|Superscript|Subscript" descriptor.
+    // ReadConfig() replaces it with the Preferences default font, if one is set
     QFont font("Monospace", 10) ;
-    mEditor->SetFont(font.toString() .toStdString()) ;
+    mEditor->SetFont(FontUtils::FontToDescriptor(font)) ;
 
     mLayout->addWidget(mBaseEditor) ;
 
@@ -1115,6 +1117,13 @@ void cWordTsar::ReadConfig(void)
     // Load configuration from XDG-standard path via cConfig
     cConfig config ;
     config.Load() ;
+
+    // Preferences default font; without one the editor keeps Monospace 10
+    std::optional<std::string> defaultFont = config.GetDefaultFontDescriptor() ;
+    if (defaultFont)
+    {
+        mEditor->SetFont(*defaultFont) ;
+    }
 
     // Show controls
     if (config.mShowControls)

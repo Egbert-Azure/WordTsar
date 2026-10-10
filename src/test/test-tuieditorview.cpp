@@ -100,3 +100,18 @@ TEST_CASE("cWSEditorView - reveal badges extend to the right of a centred line, 
         }
     }
 }
+
+
+// Regression: the TUI applies the Preferences default font at startup with
+// SetFont; the cached column width (cursor and ruler positions) has to follow
+// the new font after the relayout
+TEST_CASE("cWSEditorCtrl - a new default font updates the column width after relayout")
+{
+    cWSEditorCtrl editor;
+    COORD_T width12 = editor.GetColumnWidth();
+
+    editor.SetFont("Courier New|24.0|0|0|0|0|0");
+    editor.LayoutDocument(true);
+    CHECK(editor.GetFont() == "Courier New|24.0|0|0|0|0|0");
+    CHECK(editor.GetColumnWidth() > width12);
+}

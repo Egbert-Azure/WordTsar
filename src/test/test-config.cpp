@@ -397,3 +397,44 @@ TEST_CASE("spellCheckDotCommands round-trip save and load")
 }
 
 }  // TEST_SUITE
+
+
+TEST_CASE("GetDefaultFontDescriptor builds a layout descriptor of the default font")
+{
+    cConfig config;
+    REQUIRE(config.GetDefaultFontDescriptor().has_value() == true);
+    CHECK(*config.GetDefaultFontDescriptor() == "Courier New|12.0|0|0|0|0|0");
+
+    config.mDefaultFont = "Times New Roman";
+    config.mDefaultFontSize = 10.5;
+    CHECK(*config.GetDefaultFontDescriptor() == "Times New Roman|10.5|0|0|0|0|0");
+}
+
+
+TEST_CASE("GetDefaultFontDescriptor has no value without a default font")
+{
+    cConfig config;
+
+    config.mDefaultFont.clear();
+    CHECK(config.GetDefaultFontDescriptor().has_value() == false);
+
+    config.mDefaultFont = "Courier New";
+    config.mDefaultFontSize = 0.0;
+    CHECK(config.GetDefaultFontDescriptor().has_value() == false);
+}
+
+
+TEST_CASE("GetDefaultFontDescriptor uses the saved default font")
+{
+    TempConfigDir tmpDir;
+
+    cConfig saved;
+    saved.mDefaultFont = "Georgia";
+    saved.mDefaultFontSize = 14.0;
+    saved.Save();
+
+    cConfig loaded;
+    loaded.Load();
+    REQUIRE(loaded.GetDefaultFontDescriptor().has_value() == true);
+    CHECK(*loaded.GetDefaultFontDescriptor() == "Georgia|14.0|0|0|0|0|0");
+}

@@ -74,6 +74,10 @@
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+#include <optional>
+#include <sstream>
+#include <locale>
+#include <iomanip>
 #include <filesystem>
 #include <fstream>
 
@@ -1085,6 +1089,34 @@ void cConfig::AddRecentFile(const std::string& filename)
     }
 
     mRecentFiles[0] = filename;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return std::optional<std::string> - the Preferences default font as a
+///         layout font descriptor; no value when no default font is set
+///
+/// @brief
+/// Build the layout font descriptor ("Name|Size|Bold|Italic|Underline|
+/// Superscript|Subscript", regular style) of the Preferences default font
+/// ([editor] defaultFont and defaultFontSize). The GUI and the TUI start with
+/// this font. No value when the name is empty or the size is not positive
+/// (the TUI Preferences dialog takes both as free text).
+///
+/////////////////////////////////////////////////////////////////////////////
+std::optional<std::string> cConfig::GetDefaultFontDescriptor(void) const
+{
+    if (mDefaultFont.empty() == true || mDefaultFontSize <= 0.0)
+    {
+        return std::nullopt;
+    }
+
+    // Classic locale: '.' as the decimal separator whatever the user's locale
+    std::ostringstream descriptor;
+    descriptor.imbue(std::locale::classic());
+    descriptor << mDefaultFont << '|' << std::fixed << std::setprecision(1) << mDefaultFontSize << "|0|0|0|0|0";
+    return descriptor.str();
 }
 
 

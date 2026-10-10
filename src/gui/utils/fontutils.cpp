@@ -42,6 +42,11 @@
  * - GetFontName(string): extracts just the font family name from a descriptor
  * - GetFontSize(string): extracts just the point size from a descriptor
  *
+ * @section fontutils_hidden macOS Hidden Families
+ * macOS can leave installed, enabled families (Times, Courier, ...) out of its
+ * available-font list. FromDescriptor registers such a family when a document
+ * asks for it.
+ *
  * @section fontutils_parity GUI/TUI Parity
  * The TUI layer (TUIFontUtils namespace) uses an identical descriptor format,
  * ensuring font descriptors can be shared between GUI and TUI codebases
@@ -56,10 +61,177 @@
  */
 
 #include "fontutils.h"
+#ifdef __APPLE__
+#include <QFontDatabase>
+#include <QStringList>
+#include <CoreText/CoreText.h>
+#include <algorithm>
+#include <climits>
+#include <mutex>
+#include <set>
+#endif
 #include <QString>
 #include <sstream>
 #include <iomanip>
 #include <vector>
+
+#ifdef __APPLE__
+namespace
+{
+
+// Families already looked up by RegisterHiddenFamily (main thread only, like all font resolution)
+std::set<QString> gCheckedFamilies;
+
+// Font files RegisterFontFile has registered (startup thread and main thread)
+std::mutex gRegisterMutex;
+std::set<QString> gRegisteredFiles;
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  descriptor [in] - CoreText font descriptor
+///
+/// @return QString - the descriptor's family name, empty if it has none
+///
+/// @brief
+/// Read the family name of a CoreText font descriptor.
+///
+/////////////////////////////////////////////////////////////////////////////
+QString FamilyOf(CTFontDescriptorRef descriptor)
+{
+    QString family;
+    CFStringRef name = static_cast<CFStringRef>(CTFontDescriptorCopyAttribute(descriptor, kCTFontFamilyNameAttribute));
+    if (name != nullptr)
+    {
+        family = QString::fromCFString(name);
+        CFRelease(name);
+    }
+    return family;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  url [in] - file URL
+///
+/// @return QString - the file system path, empty if the URL has none
+///
+/// @brief
+/// Convert a CoreText font file URL to a path Qt can open.
+///
+/////////////////////////////////////////////////////////////////////////////
+QString PathOf(CFURLRef url)
+{
+    QString path;
+    char buffer[PATH_MAX];
+    if (CFURLGetFileSystemRepresentation(url, true, reinterpret_cast<UInt8*>(buffer), sizeof(buffer)) == true)
+    {
+        path = QString::fromUtf8(buffer);
+    }
+    return path;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  file [in] - path of an installed font file
+///
+/// @return nothing
+///
+/// @brief
+/// Register an installed font file with Qt as an application font, once:
+/// Qt then resolves its families and lists them in QFontDatabase::families()
+/// (QFontComboBox).
+///
+/// @note The lock is held while the file is registered (a few milliseconds),
+/// so a family the main thread asks for is complete once this returns, even
+/// when the startup thread was registering its file at the same time.
+///
+/////////////////////////////////////////////////////////////////////////////
+void RegisterFontFile(const QString& file)
+{
+    std::lock_guard<std::mutex> lock(gRegisterMutex);
+    if (gRegisteredFiles.insert(file).second == false)
+    {
+        return;
+    }
+
+    QFontDatabase::addApplicationFont(file);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  family [in] - font family name a document asks for
+///
+/// @return nothing
+///
+/// @brief
+/// Make an installed family that macOS leaves out of its available-font list
+/// usable by Qt. Qt builds its font list from CTFontManagerCopyAvailableFontFamilyNames,
+/// which can omit installed, enabled families (seen on macOS 15: Times,
+/// Courier, STIX, ... missing from every app's font list); Qt then substitutes
+/// the first font of CoreText's character-fallback list (Courier -> Menlo).
+/// CoreText still finds such a family by name, so its font files are
+/// registered (RegisterFontFile). Each family is looked up once.
+///
+/// @note Needed alongside RegisterHiddenFonts: a document can ask for a family
+/// before the startup thread has registered it.
+///
+/////////////////////////////////////////////////////////////////////////////
+void RegisterHiddenFamily(const QString& family)
+{
+    if (family.isEmpty() == true || family.startsWith('.') == true || gCheckedFamilies.count(family) != 0)
+    {
+        return;
+    }
+    gCheckedFamilies.insert(family);
+
+    if (QFontDatabase::families().contains(family) == true)
+    {
+        return;
+    }
+
+    CFStringRef familyName = family.toCFString();
+    const void* keys[] = { kCTFontFamilyNameAttribute };
+    const void* values[] = { familyName };
+    CFDictionaryRef attributes = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 1,
+                                                    &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFRelease(familyName);
+    CTFontDescriptorRef request = CTFontDescriptorCreateWithAttributes(attributes);
+    CFRelease(attributes);
+    CFArrayRef matches = CTFontDescriptorCreateMatchingFontDescriptors(request, nullptr);
+    CFRelease(request);
+    if (matches == nullptr)
+    {
+        return;
+    }
+
+    // The files holding the family's faces (a .ttc holds several faces)
+    std::set<QString> files;
+    CFIndex count = CFArrayGetCount(matches);
+    for (CFIndex index = 0; index < count; index++)
+    {
+        CTFontDescriptorRef match = static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(matches, index));
+        CFURLRef url = static_cast<CFURLRef>(CTFontDescriptorCopyAttribute(match, kCTFontURLAttribute));
+        if (url != nullptr)
+        {
+            QString path = PathOf(url);
+            if (FamilyOf(match) == family && path.isEmpty() == false)
+            {
+                files.insert(path);
+            }
+            CFRelease(url);
+        }
+    }
+    CFRelease(matches);
+
+    std::for_each(files.begin(), files.end(), RegisterFontFile);
+}
+
+
+} // namespace
+#endif
 
 namespace FontUtils
 {
@@ -156,7 +328,27 @@ QFont FontFromDescriptor(const std::string& descriptor)
     if (fields.size() >= 5)
     {
         // Field [0] = font family name
-        font.setFamily(QString::fromStdString(fields[0]));
+        QString family = QString::fromStdString(fields[0]);
+        font.setFamily(family);
+
+        // Generic "Monospace": fall back to the platform's fixed-pitch font
+        if (family.compare("Monospace", Qt::CaseInsensitive) == 0)
+        {
+            font.setStyleHint(QFont::TypeWriter);
+#ifdef __APPLE__
+            // Qt on macOS ignores the style hint for an unknown family, and
+            // looking "Monospace" up costs a one-time font alias scan (about
+            // 150 ms): use the system fixed-pitch family (Menlo) directly
+            font.setFamily(QFontDatabase::systemFont(QFontDatabase::FixedFont).family());
+#endif
+        }
+#ifdef __APPLE__
+        else
+        {
+            // Before Qt resolves the font: an installed family macOS does not list
+            RegisterHiddenFamily(family);
+        }
+#endif
 
         // Field [1] = point size (as float with decimals!)
         try
@@ -191,5 +383,9 @@ QFont FontFromDescriptor(const std::string& descriptor)
 
     return font;
 }
+
+
+#ifdef __APPLE__
+#endif
 
 } // namespace FontUtils

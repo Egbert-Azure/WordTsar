@@ -252,6 +252,15 @@ int cWSWordTsar::Run(int argc, char* argv[])
     startupConfig.Load();
     ApplyConfig(startupConfig, true);
 
+    // Preferences default font; without one the editor keeps Courier New 12.
+    // The relayout refreshes the editor's cached column width.
+    std::optional<std::string> defaultFont = startupConfig.GetDefaultFontDescriptor();
+    if (defaultFont)
+    {
+        mEditor->SetFont(*defaultFont);
+        mEditor->LayoutDocument(true);
+    }
+
     if (argc > 1)
     {
         mFilename = argv[1];

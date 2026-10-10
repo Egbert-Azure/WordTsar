@@ -22,6 +22,7 @@
 #include "doctest.h"
 
 #include "src/gui/editor/editorctrl.h"
+#include "src/gui/utils/fontutils.h"
 #include "src/gui/dialogs/colordialog.h"
 #include "src/gui/layout/layout.h"
 #include "src/core/document/document.h"
@@ -14746,4 +14747,34 @@ TEST_CASE("Reveal codes: the Show Formatting pane wraps like the main editor, ^O
         COORD_T printWidth = layout->FindLayoutCoordInLine(6, line) - layout->FindLayoutCoordInLine(0, line);
         CHECK(selectionWidth > printWidth);
     }
+}
+
+
+// Regression: the main window passed QFont::toString() ("Monospace,10,-1,5,...")
+// as the default font; the layout only reads "Name|Size|..." descriptors, so
+// body text fell back to the platform's proportional UI font
+TEST_CASE("cEditorCtrl - a default font descriptor sets the body text font")
+{
+    ensureQApplication();
+    // the offscreen platform has no system font database to resolve against
+    if (QGuiApplication::platformName() == "offscreen")
+    {
+        MESSAGE("skipped on the offscreen platform");
+        return;
+    }
+
+    cEditorCtrl editor;
+    editor.SetFont(FontUtils::FontToDescriptor(QFont("Monospace", 10)));
+    CHECK(editor.GetFont() == "Monospace|10.0|0|0|0|0|0");
+
+    editor.GetDocument()->Insert("Hello world\r");
+    editor.LayoutDocument(true);
+    const sLineLayout* line = editor.GetLayout()->GetLineByRawLineNumber(0);
+    REQUIRE(line != nullptr);
+    REQUIRE(line->segments.empty() == false);
+
+    QFontInfo body(FontUtils::FontFromDescriptor(line->segments[0].font));
+    CAPTURE(line->segments[0].font);
+    CHECK(body.fixedPitch());
+    CHECK(body.pointSizeF() == doctest::Approx(10.0));
 }

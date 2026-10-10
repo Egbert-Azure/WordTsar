@@ -18,6 +18,9 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include <QFontDatabase>
+#include <QFontInfo>
+#include <QGuiApplication>
 #include "doctest.h"
 
 #include "src/gui/layout/layout.h"
@@ -1342,3 +1345,57 @@ TEST_CASE("Layout color spans paragraph boundaries")
     CHECK(seg1[0].textcolor.IsDefault() == false);
 }
 
+
+TEST_CASE("FontFromDescriptor resolves the generic Monospace family to a fixed-pitch font")
+{
+    ensureQApplication();
+    // the offscreen platform has no system font database to resolve against
+    if (QGuiApplication::platformName() == "offscreen")
+    {
+        MESSAGE("skipped on the offscreen platform");
+        return;
+    }
+
+    QFont font = FontUtils::FontFromDescriptor("Monospace|12.0|0|0|0|0|0");
+    CHECK(QFontInfo(font).fixedPitch());
+#ifdef __APPLE__
+    // macOS has no "Monospace" family: the system fixed-pitch family is used directly
+    CHECK(font.family() == QFontDatabase::systemFont(QFontDatabase::FixedFont).family());
+#else
+    CHECK(font.family() == "Monospace");
+#endif
+    CHECK(font.pointSizeF() == doctest::Approx(12.0));
+}
+
+// Regression (macOS): installed families that macOS leaves out of its
+// available-font list (Times and Courier on macOS 15) fell back to CoreText's
+// character-fallback fonts (Times -> Times New Roman, Courier -> Menlo)
+#ifdef __APPLE__
+TEST_CASE("FontFromDescriptor uses installed families that macOS does not list")
+{
+    ensureQApplication();
+    // the offscreen platform has no system font database to resolve against
+    if (QGuiApplication::platformName() == "offscreen")
+    {
+        MESSAGE("skipped on the offscreen platform");
+        return;
+    }
+
+    // Both ship with macOS (/System/Library/Fonts/Times.ttc, Courier.ttc)
+    for (const char* family : { "Times", "Courier" })
+    {
+        std::string name = family;
+        CAPTURE(name);
+        QFontInfo regular(FontUtils::FontFromDescriptor(std::string(family) + "|12.0|0|0|0|0|0"));
+        CHECK(regular.family() == family);
+
+        QFontInfo bold(FontUtils::FontFromDescriptor(std::string(family) + "|12.0|1|0|0|0|0"));
+        CHECK(bold.family() == family);
+        CHECK(bold.bold());
+    }
+
+    // A family that is not installed still falls back
+    QFontInfo missing(FontUtils::FontFromDescriptor("No Such Font Family|12.0|0|0|0|0|0"));
+    CHECK(missing.family() != "No Such Font Family");
+}
+#endif

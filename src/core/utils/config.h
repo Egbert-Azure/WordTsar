@@ -24,6 +24,7 @@
 #include "src/core/include/config.h"
 
 #include <string>
+#include <optional>
 #include <vector>
 #include <cstdint>
 
@@ -142,6 +143,9 @@ public:
 
     // --- Recent files ---
     void AddRecentFile(const std::string& filename);
+
+    // --- Default font ---
+    std::optional<std::string> GetDefaultFontDescriptor(void) const;
 
     // --- Palette application ---
     void ApplyGUIPalette(const sGUIPalette& palette);
