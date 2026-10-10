@@ -290,8 +290,8 @@ TEST_CASE("Step 5: SplitSegmentAtPosition() - Position array adjustment")
         auto originalPositions = segments[0].position;
         REQUIRE(originalPositions.size() >= 2);
 
-        // Calculate original spacing between characters
-        COORD_T spacingAB = originalPositions[1] - originalPositions[0];
+        // Original spacing between the characters that stay adjacent after the split (B, C)
+        COORD_T spacingBC = originalPositions[2] - originalPositions[1];
 
         // Split after first character
         auto result = layout.SplitSegmentAtPosition(segments[0], 1);
@@ -302,7 +302,7 @@ TEST_CASE("Step 5: SplitSegmentAtPosition() - Position array adjustment")
         {
             COORD_T newSpacingBC = seg2.position[1] - seg2.position[0];
             // Spacing should be similar (allowing for rounding)
-            CHECK(std::abs(newSpacingBC - spacingAB) < 10);
+            CHECK(std::abs(newSpacingBC - spacingBC) < 10);
         }
     }
 }

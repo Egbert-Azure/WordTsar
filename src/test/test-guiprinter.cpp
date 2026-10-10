@@ -290,7 +290,7 @@ TEST_CASE("Word-wrap-disabled paragraphs still trigger page breaks (real QUICKRE
     // up. QUICKREF.WS sets .aw off near the top and never turns it back
     // on, so it reproduces this directly.
     cEditorCtrl editor;
-    bool loaded = editor.LoadFile("/Users/egbert/Documents/GitHub/WordTsar/docs/QUICKREF.WS");
+    bool loaded = editor.LoadFile((std::filesystem::path(__FILE__).parent_path() / ".." / ".." / "docs" / "QUICKREF.WS").string());
     REQUIRE(loaded);
 
     cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
