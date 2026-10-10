@@ -246,6 +246,7 @@ void cEditorCtrl::Init(void)
 
     // Initialize page scale to default (fixed DPI scale)
     mPageScale = 1.0 / FONTSCALE;
+    mHorizScrollOffset = 0;
 
     // Default colors for visual display
     mBGroundColour = QColor(245, 245, 245);         // Light gray background
@@ -557,8 +558,93 @@ void cEditorCtrl::PerformVisualUpdate(void)
     CalculateCaretPosition() ;
     ScrollIntoView() ;
     CalculateCaretPosition() ;      // recalculate after scroll adjusts viewport
+    UpdateHorizontalScroll() ;
     UpdateScrollbar() ;
     update() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Horizontal scroll follows the caret: 0 while the caret fits in the
+/// unscrolled view, otherwise shift the view just enough to keep the caret's
+/// display X visible (with a small margin). Lines can be wider than the view
+/// when reveal decorations (control code badges, markers) extend past the
+/// margin.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::UpdateHorizontalScroll(void)
+{
+    if (!mLayout || !mDocument)
+    {
+        return ;
+    }
+
+    constexpr COORD_T SCROLL_MARGIN = 360 ;     // quarter inch
+
+    COORD_T viewWidth = static_cast<COORD_T>(width()) * FONTSCALE ;
+    if (mPageScale > 0)
+    {
+        viewWidth = static_cast<COORD_T>(width() / mPageScale) ;
+    }
+    if (mDisplaySettings.mode == DISPLAY_PAGE)
+    {
+        viewWidth -= mDisplaySettings.pageBorder ;
+    }
+    else
+    {
+        // continuous: the text area is the paper width (the flag column is right of it)
+        viewWidth = std::min(viewWidth, mLayout->GetPaperWidth()) ;
+    }
+
+    COORD_T caretRight = mCaretX + mCaretWidth + SCROLL_MARGIN ;
+    if (caretRight <= viewWidth)
+    {
+        mHorizScrollOffset = 0 ;
+    }
+    else if (caretRight - mHorizScrollOffset > viewWidth)
+    {
+        mHorizScrollOffset = caretRight - viewWidth ;
+    }
+    else if (mCaretX - mHorizScrollOffset < SCROLL_MARGIN)
+    {
+        mHorizScrollOffset = std::max(static_cast<COORD_T>(0), mCaretX - SCROLL_MARGIN) ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return COORD_T - current horizontal scroll in twips
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T cEditorCtrl::GetHorizontalScroll(void) const
+{
+    return mHorizScrollOffset ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  line [in] a laid-out line
+///
+/// @return true if the line's display end (with reveal decorations) is past
+///         the right edge of the continuous view's text area at the current
+///         horizontal scroll (the flag column then shows "+")
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorCtrl::LineRunsPastTextArea(const sLineLayout& line) const
+{
+    if (!mLayout)
+    {
+        return false ;
+    }
+
+    COORD_T lineEnd = line.pagex + line.LayoutEndX() + line.DecorationWidth() - mHorizScrollOffset ;
+    return lineEnd > mLayout->GetPaperWidth() ;
 }
 
 
@@ -1429,6 +1515,7 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
             {
                 painter.translate(mDisplaySettings.pageBorder, mDisplaySettings.pageBorder);
             }
+            painter.translate(-mHorizScrollOffset, 0);
             DrawCaret(painter);
             painter.restore();
             return;
@@ -1670,7 +1757,7 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
         // Page mode: scale and translate for page borders
         COORD_T pageBorder = mDisplaySettings.pageBorder;
         painter.scale(mPageScale, mPageScale);
-        painter.translate(pageBorder, pageBorder);
+        painter.translate(pageBorder - mHorizScrollOffset, pageBorder);
 
         DrawPageMode(painter, viewportHeightTwips);
     }
@@ -1790,6 +1877,7 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
         {
             painter.translate(mDisplaySettings.pageBorder, mDisplaySettings.pageBorder);
         }
+        painter.translate(-mHorizScrollOffset, 0);
 
         QPainter::CompositionMode oldMode = painter.compositionMode();
         painter.setCompositionMode(QPainter::RasterOp_NotDestination);
@@ -1947,9 +2035,20 @@ void cEditorCtrl::DrawContinuousMode(QPainter& painter, COORD_T viewportHeight)
     QFont indicatorFont = FontUtils::FontFromDescriptor(GetFont());
     indicatorFont.setPointSizeF(indicatorFont.pointSizeF() * FONTSCALE);
 
+    // Laid-out text is clipped to the text area and scrolled horizontally; the
+    // flag column to its right stays put
+    QRectF textArea(0, 0, mPaperWidth, viewportHeight);
+    auto beginTextArea = [&](void)
+    {
+        painter.save();
+        painter.setClipRect(textArea);
+        painter.translate(-mHorizScrollOffset, 0);
+    };
+
     PAGE_T lastPage = 0;
 
     // STEP 1: Draw dot command/comment backgrounds
+    beginTextArea();
     // BLACK BOX API: Use GetParagraphLayout() instead of direct mParagraphLayout access
     for (PARAGRAPH_T paraNum = 0; paraNum < mLayout->GetNumberOfParagraphs(); paraNum++)
     {
@@ -1982,6 +2081,8 @@ void cEditorCtrl::DrawContinuousMode(QPainter& painter, COORD_T viewportHeight)
             }
         }
     }
+
+    painter.restore();
 
     // STEP 2: Draw text and indicators
     // Reset visible line tracking for page up/down
@@ -2075,7 +2176,9 @@ void cEditorCtrl::DrawContinuousMode(QPainter& painter, COORD_T viewportHeight)
                         }
                     }
                 }
+                beginTextArea();
                 DrawLine(painter, line, lineFgOverride);
+                painter.restore();
 
 #ifdef DEBUG
                 // Draw paragraph and line numbers in left margin
@@ -2104,7 +2207,14 @@ void cEditorCtrl::DrawContinuousMode(QPainter& painter, COORD_T viewportHeight)
                 {
                     COORD_T lineY = line.screeny - mScrollOffset;
 
-                    if (paragraph->isCommand || paragraph->isComment)
+                    // A line running past the right of the text area gets "+"
+                    if (LineRunsPastTextArea(line))
+                    {
+                        painter.setFont(indicatorFont);
+                        painter.setPen(mTextColour);
+                        painter.drawText(QPointF(indicatorX, lineY + line.lineheight), "+");
+                    }
+                    else if (paragraph->isCommand || paragraph->isComment)
                     {
                         // Draw "." or "?" for dot commands/comments (only on first line)
                         if (lineIndex == 0)
@@ -2137,7 +2247,9 @@ void cEditorCtrl::DrawContinuousMode(QPainter& painter, COORD_T viewportHeight)
     }
 
     // STEP 3: Draw selection highlights LAST (on top of text and all backgrounds)
+    beginTextArea();
     DrawHighlights(painter);
+    painter.restore();
 
     // Draw vertical line at right edge of page to separate content from indicators
     // Skip when indicator column is hidden
@@ -2434,6 +2546,12 @@ void cEditorCtrl::DrawControlCodeBackgrounds(QPainter& painter, const sLineLayou
             continue;
         }
 
+        // A tag's badge is drawn with its own background (DrawMarkers)
+        if (segment.GetTagWidth(idx) > 0)
+        {
+            continue;
+        }
+
         COORD_T glyphX = lineX + segment.position[idx] + line.DecorationOffset(segmentIndex, idx);
         COORD_T glyphWidth;
 
@@ -2482,8 +2600,9 @@ void cEditorCtrl::DrawControlCodeBackgrounds(QPainter& painter, const sLineLayou
 /// @return nothing
 ///
 /// @brief
-/// Draws the block / place markers of a segment (<B>, <K>, <0>..<9>) with
-/// the control code highlight, just before the marked grapheme.
+/// Draws the reveal decorations of a segment with the control code
+/// highlight: block / place markers (<B>, <K>, <0>..<9>) just before the
+/// marked grapheme, and control code badges (^B, <font>, !, [) at their tag.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::DrawMarkers(QPainter& painter, const sLineLayout& line, size_t segmentIndex, COORD_T lineY, COORD_T maxAscent)
@@ -2491,12 +2610,16 @@ void cEditorCtrl::DrawMarkers(QPainter& painter, const sLineLayout& line, size_t
     const sSegmentLayout& segment = line.segments[segmentIndex];
     for (const sSegmentMarker& marker : segment.markers)
     {
-        if (marker.kind != DECORATION_MARKER || marker.index >= segment.position.size())
+        if (marker.index >= segment.position.size())
         {
             continue;
         }
 
-        COORD_T x = line.pagex + segment.position[marker.index] + line.DecorationOffset(segmentIndex, marker.index) - marker.width;
+        COORD_T x = line.pagex + segment.position[marker.index] + line.DecorationOffset(segmentIndex, marker.index);
+        if (marker.kind == DECORATION_MARKER)
+        {
+            x -= marker.width;
+        }
 
         painter.save();
         painter.setPen(QPen(mBGroundColour, 2));
@@ -2634,6 +2757,12 @@ void cEditorCtrl::DrawSegment(QPainter& painter, const sLineLayout& line, size_t
 
         if (!graphemes[i].empty() && graphemes[i][0] == MARKER_CHAR)
         {
+            // A tag is drawn as its badge (DrawMarkers); the EOF is never drawn
+            if (segment.GetTagWidth(i) > 0 || mDocument->GetControlChar(docPos) == STYLE_EOF)
+            {
+                continue;
+            }
+
             isControlCode = true;
 
             // Draw background for variables (half-intensity highlight)
@@ -4237,6 +4366,13 @@ void cEditorCtrl::GenerateHighlightRects(void)
                             QString lastGlyph = QString::fromStdString(graphemes.back());
                             // Font is already scaled by FONTSCALE, so metrics are in twips - don't scale again!
                             COORD_T lastGlyphWidth = metrics.horizontalAdvance(lastGlyph);
+
+                            // a control code badge is the width of its tag
+                            COORD_T lastTagWidth = segment.GetTagWidth(segment.position.size() - 1);
+                            if (lastTagWidth > 0)
+                            {
+                                lastGlyphWidth = lastTagWidth;
+                            }
                             segmentWidth += lastGlyphWidth;
                         }
                     }
@@ -4258,6 +4394,13 @@ void cEditorCtrl::GenerateHighlightRects(void)
                             QString glyph = QString::fromStdString(graphemes[0]);
                             // Font is already scaled by FONTSCALE, so metrics are in twips - don't scale again!
                             segmentWidth = metrics.horizontalAdvance(glyph);
+
+                            // a control code badge is the width of its tag
+                            COORD_T tagWidth = segment.GetTagWidth(0);
+                            if (tagWidth > 0)
+                            {
+                                segmentWidth = tagWidth;
+                            }
                         }
                     }
                 }
@@ -7611,6 +7754,9 @@ POSITION_T cEditorCtrl::PositionFromPoint(const QPoint& point)
         xTwips -= mDisplaySettings.pageBorder;
         yTwips -= mDisplaySettings.pageBorder;
     }
+
+    // Undo the horizontal scroll
+    xTwips += mHorizScrollOffset;
 
     // Mouse Y is viewport-relative, but line.screeny is document-absolute
     // So we need to convert viewport Y to document Y by adding scroll offset

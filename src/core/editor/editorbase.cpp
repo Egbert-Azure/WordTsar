@@ -882,10 +882,9 @@ const sViewport& cEditorBase::GetViewport(void) const
 ///   line.screeny - mScrollOffset (continuous coordinates).
 ///
 /// Phase 7 -- Print X calculation
-///   Computes mCaretPrintX by subtracting widths of non-printing control
-///   code glyphs (formatting markers like bold/italic toggles) that appear
-///   before the caret. Tabs and variables are NOT subtracted (they print).
-///   This gives the "real" X position for printing/export.
+///   mCaretPrintX is the caret's layout X: reveal decorations (control code
+///   badges, block / place markers) are display only. This gives the "real"
+///   X position for printing/export.
 ///
 /// Phase 8 -- Page mode and sibling sync
 ///   AdjustCaretYForPageMode() converts mCaretY from continuous screeny to
@@ -5254,6 +5253,7 @@ void cEditorBase::SyncSiblingCaret(void)
         mSiblingEditor->CalculateCaretPosition() ;  // find caret location (for ScrollIntoView)
         mSiblingEditor->ScrollIntoView() ;           // may change mScrollOffset
         mSiblingEditor->CalculateCaretPosition() ;  // recompute mCaretY with new scroll offset
+        mSiblingEditor->UpdateHorizontalScroll() ;   // keep the caret in view horizontally
         mSiblingEditor->Repaint() ;
         mSiblingEditor->StartCaretTimer(1) ;         // trigger caret draw promptly
         mSiblingEditor->mSyncingCaret = false ;
@@ -5827,6 +5827,7 @@ bool cEditorBase::FindCaretLine(sCaretCalcState& state)
 void cEditorBase::ResolveCaretGlyph(sCaretCalcState& state)
 {
     state.caretX = state.caretLine->pagex ;  // Default to line start
+    state.caretLayoutX = state.caretX ;
     state.caretSegmentHeight = 0 ;
     state.caretGlyphWidth = DEFAULT_CARET_WIDTH ;
     bool foundCaretPos = false ;
@@ -5847,12 +5848,17 @@ void cEditorBase::ResolveCaretGlyph(sCaretCalcState& state)
             {
                 // Found it! Use this glyph's X position and segment height
                 // Display X: layout X plus the inline markers drawn before it
-                state.caretX = state.caretLine->pagex + segment.position[i] +
-                               state.caretLine->DecorationOffset(segIdx, i) ;
+                state.caretLayoutX = state.caretLine->pagex + segment.position[i] ;
+                state.caretX = state.caretLayoutX + state.caretLine->DecorationOffset(segIdx, i) ;
                 state.caretSegmentHeight = segment.segmentheight ;
 
-                // Calculate glyph width for overwrite mode
-                if (i + 1 < graphemeCount)
+                // Calculate glyph width for overwrite mode (a tag: its badge)
+                COORD_T tagWidth = segment.GetTagWidth(i) ;
+                if (tagWidth > 0)
+                {
+                    state.caretGlyphWidth = tagWidth ;
+                }
+                else if (i + 1 < graphemeCount)
                 {
                     state.caretGlyphWidth = segment.position[i + 1] - segment.position[i] ;
                 }
@@ -5892,18 +5898,10 @@ void cEditorBase::ResolveCaretGlyph(sCaretCalcState& state)
     {
         size_t lastSegIdx = state.caretLine->segments.size() - 1;
         const auto& lastSegment = state.caretLine->segments[lastSegIdx] ;
-        if (lastSegment.GetGraphemeCount() > 0)
-        {
-            size_t lastGlyphIdx = lastSegment.GetGraphemeCount() - 1 ;
-            state.caretX = state.caretLine->pagex + lastSegment.position[lastGlyphIdx] +
-                           state.caretLine->DecorationOffset(lastSegIdx, lastGlyphIdx) ;
-            // Calculate width of last glyph
-            state.caretGlyphWidth = lastSegment.totalWidth - lastSegment.position[lastGlyphIdx] ;
-            if (state.caretGlyphWidth <= 0)
-            {
-                state.caretGlyphWidth = DEFAULT_CARET_WIDTH ;
-            }
-        }
+        // caret is after the line's last grapheme
+        state.caretLayoutX = state.caretLine->pagex + state.caretLine->LayoutEndX() ;
+        state.caretX = state.caretLayoutX + state.caretLine->DecorationWidth() ;
+        state.caretGlyphWidth = DEFAULT_CARET_WIDTH ;
         state.caretSegmentHeight = lastSegment.segmentheight ;
 
         // Parse font descriptor for status bar
@@ -5934,59 +5932,7 @@ void cEditorBase::ResolveCaretGlyph(sCaretCalcState& state)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::CalculatePrintX(const sCaretCalcState& state)
 {
-    COORD_T controlCodeWidthAdjust = 0 ;
-    POSITION_T ccGraphemePos = state.caretLine->linestart ;
-
-    for (const auto& seg : state.caretLine->segments)
-    {
-        // Tabs print at full expansion width -- no adjustment
-        if (seg.isTab)
-        {
-            ccGraphemePos += seg.GetGraphemeCount() ;
-            continue ;
-        }
-
-        size_t segGraphemeCount = seg.GetGraphemeCount() ;
-
-        for (size_t ccIdx : seg.controlCodeIndices)
-        {
-            // Only count control codes before the caret position
-            POSITION_T ccPosInPara = ccGraphemePos + static_cast<POSITION_T>(ccIdx) ;
-            if (ccPosInPara >= state.offsetInPara)
-            {
-                break ;
-            }
-
-            // Variables print at their expanded width -- skip them
-            POSITION_T docPos = state.paraStart + ccPosInPara ;
-            std::string ch = mDocument->GetCharNoAdvance(docPos) ;
-            if (!ch.empty() && ch[0] == MARKER_CHAR)
-            {
-                eModifiers controlType = mDocument->GetControlChar(docPos) ;
-                if (controlType == STYLE_VARIABLE)
-                {
-                    continue ;
-                }
-            }
-
-            // Calculate width of this non-printing control code glyph
-            COORD_T ccWidth = 0 ;
-            if (ccIdx + 1 < seg.position.size())
-            {
-                ccWidth = seg.position[ccIdx + 1] - seg.position[ccIdx] ;
-            }
-            else
-            {
-                // Last glyph in segment: width extends to segment end
-                ccWidth = (seg.position[0] + seg.totalWidth) - seg.position[ccIdx] ;
-            }
-            controlCodeWidthAdjust += ccWidth ;
-        }
-
-        ccGraphemePos += segGraphemeCount ;
-    }
-
-    mCaretPrintX = mCaretX - controlCodeWidthAdjust ;
+    mCaretPrintX = state.caretLayoutX ;
 }
 
 

@@ -560,24 +560,23 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
 
                 // Tab segments always occupy 1 grapheme for caret navigation
                 AddSegmentMarker(tabSegment, pendingMarker);
-                tabSegment.position.push_back(0);
-                tabSegment.length = 1;
 
-                // Show tab display character and highlight background only in SHOW_ALL
+                // Show tab display character and highlight background only in SHOW_ALL;
+                // an alignment tab's ! / [ is a badge, it takes no layout width
+                eTabTypes tt = tabSegment.tabType;
+                bool alignmentTab = (tt == TAB_CENTER || tt == TAB_RIGHT || tt == TAB_RIGHT1);
                 if (GetShowControl() == SHOW_ALL)
                 {
                     tabSegment.hasControlCodes = true;
                     tabSegment.controlCodeIndices.push_back(0);
-
-                    // Only set totalWidth for alignment markers
-                    eTabTypes tt = tabSegment.tabType;
-                    if (tt == TAB_CENTER || tt == TAB_RIGHT || tt == TAB_RIGHT1)
+                    if (alignmentTab)
                     {
-                        std::string displayGrapheme = GetDisplayCharacter(documentPos, grapheme);
-                        COORD_T charWidth = GetTextWidth(displayGrapheme);
-                        tabSegment.totalWidth = charWidth;
+                        AddSegmentTag(tabSegment, GetDisplayCharacter(documentPos, grapheme));
                     }
                 }
+
+                tabSegment.position.push_back(0);
+                tabSegment.length = 1;
 
                 segments.push_back(tabSegment);
 
@@ -628,19 +627,25 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
             InitializeSegment(currentSegment, paragraphNum, startPos, lineHeight);
             currentX = 0;
 
-            // If control codes are visible, add to NEW segment with NEW font
+            // If control codes are visible, add to NEW segment with NEW font:
+            // a zero-width grapheme with its badge (the end-of-file marker has none)
             if (GetShowControl() == SHOW_ALL)
             {
-                std::string displayGrapheme = GetDisplayCharacter(documentPos, grapheme);
-                COORD_T glyphWidth = GetTextWidth(displayGrapheme);
-
                 AddSegmentMarker(currentSegment, pendingMarker);
+                bool isEof = (controlType == STYLE_EOF);
+                if (!isEof)
+                {
+                    AddSegmentTag(currentSegment, GetDisplayCharacter(documentPos, grapheme));
+                }
+
                 currentSegment.position.push_back(currentX);
                 currentSegment.length++;
-                currentX += glyphWidth;
 
-                currentSegment.hasControlCodes = true;
-                currentSegment.controlCodeIndices.push_back(currentSegment.length - 1);
+                if (!isEof)
+                {
+                    currentSegment.hasControlCodes = true;
+                    currentSegment.controlCodeIndices.push_back(currentSegment.length - 1);
+                }
             }
         }
         else

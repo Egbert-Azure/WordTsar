@@ -75,6 +75,8 @@ private:
                                 uint32_t& attrs) const;
     int GraphemeColumns(POSITION_T docPos, const std::string& grapheme, PAGE_T pagenumber) const;
     int MarkerColumns(const sSegmentLayout& seg, size_t index) const;
+    int TagColumns(const sSegmentLayout& seg, size_t index) const;
+    bool IsAlignmentTab(const sSegmentLayout& seg) const;
     int LineScreenRows(LINE_T rawLine) const;
     int LineStartCol(const sLineLayout* line, COORD_T twipsPerCol) const;
     int LineEndCol(const sLineLayout* line, COORD_T twipsPerCol) const;

@@ -325,6 +325,7 @@ if(BUILD_TUI)
         src/test/test-tuicolorutils.cpp
         src/test/test-tuicolorpicker.cpp
         src/test/test-tuimenuwalk.cpp
+        src/test/test-tuieditorview.cpp
         src/tui/print/tuiprintout.cpp
         ${WORDTSAR_WSTUI_SOURCES_NO_MAIN}
         ${WORDTSAR_CORE_SOURCES}

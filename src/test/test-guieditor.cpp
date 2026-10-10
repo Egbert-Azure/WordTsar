@@ -14417,3 +14417,333 @@ TEST_CASE("Hidden block round-trips and positions outside the document are dropp
 
     CleanupGUIBackupTestDir(dir);
 }
+
+
+namespace
+{
+
+// GetLineFromPosition() returns NOT_SET when there is no such line
+std::optional<LINE_T> RevealOptLine(LINE_T line)
+{
+    if (line < 0)
+    {
+        return std::nullopt;
+    }
+    return line;
+}
+
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Reveal codes in the GUI: badges and markers are drawn over the layout,
+/// the view scrolls horizontally to keep the caret visible, clicks land on
+/// badges, the Show Formatting pane wraps like the main editor and ^OD never
+/// re-wraps.
+///
+/////////////////////////////////////////////////////////////////////////////
+namespace
+{
+
+// A paragraph whose shown codes make its first line run far past the margin
+void FillLongRevealLine(cDocument* doc)
+{
+    for (int word = 0; word < 40; ++word)
+    {
+        for (int tag = 0; tag < 4; ++tag)
+        {
+            doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        }
+        doc->Insert("w" + std::to_string(word) + " ");
+    }
+    doc->Insert("\r");
+}
+
+// Content line of every visible grapheme
+std::map<POSITION_T, LINE_T> ContentLines(cLayoutBase* layout, cDocument* doc)
+{
+    std::map<POSITION_T, LINE_T> lines;
+    for (POSITION_T pos = 0; pos < doc->GetTextSize(); ++pos)
+    {
+        std::string grapheme = doc->GetCharNoAdvance(pos);
+        if (grapheme.empty() || grapheme[0] == MARKER_CHAR)
+        {
+            continue;
+        }
+        std::optional<LINE_T> line = RevealOptLine(layout->GetLineFromPosition(pos));
+        const sLineLayout* lineLayout = nullptr;
+        if (line)
+        {
+            lineLayout = layout->GetLineByRawLineNumber(*line);
+        }
+        if (lineLayout != nullptr)
+        {
+            lines[pos] = lineLayout->contentLineNumber;
+        }
+    }
+    return lines;
+}
+
+}
+
+
+TEST_CASE("Reveal codes: horizontal scroll follows the caret")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.resize(1000, 300);
+    cDocument* doc = editor.GetDocument();
+    editor.SetDisplayMode(DISPLAY_CONTINUOUS);
+    editor.SetShowControls(SHOW_ALL);
+    FillLongRevealLine(doc);
+    editor.LayoutDocument(true);
+
+    doc->SetPosition(0);
+    editor.PerformVisualUpdate();
+    CHECK(editor.GetHorizontalScroll() == doctest::Approx(0));
+
+    // the end of the first line is far right: the view follows the caret
+    std::optional<LINE_T> firstLine = RevealOptLine(editor.GetLayout()->GetLineFromPosition(0));
+    REQUIRE(firstLine);
+    POSITION_T lineEnd = editor.GetLayout()->GetLineEndPosition(*firstLine);
+    // continuous view: the text area is the paper width, the flag column is right of it
+    const sLineLayout* firstLayout = editor.GetLayout()->GetLineByRawLineNumber(*firstLine);
+    REQUIRE(firstLayout != nullptr);
+    CHECK(editor.LineRunsPastTextArea(*firstLayout));
+
+    doc->SetPosition(lineEnd);
+    editor.PerformVisualUpdate();
+    COORD_T textArea = editor.GetLayout()->GetPaperWidth();
+    CHECK(editor.GetCaretX() > textArea);
+    CHECK(editor.GetHorizontalScroll() > 0);
+    CHECK(editor.GetCaretX() - editor.GetHorizontalScroll() < textArea);
+    CHECK(editor.GetCaretX() - editor.GetHorizontalScroll() > 0);
+    CHECK_FALSE(editor.LineRunsPastTextArea(*firstLayout));       // its end is now in view
+
+    // back to the start: the view returns
+    doc->SetPosition(0);
+    editor.PerformVisualUpdate();
+    CHECK(editor.GetHorizontalScroll() == doctest::Approx(0));
+
+    // without the badges the line fits: no scroll, no "+"
+    editor.SetShowControls(SHOW_NONE);
+    editor.LayoutDocument(true);
+    doc->SetPosition(lineEnd);
+    editor.PerformVisualUpdate();
+    CHECK(editor.GetHorizontalScroll() == doctest::Approx(0));
+    CHECK_FALSE(editor.LineRunsPastTextArea(*editor.GetLayout()->GetLineByRawLineNumber(*firstLine)));
+}
+
+
+TEST_CASE("Reveal codes pane follows the page view's caret horizontally")
+{
+    ensureQApplication();
+
+    // main editor in page mode, the reveal codes pane as its sibling (as ToggleRevealCodes() sets up)
+    cEditorCtrl editor;
+    editor.resize(1000, 300);
+    cDocument* doc = editor.GetDocument();
+    FillLongRevealLine(doc);
+    editor.SetDisplayMode(DISPLAY_PAGE);
+    editor.LayoutDocument(true);
+
+    cEditorCtrl codes(doc);
+    codes.resize(1000, 300);
+    codes.SetDisplayMode(DISPLAY_CONTINUOUS);
+    codes.SetShowControls(SHOW_ALL);
+    codes.LayoutDocument(true);
+
+    editor.SetSiblingEditor(&codes);
+    codes.SetSiblingEditor(&editor);
+
+    std::optional<LINE_T> firstLine = RevealOptLine(codes.GetLayout()->GetLineFromPosition(0));
+    REQUIRE(firstLine);
+    const sLineLayout* firstLayout = codes.GetLayout()->GetLineByRawLineNumber(*firstLine);
+    REQUIRE(firstLayout != nullptr);
+    REQUIRE(codes.LineRunsPastTextArea(*firstLayout));
+    POSITION_T lineEnd = codes.GetLayout()->GetLineEndPosition(*firstLine);
+    COORD_T textArea = codes.GetLayout()->GetPaperWidth();
+
+    // caret moved in the page view to the far right of the pane's line: the pane scrolls
+    doc->SetPosition(lineEnd);
+    editor.PerformVisualUpdate();
+    CHECK(codes.GetCaretX() > textArea);
+    CHECK(codes.GetHorizontalScroll() > 0);
+    CHECK(codes.GetCaretX() - codes.GetHorizontalScroll() < textArea);
+    CHECK(codes.GetCaretX() - codes.GetHorizontalScroll() > 0);
+
+    // back to the start: the pane scrolls back
+    doc->SetPosition(0);
+    editor.PerformVisualUpdate();
+    CHECK(codes.GetHorizontalScroll() == doctest::Approx(0));
+
+    // caret moved in the pane: the page view (no badges, the line fits) needs no scroll
+    doc->SetPosition(lineEnd);
+    codes.PerformVisualUpdate();
+    CHECK(codes.GetHorizontalScroll() > 0);
+    CHECK(editor.GetHorizontalScroll() == doctest::Approx(0));
+
+    editor.SetSiblingEditor(nullptr);
+    codes.SetSiblingEditor(nullptr);
+}
+
+
+TEST_CASE("Reveal codes pane draws its caret where it scrolled to when the page view has focus")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    editor.resize(1000, 300);
+    cDocument* doc = editor.GetDocument();
+    FillLongRevealLine(doc);
+    editor.SetDisplayMode(DISPLAY_PAGE);
+    editor.LayoutDocument(true);
+
+    cEditorCtrl codes(doc);
+    codes.resize(1000, 300);
+    codes.SetDisplayMode(DISPLAY_CONTINUOUS);
+    codes.SetShowControls(SHOW_ALL);
+    codes.LayoutDocument(true);
+
+    editor.SetSiblingEditor(&codes);
+    codes.SetSiblingEditor(&editor);
+
+    std::optional<LINE_T> firstLine = RevealOptLine(codes.GetLayout()->GetLineFromPosition(0));
+    REQUIRE(firstLine);
+    doc->SetPosition(codes.GetLayout()->GetLineEndPosition(*firstLine));
+    editor.PerformVisualUpdate();
+    REQUIRE(codes.GetHorizontalScroll() > 0);
+
+    // full repaint of the pane (it has no focus): the caret is drawn at its scrolled position
+    // the image is in device pixels (2 per widget pixel on a Retina / 200% display)
+    QImage image = codes.grab().toImage();
+    double scale = codes.GetPageScale() * image.devicePixelRatio();
+    int x = static_cast<int>((codes.GetCaretX() - codes.GetHorizontalScroll()) * scale);
+    int top = static_cast<int>(codes.GetCaretY() * scale) + 1;
+    int bottom = static_cast<int>((codes.GetCaretY() + codes.GetCaretHeight()) * scale) - 1;
+    REQUIRE(x >= 0);
+    REQUIRE(x < image.width());
+    REQUIRE(top >= 0);
+    REQUIRE(bottom < image.height());
+    REQUIRE(bottom > top);
+
+    // the caret is a solid bar: one column at (or just right of) its X is dark over its whole height
+    bool caretDrawn = false;
+    for (int dx = 0; dx <= 2; ++dx)
+    {
+        int dark = 0;
+        for (int y = top; y <= bottom; ++y)
+        {
+            if ((x + dx) < image.width() && qGray(image.pixel(x + dx, y)) < 80)
+            {
+                dark++;
+            }
+        }
+        if (dark == (bottom - top + 1))
+        {
+            caretDrawn = true;
+        }
+    }
+    CHECK(caretDrawn);
+
+    editor.SetSiblingEditor(nullptr);
+    codes.SetSiblingEditor(nullptr);
+}
+
+
+TEST_CASE("Reveal codes: a click on a badge lands on the tag, also when scrolled")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.resize(1000, 300);
+    cDocument* doc = editor.GetDocument();
+    editor.SetDisplayMode(DISPLAY_CONTINUOUS);
+    editor.SetShowControls(SHOW_ALL);
+    FillLongRevealLine(doc);
+    editor.LayoutDocument(true);
+    cLayoutBase* layout = editor.GetLayout();
+
+    auto clickOn = [&](POSITION_T tagPos, COORD_T badgeOffset)
+    {
+        LINE_T line = RevealOptLine(layout->GetLineFromPosition(tagPos)).value();
+        COORD_T x = layout->FindCoordInLine(tagPos, line) + badgeOffset - editor.GetHorizontalScroll();
+        COORD_T y = layout->GetLineScreenY(line) + layout->GetLineHeight(line) / 2;
+        QPoint point(static_cast<int>(x / FONTSCALE), static_cast<int>(y / FONTSCALE));
+        return editor.PositionFromPoint(point);
+    };
+
+    // the first tag of word 1 (word 0 is "\x7f\x7f\x7f\x7fw0 ")
+    POSITION_T tagPos = 8;
+    REQUIRE(doc->GetControlChar(tagPos) == STYLE_BOLD);
+    std::optional<POSITION_T> hit = clickOn(tagPos, 60);
+    REQUIRE(hit);
+    CHECK(*hit == tagPos);
+
+    // scrolled to the end of the line, a click on a later badge
+    LINE_T firstLine = RevealOptLine(layout->GetLineFromPosition(0)).value();
+    doc->SetPosition(layout->GetLineEndPosition(firstLine));
+    editor.PerformVisualUpdate();
+    REQUIRE(editor.GetHorizontalScroll() > 0);
+    POSITION_T lateTag = layout->GetLineEndPosition(firstLine) - 7;
+    while (doc->GetCharNoAdvance(lateTag)[0] != MARKER_CHAR)
+    {
+        lateTag--;
+    }
+    hit = clickOn(lateTag, 60);
+    REQUIRE(hit);
+    CHECK(*hit == lateTag);
+}
+
+
+TEST_CASE("Reveal codes: the Show Formatting pane wraps like the main editor, ^OD never re-wraps")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    editor.SetDisplayMode(DISPLAY_CONTINUOUS);
+    editor.SetShowControls(SHOW_NONE);
+    for (int para = 0; para < 3; ++para)
+    {
+        FillLongRevealLine(doc);
+    }
+    editor.LayoutDocument(true);
+    std::map<POSITION_T, LINE_T> mainLines = ContentLines(editor.GetLayout(), doc);
+    PAGE_T mainPages = editor.GetLayout()->GetNumberOfPages();
+    REQUIRE(mainLines.rbegin()->second >= 5);
+
+    SUBCASE("the Show Formatting pane (continuous SHOW_ALL on the same document)")
+    {
+        cEditorCtrl codes(doc);
+        codes.SetDisplayMode(DISPLAY_CONTINUOUS);
+        codes.SetShowControls(SHOW_ALL);
+        codes.LayoutDocument(true);
+        CHECK(ContentLines(codes.GetLayout(), doc) == mainLines);
+        CHECK(codes.GetLayout()->GetNumberOfPages() == mainPages);
+    }
+
+    SUBCASE("^OD through every mode")
+    {
+        for (int step = 0; step < 3; ++step)
+        {
+            editor.ToggleShowControl();
+            editor.LayoutDocument(true);
+            CAPTURE(static_cast<int>(editor.GetLayout()->GetShowControl()));
+            CHECK(ContentLines(editor.GetLayout(), doc) == mainLines);
+            CHECK(editor.GetLayout()->GetNumberOfPages() == mainPages);
+        }
+    }
+
+    SUBCASE("a selection over tags covers their badges")
+    {
+        editor.SetShowControls(SHOW_ALL);
+        editor.LayoutDocument(true);
+        cLayoutBase* layout = editor.GetLayout();
+        LINE_T line = RevealOptLine(layout->GetLineFromPosition(0)).value();
+        // block [0, 6): four tags, "w0"
+        COORD_T selectionWidth = layout->FindCoordInLine(6, line) - layout->FindCoordInLine(0, line);
+        COORD_T printWidth = layout->FindLayoutCoordInLine(6, line) - layout->FindLayoutCoordInLine(0, line);
+        CHECK(selectionWidth > printWidth);
+    }
+}

@@ -418,6 +418,7 @@ protected:
     void GetParagraphDisplayMarkers(POSITION_T paragraphStart, POSITION_T paragraphEnd, std::vector<sDisplayMarker>& markers);
     std::string TakeDisplayMarkers(const std::vector<sDisplayMarker>& markers, size_t& nextMarker, POSITION_T documentPos) const;
     void AddSegmentMarker(sSegmentLayout& segment, std::string& pendingMarker);
+    void AddSegmentTag(sSegmentLayout& segment, const std::string& text);
     bool FindGraphemeInLine(const sLineLayout& line, POSITION_T paraRelativePos, size_t& segmentIndex, size_t& index) const;
     void MarkSegmentIfInRange(sSegmentLayout& segment, POSITION_T paragraphStart);
 

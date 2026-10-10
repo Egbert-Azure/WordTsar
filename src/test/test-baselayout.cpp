@@ -12325,3 +12325,890 @@ TEST_CASE("LayoutParagraph of the last paragraph drops entries for deleted parag
     CHECK(layout.GetNumberOfParagraphs() == 3);
     CHECK(incrementalLines == layout.GetNumberOfLines());
 }
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Block and place markers are laid out inline: they take width before the
+/// marked grapheme but are never a position of their own.
+///
+/////////////////////////////////////////////////////////////////////////////
+namespace
+{
+
+// First inline marker of the paragraph's lines anchored at a document position
+const sSegmentMarker* FindInlineMarker(cLayout& layout, cDocument& doc, POSITION_T documentPos)
+{
+    PARAGRAPH_T para = doc.GetParagraphFromPosition(documentPos);
+    POSITION_T paraStart = 0;
+    POSITION_T paraEnd = 0;
+    doc.GetParagraphStartandEnd(para, paraStart, paraEnd);
+    for (LINE_T ln = 0; ln < layout.GetNumberOfLines(); ++ln)
+    {
+        const sLineLayout* line = layout.GetLineByRawLineNumber(ln);
+        if (line == nullptr)
+        {
+            continue;
+        }
+        for (const sSegmentLayout& seg : line->segments)
+        {
+            if (seg.paragraph != para)
+            {
+                continue;
+            }
+            for (const sSegmentMarker& marker : seg.markers)
+            {
+                if (marker.kind == DECORATION_MARKER &&
+                    paraStart + seg.startPosition + static_cast<POSITION_T>(marker.index) == documentPos)
+                {
+                    return &marker;
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+// Count of the decorations of one kind in the whole layout
+size_t CountDecorations(cLayout& layout, eDecorationKind kind)
+{
+    size_t count = 0;
+    for (LINE_T ln = 0; ln < layout.GetNumberOfLines(); ++ln)
+    {
+        const sLineLayout* line = layout.GetLineByRawLineNumber(ln);
+        if (line != nullptr)
+        {
+            for (const sSegmentLayout& seg : line->segments)
+            {
+                count += static_cast<size_t>(std::count_if(seg.markers.begin(), seg.markers.end(),
+                    [kind](const sSegmentMarker& decoration)
+                    {
+                        return decoration.kind == kind;
+                    }));
+            }
+        }
+    }
+    return count;
+}
+
+// Count of inline block / place markers in the whole layout
+size_t CountInlineMarkers(cLayout& layout)
+{
+    return CountDecorations(layout, DECORATION_MARKER);
+}
+
+COORD_T CoordOf(cLayout& layout, POSITION_T pos)
+{
+    return layout.FindCoordInLine(pos, layout.GetLineFromPosition(pos));
+}
+
+}
+
+
+TEST_CASE("Inline markers: offsets and hit testing")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_DOT);
+    doc.Insert("abcdef\r");
+    layout.LayoutDocument(&doc);
+
+    std::vector<COORD_T> plain;
+    for (POSITION_T pos = 0; pos <= 6; ++pos)
+    {
+        plain.push_back(CoordOf(layout, pos));
+    }
+
+    doc.SetPosition(3);
+    doc.SetSavePosition(0);
+    layout.LayoutDocument(&doc);
+
+    const sSegmentMarker* marker = FindInlineMarker(layout, doc, 3);
+    REQUIRE(marker != nullptr);
+    CHECK(marker->text == "<0>");
+    CHECK(marker->kind == DECORATION_MARKER);
+    COORD_T width = marker->width;
+    CHECK(width > 0);
+
+    SUBCASE("graphemes before the marker keep their X, the rest are drawn shifted by its width")
+    {
+        for (POSITION_T pos = 0; pos <= 6; ++pos)
+        {
+            CHECK(layout.FindLayoutCoordInLine(pos, 0) == doctest::Approx(plain[static_cast<size_t>(pos)]));
+        }
+        for (POSITION_T pos = 0; pos <= 2; ++pos)
+        {
+            CHECK(CoordOf(layout, pos) == doctest::Approx(plain[static_cast<size_t>(pos)]));
+        }
+        for (POSITION_T pos = 3; pos <= 6; ++pos)
+        {
+            CHECK(CoordOf(layout, pos) == doctest::Approx(plain[static_cast<size_t>(pos)] + width));
+        }
+    }
+
+    SUBCASE("a click on the marker lands on the marked grapheme")
+    {
+        COORD_T markerLeft = CoordOf(layout, 3) - width;
+        CHECK(layout.FindPositionInLine(markerLeft + 1, 0) == 3);
+        CHECK(layout.FindPositionInLine(markerLeft + width / 2, 0) == 3);
+        CHECK(layout.FindPositionInLine(CoordOf(layout, 3) - 1, 0) == 3);
+        CHECK(layout.FindPositionInLine(CoordOf(layout, 2), 0) == 2);
+        CHECK(layout.FindPositionInLine(CoordOf(layout, 4), 0) == 4);
+    }
+
+    SUBCASE("several markers at one position are joined")
+    {
+        doc.SetPosition(3);
+        doc.SetBeginBlock();
+        doc.SetSavePosition(5);
+        layout.LayoutDocument(&doc);
+        marker = FindInlineMarker(layout, doc, 3);
+        REQUIRE(marker != nullptr);
+        CHECK(marker->text == "<B><0><5>");
+        CHECK(CountInlineMarkers(layout) == 1);
+    }
+
+    SUBCASE("print layout has no markers")
+    {
+        layout.SetMarkersVisible(false);
+        layout.LayoutDocument(&doc);
+        CHECK(CountInlineMarkers(layout) == 0);
+        for (POSITION_T pos = 0; pos <= 6; ++pos)
+        {
+            CHECK(CoordOf(layout, pos) == doctest::Approx(plain[static_cast<size_t>(pos)]));
+        }
+        layout.SetMarkersVisible(true);
+        layout.LayoutDocument(&doc);
+        CHECK(CountInlineMarkers(layout) == 1);
+    }
+
+    SUBCASE("clearing the marker restores the layout")
+    {
+        doc.SetPosition(3);
+        doc.SetSavePosition(0);
+        layout.LayoutDocument(&doc);
+        CHECK(CountInlineMarkers(layout) == 0);
+        CHECK(CoordOf(layout, 3) == doctest::Approx(plain[3]));
+    }
+}
+
+
+TEST_CASE("Inline markers: block markers follow the block state")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_DOT);
+    doc.Insert("abcdefgh\r");
+
+    doc.SetPosition(2);
+    doc.SetBeginBlock();
+    layout.LayoutDocument(&doc);
+    REQUIRE(FindInlineMarker(layout, doc, 2) != nullptr);
+    CHECK(FindInlineMarker(layout, doc, 2)->text == "<B>");
+
+    doc.SetPosition(5);
+    doc.SetEndBlock();
+    layout.LayoutDocument(&doc);
+    CHECK(CountInlineMarkers(layout) == 0);
+
+    // hidden: no markers
+    doc.ToggleHideBlock();
+    layout.LayoutDocument(&doc);
+    CHECK(CountInlineMarkers(layout) == 0);
+
+    // ^KK only: <K>
+    doc.UnsetBlock();
+    doc.SetPosition(5);
+    doc.SetEndBlock();
+    layout.LayoutDocument(&doc);
+    REQUIRE(FindInlineMarker(layout, doc, 5) != nullptr);
+    CHECK(FindInlineMarker(layout, doc, 5)->text == "<K>");
+    CHECK(CountInlineMarkers(layout) == 1);
+}
+
+
+TEST_CASE("Inline markers: highlighted block keeps place markers and block marking")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_DOT);
+    doc.Insert("abcdefgh\r");
+    doc.SetPosition(1);
+    doc.SetBeginBlock();
+    doc.SetPosition(6);
+    doc.SetEndBlock();
+    doc.SetPosition(3);
+    doc.SetSavePosition(2);
+    layout.LayoutDocument(&doc);
+
+    const sLineLayout* line = layout.GetLineByRawLineNumber(0);
+    REQUIRE(line != nullptr);
+    for (const sSegmentLayout& seg : line->segments)
+    {
+        bool inBlock = seg.startPosition < 6 && seg.startPosition + seg.length > 1;
+        CHECK(seg.isBlock == inBlock);
+    }
+    REQUIRE(FindInlineMarker(layout, doc, 3) != nullptr);
+}
+
+
+TEST_CASE("Inline markers: hidden control codes and EOF")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+
+    // a0 b1 ^B2 c3 d4 ^B5 \r6 e7 f8 EOF9
+    doc.Insert("ab");
+    doc.BeginBold();
+    doc.Insert("cd");
+    doc.EndBold();
+    doc.Insert("\ref");
+    doc.SetPosition(2);
+    doc.SetSavePosition(1);                   // on the hidden bold code
+    doc.SetPosition(doc.GetTextSize() - 1);
+    doc.SetSavePosition(2);                   // on the EOF
+
+    SUBCASE("hidden codes: the marker goes before the next shown grapheme")
+    {
+        layout.SetShowControl(SHOW_NONE);
+        layout.LayoutDocument(&doc);
+        const sSegmentMarker* marker = FindInlineMarker(layout, doc, 3);
+        REQUIRE(marker != nullptr);
+        CHECK(marker->text == "<1>");
+
+        const sSegmentMarker* eof = FindInlineMarker(layout, doc, 9);
+        REQUIRE(eof != nullptr);
+        CHECK(eof->text == "<2>");
+        CHECK(CoordOf(layout, 9) > CoordOf(layout, 8));
+        CHECK(CountInlineMarkers(layout) == 2);
+    }
+
+    SUBCASE("shown codes: the marker goes before the code")
+    {
+        layout.SetShowControl(SHOW_ALL);
+        layout.LayoutDocument(&doc);
+        REQUIRE(FindInlineMarker(layout, doc, 2) != nullptr);
+        REQUIRE(FindInlineMarker(layout, doc, 9) != nullptr);
+        CHECK(CountInlineMarkers(layout) == 2);
+    }
+}
+
+
+TEST_CASE("Inline markers: word wrap")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_DOT);
+
+    std::string text;
+    for (int word = 0; word < 40; ++word)
+    {
+        text += "word" + std::to_string(10 + word) + " ";
+    }
+    doc.Insert(text + "\r");
+    layout.LayoutDocument(&doc);
+    REQUIRE(layout.GetNumberOfLines() >= 2);
+    POSITION_T secondLineStart = layout.GetLineByRawLineNumber(1)->documentPosition;
+
+    SUBCASE("a marker on the first word of a line stays with it")
+    {
+        doc.SetPosition(secondLineStart);
+        doc.SetSavePosition(0);
+        layout.LayoutDocument(&doc);
+        const sLineLayout* line = layout.GetLineByRawLineNumber(1);
+        REQUIRE(line != nullptr);
+        CHECK(line->documentPosition == secondLineStart);
+        REQUIRE(line->segments.empty() == false);
+        REQUIRE(line->segments[0].markers.empty() == false);
+        CHECK(line->segments[0].markers[0].index == 0);
+        CHECK(CoordOf(layout, secondLineStart) > line->pagex);
+    }
+
+    SUBCASE("markers never change wrapping")
+    {
+        for (int slot = 0; slot < 10; ++slot)
+        {
+            doc.SetPosition(static_cast<POSITION_T>(slot) * 7);
+            doc.SetSavePosition(slot);
+        }
+        layout.LayoutDocument(&doc);
+        CHECK(layout.GetLineByRawLineNumber(1)->documentPosition == secondLineStart);
+
+        layout.SetMarkersVisible(false);
+        layout.LayoutDocument(&doc);
+        CHECK(layout.GetLineByRawLineNumber(1)->documentPosition == secondLineStart);
+    }
+}
+
+
+TEST_CASE("Inline markers: before a tab")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_DOT);
+
+    doc.Insert("a");
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+    doc.InsertTab(tab);                       // tab at 1
+    doc.Insert("b\r");
+    layout.LayoutDocument(&doc);
+    COORD_T tabX = CoordOf(layout, 1);
+    COORD_T afterTab = CoordOf(layout, 2);
+
+    doc.SetPosition(1);
+    doc.SetSavePosition(3);
+    layout.LayoutDocument(&doc);
+
+    const sSegmentMarker* marker = FindInlineMarker(layout, doc, 1);
+    REQUIRE(marker != nullptr);
+
+    // the tab stop comes from the layout: the marker only shifts the display
+    CHECK(layout.FindLayoutCoordInLine(1, 0) == doctest::Approx(tabX));
+    CHECK(layout.FindLayoutCoordInLine(2, 0) == doctest::Approx(afterTab));
+    CHECK(CoordOf(layout, 1) == doctest::Approx(tabX + marker->width));
+    CHECK(CoordOf(layout, 2) == doctest::Approx(afterTab + marker->width));
+}
+
+
+TEST_CASE("Inline markers: dot command and comment lines")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_ALL);
+
+    doc.Insert("..a comment line\rtext\r");
+    layout.LayoutDocument(&doc);
+    COORD_T plain = CoordOf(layout, 5);
+
+    doc.SetPosition(5);
+    doc.SetSavePosition(6);
+    layout.LayoutDocument(&doc);
+
+    const sSegmentMarker* marker = FindInlineMarker(layout, doc, 5);
+    REQUIRE(marker != nullptr);
+    CHECK(marker->text == "<6>");
+    CHECK(CoordOf(layout, 5) == doctest::Approx(plain + marker->width));
+    CHECK(layout.FindPositionInLine(CoordOf(layout, 5) - 1, layout.GetLineFromPosition(5)) == 5);
+}
+
+
+TEST_CASE("Inline markers: SplitSegmentAtPosition")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_DOT);
+    doc.Insert("abcdefgh\r");
+    std::vector<sSegmentLayout> plain = layout.BuildParagraphSegments(0);
+    doc.SetPosition(3);
+    doc.SetSavePosition(0);
+
+    // a marker does not split the segment or move any X
+    std::vector<sSegmentLayout> segments = layout.BuildParagraphSegments(0);
+    REQUIRE(segments.size() == 1);
+    REQUIRE(segments[0].markers.size() == 1);
+    CHECK(segments[0].markers[0].index == 3);
+    CHECK(segments[0].markers[0].kind == DECORATION_MARKER);
+    CHECK(segments[0].position == plain[0].position);
+    CHECK(segments[0].totalWidth == doctest::Approx(plain[0].totalWidth));
+
+    SUBCASE("a marker before the split point stays with the first part")
+    {
+        auto parts = layout.SplitSegmentAtPosition(segments[0], 5);
+        REQUIRE(parts.first.markers.size() == 1);
+        CHECK(parts.first.markers[0].index == 3);
+        CHECK(parts.second.markers.empty());
+        CHECK(parts.first.totalWidth + parts.second.totalWidth == doctest::Approx(segments[0].totalWidth));
+        CHECK(parts.second.position[0] == doctest::Approx(0));
+    }
+
+    SUBCASE("a marker at the split point moves to the second part")
+    {
+        auto parts = layout.SplitSegmentAtPosition(segments[0], 3);
+        CHECK(parts.first.markers.empty());
+        REQUIRE(parts.second.markers.size() == 1);
+        CHECK(parts.second.markers[0].index == 0);
+        CHECK(parts.first.totalWidth == doctest::Approx(segments[0].position[3]));
+        CHECK(parts.second.position[0] == doctest::Approx(0));
+        CHECK(parts.first.totalWidth + parts.second.totalWidth == doctest::Approx(segments[0].totalWidth));
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Reveal codes: control code tags and block / place markers are drawn over
+/// the layout and never change it. Turning codes on or off (SHOW_ALL,
+/// SHOW_DOT, SHOW_NONE) or hiding the markers (print) keeps every visible
+/// grapheme on the same content line at the same layout X, and keeps the
+/// page count.
+///
+/////////////////////////////////////////////////////////////////////////////
+namespace
+{
+
+// A document with every kind of reveal decoration, long enough to wrap
+void FillRevealDocument(cDocument& doc)
+{
+    sWSTab centerTab;
+    centerTab.type = TAB_CENTER;
+    centerTab.tabsize = 0;
+    centerTab.abstabsize = 0;
+    centerTab.size = 0;
+    sWSTab tab = centerTab;
+    tab.type = TAB_TAB;
+
+    sInternalFonts font;
+    font.name = "Arial";
+    font.fontname = "Arial";
+    font.size = 14.0;
+    font.haveWSFont = false;
+
+    sSeqRGBColor color;
+    color.red = 200;
+    color.green = 10;
+    color.blue = 10;
+    color.alpha = 255;
+
+    sNote note;
+    note.text = "a note";
+
+    for (int word = 0; word < 60; ++word)
+    {
+        if (word % 9 == 2)
+        {
+            doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        }
+        doc.Insert("word" + std::to_string(word));
+        if (word % 9 == 4)
+        {
+            doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        }
+        if (word == 20)
+        {
+            doc.InsertFont(font);
+        }
+        if (word == 30)
+        {
+            doc.InsertColor(color);
+        }
+        if (word == 35)
+        {
+            doc.InsertFootnote(note);
+        }
+        doc.Insert(" ");
+    }
+    doc.Insert("\r");
+
+    doc.InsertTab(centerTab);
+    doc.Insert("centred ");
+    doc.Insert(static_cast<CHAR_T>(STYLE_ITALICS));
+    doc.Insert("line");
+    doc.Insert(static_cast<CHAR_T>(STYLE_ITALICS));
+    doc.Insert("\r.oj on\r");
+
+    for (int word = 0; word < 50; ++word)
+    {
+        if (word % 5 == 1)
+        {
+            doc.Insert(static_cast<CHAR_T>(STYLE_UNDERLINE));
+        }
+        doc.Insert("just" + std::to_string(word) + " ");
+    }
+    doc.Insert("\r.oj off\r");
+
+    doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc.Insert("tabbed");
+    doc.InsertTab(tab);
+    doc.Insert("column\r");
+
+    // place markers, and a block begin with no end
+    doc.SetPosition(5);
+    doc.SetSavePosition(1);
+    doc.SetPosition(60);
+    doc.SetSavePosition(2);
+    doc.SetPosition(200);
+    doc.SetSavePosition(3);
+    doc.SetPosition(301);
+    doc.SetBeginBlock();
+}
+
+struct sGraphemePlace
+{
+    LINE_T contentLine;
+    COORD_T layoutX;
+};
+
+// Content line and layout X of every visible (non control code) grapheme
+std::map<POSITION_T, sGraphemePlace> GraphemePlaces(cLayout& layout, cDocument& doc)
+{
+    std::map<POSITION_T, sGraphemePlace> places;
+    for (POSITION_T pos = 0; pos < doc.GetTextSize(); ++pos)
+    {
+        std::string grapheme = doc.GetCharNoAdvance(pos);
+        if (grapheme.empty() || grapheme[0] == MARKER_CHAR)
+        {
+            continue;
+        }
+        // dot command lines are hidden in SHOW_NONE (not part of the rule)
+        std::string paragraph = doc.GetParagraphText(doc.GetParagraphFromPosition(pos));
+        if (!paragraph.empty() && paragraph[0] == '.')
+        {
+            continue;
+        }
+        LINE_T line = layout.GetLineFromPosition(pos);
+        if (line < 0)
+        {
+            continue;
+        }
+        const sLineLayout* lineLayout = layout.GetLineByRawLineNumber(line);
+        if (lineLayout == nullptr || lineLayout->isPrintable == false)
+        {
+            continue;
+        }
+        places[pos] = { lineLayout->contentLineNumber, layout.FindLayoutCoordInLine(pos, line) };
+    }
+    return places;
+}
+
+}
+
+
+TEST_CASE("Reveal codes: tags and markers never change the layout")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    FillRevealDocument(doc);
+
+    layout.SetShowControl(SHOW_NONE);
+    layout.SetMarkersVisible(false);
+    layout.LayoutDocument(&doc);
+    std::map<POSITION_T, sGraphemePlace> printPlaces = GraphemePlaces(layout, doc);
+    PAGE_T printPages = layout.GetNumberOfPages();
+    REQUIRE(printPlaces.size() > 300);
+    REQUIRE(printPlaces.rbegin()->second.contentLine > 5);
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+    {
+        for (bool markersVisible : { true, false })
+        {
+            CAPTURE(static_cast<int>(mode));
+            CAPTURE(markersVisible);
+            layout.SetShowControl(mode);
+            layout.SetMarkersVisible(markersVisible);
+            layout.LayoutDocument(&doc);
+
+            CHECK(layout.GetNumberOfPages() == printPages);
+            std::map<POSITION_T, sGraphemePlace> places = GraphemePlaces(layout, doc);
+            REQUIRE(places.size() == printPlaces.size());
+            for (const auto& [pos, place] : printPlaces)
+            {
+                CAPTURE(pos);
+                REQUIRE(places.count(pos) == 1);
+                CHECK(places[pos].contentLine == place.contentLine);
+                CHECK(places[pos].layoutX == doctest::Approx(place.layoutX));
+            }
+        }
+    }
+
+    SUBCASE("decorations: markers on screen in every mode, tags only in SHOW_ALL, none in print")
+    {
+        layout.SetMarkersVisible(true);
+        layout.SetShowControl(SHOW_ALL);
+        layout.LayoutDocument(&doc);
+        CHECK(CountDecorations(layout, DECORATION_MARKER) == 4);
+        CHECK(CountDecorations(layout, DECORATION_TAG) > 10);
+
+        layout.SetShowControl(SHOW_DOT);
+        layout.LayoutDocument(&doc);
+        CHECK(CountDecorations(layout, DECORATION_MARKER) == 4);
+        CHECK(CountDecorations(layout, DECORATION_TAG) == 0);
+
+        layout.SetMarkersVisible(false);
+        layout.SetShowControl(SHOW_NONE);
+        layout.LayoutDocument(&doc);
+        CHECK(CountDecorations(layout, DECORATION_MARKER) == 0);
+        CHECK(CountDecorations(layout, DECORATION_TAG) == 0);
+    }
+}
+
+
+TEST_CASE("Reveal codes: display X, badges and hit testing")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+
+    // a0 b1 ^B2 c3 d4 ^B5 \r6
+    doc.Insert("ab");
+    doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc.Insert("cd");
+    doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc.Insert("\r");
+
+    layout.SetShowControl(SHOW_NONE);
+    layout.LayoutDocument(&doc);
+    COORD_T hiddenC = layout.FindLayoutCoordInLine(3, 0);
+    COORD_T hiddenCr = layout.FindLayoutCoordInLine(6, 0);
+
+    layout.SetShowControl(SHOW_ALL);
+    layout.LayoutDocument(&doc);
+    const sLineLayout* line = layout.GetLineByRawLineNumber(0);
+    REQUIRE(line != nullptr);
+
+    // the two tags are zero-width graphemes with badges
+    std::vector<const sSegmentMarker*> tags;
+    for (const sSegmentLayout& seg : line->segments)
+    {
+        for (const sSegmentMarker& decoration : seg.markers)
+        {
+            if (decoration.kind == DECORATION_TAG)
+            {
+                tags.push_back(&decoration);
+            }
+        }
+    }
+    REQUIRE(tags.size() == 2);
+    COORD_T badge1 = tags[0]->width;
+    COORD_T badge2 = tags[1]->width;
+    CHECK(badge1 > 0);
+    CHECK(badge2 > 0);
+
+    SUBCASE("layout X ignores the tags")
+    {
+        CHECK(layout.FindLayoutCoordInLine(2, 0) == doctest::Approx(layout.FindLayoutCoordInLine(3, 0)));
+        CHECK(layout.FindLayoutCoordInLine(3, 0) == doctest::Approx(hiddenC));
+        CHECK(layout.FindLayoutCoordInLine(6, 0) == doctest::Approx(hiddenCr));
+    }
+
+    SUBCASE("display X adds the badges drawn before a grapheme")
+    {
+        CHECK(layout.FindCoordInLine(1, 0) == doctest::Approx(layout.FindLayoutCoordInLine(1, 0)));
+        CHECK(layout.FindCoordInLine(2, 0) == doctest::Approx(layout.FindLayoutCoordInLine(2, 0)));
+        CHECK(layout.FindCoordInLine(3, 0) == doctest::Approx(layout.FindLayoutCoordInLine(3, 0) + badge1));
+        CHECK(layout.FindCoordInLine(6, 0) == doctest::Approx(layout.FindLayoutCoordInLine(6, 0) + badge1 + badge2));
+    }
+
+    SUBCASE("a click on a badge lands on the tag, after it on the next grapheme")
+    {
+        COORD_T tagX = layout.FindCoordInLine(2, 0);
+        CHECK(layout.FindPositionInLine(tagX + 1, 0) == 2);
+        CHECK(layout.FindPositionInLine(tagX + badge1 - 1, 0) == 2);
+        CHECK(layout.FindPositionInLine(layout.FindCoordInLine(3, 0) + 1, 0) == 3);
+    }
+
+    SUBCASE("a marker before a grapheme after a tag: marker, then grapheme")
+    {
+        doc.SetPosition(3);
+        doc.SetSavePosition(0);
+        layout.LayoutDocument(&doc);
+        const sSegmentMarker* marker = FindInlineMarker(layout, doc, 3);
+        REQUIRE(marker != nullptr);
+        COORD_T cX = layout.FindCoordInLine(3, 0);
+        CHECK(cX == doctest::Approx(layout.FindLayoutCoordInLine(3, 0) + badge1 + marker->width));
+        CHECK(layout.FindPositionInLine(cX - 1, 0) == 3);
+        CHECK(layout.FindPositionInLine(cX - marker->width - 1, 0) == 2);
+    }
+
+    SUBCASE("SHOW_DOT and SHOW_NONE: no badges, display X = layout X")
+    {
+        for (eShowControl mode : { SHOW_DOT, SHOW_NONE })
+        {
+            layout.SetShowControl(mode);
+            layout.LayoutDocument(&doc);
+            CHECK(CountDecorations(layout, DECORATION_TAG) == 0);
+            CHECK(layout.FindCoordInLine(3, 0) == doctest::Approx(hiddenC));
+        }
+    }
+}
+
+
+TEST_CASE("Reveal codes: a font tag's badge is in the tag's font")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_ALL);
+
+    sInternalFonts font;
+    font.name = "Arial";
+    font.fontname = "Arial";
+    font.size = 20.0;
+    font.haveWSFont = false;
+    doc.Insert("small ");
+    doc.InsertFont(font);
+    doc.Insert("BIG\r");
+    layout.LayoutDocument(&doc);
+
+    const sLineLayout* line = layout.GetLineByRawLineNumber(0);
+    REQUIRE(line != nullptr);
+    const sSegmentLayout* tagSegment = nullptr;
+    for (const sSegmentLayout& seg : line->segments)
+    {
+        if (seg.GetTagWidth(0) > 0)
+        {
+            tagSegment = &seg;
+        }
+    }
+    REQUIRE(tagSegment != nullptr);
+    CHECK(tagSegment->font.find("Arial") != std::string::npos);
+    CHECK(tagSegment->font.find("20") != std::string::npos);
+    CHECK(tagSegment->markers[0].text.find("Arial") != std::string::npos);
+}
+
+
+TEST_CASE("Reveal codes: wrapping with tags")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+
+    // Fill the first line to the margin with words, then a tagged word
+    std::string filler;
+    for (int word = 0; word < 12; ++word)
+    {
+        filler += "wordy" + std::to_string(word) + " ";
+    }
+
+    SUBCASE("a tag before a word wraps with the word: hello ^Bworld")
+    {
+        for (int extra = 0; extra < 6; ++extra)
+        {
+            doc.Clear();
+            doc.Insert(filler + std::string(static_cast<size_t>(extra), 'x') + " ");
+            POSITION_T tagPos = doc.GetPosition();
+            doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+            doc.Insert("world more words here to wrap\r");
+
+            layout.SetShowControl(SHOW_ALL);
+            layout.LayoutDocument(&doc);
+            std::optional<LINE_T> tagLine = layout.GetLineFromPosition(tagPos);
+            std::optional<LINE_T> wordLine = layout.GetLineFromPosition(tagPos + 1);
+            REQUIRE(tagLine);
+            REQUIRE(wordLine);
+            CHECK(*tagLine == *wordLine);
+
+            // visible graphemes on the same lines as without codes
+            std::map<POSITION_T, sGraphemePlace> shown = GraphemePlaces(layout, doc);
+            layout.SetShowControl(SHOW_NONE);
+            layout.LayoutDocument(&doc);
+            std::map<POSITION_T, sGraphemePlace> hidden = GraphemePlaces(layout, doc);
+            REQUIRE(shown.size() == hidden.size());
+            for (const auto& [pos, place] : hidden)
+            {
+                CHECK(shown[pos].contentLine == place.contentLine);
+            }
+        }
+    }
+
+    SUBCASE("a tag after a word stays with it: hello^B world")
+    {
+        doc.Insert(filler + "hello");
+        POSITION_T tagPos = doc.GetPosition();
+        doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        doc.Insert(" world more words here to wrap the line\r");
+        layout.SetShowControl(SHOW_ALL);
+        layout.LayoutDocument(&doc);
+        CHECK(layout.GetLineFromPosition(tagPos) == layout.GetLineFromPosition(tagPos - 1));
+    }
+
+    SUBCASE("a long run of tags at the margin never makes a tag-only line")
+    {
+        doc.Insert(filler);
+        for (int tag = 0; tag < 40; ++tag)
+        {
+            doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        }
+        doc.Insert("next words after the tags\r");
+        layout.SetShowControl(SHOW_ALL);
+        layout.LayoutDocument(&doc);
+        const sParagraphLayout* paragraph = layout.GetParagraphLayout(0);
+        REQUIRE(paragraph != nullptr);
+        REQUIRE(paragraph->lines.size() >= 2);
+        for (const sLineLayout& lineRef : paragraph->lines)
+        {
+            const sLineLayout* line = &lineRef;
+            LINE_T ln = line->rawLineNumber;
+            bool hasText = false;
+            for (const sSegmentLayout& seg : line->segments)
+            {
+                std::vector<std::string> graphemes;
+                seg.GetGraphemes(&doc, graphemes);
+                hasText = hasText || std::any_of(graphemes.begin(), graphemes.end(),
+                    [](const std::string& g)
+                    {
+                        return !g.empty() && g[0] != MARKER_CHAR;
+                    });
+            }
+            CAPTURE(ln);
+            CHECK(hasText);
+        }
+    }
+}
+
+
+TEST_CASE("Reveal codes: the end-of-file marker is never displayed")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    doc.Insert("abc");                        // EOF at 3
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        layout.SetShowControl(mode);
+        layout.LayoutDocument(&doc);
+        CHECK(CountDecorations(layout, DECORATION_TAG) == 0);
+
+        // nothing after "c": the EOF has no width or badge
+        COORD_T endOfText = layout.FindLayoutCoordInLine(2, 0) + (layout.FindLayoutCoordInLine(1, 0) - layout.FindLayoutCoordInLine(0, 0));
+        CHECK(layout.FindCoordInLine(3, 0) == doctest::Approx(endOfText).epsilon(0.2));
+        const sLineLayout* line = layout.GetLineByRawLineNumber(0);
+        REQUIRE(line != nullptr);
+        CHECK(line->pagex + line->LayoutEndX() == doctest::Approx(layout.FindCoordInLine(3, 0)));
+    }
+
+    SUBCASE("a marker on the EOF is still drawn")
+    {
+        doc.SetPosition(3);
+        doc.SetSavePosition(7);
+        for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+        {
+            CAPTURE(static_cast<int>(mode));
+            layout.SetShowControl(mode);
+            layout.LayoutDocument(&doc);
+            const sSegmentMarker* marker = FindInlineMarker(layout, doc, 3);
+            REQUIRE(marker != nullptr);
+            CHECK(marker->text == "<7>");
+        }
+    }
+}

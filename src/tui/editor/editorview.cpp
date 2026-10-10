@@ -371,24 +371,36 @@ int cWSEditorView::LineStartCol(const sLineLayout* line, COORD_T twipsPerCol) co
         indentCol = static_cast<int>(indent / twipsPerCol);
     }
 
+    // Centre / right alignment from the document columns only: reveal badges
+    // and markers extend to the right, as in the GUI
+    bool alignRight = (line->right == true) || (line->rightLine == true);
+    bool alignCenter = (alignRight == false) && ((line->center == true) || (line->centerLine == true));
     int alignOffset = 0;
-    if ((line->center == true) || (line->right == true))
+    if ((alignCenter == true) || (alignRight == true))
     {
         cDocument* doc = mEditor->GetDocument();
         int contentCols = 0;
-        POSITION_T docPos = line->documentPosition;
+        POSITION_T paraStart = line->documentPosition - line->linestart;
         for (const sSegmentLayout& s : line->segments)
         {
+            if (s.isTab == true)
+            {
+                continue;
+            }
             if (doc == nullptr)
             {
                 contentCols += static_cast<int>(s.GetGraphemeCount());
                 continue;
             }
+            POSITION_T docPos = paraStart + s.startPosition;
             std::vector<std::string> graphemes;
             s.GetGraphemes(doc, graphemes);
             for (size_t gi = 0; gi < graphemes.size(); ++gi)
             {
-                contentCols += GraphemeColumns(docPos, graphemes[gi], line->pagenumber);
+                if (TagColumns(s, gi) == 0)
+                {
+                    contentCols += GraphemeColumns(docPos, graphemes[gi], line->pagenumber);
+                }
                 docPos++;
             }
         }
@@ -396,11 +408,11 @@ int cWSEditorView::LineStartCol(const sLineLayout* line, COORD_T twipsPerCol) co
         int available = boxCols - indentCol - contentCols;
         if (available > 0)
         {
-            if (line->center == true)
+            if (alignCenter == true)
             {
                 alignOffset = available / 2;
             }
-            else if (line->right == true)
+            else
             {
                 alignOffset = available;
             }
@@ -448,6 +460,12 @@ int cWSEditorView::LineEndCol(const sLineLayout* line, COORD_T twipsPerCol) cons
         if (seg.isTab == true)
         {
             col += MarkerColumns(seg, 0);
+            if (IsAlignmentTab(seg) == true)
+            {
+                col += TagColumns(seg, 0);
+                docPos++;
+                continue;
+            }
             COORD_T currentTwips = static_cast<COORD_T>(col) * twipsPerCol;
             sTabStop nextStop = layout->GetNextTabStop(currentTwips);
             int nextCol = static_cast<int>(nextStop.position / twipsPerCol);
@@ -510,6 +528,13 @@ int cWSEditorView::GraphemeColumns(POSITION_T docPos, const std::string& graphem
         return isSoftHyphen ? 0 : 1;
     }
 
+    // The end-of-file marker is never displayed
+    cDocument* eofDoc = mEditor->GetDocument();
+    if ((isMarker == true) && (eofDoc != nullptr) && (eofDoc->GetControlChar(docPos) == STYLE_EOF))
+    {
+        return 0;
+    }
+
     std::string disp = layout->GetDisplayCharacter(docPos, grapheme, pagenumber);
     if (disp.empty() == true)
     {
@@ -547,6 +572,42 @@ int cWSEditorView::MarkerColumns(const sSegmentLayout& seg, size_t index) const
             }
             return sum;
         });
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const sSegmentLayout& seg [in] segment of a line
+/// @param  size_t index [in] grapheme index in the segment
+///
+/// @return number of columns of the control code badge of the tag grapheme
+///         at index (0 if it is not a visible tag)
+///
+/////////////////////////////////////////////////////////////////////////////
+int cWSEditorView::TagColumns(const sSegmentLayout& seg, size_t index) const
+{
+    return std::accumulate(seg.markers.begin(), seg.markers.end(), 0,
+        [index](int sum, const sSegmentMarker& tag)
+        {
+            if (tag.index == index && tag.kind == DECORATION_TAG)
+            {
+                return sum + static_cast<int>(wordstartui::cUtf8Helper::SplitGraphemes(tag.text).size());
+            }
+            return sum;
+        });
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const sSegmentLayout& seg [in] segment of a line
+///
+/// @return true for a centre / right alignment tab: it aligns the line and
+///         takes no columns of its own (only its badge in SHOW_ALL)
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSEditorView::IsAlignmentTab(const sSegmentLayout& seg) const
+{
+    return (seg.isTab == true) &&
+           ((seg.tabType == TAB_CENTER) || (seg.tabType == TAB_RIGHT) || (seg.tabType == TAB_RIGHT1));
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -626,6 +687,12 @@ int cWSEditorView::LogicalColumnAt(const sLineLayout* line, POSITION_T position)
             if (docPos >= position)
             {
                 return col;
+            }
+            if (IsAlignmentTab(seg) == true)
+            {
+                col += TagColumns(seg, 0);
+                docPos++;
+                continue;
             }
             COORD_T currentTwips = static_cast<COORD_T>(col) * twipsPerCol;
             sTabStop nextStop = layout->GetNextTabStop(currentTwips);
@@ -800,6 +867,17 @@ POSITION_T cWSEditorView::PositionInLine(const sLineLayout* line, int targetScre
         {
             // A click on an inline marker lands on the grapheme it marks
             col += MarkerColumns(seg, 0);
+            if (IsAlignmentTab(seg) == true)
+            {
+                int badgeEnd = col + TagColumns(seg, 0);
+                if (targetCol < badgeEnd)
+                {
+                    return docPos;
+                }
+                col = badgeEnd;
+                docPos++;
+                continue;
+            }
             COORD_T currentTwips = static_cast<COORD_T>(col) * twipsPerCol;
             sTabStop nextStop = layout->GetNextTabStop(currentTwips);
             int nextCol = static_cast<int>(nextStop.position / twipsPerCol);
@@ -1217,6 +1295,29 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
                     mCaretVisible = true;
                 }
 
+                // An alignment tab only shows its ! / [ badge (SHOW_ALL)
+                if (IsAlignmentTab(seg) == true)
+                {
+                    for (const sSegmentMarker& tag : seg.markers)
+                    {
+                        if ((tag.index != 0) || (tag.kind != DECORATION_TAG))
+                        {
+                            continue;
+                        }
+                        for (const std::string& cell : wordstartui::cUtf8Helper::SplitGraphemes(tag.text))
+                        {
+                            int sc = col - hs;
+                            if ((sc >= 0) && (sc < textCols))
+                            {
+                                screen.PutCell(screenRow, mBounds.col + sc, cell, markerStyle);
+                            }
+                            col++;
+                        }
+                    }
+                    docPos++;
+                    continue;
+                }
+
                 int currentCol = col;
                 COORD_T currentTwips = static_cast<COORD_T>(currentCol) * twipsPerCol;
                 sTabStop nextStop = layout->GetNextTabStop(currentTwips);
@@ -1303,6 +1404,13 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
 
                 bool isMarker = (c == MARKER);
                 bool isTerminator = (c == HARDCR) || (c == EOFCH);
+
+                // The end-of-file marker is never drawn
+                if ((isMarker == true) && (doc->GetControlChar(docPos) == STYLE_EOF))
+                {
+                    docPos++;
+                    continue;
+                }
 
                 bool isSearch = (mEditor->mSearchBlockSet == true) &&
                                 (docPos >= mEditor->mStartSearchBlock) &&

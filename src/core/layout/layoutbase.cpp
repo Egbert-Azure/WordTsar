@@ -4168,6 +4168,29 @@ void cLayoutBase::AddSegmentMarker(sSegmentLayout& segment, std::string& pending
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  segment [in/out] segment the tag grapheme is added to next
+/// @param  text    [in]     badge text of the tag (GetDisplayCharacter())
+///
+/// @return nothing
+///
+/// @brief
+/// Add the badge of a visible control code as a decoration at the next
+/// grapheme of the segment, measured in the current font. Display only.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::AddSegmentTag(sSegmentLayout& segment, const std::string& text)
+{
+    sSegmentMarker tag;
+    tag.index = static_cast<size_t>(segment.length);
+    tag.text = text;
+    tag.width = GetTextWidth(text);
+    tag.kind = DECORATION_TAG;
+    segment.markers.push_back(tag);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  segment [in/out] - segment to analyze for control codes
 /// @param  graphemes [in] - all graphemes from the paragraph
 ///

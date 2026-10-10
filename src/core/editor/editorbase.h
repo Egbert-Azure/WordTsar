@@ -117,6 +117,7 @@ public:
     virtual void StartCaretTimer(long delay) = 0;             // Start platform-specific blink timer
     virtual void StopCaretTimer(void) = 0;                    // Stop platform-specific blink timer
     virtual void PerformVisualUpdate(void) = 0;               // Caret + scroll + repaint (platform-specific)
+    virtual void UpdateHorizontalScroll(void) {}              // Keep the caret in view horizontally (GUI; default none)
     virtual PARAGRAPH_T GetLastVisibleParagraph(void) = 0;    // Find last visible paragraph from layout data
 
     // Pure Virtual - Platform UI Dialogs
@@ -409,7 +410,8 @@ private:
         const sLineLayout* caretLine ;           // line containing caret
         POSITION_T paraStart ;                   // paragraph start in document
         POSITION_T offsetInPara ;                // caret offset within paragraph
-        COORD_T caretX ;                         // resolved X coordinate
+        COORD_T caretX ;                         // resolved display X (layout X plus reveal decorations)
+        COORD_T caretLayoutX ;                   // resolved layout (print) X
         COORD_T caretSegmentHeight ;             // text height (not line height)
         COORD_T caretGlyphWidth ;                // glyph width (for overwrite mode)
     } ;

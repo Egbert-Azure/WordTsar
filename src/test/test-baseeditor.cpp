@@ -2933,3 +2933,177 @@ TEST_CASE("Idle layout completes the re-layout after leaving a shown dot command
     CHECK(incremental.rawLineNumber == full.rawLineNumber);
     CHECK(incremental.contentLineNumber == full.contentLineNumber);
 }
+
+
+namespace
+{
+
+// GetLineFromPosition() returns NOT_SET when there is no such line
+std::optional<LINE_T> RevealOptLine(LINE_T line)
+{
+    if (line < 0)
+    {
+        return std::nullopt;
+    }
+    return line;
+}
+
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Reveal codes and the caret: the caret is drawn at display X (a tag's
+/// badge, after markers); status H and the column are print based and the
+/// same in every mode; at the end of the document the caret sits after the
+/// last character; sticky X uses the display mapping; alignment tabs stay
+/// deletable content.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Reveal codes: caret, status H and the end of the document")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    // a0 b1 ^B2 c3 d4 \r5, then "xyz" and the EOF
+    doc->Insert("ab");
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->Insert("cd\rxyz");
+    POSITION_T eof = doc->GetTextSize() - 1;
+
+    auto caretAt = [&](POSITION_T pos)
+    {
+        doc->SetPosition(pos);
+        editor.CalculateCaretPosition();
+    };
+
+    SUBCASE("the caret on a tag is drawn at its badge, with the badge width")
+    {
+        editor.SetShowControls(SHOW_ALL);
+        layout->LayoutDocument(doc);
+        caretAt(2);
+        CHECK(editor.GetCaretX() == doctest::Approx(layout->FindCoordInLine(2, 0)));
+        const sLineLayout* line = layout->GetLineByRawLineNumber(0);
+        REQUIRE(line != nullptr);
+        COORD_T badge = 0;
+        for (const sSegmentLayout& seg : line->segments)
+        {
+            for (const sSegmentMarker& decoration : seg.markers)
+            {
+                if (decoration.kind == DECORATION_TAG)
+                {
+                    badge = decoration.width;
+                }
+            }
+        }
+        CHECK(badge > 0);
+        editor.mInsertMode = false;
+        caretAt(2);
+        CHECK(editor.GetCaretWidth() == doctest::Approx(badge));
+        editor.mInsertMode = true;
+
+        caretAt(3);
+        CHECK(editor.GetCaretX() == doctest::Approx(layout->FindLayoutCoordInLine(3, 0) + badge));
+    }
+
+    SUBCASE("status H and column are the same in every mode")
+    {
+        editor.SetShowControls(SHOW_NONE);
+        layout->LayoutDocument(doc);
+        caretAt(4);
+        sStatus hidden;
+        editor.GetStatus(hidden);
+
+        for (eShowControl mode : { SHOW_ALL, SHOW_DOT })
+        {
+            CAPTURE(static_cast<int>(mode));
+            editor.SetShowControls(mode);
+            layout->LayoutDocument(doc);
+            caretAt(4);
+            sStatus shown;
+            editor.GetStatus(shown);
+            CHECK(shown.hPosition == doctest::Approx(hidden.hPosition));
+            CHECK(shown.column == hidden.column);
+        }
+    }
+
+    SUBCASE("at the end of the document the caret is after the last character")
+    {
+        for (bool withMarker : { false, true })
+        {
+            if (withMarker)
+            {
+                doc->SetPosition(eof);
+                doc->SetSavePosition(3);
+            }
+            for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+            {
+                CAPTURE(withMarker);
+                CAPTURE(static_cast<int>(mode));
+                editor.SetShowControls(mode);
+                layout->LayoutDocument(doc);
+                caretAt(eof - 1);
+                COORD_T lastX = editor.GetCaretX();
+                caretAt(eof);
+                CHECK(editor.GetCaretX() > lastX);
+
+                sStatus status;
+                editor.GetStatus(status);
+                editor.SetShowControls(SHOW_NONE);
+                layout->LayoutDocument(doc);
+                caretAt(eof);
+                sStatus hidden;
+                editor.GetStatus(hidden);
+                CHECK(status.hPosition == doctest::Approx(hidden.hPosition));
+            }
+        }
+    }
+
+    SUBCASE("sticky X goes through the display mapping")
+    {
+        editor.SetShowControls(SHOW_ALL);
+        layout->LayoutDocument(doc);
+        caretAt(eof - 1);                                // 'z' on the second line
+        COORD_T stickyX = editor.GetCaretX();
+        editor.MoveCaretLine(-1);
+        CHECK(doc->GetPosition() == layout->FindPositionInLine(stickyX, 0));
+    }
+}
+
+
+TEST_CASE("Reveal codes: an alignment tab is deletable in every mode and undo restores it")
+{
+    ensureQApplication();
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        editor.SetShowControls(mode);
+
+        sWSTab centerTab;
+        centerTab.type = TAB_CENTER;
+        centerTab.tabsize = 0;
+        centerTab.abstabsize = 0;
+        centerTab.size = 0;
+        doc->InsertTab(centerTab);
+        doc->Insert("centred\r");
+        editor.PerformPostCommandUpdate();
+        POSITION_T size = doc->GetTextSize();
+
+        doc->SetPosition(0);
+        editor.Delete(0, 1);
+        editor.PerformPostCommandUpdate();
+        CHECK(doc->GetTextSize() == size - 1);
+        CHECK(doc->GetCharNoAdvance(0) == "c");
+
+        editor.Undo();
+        editor.PerformPostCommandUpdate();
+        CHECK(doc->GetTextSize() == size);
+        CHECK(doc->GetControlChar(0) == STYLE_TAB);
+    }
+}

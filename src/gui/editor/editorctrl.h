@@ -86,6 +86,12 @@ public:
     // Single visual update method -- incremental layout + caret + scroll + paint
     void PerformVisualUpdate(void) override;
 
+    // --- Horizontal scroll (follows the caret when reveal decorations extend past the margin) ---
+    COORD_T GetHorizontalScroll(void) const;
+    void UpdateHorizontalScroll(void) override;
+    double GetPageScale(void) const { return mPageScale; }
+    bool LineRunsPastTextArea(const sLineLayout& line) const;
+
     // --- Scroll management ---
     // Override scroll management to sync scrollbar
     void SetScrollOffset(COORD_T offset) override;
@@ -341,6 +347,7 @@ private:
     QRectF mLastPaintedCaretPosQt;         // Caret rect as of the last FULL repaint (not a blink-only tick)
     COORD_T mLastPaintedScrollOffset;     // Scroll offset as of the last FULL repaint
     double mPageScale;                    // Dynamic page zoom scale
+    COORD_T mHorizScrollOffset;           // Horizontal scroll in twips (follows the caret)
 
     // Visual display colors (Qt-specific)
     QColor mBGroundColour;                // Background color

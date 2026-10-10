@@ -8020,3 +8020,84 @@ TEST_CASE("GetNumberOfPages does not count page boxes without lines")
     layout.CreatePageBox(5);
     CHECK(layout.GetNumberOfPages() == 1);
 }
+
+
+namespace
+{
+
+// GetLineFromPosition() returns NOT_SET when there is no such line
+std::optional<LINE_T> RevealOptLine(LINE_T line)
+{
+    if (line < 0)
+    {
+        return std::nullopt;
+    }
+    return line;
+}
+
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Reveal decorations: per-kind widths, the display offset of a grapheme,
+/// the line's total decoration width and layout end, and equality.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Reveal decorations on segments and lines")
+{
+    // segment 0: graphemes at 0, 100, 200 (width 300); marker before 1, tag at 2
+    sSegmentLayout first;
+    first.startPosition = 0;
+    first.length = 3;
+    first.position = { 0, 100, 200 };
+    first.totalWidth = 300;
+    first.markers.push_back({ 1, "<0>", 50, DECORATION_MARKER });
+    first.markers.push_back({ 2, "^B", 70, DECORATION_TAG });
+
+    // segment 1: graphemes at 300, 400 (width 200); marker before 0
+    sSegmentLayout second;
+    second.startPosition = 3;
+    second.length = 2;
+    second.position = { 300, 400 };
+    second.totalWidth = 200;
+    second.markers.push_back({ 0, "<B>", 40, DECORATION_MARKER });
+
+    sLineLayout line;
+    line.segments.push_back(first);
+    line.segments.push_back(second);
+
+    SUBCASE("widths per kind")
+    {
+        CHECK(first.GetMarkerWidth(1) == doctest::Approx(50));
+        CHECK(first.GetTagWidth(1) == doctest::Approx(0));
+        CHECK(first.GetMarkerWidth(2) == doctest::Approx(0));
+        CHECK(first.GetTagWidth(2) == doctest::Approx(70));
+    }
+
+    SUBCASE("display offset: markers at or before, tags before the grapheme")
+    {
+        CHECK(line.DecorationOffset(0, 0) == doctest::Approx(0));
+        CHECK(line.DecorationOffset(0, 1) == doctest::Approx(50));
+        CHECK(line.DecorationOffset(0, 2) == doctest::Approx(50));          // the tag's own badge starts here
+        CHECK(line.DecorationOffset(1, 0) == doctest::Approx(50 + 70 + 40));
+        CHECK(line.DecorationOffset(1, 1) == doctest::Approx(50 + 70 + 40));
+        CHECK(line.DecorationWidth() == doctest::Approx(160));
+    }
+
+    SUBCASE("layout end of the line")
+    {
+        CHECK(line.LayoutEndX() == doctest::Approx(500));
+        sLineLayout empty;
+        CHECK(empty.LayoutEndX() == doctest::Approx(0));
+    }
+
+    SUBCASE("equality compares the decoration kind")
+    {
+        sSegmentLayout copy = first;
+        CHECK(copy.IsEqualTo(first));
+        copy.markers[1].kind = DECORATION_MARKER;
+        CHECK_FALSE(copy.IsEqualTo(first));
+    }
+}

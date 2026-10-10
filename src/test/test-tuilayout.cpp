@@ -308,3 +308,73 @@ TEST_CASE("TUI layout - GetFontWithFormatting")
 
     layout.ShutdownFontSystem();
 }
+
+
+TEST_CASE("TUI layout - reveal codes never change the layout")
+{
+    cDocument doc;
+    cLayout layout;
+    REQUIRE(layout.InitializeFontSystem());
+    layout.SetDocument(&doc);
+
+    for (int word = 0; word < 80; ++word)
+    {
+        if (word % 3 == 1)
+        {
+            doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        }
+        doc.Insert("word" + std::to_string(word) + " ");
+    }
+    doc.Insert("\r");
+    doc.SetPosition(40);
+    doc.SetSavePosition(1);
+    doc.SetPosition(200);
+    doc.SetBeginBlock();
+
+    // content line and layout X of every visible grapheme
+    auto places = [&](void)
+    {
+        std::map<POSITION_T, std::pair<LINE_T, COORD_T>> result;
+        for (POSITION_T pos = 0; pos < doc.GetTextSize(); ++pos)
+        {
+            std::string grapheme = doc.GetCharNoAdvance(pos);
+            if (grapheme.empty() || grapheme[0] == MARKER_CHAR)
+            {
+                continue;
+            }
+            LINE_T line = layout.GetLineFromPosition(pos);
+            REQUIRE(line >= 0);
+            result[pos] = { layout.GetLineByRawLineNumber(line)->contentLineNumber, layout.FindLayoutCoordInLine(pos, line) };
+        }
+        return result;
+    };
+
+    layout.SetShowControl(SHOW_NONE);
+    layout.SetMarkersVisible(false);
+    layout.LayoutDocument(&doc);
+    auto print = places();
+    REQUIRE(print.rbegin()->second.first >= 2);
+    PAGE_T pages = layout.GetNumberOfPages();
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+    {
+        for (bool markersVisible : { true, false })
+        {
+            CAPTURE(static_cast<int>(mode));
+            CAPTURE(markersVisible);
+            layout.SetShowControl(mode);
+            layout.SetMarkersVisible(markersVisible);
+            layout.LayoutDocument(&doc);
+            CHECK(layout.GetNumberOfPages() == pages);
+            auto shown = places();
+            REQUIRE(shown.size() == print.size());
+            for (const auto& [pos, place] : print)
+            {
+                CHECK(shown[pos].first == place.first);
+                CHECK(shown[pos].second == doctest::Approx(place.second));
+            }
+        }
+    }
+
+    layout.ShutdownFontSystem();
+}
