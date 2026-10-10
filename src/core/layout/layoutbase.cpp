@@ -703,6 +703,12 @@ bool cLayoutBase::LayoutParagraph(PARAGRAPH_T para)
         mParagraphLayout.resize(para + 1);
     }
 
+    // Last document paragraph: drop entries for paragraphs that no longer exist
+    if (para == paraCount - 1 && std::ssize(mParagraphLayout) > paraCount)
+    {
+        mParagraphLayout.resize(static_cast<size_t>(paraCount));
+    }
+
 #ifdef LAYOUT_TIMER
     mResizeTimeNs += resizeTimer.time_elapsed_nanoseconds();
 #endif
@@ -3998,16 +4004,34 @@ PAGE_T cLayoutBase::GetPageFromLine(LINE_T rawLineNumber) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return highest page number in any box, or 0 if no boxes exist
+/// @return page number of the last line, or 0 if no boxes exist
 ///
 /// @brief
-/// Calculates the total number of pages by finding the highest page
-/// number among all boxes in the global box list.
+/// Calculates the total number of pages: the page of the last line that
+/// exists, limited to the highest page in the global box list. Boxes
+/// created beyond the last line are not counted.
 ///
 /////////////////////////////////////////////////////////////////////////////
 PAGE_T cLayoutBase::GetNumberOfPages(void) const
 {
-    return mPageManager->GetNumberOfPages();
+    PAGE_T boxPages = mPageManager->GetNumberOfPages();
+    if (boxPages == 0)
+    {
+        return 0;
+    }
+
+    // Page boxes created ahead of content that never came are not pages: the
+    // count ends at the page of the last line
+    auto lastWithLines = std::find_if(mParagraphLayout.rbegin(), mParagraphLayout.rend(),
+                                      [](const sParagraphLayout& paraLayout)
+                                      {
+                                          return !paraLayout.lines.empty();
+                                      });
+    if (lastWithLines == mParagraphLayout.rend())
+    {
+        return 1;
+    }
+    return std::clamp(lastWithLines->lines.back().pagenumber, static_cast<PAGE_T>(1), boxPages);
 }
 
 

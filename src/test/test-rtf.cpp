@@ -121,6 +121,34 @@ TEST_SUITE("RTF Reader")
     }
 
 
+    TEST_CASE("Input outside the document group is ignored")
+    {
+        const std::vector<std::string> inputs = {
+            "{\\rtf1\\pc Hello}trailing",
+            "{\\rtf1\\pc Hello}\\par after",
+            "{\\rtf1\\pc Hello}{\\b after}",
+            "{\\rtf1\\pc Hello}}",
+            "junk\\b {\\rtf1\\pc Hello}",
+        } ;
+
+        for(const std::string &rtf : inputs)
+        {
+            CAPTURE(rtf) ;
+            auto paras = ParseRTF(rtf) ;
+
+            std::string all ;
+            for(auto &p : paras)
+            {
+                all += p ;
+            }
+            CHECK(all.find("Hello") != std::string::npos) ;
+            CHECK(all.find("trailing") == std::string::npos) ;
+            CHECK(all.find("after") == std::string::npos) ;
+            CHECK(all.find("junk") == std::string::npos) ;
+        }
+    }
+
+
     TEST_CASE("Multiple paragraphs via \\par")
     {
         std::string rtf = "{\\rtf1\\pc First paragraph\\par Second paragraph}" ;

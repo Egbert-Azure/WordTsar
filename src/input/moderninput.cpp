@@ -330,7 +330,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
             if (doc)
             {
                 // Check if document has unsaved changes
-                if (doc->mChanged)
+                if (doc->IsModified())
                 {
                     bool save = mEditor->AskYesNo("New Document",
                         "Current document has unsaved changes. Save first?") ;
@@ -433,7 +433,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
                     bool ok = mEditor->SaveFile(filename) ;
                     if (ok)
                     {
-                        mEditor->GetDocument()->mChanged = false ;
+                        mEditor->MarkDocumentSaved() ;
                         mEditor->SetTitle(mEditor->mFileName) ;
                     }
                     else
@@ -446,7 +446,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
             {
                 // Ctrl+S: Save
                 cDocument* doc = mEditor->GetDocument() ;
-                if (doc && doc->mChanged)
+                if (doc && doc->IsModified())
                 {
                     if (mEditor->mFileSet)
                     {
@@ -454,7 +454,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
                         bool ok = mEditor->SaveFile(fname) ;
                         if (ok)
                         {
-                            doc->mChanged = false ;
+                            mEditor->MarkDocumentSaved() ;
                         }
                         else
                         {
@@ -475,7 +475,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
                             bool ok = mEditor->SaveFile(filename) ;
                             if (ok)
                             {
-                                doc->mChanged = false ;
+                                mEditor->MarkDocumentSaved() ;
                                 mEditor->SetTitle(mEditor->mFileName) ;
                             }
                             else

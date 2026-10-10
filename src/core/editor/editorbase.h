@@ -253,6 +253,7 @@ public:
     // Text Editing
     void InsertText(const std::string& text);
     void Delete(POSITION_T pos, POSITION_T length);
+    void MarkDocumentSaved(void) ;                            // mark the document saved (closes the typing group, sets the save point)
     void DeleteChar(void);
     void ToggleInsertOverwrite(void);
     void DeleteWordRight(void);
@@ -415,6 +416,7 @@ private:
 
     // Caret Calc Helpers
     bool LookupCaretParagraph(sCaretCalcState& state) ;
+    void RelayoutFromParagraph(PARAGRAPH_T fromPara, PARAGRAPH_T caretPara) ;   // re-layout following paragraphs after a line count change
     bool HandleHiddenParagraph(sCaretCalcState& state) ;
     bool FindCaretLine(sCaretCalcState& state) ;
     void ResolveCaretGlyph(sCaretCalcState& state) ;

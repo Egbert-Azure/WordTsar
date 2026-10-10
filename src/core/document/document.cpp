@@ -107,7 +107,7 @@
 //#include "../../third-party/parallel-for/parallel-for.h"
 
 // base wordstar colors
-sSeqRGBColor gBaseWSColors[] =
+sSeqRGBColor gBaseWSColors[WS_PALETTE_SIZE] =
 {
     {   0,   0,   0, 255 },             // black
     {   0,   0, 170, 255 },             // blue
@@ -124,7 +124,7 @@ sSeqRGBColor gBaseWSColors[] =
     { 255,  85,  85, 255 },             // light red
     { 255,  85, 255, 255 },             // light magenta
     { 255, 255,  85, 255 },             // yellow
-    { 155, 255, 255, 255 },             // white
+    { 255, 255, 255, 255 },             // white
 } ;
 
 
@@ -314,14 +314,13 @@ bool FuzzyCompare(double a, double b)
 /// @return nothing
 ///
 /// @brief
-/// Constructor. Initializes the document by calling Clear() and
-/// resetting the changed flag.
+/// Constructor. Initializes the document by calling Clear(); the new
+/// document is unmodified.
 ///
 /////////////////////////////////////////////////////////////////////////////
 cDocument::cDocument(void)
 {
     Clear();
-    mChanged = false ;
 /*
     int numthreads = static_cast<int>(std::thread::hardware_concurrency()) ;
     if(numthreads == 0)
@@ -459,7 +458,11 @@ void cDocument::Clear(void)
     pdata.index = 0;
     mParagraphData.push_back(pdata);
 
-    mChanged = false;
+    // an empty, unmodified document
+    mNextUndoGroupId = 1 ;
+    mSavedUndoGroupId = 0 ;
+    mSavePointLost = false ;
+    mUnrecordedChange = false ;
 
     mLastParagraphFromPosition = 0;
     mLastParagraphFromPositionResult = 0;
@@ -540,7 +543,11 @@ void cDocument::ShrinkToFit(void)
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::Insert(CHAR_T ch)
 {
-    mChanged = true ;
+    // loading records no undo, so the change is tracked here
+    if (mIsLoading)
+    {
+        mUnrecordedChange = true ;
+    }
 
     // save original codepoint before it gets converted to MARKER_CHAR
     CHAR_T originalCodepoint = ch ;
@@ -777,22 +784,18 @@ void cDocument::Insert(const std::string &text)
 /////////////////////////////////////////////////////////////////////////////
 bool cDocument::Delete(POSITION_T position, POSITION_T length)
 {
-    POSITION_T bsize = GetTextSize() ;
-    // nothing to delete (can't delete STYLE_EOF)
-    if (bsize <= 1)
-    {
-        return false;
-    }
+    MY_ASSERT(position >= 0)
+    MY_ASSERT(length > 0)
 
-    if(position >= bsize - 1)
+    // the last grapheme is the permanent STYLE_EOF marker: never delete it
+    POSITION_T eofPosition = GetTextSize() - 1 ;
+    if (position >= eofPosition)
     {
         return false ;
     }
 
-
-    MY_ASSERT(length <= GetTextSize() - position)
-    MY_ASSERT(position >= 0)
-    MY_ASSERT(length > 0)
+    // clamp the range so it ends before the EOF marker
+    length = std::min(length, eofPosition - position) ;
 
     // capture characters before deletion for undo recording
     bool shouldRecord = !mUndoDisabled && !mIsLoading ;
@@ -803,7 +806,11 @@ bool cDocument::Delete(POSITION_T position, POSITION_T length)
         capturedChars = CaptureCharacters(position, length) ;
     }
 
-    mChanged = true ;
+    // loading records no undo, so the change is tracked here
+    if (mIsLoading)
+    {
+        mUnrecordedChange = true ;
+    }
 
     mCurrentPosition = position ;
 
@@ -1479,16 +1486,27 @@ void cDocument::InsertColor(sSeqRGBColor &color)
 /// @brief
 /// Convert a WordStar palette color to full RGB and insert it. Used by
 /// file I/O readers (WordStar format) that read palette indices from disk.
-/// Converts via gBaseWSColors[] lookup.
+/// Converts via gBaseWSColors[] lookup. An index outside the palette inserts
+/// the Automatic color {-1,-1,-1,-1}.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::InsertColorFromWSPalette(sWSColor &color)
 {
     sSeqRGBColor rgbColor ;
-    rgbColor.red = gBaseWSColors[color.colornumber].red ;
-    rgbColor.green = gBaseWSColors[color.colornumber].green ;
-    rgbColor.blue = gBaseWSColors[color.colornumber].blue ;
-    rgbColor.alpha = 255 ;
+    if (color.colornumber >= WS_PALETTE_SIZE)
+    {
+        rgbColor.red = -1 ;
+        rgbColor.green = -1 ;
+        rgbColor.blue = -1 ;
+        rgbColor.alpha = -1 ;
+    }
+    else
+    {
+        rgbColor.red = gBaseWSColors[color.colornumber].red ;
+        rgbColor.green = gBaseWSColors[color.colornumber].green ;
+        rgbColor.blue = gBaseWSColors[color.colornumber].blue ;
+        rgbColor.alpha = 255 ;
+    }
     InsertColor(rgbColor) ;
 }
 
@@ -3141,7 +3159,12 @@ void cDocument::RecordAction(eUndoActionType type, POSITION_T position, POSITION
     action.cursorBefore = cursorBefore ;
     action.cursorAfter = mCurrentPosition ;
 
-    // clear redo stack on new action
+    // clear redo stack on new action (a save point on it becomes unreachable)
+    if (std::any_of(mRedoStack.begin(), mRedoStack.end(),
+                    [this](const sUndoGroup &group) { return group.id == mSavedUndoGroupId ; }))
+    {
+        mSavePointLost = true ;
+    }
     mRedoStack.clear() ;
 
     if (mUndoGroupOpen)
@@ -3158,13 +3181,7 @@ void cDocument::RecordAction(eUndoActionType type, POSITION_T position, POSITION
         group.cursorAfter = mCurrentPosition ;
         group.actions.push_back(action) ;
 
-        mUndoStack.push_back(group) ;
-
-        // trim oldest entries if stack exceeds limit
-        while (static_cast<int>(mUndoStack.size()) > MAX_UNDO_STEPS)
-        {
-            mUndoStack.pop_front() ;
-        }
+        PushUndoGroup(group) ;
     }
 }
 
@@ -3411,6 +3428,9 @@ void cDocument::ReinsertCharacters(POSITION_T position, const std::vector<sUndoC
 /////////////////////////////////////////////////////////////////////////////
 bool cDocument::Undo(void)
 {
+    // work still accumulating in an open group is the most recent step
+    CommitOpenUndoGroup() ;
+
     if (mUndoStack.empty())
     {
         return false ;
@@ -3461,6 +3481,9 @@ bool cDocument::Undo(void)
 /////////////////////////////////////////////////////////////////////////////
 bool cDocument::Redo(void)
 {
+    // an open group's edits are committed (they already cleared the redo stack)
+    CommitOpenUndoGroup() ;
+
     if (mRedoStack.empty())
     {
         return false ;
@@ -3575,23 +3598,9 @@ void cDocument::EndUndoGroup(void)
         mUndoGroupNesting-- ;
     }
 
-    if (mUndoGroupNesting == 0 && mUndoGroupOpen)
+    if (mUndoGroupNesting == 0)
     {
-        mUndoGroupOpen = false ;
-
-        if (!mCurrentGroup.actions.empty())
-        {
-            mCurrentGroup.cursorAfter = mCurrentPosition ;
-            mUndoStack.push_back(mCurrentGroup) ;
-
-            // trim oldest entries if stack exceeds limit
-            while (static_cast<int>(mUndoStack.size()) > MAX_UNDO_STEPS)
-            {
-                mUndoStack.pop_front() ;
-            }
-        }
-
-        mCurrentGroup = sUndoGroup{} ;
+        CommitOpenUndoGroup() ;
     }
 }
 
@@ -3606,12 +3615,144 @@ void cDocument::EndUndoGroup(void)
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::ClearUndoHistory(void)
 {
+    // the modified state survives the history
+    bool modified = IsModified() ;
+
     mUndoStack.clear() ;
     mRedoStack.clear() ;
     mUndoGroupOpen = false ;
     mCurrentGroup = sUndoGroup{} ;
     mUndoGroupNesting = 0 ;
     mUndoDisabled = false ;
+
+    mSavedUndoGroupId = 0 ;
+    mSavePointLost = false ;
+    mUnrecordedChange = modified ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Commit an open undo group: push it (when it has actions) onto the undo
+/// stack and close it. Called when a group ends and before undo, redo and
+/// MarkSaved, so edits still accumulating are the most recent step.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::CommitOpenUndoGroup(void)
+{
+    if (!mUndoGroupOpen)
+    {
+        return ;
+    }
+
+    mUndoGroupOpen = false ;
+    mUndoGroupNesting = 0 ;
+
+    if (!mCurrentGroup.actions.empty())
+    {
+        mCurrentGroup.cursorAfter = mCurrentPosition ;
+        PushUndoGroup(mCurrentGroup) ;
+    }
+
+    mCurrentGroup = sUndoGroup{} ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  group [in/out] committed group; receives its id
+///
+/// @return nothing
+///
+/// @brief
+/// Give a committed group a new id, push it onto the undo stack and trim
+/// the stack to MAX_UNDO_STEPS. Trimming the save point group moves the
+/// save point to the bottom of the stack; trimming the group above an
+/// empty-stack save point makes the saved state unreachable.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::PushUndoGroup(sUndoGroup &group)
+{
+    group.id = mNextUndoGroupId++ ;
+    mUndoStack.push_back(group) ;
+
+    while (std::ssize(mUndoStack) > MAX_UNDO_STEPS)
+    {
+        if (mSavedUndoGroupId == 0)
+        {
+            mSavePointLost = true ;
+        }
+        else if (mUndoStack.front().id == mSavedUndoGroupId)
+        {
+            mSavedUndoGroupId = 0 ;
+        }
+        mUndoStack.pop_front() ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return id of the top undo group, 0 when the undo stack is empty
+///
+/////////////////////////////////////////////////////////////////////////////
+uint64_t cDocument::TopUndoGroupId(void) const
+{
+    if (mUndoStack.empty())
+    {
+        return 0 ;
+    }
+    return mUndoStack.back().id ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Mark the current state as saved (after a save or load). Commits an open
+/// undo group first, so later edits start a new step. Undo / redo back to
+/// this state makes the document unmodified again.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::MarkSaved(void)
+{
+    CommitOpenUndoGroup() ;
+
+    mSavedUndoGroupId = TopUndoGroupId() ;
+    mSavePointLost = false ;
+    mUnrecordedChange = false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true if the document differs from its saved state
+///
+/// @brief
+/// Modified when the undo history's top group is not the saved one, when
+/// an open undo group has recorded edits, when the saved state is no longer
+/// reachable (trimmed, or dropped from the redo stack by a new edit), or
+/// after an edit that was not recorded (loading).
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDocument::IsModified(void) const
+{
+    if (mUnrecordedChange || mSavePointLost)
+    {
+        return true ;
+    }
+
+    if (mUndoGroupOpen && !mCurrentGroup.actions.empty())
+    {
+        return true ;
+    }
+
+    return TopUndoGroupId() != mSavedUndoGroupId ;
 }
 
 /////////////////////////////////////////////////////////////////////////////

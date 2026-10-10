@@ -202,8 +202,9 @@ eTextEncoding cTextFile::DetectBOM(const std::vector<unsigned char>& buffer, siz
 /// @return true if valid UTF-8 sequence
 ///
 /// @brief
-/// Validate UTF-8 byte sequence for proper multi-byte encoding.
-/// Checks continuation bytes and overlong encodings.
+/// Validate a UTF-8 byte sequence per RFC 3629. Checks lead and continuation
+/// byte patterns, then decodes each codepoint and rejects overlong encodings,
+/// UTF-16 surrogates (U+D800..U+DFFF), and values above U+10FFFF.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cTextFile::IsValidUTF8(const unsigned char* data, size_t length)
@@ -221,23 +222,32 @@ bool cTextFile::IsValidUTF8(const unsigned char* data, size_t length)
             continue;
         }
 
-        // Multi-byte character - determine expected length
-        int extraBytes = 0;
+        // Multi-byte lead byte: determine length, seed the codepoint, and set
+        // the minimum legal value that rejects overlong encodings.
+        size_t extraBytes = 0;
+        uint32_t codepoint = 0;
+        uint32_t minValue = 0;
         if ((byte & 0xE0) == 0xC0)
         {
-            extraBytes = 1;  // 110xxxxx
+            extraBytes = 1;             // 110xxxxx
+            codepoint = byte & 0x1F;
+            minValue = 0x80;
         }
         else if ((byte & 0xF0) == 0xE0)
         {
-            extraBytes = 2;  // 1110xxxx
+            extraBytes = 2;             // 1110xxxx
+            codepoint = byte & 0x0F;
+            minValue = 0x800;
         }
         else if ((byte & 0xF8) == 0xF0)
         {
-            extraBytes = 3;  // 11110xxx
+            extraBytes = 3;             // 11110xxx
+            codepoint = byte & 0x07;
+            minValue = 0x10000;
         }
         else
         {
-            return false;  // Invalid UTF-8 start byte
+            return false;               // Invalid UTF-8 start byte
         }
 
         // Check we have enough bytes
@@ -246,16 +256,62 @@ bool cTextFile::IsValidUTF8(const unsigned char* data, size_t length)
             return false;
         }
 
-        // Validate continuation bytes (10xxxxxx)
-        for (int j = 1; j <= extraBytes; j++)
+        // Validate continuation bytes (10xxxxxx) and accumulate the codepoint
+        for (size_t j = 1; j <= extraBytes; j++)
         {
-            if ((data[i + j] & 0xC0) != 0x80)
+            unsigned char continuation = data[i + j];
+            if ((continuation & 0xC0) != 0x80)
             {
                 return false;
             }
+            codepoint = (codepoint << 6) | (continuation & 0x3F);
+        }
+
+        // Reject overlong encodings
+        if (codepoint < minValue)
+        {
+            return false;
+        }
+
+        // Reject UTF-16 surrogate range
+        if (codepoint >= 0xD800 && codepoint <= 0xDFFF)
+        {
+            return false;
+        }
+
+        // Reject codepoints above the Unicode maximum
+        if (codepoint > 0x10FFFF)
+        {
+            return false;
         }
 
         i += extraBytes + 1;
+    }
+
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  fileSize [in] size reported by tellg() for a file to load
+///
+/// @return true if the size is non-negative and within MAX_TEXT_FILE_SIZE
+///
+/// @brief
+/// Guard against a failed tellg() (returns -1, which would wrap to a huge
+/// allocation) and against oversized files that would exhaust memory.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cTextFile::IsAcceptableFileSize(long long fileSize)
+{
+    if (fileSize < 0)
+    {
+        return false;
+    }
+
+    if (fileSize > MAX_TEXT_FILE_SIZE)
+    {
+        return false;
     }
 
     return true;
@@ -843,13 +899,24 @@ bool cTextFile::LoadFile(std::string filename)
     std::streamsize fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
 
+    // Reject failed tellg() (-1) and oversized files before allocating
+    if (!IsAcceptableFileSize(fileSize))
+    {
+        if (mEditor != nullptr)
+        {
+            mEditor->ShowError("File Too Large",
+                "This file is too large to load as text.");
+        }
+        return false;
+    }
+
     if (fileSize == 0)
     {
         return true;  // Empty file is valid
     }
 
     // Read entire file into buffer
-    std::vector<unsigned char> buffer(fileSize);
+    std::vector<unsigned char> buffer(static_cast<size_t>(fileSize));
     if (!file.read(reinterpret_cast<char*>(buffer.data()), fileSize))
     {
         return false;

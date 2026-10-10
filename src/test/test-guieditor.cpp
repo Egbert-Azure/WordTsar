@@ -12709,18 +12709,18 @@ TEST_CASE("GUI editor - AbandonFile clears document and resets state")
     cDocument* doc = editor.GetDocument();
     REQUIRE(doc != nullptr);
 
-    // Insert text but manually clear the changed flag to skip confirm dialog
+    // Insert text but mark the document saved to skip confirm dialog
     // (QMessageBox blocks in tests even with QT_TESTING=1)
     doc->SetPosition(0);
     doc->Insert("Hello World\r");
-    doc->mChanged = false;
+    doc->MarkSaved();
 
     // AbandonFile should clear document and reset state
     editor.AbandonFile();
 
     // Document should be cleared (only EOF marker remains)
     CHECK(doc->GetTextSize() <= 1);
-    CHECK(doc->mChanged == false);
+    CHECK(doc->IsModified() == false);
 }
 
 
@@ -14125,3 +14125,211 @@ TEST_CASE("SetInputMode handler swap")
 }
 
 
+// Regression: the emergency save (out of memory, termination signal) was
+// written to the working directory -- "/" when the macOS Finder starts the
+// app -- instead of next to the document
+TEST_CASE("cEditorCtrl::EmergencySaveFile writes next to the document, not in the working directory")
+{
+    ensureQApplication();
+
+    // canonical: the macOS temp directory is behind a symlink (/var -> /private/var)
+    std::filesystem::path root = std::filesystem::canonical(std::filesystem::temp_directory_path()) / "wordtsar_gui_emergency_test";
+    std::filesystem::remove_all(root);
+    std::filesystem::path docs = root / "docs";
+    std::filesystem::path elsewhere = root / "cwd";
+    std::filesystem::create_directories(docs);
+    std::filesystem::create_directories(elsewhere);
+    std::filesystem::path file = docs / "doc.txt";
+    {
+        std::ofstream out(file, std::ios::binary);
+        out << "Original text";
+    }
+
+    cEditorCtrl editor;
+    REQUIRE(editor.LoadFile(file.string()));
+    editor.GetDocument()->SetPosition(0);
+    editor.GetDocument()->Insert("EDITED ");
+
+    std::filesystem::path saved = std::filesystem::current_path();
+    std::filesystem::current_path(elsewhere);
+    editor.EmergencySaveFile(const_cast<char*>("test"));
+    std::filesystem::current_path(saved);
+
+    std::filesystem::directory_iterator entries(docs);
+    bool savedNextToDocument = std::any_of(std::filesystem::begin(entries), std::filesystem::end(entries),
+                                           [](const std::filesystem::directory_entry& entry)
+    {
+        return entry.path().filename().string().rfind("emergency-", 0) == 0;
+    });
+    CHECK(savedNextToDocument);
+    CHECK(std::filesystem::is_empty(elsewhere));
+
+    std::filesystem::remove_all(root);
+}
+
+
+namespace
+{
+
+class cQuietEditor : public cEditorCtrl
+{
+public:
+    void ShowError(const std::string& title, const std::string& message) override
+    {
+        UNUSED_ARGUMENT(title);
+        UNUSED_ARGUMENT(message);
+        mErrors++;
+    }
+
+    void ShowMessage(const std::string& title, const std::string& message) override
+    {
+        UNUSED_ARGUMENT(title);
+        UNUSED_ARGUMENT(message);
+    }
+
+    bool AskYesNo(const std::string& title, const std::string& question) override
+    {
+        UNUSED_ARGUMENT(title);
+        UNUSED_ARGUMENT(question);
+        mPrompts++;
+        return mAnswer;
+    }
+
+    int mErrors = 0;
+    int mPrompts = 0;
+    bool mAnswer = false;
+};
+
+}
+
+
+TEST_CASE("GUI save and load paths use the undo save point")
+{
+    ensureQApplication();
+    auto dir = MakeGUIBackupTestDir("savepoint");
+    auto file = dir / "saved.ws";
+    {
+        cEditorCtrl seed;
+        seed.GetDocument()->Insert("saved text\r");
+        REQUIRE(seed.SaveFile(file.string()));
+    }
+
+    auto typeText = [](cEditorCtrl& editor, const std::string& text)
+    {
+        for (char ch : text)
+        {
+            editor.InsertText(std::string(1, ch));
+        }
+    };
+
+    SUBCASE("a loaded file is unmodified; undo of every edit returns to it")
+    {
+        cQuietEditor editor;
+        REQUIRE(editor.LoadFile(file.string()));
+        cDocument* doc = editor.GetDocument();
+        CHECK(doc->IsModified() == false);
+        typeText(editor, "abc");
+        CHECK(doc->IsModified() == true);
+        editor.Undo();
+        CHECK(doc->IsModified() == false);
+        CHECK(editor.CloseEvent() == true);
+    }
+
+    SUBCASE("Save marks the save point; Save of an unmodified document does nothing")
+    {
+        cQuietEditor editor;
+        REQUIRE(editor.LoadFile(file.string()));
+        cDocument* doc = editor.GetDocument();
+        typeText(editor, "new ");
+        CHECK(editor.Save() == true);
+        CHECK(doc->IsModified() == false);
+        CHECK(editor.Save() == false);
+
+        typeText(editor, "more");
+        CHECK(doc->IsModified() == true);
+        editor.Undo();
+        CHECK(doc->IsModified() == false);
+        CHECK(editor.Save() == false);
+
+        editor.Undo();                          // past the save point
+        CHECK(doc->IsModified() == true);
+        editor.Redo();
+        CHECK(doc->IsModified() == false);
+    }
+
+    SUBCASE("loading a file into a modified editor gives an unmodified document")
+    {
+        cQuietEditor editor;
+        typeText(editor, "unsaved");
+        REQUIRE(editor.GetDocument()->IsModified() == true);
+        REQUIRE(editor.LoadFile(file.string()));
+        CHECK(editor.GetDocument()->IsModified() == false);
+        CHECK(editor.GetDocument()->CanUndo() == false);
+    }
+
+    SUBCASE("^KS through the WordStar input saves only a modified document")
+    {
+        cQuietEditor editor;
+        REQUIRE(editor.LoadFile(file.string()));
+        cDocument* doc = editor.GetDocument();
+        typeText(editor, "Z");
+        editor.mInput->HandleKey(CTRL_K, false);
+        editor.mInput->HandleKey('S', false);
+        CHECK(doc->IsModified() == false);
+
+        auto before = std::filesystem::last_write_time(file);
+        typeText(editor, "Q");
+        editor.Undo();
+        editor.mInput->HandleKey(CTRL_K, false);
+        editor.mInput->HandleKey('S', false);
+        CHECK(std::filesystem::last_write_time(file) == before);
+        CHECK(editor.mErrors == 0);
+    }
+
+    SUBCASE("Modern Ctrl+S saves and marks the save point")
+    {
+        cQuietEditor editor;
+        REQUIRE(editor.LoadFile(file.string()));
+        editor.SetInputMode(INPUT_MODERN);
+        cDocument* doc = editor.GetDocument();
+        typeText(editor, "M");
+        CHECK(doc->IsModified() == true);
+        editor.mInput->HandleKey(CTRL_S, false);
+        CHECK(doc->IsModified() == false);
+        CHECK(editor.mErrors == 0);
+        typeText(editor, "N");
+        editor.Undo();
+        CHECK(doc->IsModified() == false);
+    }
+
+    CleanupGUIBackupTestDir(dir);
+}
+
+
+TEST_CASE("GUI editor - a failed backup write does not fail the save or the auto-save tick")
+{
+    ensureQApplication();
+    auto dir = MakeGUIBackupTestDir("bakfail");
+    auto source = dir / "bakfail.ws";
+    auto backupPath = dir / "bakfail-bak.ws";
+
+    // A directory in the backup's place cannot be written
+    std::filesystem::create_directories(backupPath);
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+    doc->SetPosition(0);
+    doc->Insert("Some text\r");
+
+    CHECK(editor.SaveFile(source.string()));
+    CHECK(std::filesystem::file_size(source) > 0);
+    CHECK(std::filesystem::path(editor.mBackupFileName) == backupPath);
+
+    doc->Insert("More\r");
+    bool invoked = QMetaObject::invokeMethod(&editor, "OnAutoSaveTimer", Qt::DirectConnection);
+    CHECK(invoked);
+    CHECK(std::filesystem::is_directory(backupPath));
+
+    CleanupGUIBackupTestDir(dir);
+}

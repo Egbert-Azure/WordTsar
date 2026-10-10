@@ -27,6 +27,7 @@
 #include <deque>
 #include <algorithm>
 #include <optional>
+#include <cstdint>
 
 
 #include "src/core/include/config.h"
@@ -221,6 +222,7 @@ struct sUndoGroup
     std::vector<sUndoAction> actions ;                  ///< actions in this group (in order)
     POSITION_T cursorBefore ;                           ///< cursor before first action in group
     POSITION_T cursorAfter ;                            ///< cursor after last action in group
+    uint64_t id = 0 ;                                   ///< unique id, assigned when the group is committed
 };
 
 
@@ -363,6 +365,10 @@ public:
     void EndUndoGroup(void) ;
     void ClearUndoHistory(void) ;
 
+    // --- Modified State (save point in the undo history) ---
+    void MarkSaved(void) ;
+    bool IsModified(void) const ;
+
     // --- Listener Management ---
     void AddListener(cDocumentListener* listener) ;
     void RemoveListener(cDocumentListener* listener) ;
@@ -428,15 +434,15 @@ private:
                       const std::vector<sUndoCharInfo> &chars, POSITION_T cursorBefore) ;
     std::vector<sUndoCharInfo> CaptureCharacters(POSITION_T position, POSITION_T length) ;
     void ReinsertCharacters(POSITION_T position, const std::vector<sUndoCharInfo> &chars) ;
+    void CommitOpenUndoGroup(void) ;
+    void PushUndoGroup(sUndoGroup &group) ;
+    uint64_t TopUndoGroupId(void) const ;
 
     // =================================================================
     // MEMBER VARIABLES
     // =================================================================
 
 public:
-    // --- Document State ---
-    bool mChanged ;                                     ///< flag for 'has the file changed'
-
     // --- Block Selection ---
     POSITION_T mStartBlock ;                            ///< position where a selected block starts
     POSITION_T mEndBlock ;                              ///< position where a selected block ends
@@ -497,6 +503,12 @@ private:
     sUndoGroup mCurrentGroup ;                           ///< group being built
     int mUndoGroupNesting ;                              ///< for nested Begin/End calls
     bool mUndoDisabled ;                                 ///< true during undo/redo execution
+
+    // --- Save Point ---
+    uint64_t mNextUndoGroupId ;                          ///< id for the next committed undo group
+    uint64_t mSavedUndoGroupId ;                         ///< top undo group id when saved (0 = empty stack)
+    bool mSavePointLost ;                                ///< saved state no longer reachable by undo / redo
+    bool mUnrecordedChange ;                             ///< content changed without an undo record (loading)
 
     // --- Listeners ---
     std::vector<cDocumentListener*> mListeners ;        ///< registered listeners (not owned)

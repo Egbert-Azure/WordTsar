@@ -1417,7 +1417,7 @@ bool cWordStarInput::OnControlKChar(char ch)
             // a document with no unsaved changes has nothing to save, so it
             // must still clear the buffer like real WordStar 7's ^KD does.
             retval = true ;
-            if(mEditor->GetDocument() && mEditor->GetDocument()->mChanged)
+            if(mEditor->GetDocument() && mEditor->GetDocument()->IsModified())
             {
                 if(mEditor->mFileSet != false)      // if we have a directory, we have a valid file name
                 {
@@ -1431,7 +1431,7 @@ bool cWordStarInput::OnControlKChar(char ch)
                     }
                     else
                     {
-                        mEditor->GetDocument()->mChanged = false ;
+                        mEditor->MarkDocumentSaved() ;
                     }
                 }
                 else
@@ -1454,7 +1454,7 @@ bool cWordStarInput::OnControlKChar(char ch)
             break ;
 
         case 's' :          // save file
-            if(mEditor->GetDocument() && mEditor->GetDocument()->mChanged == true)
+            if(mEditor->GetDocument() && mEditor->GetDocument()->IsModified())
             {
                 if(mEditor->mFileSet != false)      // if we have a directory, we have a valid file name
                 {
@@ -1467,7 +1467,7 @@ bool cWordStarInput::OnControlKChar(char ch)
                     }
                     else
                     {
-                        mEditor->GetDocument()->mChanged = false ;
+                        mEditor->MarkDocumentSaved() ;
 
                         retval = true ;
                     }
@@ -1526,7 +1526,7 @@ bool cWordStarInput::OnControlKChar(char ch)
                     }
                     else
                     {
-                        mEditor->GetDocument()->mChanged = false ;
+                        mEditor->MarkDocumentSaved() ;
                         retval = true ;
 
                         std::string msg = string_sprintf("File %s saved", filename.c_str()) ;

@@ -116,6 +116,7 @@ constexpr int MAX_HEADER_FOOTER = 5 ;           ///< the maximum number of lines
 #define MAXWSCOLORS 16                      ///< the number of colors the original Wordstar knows about.
 
 constexpr int MAX_UNDO_STEPS = 100;         ///< maximum undo levels (matches Word/LibreOffice default)
+constexpr long long MAX_TEXT_FILE_SIZE = 256LL * 1024 * 1024;   ///< reject plain-text files larger than 256 MB in cTextFile::LoadFile
 
 #define UNUSED_ARGUMENT(x) (void)x          // also used for unused locals
 

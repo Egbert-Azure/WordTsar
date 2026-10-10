@@ -94,6 +94,8 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     ../src/test/test-cheapwins.cpp
     ../src/test/test-spellcheck.cpp
     ../src/test/test-rtf.cpp
+    ../src/test/test-wordstarfile.cpp
+    ../src/test/test-textfile.cpp
     ../src/test/test-docxwriter.cpp
     ../src/test/test-docxreader.cpp
     ../src/test/test-tocindexgenerator.cpp

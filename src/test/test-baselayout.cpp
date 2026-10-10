@@ -3498,6 +3498,120 @@ TEST_CASE("RR parsing - ruler sets margins correctly")
 }
 
 
+
+
+namespace
+{
+
+// ".rr " + a ruler with L at column left and R at column right (-1 = none), length columns long
+std::string MakeRuler(int left, int right, int length)
+{
+    std::string ruler(static_cast<size_t>(length), '-');
+    if (left >= 0)
+    {
+        ruler[static_cast<size_t>(left)] = 'L';
+    }
+    if (right >= 0)
+    {
+        ruler[static_cast<size_t>(right)] = 'R';
+    }
+    return ".rr " + ruler;
+}
+
+}
+
+TEST_CASE("RR parsing - right margin is clamped to the paper width")
+{
+    sParserFixture f;
+
+    // defaults: 8.5" paper (12240), page offset 1" (1440): the right margin can reach 10800
+    REQUIRE(CoordsEqual(f.state.GetPaperWidth(), 12240));
+    REQUIRE(CoordsEqual(f.state.GetPageOffsetOdd(), 1440));
+    const COORD_T maxRight = 12240 - 1440;
+
+    SUBCASE("R past the paper edge is clamped")
+    {
+        CHECK(f.parser.ParseDotCommand(MakeRuler(0, 90, 91)) == DOT_GOOD);
+        CHECK(CoordsEqual(f.state.GetLeftMargin(), 0));
+        CHECK(CoordsEqual(f.state.GetRightMargin(), maxRight));
+        REQUIRE(f.state.GetTabs().empty() == false);
+        CHECK(CoordsEqual(f.state.GetTabs().back().position, maxRight));
+    }
+
+    SUBCASE("R exactly at the paper edge is kept")
+    {
+        CHECK(f.parser.ParseDotCommand(MakeRuler(0, 75, 76)) == DOT_GOOD);
+        CHECK(CoordsEqual(f.state.GetRightMargin(), 75 * 144));
+        CHECK(CoordsEqual(75 * 144, maxRight));
+    }
+
+    SUBCASE("R inside the paper is unchanged")
+    {
+        CHECK(f.parser.ParseDotCommand(MakeRuler(5, 65, 66)) == DOT_GOOD);
+        CHECK(CoordsEqual(f.state.GetLeftMargin(), 5 * 144));
+        CHECK(CoordsEqual(f.state.GetRightMargin(), 65 * 144));
+    }
+
+    SUBCASE("a long ruler without R is clamped")
+    {
+        CHECK(f.parser.ParseDotCommand(MakeRuler(0, -1, 100)) == DOT_GOOD);
+        CHECK(CoordsEqual(f.state.GetRightMargin(), maxRight));
+    }
+
+    SUBCASE("the larger of the odd / even page offsets limits the margin")
+    {
+        f.state.SetPageOffsetEven(2880);
+        CHECK(f.parser.ParseDotCommand(MakeRuler(0, 80, 81)) == DOT_GOOD);
+        CHECK(CoordsEqual(f.state.GetRightMargin(), 12240 - 2880));
+
+        f.state.SetPageOffsetEven(1440);
+        f.state.SetPageOffsetOdd(2160);
+        CHECK(f.parser.ParseDotCommand(MakeRuler(0, 80, 81)) == DOT_GOOD);
+        CHECK(CoordsEqual(f.state.GetRightMargin(), 12240 - 2160));
+    }
+
+    SUBCASE("wider paper allows a wider ruler")
+    {
+        f.state.SetPaperWidth(15840);         // 11" landscape
+        CHECK(f.parser.ParseDotCommand(MakeRuler(0, 90, 91)) == DOT_GOOD);
+        CHECK(CoordsEqual(f.state.GetRightMargin(), 90 * 144));
+    }
+
+    SUBCASE("L so close to the edge that the minimum width no longer fits is an error")
+    {
+        CHECK(f.parser.ParseDotCommand(MakeRuler(0, 60, 61)) == DOT_GOOD);
+        std::vector<sTabStop> tabsBefore = f.state.GetTabs();
+
+        // L at 72 (10368): clamped R 10800 leaves 432 < 720
+        CHECK(f.parser.ParseDotCommand(MakeRuler(72, 78, 79)) == DOT_ERROR);
+        CHECK(CoordsEqual(f.state.GetLeftMargin(), 0));
+        CHECK(CoordsEqual(f.state.GetRightMargin(), 60 * 144));
+        CHECK(f.state.GetTabs().size() == tabsBefore.size());
+
+        // without R the minimum width would also leave the paper
+        CHECK(f.parser.ParseDotCommand(MakeRuler(73, -1, 74)) == DOT_ERROR);
+        CHECK(CoordsEqual(f.state.GetRightMargin(), 60 * 144));
+    }
+
+    SUBCASE("L leaving exactly the minimum width is accepted")
+    {
+        // L at 70 (10080): clamped R 10800 leaves exactly 720
+        CHECK(f.parser.ParseDotCommand(MakeRuler(70, 80, 81)) == DOT_GOOD);
+        CHECK(CoordsEqual(f.state.GetLeftMargin(), 70 * 144));
+        CHECK(CoordsEqual(f.state.GetRightMargin(), maxRight));
+    }
+
+    SUBCASE("tab stops past the paper edge do not move the right margin")
+    {
+        std::string ruler = MakeRuler(0, 60, 90);
+        ruler[4 + 85] = '!';
+        CHECK(f.parser.ParseDotCommand(ruler) == DOT_GOOD);
+        CHECK(CoordsEqual(f.state.GetRightMargin(), 60 * 144));
+        CHECK(CoordsEqual(f.state.GetTabs().back().position, 60 * 144));
+    }
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 // TEST: .RR (Ruler) Layout Scope
 //
@@ -12022,3 +12136,148 @@ TEST_CASE("Layout - trailing comment not duplicated in box on relayout")
     CHECK(occurrences == 1);
 }
 
+
+TEST_CASE("No phantom trailing page when the document ends at a page boundary")
+{
+    ensureQApplication();
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+
+    // Lines that fit on one page (default margins, default font)
+    auto linesPerPage = [&](void)
+    {
+        cDocument probe;
+        cLayout probeLayout;
+        probeLayout.SetDocument(&probe);
+        probe.Insert("x\r");
+        probeLayout.LayoutDocument(&probe);
+        COORD_T lineHeight = probeLayout.GetParagraphLayout(0)->lines.front().lineheight;
+        return static_cast<int>((14400 - 1440) / lineHeight);
+    };
+    int perPage = linesPerPage();
+
+    // Page of the last line of the last paragraph that has lines
+    auto lastLinePage = [&](void)
+    {
+        for (PARAGRAPH_T para = layout.GetNumberOfParagraphs() - 1; para >= 0; --para)
+        {
+            const sParagraphLayout* paraLayout = layout.GetParagraphLayout(para);
+            if (paraLayout != nullptr && paraLayout->lines.empty() == false)
+            {
+                return paraLayout->lines.back().pagenumber;
+            }
+        }
+        return static_cast<PAGE_T>(0);
+    };
+
+    SUBCASE("a full page whose last line has no CR is one page (display and print)")
+    {
+        for (int i = 0; i < perPage - 1; i++)
+        {
+            doc.Insert("Line\r");
+        }
+        doc.Insert("Last line");
+        for (eShowControl show : {SHOW_ALL, SHOW_NONE})
+        {
+            CAPTURE(show);
+            layout.SetShowControl(show);
+            layout.SetActiveParagraph(NOT_SET);
+            layout.LayoutDocument(&doc);
+            REQUIRE(lastLinePage() == 1);
+            CHECK(layout.GetNumberOfPages() == 1);
+        }
+    }
+
+    SUBCASE("a full page ending in CR prints as one page")
+    {
+        doc.Insert(".he Header #\r");
+        for (int i = 0; i < perPage; i++)
+        {
+            doc.Insert("Line\r");
+        }
+        layout.SetShowControl(SHOW_NONE);
+        layout.SetActiveParagraph(NOT_SET);
+        layout.LayoutDocument(&doc);
+        CHECK(layout.GetNumberOfPages() == 1);
+
+        // On screen the end-of-document line starts page 2, so page 2 is shown
+        layout.SetShowControl(SHOW_ALL);
+        layout.LayoutDocument(&doc);
+        CHECK(lastLinePage() == 2);
+        CHECK(layout.GetNumberOfPages() == 2);
+    }
+
+    SUBCASE(".PA or .CP as the last paragraph does not print an empty page")
+    {
+        for (const char* ending : {".pa\r", ".cp 99\r"})
+        {
+            CAPTURE(ending);
+            cDocument endDoc;
+            cLayout endLayout;
+            endLayout.SetDocument(&endDoc);
+            endLayout.SetShowControl(SHOW_NONE);
+            endLayout.SetActiveParagraph(NOT_SET);
+            endDoc.Insert("Text on page one.\r");
+            endDoc.Insert(ending);
+            endLayout.LayoutDocument(&endDoc);
+            CHECK(endLayout.GetNumberOfPages() == 1);
+        }
+    }
+
+    SUBCASE("a page break followed by text still counts both pages")
+    {
+        doc.Insert("Page one.\r.pa\rPage two.\r");
+        layout.SetShowControl(SHOW_NONE);
+        layout.SetActiveParagraph(NOT_SET);
+        layout.LayoutDocument(&doc);
+        CHECK(layout.GetNumberOfPages() == 2);
+    }
+
+    SUBCASE("an empty document has one page")
+    {
+        layout.SetShowControl(SHOW_NONE);
+        layout.SetActiveParagraph(NOT_SET);
+        layout.LayoutDocument(&doc);
+        CHECK(layout.GetNumberOfPages() == 1);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Test that laying out the document's last paragraph drops layout entries
+/// for paragraphs that no longer exist (after paragraphs were deleted), so
+/// the paragraph and line counts match a full layout.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("LayoutParagraph of the last paragraph drops entries for deleted paragraphs")
+{
+    ensureQApplication();
+
+    cDocument doc;
+    doc.Insert("One\r");
+    doc.Insert("Two\r");
+    doc.Insert("Three\r");
+    doc.Insert("Four\r");
+
+    cLayout layout;
+    layout.LayoutDocument(&doc);
+    REQUIRE(layout.GetNumberOfParagraphs() == 5);         // 4 + EOF paragraph
+
+    // remove "Two\r" and "Three\r" (two paragraphs)
+    doc.Delete(4, 10);
+    REQUIRE(doc.GetNumberofParagraphs() == 3);
+
+    for (PARAGRAPH_T para = 0; para < doc.GetNumberofParagraphs(); para++)
+    {
+        layout.LayoutParagraph(para);
+    }
+    CHECK(layout.GetNumberOfParagraphs() == 3);
+    LINE_T incrementalLines = layout.GetNumberOfLines();
+
+    layout.LayoutDocument(&doc);
+    CHECK(layout.GetNumberOfParagraphs() == 3);
+    CHECK(incrementalLines == layout.GetNumberOfLines());
+}

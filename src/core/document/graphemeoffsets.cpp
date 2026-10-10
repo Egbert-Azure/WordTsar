@@ -28,7 +28,9 @@
  * ASCII paragraphs, IDENTITY mode is used (zero storage, O(1) lookup since
  * byte offset equals grapheme index). For paragraphs containing multi-byte
  * characters, DELTA mode stores per-grapheme byte lengths as uint8_t values
- * (1 byte per grapheme instead of 8), reconstructing offsets via prefix sum.
+ * (1 byte per grapheme instead of 8) plus the absolute offset of every
+ * OFFSET_CHECKPOINT_INTERVAL-th grapheme, reconstructing an offset from the
+ * nearest checkpoint.
  * This is a key memory optimization for cDocument's grapheme-based positioning.
  *
  * @section grapheme_modes Storage Modes
@@ -36,12 +38,17 @@
  * - MODE_IDENTITY: pure ASCII paragraph where byte offset equals grapheme index,
  *   requiring zero additional storage and O(1) lookup
  * - MODE_DELTA: multi-byte paragraph storing per-grapheme byte lengths as uint8_t
- *   values, reconstructing absolute offsets via prefix sum (O(n) lookup but
- *   minimal memory: 1 byte per grapheme vs. 8 bytes for a full offset table)
+ *   values plus a checkpoint offset every OFFSET_CHECKPOINT_INTERVAL (64)
+ *   graphemes. Lookup sums at most 63 deltas from the nearest checkpoint
+ *   (O(1) with respect to position); memory is 1 byte per grapheme plus
+ *   8 bytes per 64 graphemes, vs. 8 bytes per grapheme for a full table
+ * - MODE_FULL: used only when some grapheme is longer than 255 bytes (e.g.
+ *   long combining-mark stacks), which a uint8_t delta cannot hold. Stores
+ *   every grapheme's byte offset plus the buffer length, O(1) lookup.
  *
  * For typical English documents, ~90% of paragraphs use IDENTITY mode,
  * reducing memory from 8 bytes/grapheme (POSITION_T) to 0 bytes.
- * DELTA mode uses 1 byte/grapheme instead of 8.
+ * DELTA mode uses about 1.125 bytes/grapheme instead of 8.
  *
  * @section grapheme_usage Usage Pattern
  * cDocument creates and populates cGraphemeOffsets for each sParagraphData during
@@ -57,6 +64,10 @@
  */
 
 #include "graphemeoffsets.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <numeric>
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -81,9 +92,12 @@ cGraphemeOffsets::cGraphemeOffsets(void)
 /// @return byte offset of grapheme i within the paragraph's UTF-8 buffer
 ///
 /// @brief
-/// Returns the byte offset for the given grapheme index.
+/// Returns the byte offset for the given grapheme index (i == size()
+/// returns the buffer length).
 /// In IDENTITY mode (ASCII text), offset[i] = i, O(1).
-/// In DELTA mode (multi-byte text), reconstructs via prefix sum, O(i).
+/// In DELTA mode (multi-byte text), starts from the checkpoint at or before i
+/// and adds at most OFFSET_CHECKPOINT_INTERVAL - 1 deltas.
+/// In FULL mode (a grapheme longer than 255 bytes), reads the stored offset.
 ///
 /////////////////////////////////////////////////////////////////////////////
 POSITION_T cGraphemeOffsets::operator[](size_t i) const
@@ -93,13 +107,21 @@ POSITION_T cGraphemeOffsets::operator[](size_t i) const
         return static_cast<POSITION_T>(i) ;
     }
 
-    // DELTA mode: prefix sum of byte-lengths up to position i
-    POSITION_T offset = 0 ;
-    for (size_t j = 0 ; j < i ; ++j)
+    if (mMode == MODE_FULL)
     {
-        offset += mDeltas[j] ;
+        return mFull[i] ;
     }
-    return offset ;
+
+    // DELTA mode: nearest checkpoint, then the deltas after it
+    size_t block = i / OFFSET_CHECKPOINT_INTERVAL ;
+    size_t first = block * OFFSET_CHECKPOINT_INTERVAL ;
+    POSITION_T offset = 0 ;
+    if (block > 0)
+    {
+        offset = mCheckpoints[block - 1] ;
+    }
+    return std::accumulate(mDeltas.begin() + static_cast<std::ptrdiff_t>(first),
+                           mDeltas.begin() + static_cast<std::ptrdiff_t>(i), offset) ;
 }
 
 
@@ -129,17 +151,23 @@ size_t cGraphemeOffsets::size(void) const
 /// If buffer.size() == offsets.size(), all graphemes are single-byte
 /// (ASCII/Latin-1) and we use IDENTITY mode (zero storage).
 /// Otherwise, we compute per-grapheme byte-lengths and store as uint8_t
-/// deltas in DELTA mode (1 byte per grapheme instead of 8).
+/// deltas in DELTA mode (1 byte per grapheme instead of 8), plus the byte
+/// offset of every OFFSET_CHECKPOINT_INTERVAL-th grapheme (mCheckpoints).
+/// If any grapheme is longer than 255 bytes, FULL mode stores every offset
+/// plus the buffer length instead.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cGraphemeOffsets::Store(const std::string& buffer, const std::vector<POSITION_T>& offsets)
 {
     mCount = offsets.size() ;
 
+    mDeltas.clear() ;
+    mCheckpoints.clear() ;
+    mFull.clear() ;
+
     if (mCount == 0)
     {
         mMode = MODE_EMPTY ;
-        mDeltas.clear() ;
         return ;
     }
 
@@ -147,25 +175,37 @@ void cGraphemeOffsets::Store(const std::string& buffer, const std::vector<POSITI
     if (buffer.size() == mCount)
     {
         mMode = MODE_IDENTITY ;
-        mDeltas.clear() ;
         return ;
     }
 
-    // multi-byte graphemes: store byte-length of each grapheme as uint8_t
-    mMode = MODE_DELTA ;
-    mDeltas.resize(mCount) ;
-
-    for (size_t i = 0 ; i < mCount - 1 ; ++i)
+    // a grapheme too long for a uint8_t delta: keep the full offset table
+    POSITION_T end = std::ssize(buffer) ;
+    auto tooLong = [](POSITION_T from, POSITION_T to) { return (to - from) > 255 ; } ;
+    if (std::adjacent_find(offsets.begin(), offsets.end(), tooLong) != offsets.end() ||
+        tooLong(offsets.back(), end))
     {
-        POSITION_T delta = offsets[i + 1] - offsets[i] ;
-        // clamp to 255 for safety (should never exceed 4 for normal UTF-8,
-        // but combining character sequences could theoretically be longer)
-        mDeltas[i] = static_cast<uint8_t>(delta > 255 ? 255 : delta) ;
+        mMode = MODE_FULL ;
+        mFull.assign(offsets.begin(), offsets.end()) ;
+        mFull.push_back(end) ;
+        return ;
     }
 
-    // last grapheme: byte-length from last offset to end of buffer
-    POSITION_T lastDelta = static_cast<POSITION_T>(buffer.size()) - offsets[mCount - 1] ;
-    mDeltas[mCount - 1] = static_cast<uint8_t>(lastDelta > 255 ? 255 : lastDelta) ;
+    // multi-byte graphemes: byte-length of each grapheme as uint8_t
+    mMode = MODE_DELTA ;
+    mDeltas.resize(mCount) ;
+    std::transform(offsets.begin() + 1, offsets.end(), offsets.begin(), mDeltas.begin(),
+                   [](POSITION_T next, POSITION_T current) { return static_cast<uint8_t>(next - current) ; }) ;
+    mDeltas[mCount - 1] = static_cast<uint8_t>(end - offsets.back()) ;
+
+    // checkpoints: running sum of the deltas at every interval boundary
+    mCheckpoints.reserve(mCount / OFFSET_CHECKPOINT_INTERVAL) ;
+    POSITION_T offset = 0 ;
+    for (size_t first = 0 ; first + OFFSET_CHECKPOINT_INTERVAL <= mCount ; first += OFFSET_CHECKPOINT_INTERVAL)
+    {
+        auto blockStart = mDeltas.begin() + static_cast<std::ptrdiff_t>(first) ;
+        offset = std::accumulate(blockStart, blockStart + static_cast<std::ptrdiff_t>(OFFSET_CHECKPOINT_INTERVAL), offset) ;
+        mCheckpoints.push_back(offset) ;
+    }
 }
 
 
@@ -188,20 +228,16 @@ void cGraphemeOffsets::CopyTo(std::vector<POSITION_T>& out) const
     if (mMode == MODE_IDENTITY)
     {
         // offset[i] = i
-        for (size_t i = 0 ; i < mCount ; ++i)
-        {
-            out[i] = static_cast<POSITION_T>(i) ;
-        }
+        std::iota(out.begin(), out.end(), POSITION_T(0)) ;
     }
     else if (mMode == MODE_DELTA)
     {
         // prefix sum of deltas
-        POSITION_T offset = 0 ;
-        for (size_t i = 0 ; i < mCount ; ++i)
-        {
-            out[i] = offset ;
-            offset += mDeltas[i] ;
-        }
+        std::exclusive_scan(mDeltas.begin(), mDeltas.end(), out.begin(), POSITION_T(0)) ;
+    }
+    else if (mMode == MODE_FULL)
+    {
+        std::copy_n(mFull.begin(), mCount, out.begin()) ;
     }
 }
 
@@ -219,6 +255,8 @@ void cGraphemeOffsets::clear(void)
     mMode = MODE_EMPTY ;
     mCount = 0 ;
     mDeltas.clear() ;
+    mCheckpoints.clear() ;
+    mFull.clear() ;
 }
 
 
@@ -227,12 +265,15 @@ void cGraphemeOffsets::clear(void)
 /// @return nothing
 ///
 /// @brief
-/// Releases excess allocated memory in the delta vector.
+/// Releases excess allocated memory in the delta, checkpoint and full
+/// offset vectors.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cGraphemeOffsets::shrink_to_fit(void)
 {
     mDeltas.shrink_to_fit() ;
+    mCheckpoints.shrink_to_fit() ;
+    mFull.shrink_to_fit() ;
 }
 
 
@@ -242,12 +283,14 @@ void cGraphemeOffsets::shrink_to_fit(void)
 ///
 /// @brief
 /// Returns the number of bytes actually used by stored data.
-/// IDENTITY mode uses 0 bytes. DELTA mode uses 1 byte per grapheme.
+/// IDENTITY mode uses 0 bytes. DELTA mode uses 1 byte per grapheme plus
+/// one POSITION_T per OFFSET_CHECKPOINT_INTERVAL graphemes. FULL mode uses
+/// one POSITION_T per grapheme plus one for the buffer length.
 ///
 /////////////////////////////////////////////////////////////////////////////
 size_t cGraphemeOffsets::memoryUsed(void) const
 {
-    return mDeltas.size() * sizeof(uint8_t) ;
+    return mDeltas.size() * sizeof(uint8_t) + (mCheckpoints.size() + mFull.size()) * sizeof(POSITION_T) ;
 }
 
 
@@ -262,5 +305,5 @@ size_t cGraphemeOffsets::memoryUsed(void) const
 /////////////////////////////////////////////////////////////////////////////
 size_t cGraphemeOffsets::memoryAllocated(void) const
 {
-    return mDeltas.capacity() * sizeof(uint8_t) ;
+    return mDeltas.capacity() * sizeof(uint8_t) + (mCheckpoints.capacity() + mFull.capacity()) * sizeof(POSITION_T) ;
 }

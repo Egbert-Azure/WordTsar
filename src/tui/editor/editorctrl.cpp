@@ -953,6 +953,7 @@ void cWSEditorCtrl::Undo(void)
 {
     if (mDocument)
     {
+        CloseTypingGroup();
         mDocument->Undo();
     }
 }
@@ -970,6 +971,7 @@ void cWSEditorCtrl::Redo(void)
 {
     if (mDocument)
     {
+        CloseTypingGroup();
         mDocument->Redo();
     }
 }
@@ -1111,8 +1113,8 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
         mDocument->Clear();
     }
 
-    // Save dirty flag before loading (Insert() sets mChanged per character)
-    bool wasDirty = mDocument->mChanged;
+    // Modified state before loading (kept if the load fails)
+    bool wasModified = mDocument->IsModified();
 
     // Block idle layout during file loading
     mDocument->SetLoading(true);
@@ -1137,8 +1139,11 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
     // Re-enable idle layout
     mDocument->SetLoading(false);
 
-    // Restore dirty flag (loading shouldn't change dirty state)
-    mDocument->mChanged = wasDirty;
+    // A failed load keeps the old modified state
+    if (!success && !wasModified)
+    {
+        MarkDocumentSaved();
+    }
 
     delete fileReader;
 
@@ -1151,6 +1156,7 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
             mDocument->UnsetBlock();
             mDocument->SetPosition(0);
             mDocument->ClearUndoHistory();
+            MarkDocumentSaved();
         }
 
         LoadFileState(filename);
@@ -1375,11 +1381,7 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
 
         if (ext != ".docx")
         {
-            cFile* backupWriter = new cWordstarFile(this);
-            backupWriter->SetSilent(true);
-            POSITION_T backupSize = mDocument->GetTextSize();
-            backupWriter->SaveFile(mBackupFileName, backupSize);
-            delete backupWriter;
+            WriteBackup();
         }
 
         SaveFileState(filename);
@@ -1406,7 +1408,7 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
 /////////////////////////////////////////////////////////////////////////////
 void cWSEditorCtrl::EmergencySaveFile(char *text)
 {
-    if (!mDocument || !mDocument->mChanged)
+    if (!mDocument || !mDocument->IsModified())
     {
         return;
     }
@@ -1417,7 +1419,9 @@ void cWSEditorCtrl::EmergencySaveFile(char *text)
         filename = "untitled";
     }
 
-    std::string emergency = filename + ".emergency";
+    // next to the document (mFileName has no directory), not in the working directory
+    std::filesystem::path emergencyPath = std::filesystem::path(mFileDir) / (filename + ".emergency");
+    std::string emergency = emergencyPath.string();
     SaveFileImpl(emergency, true);
 
     if (text)
@@ -1445,18 +1449,14 @@ void cWSEditorCtrl::AutoSaveBackup(void)
         return;
     }
 
-    if (!mDocument || mDocument->mChanged == false)
+    if (!mDocument || mDocument->IsModified() == false)
     {
         return;
     }
 
     SetStatusMessage("Saving backup...", true, 30);
 
-    cFile* backupWriter = new cWordstarFile(this);
-    backupWriter->SetSilent(true);
-    POSITION_T backupSize = mDocument->GetTextSize();
-    backupWriter->SaveFile(mBackupFileName, backupSize);
-    delete backupWriter;
+    bool success = WriteBackup();
 
     mDocument->ShrinkToFit();
     if (mLayout != nullptr)
@@ -1464,7 +1464,34 @@ void cWSEditorCtrl::AutoSaveBackup(void)
         mLayout->ShrinkToFit();
     }
 
-    SetStatusMessage("Backup saved", false, 30);
+    if (success == true)
+    {
+        SetStatusMessage("Backup saved", false, 30);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return bool - true if the backup file was written
+///
+/// @brief
+/// Write the document to its -bak backup file in WordStar format. On failure,
+/// show "Backup save failed" with the backup path on the status bar.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSEditorCtrl::WriteBackup(void)
+{
+    cWordstarFile backupWriter(this);
+    backupWriter.SetSilent(true);
+    bool success = backupWriter.SaveFile(mBackupFileName, mDocument->GetTextSize());
+
+    if (success == false)
+    {
+        SetStatusMessage("Backup save failed: " + mBackupFileName, false, 300);
+    }
+
+    return success;
 }
 
 
@@ -1542,7 +1569,7 @@ std::string cWSEditorCtrl::PromptForSaveFile(void)
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::CloseEvent(void)
 {
-    if ((mDocument == nullptr) || (mDocument->mChanged == false))
+    if ((mDocument == nullptr) || (mDocument->IsModified() == false))
     {
         return true;
     }
@@ -1569,7 +1596,12 @@ bool cWSEditorCtrl::CloseEvent(void)
             }
         }
 
-        return SaveFile(filename);
+        bool saved = SaveFile(filename);
+        if (saved)
+        {
+            MarkDocumentSaved();
+        }
+        return saved;
     }
     else if (choice == 1)
     {
@@ -1812,7 +1844,7 @@ void cWSEditorCtrl::AbandonFile(void)
 {
     cEditorBase::AbandonFile();
 
-    if (mDocument && mDocument->mChanged)
+    if (mDocument && mDocument->IsModified())
     {
         return;
     }

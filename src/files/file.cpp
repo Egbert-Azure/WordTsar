@@ -74,7 +74,14 @@
 cFile::cFile(cEditorBase *editor)
 {
     mEditor = editor ;
-    mDocument = mEditor->GetDocument() ;
+    if (mEditor != nullptr)
+    {
+        mDocument = mEditor->GetDocument() ;
+    }
+    else
+    {
+        mDocument = nullptr ;
+    }
 }
 
 

@@ -3081,12 +3081,36 @@ void cEditorCtrl::OnCaretTimer(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return bool - true if the backup file was written
+///
+/// @brief
+/// Write the document to its -bak backup file in WordStar format. On failure,
+/// show "Backup save failed" with the backup path on the status bar.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorCtrl::WriteBackup(void)
+{
+    // Always save backups in WordStar format -- avoids hangs from RTF/DOCX backup loading
+    cWordstarFile backupWriter(this);
+    backupWriter.SetSilent(true);
+    bool success = backupWriter.SaveFile(mBackupFileName, mDocument->GetTextSize());
+
+    if (success == false && mWordTsar)
+    {
+        mWordTsar->SetStatus(QString::fromStdString("Backup save failed: " + mBackupFileName), false, 0);
+    }
+
+    return success;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
 /// Timer callback to auto-save backup file.
 /// Called every AUTO_SAVE_INTERVAL_MS (60 seconds) to save backup.
-/// Same logic as old editorctrl.cpp OnStatusTimer() line 1529-1566.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::OnAutoSaveTimer(void)
@@ -3109,17 +3133,10 @@ void cEditorCtrl::OnAutoSaveTimer(void)
         mWordTsar->SetStatus("Saving backup...", true, 0);
     }
 
-    // Always save backups in WordStar format -- avoids hangs from RTF/DOCX backup loading
-    cFile* fileWriter = new cWordstarFile(this);
-    fileWriter->SetSilent(true);
-
-    POSITION_T docSize = mDocument->GetTextSize();
-    fileWriter->SaveFile(mBackupFileName, docSize);
-
-    delete fileWriter;
+    bool success = WriteBackup();
 
     // Show completion briefly
-    if (mWordTsar)
+    if (success == true && mWordTsar)
     {
         mWordTsar->SetStatus("Backup saved", false, 0);
     }
@@ -6719,9 +6736,8 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
         mDocument->Clear();
     }
 
-    // Save dirty flag before loading (Insert() sets mChanged for every character)
-    // Restore after so loading doesn't change the document's dirty state
-    bool wasDirty = mDocument->mChanged;
+    // Modified state before loading (kept if the load fails)
+    bool wasModified = mDocument->IsModified();
 
     // Block idle layout during file loading
     // QProgressDialog processes events, which could trigger OnIdle before loading completes
@@ -6748,8 +6764,11 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
     // Re-enable idle layout
     mDocument->SetLoading(false);
 
-    // Restore dirty flag (loading shouldn't change dirty state)
-    mDocument->mChanged = wasDirty;
+    // A failed load keeps the old modified state
+    if (!success && !wasModified)
+    {
+        MarkDocumentSaved();
+    }
 
     delete fileReader;
 
@@ -6764,6 +6783,7 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
             mDocument->UnsetBlock();
             mDocument->SetPosition(0);  // Move to start of document
             mDocument->ClearUndoHistory();
+            MarkDocumentSaved();
         }
 
         // Restore per-file editor state (cursor, saved positions, block)
@@ -6975,11 +6995,7 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
         // Create backup file in WordStar format (except for DOCX)
         if (!qfilename.endsWith(".docx", Qt::CaseInsensitive))
         {
-            cFile* backupWriter = new cWordstarFile(this);
-            backupWriter->SetSilent(true);
-            POSITION_T backupSize = mDocument->GetTextSize();
-            backupWriter->SaveFile(mBackupFileName, backupSize);
-            delete backupWriter;
+            WriteBackup();
         }
 
         // Sync reveal codes visibility to base member before saving per-file state
@@ -7032,7 +7048,9 @@ void cEditorCtrl::EmergencySaveFile(char *text)
     char timestamp[64];
     strftime(timestamp, sizeof(timestamp), "%Y%m%d-%H%M%S", localtime(&now));
 
-    std::string emergencyFilename = std::string("emergency-") + timestamp + ".ws";
+    // next to the document, not in the working directory ("/" when started from the macOS Finder)
+    std::filesystem::path emergencyPath = std::filesystem::path(mFileDir) / (std::string("emergency-") + timestamp + ".ws");
+    std::string emergencyFilename = emergencyPath.string();
 
     // Save document without progress UI (we're crashing) -- never block on a
     // dialog here, the app may be unwinding from a fatal error.
@@ -7290,7 +7308,7 @@ bool cEditorCtrl::Open(void)
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorCtrl::Save(void)
 {
-    if (GetDocument() == nullptr || GetDocument()->mChanged == false)
+    if (GetDocument() == nullptr || GetDocument()->IsModified() == false)
     {
         return false;
     }
@@ -7308,7 +7326,7 @@ bool cEditorCtrl::Save(void)
         return false;
     }
 
-    GetDocument()->mChanged = false;
+    MarkDocumentSaved();
     return true;
 }
 
@@ -7343,7 +7361,7 @@ bool cEditorCtrl::SaveAs(void)
 
     if (GetDocument())
     {
-        GetDocument()->mChanged = false;
+        MarkDocumentSaved();
     }
 
     std::string msg = string_sprintf("File %s saved", filename.c_str());
@@ -7368,7 +7386,7 @@ bool cEditorCtrl::SaveAndClose(void)
 {
     bool ok = false;
 
-    if (GetDocument() && GetDocument()->mChanged)
+    if (GetDocument() && GetDocument()->IsModified())
     {
         if (mFileSet != false)
         {
@@ -7380,7 +7398,7 @@ bool cEditorCtrl::SaveAndClose(void)
             }
             else
             {
-                GetDocument()->mChanged = false;
+                MarkDocumentSaved();
             }
         }
         else
@@ -7679,7 +7697,7 @@ void cEditorCtrl::SetRuler(cRulerCtrl* ruler)
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorCtrl::CloseEvent(void)
 {
-    if (GetDocument() && GetDocument()->mChanged == true)
+    if (GetDocument() && GetDocument()->IsModified())
     {
         QMessageBox::StandardButton result = QMessageBox::question(
             this,
@@ -7698,7 +7716,7 @@ bool cEditorCtrl::CloseEvent(void)
                 {
                     return false;  // Save failed, cancel close
                 }
-                GetDocument()->mChanged = false;
+                MarkDocumentSaved();
             }
             else
             {
@@ -7718,7 +7736,7 @@ bool cEditorCtrl::CloseEvent(void)
                 {
                     return false;  // Save failed, cancel close
                 }
-                GetDocument()->mChanged = false;
+                MarkDocumentSaved();
                 SetTitle(mFileName);
             }
             return true;  // Saved successfully, allow close

@@ -2497,3 +2497,457 @@ TEST_CASE("Overwrite mode control-code rules")
         CHECK(notes == 1);
     }
 }
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Test that cEditorBase::Delete() never removes the EOF marker, even when
+/// asked to delete past the end, and leaves the caret on a valid position.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Editor Delete keeps the EOF marker")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert("Hello\r");
+    layout->LayoutDocument(doc);
+
+    doc->SetPosition(3);
+    editor.Delete(3, 1000);
+
+    CHECK(doc->GetTextSize() == 4);                       // "Hel" + EOF
+    CHECK(doc->GetControlChar(doc->GetTextSize() - 1) == STYLE_EOF);
+    CHECK(doc->GetPosition() == 3);
+
+    editor.Delete(0, doc->GetTextSize());
+    CHECK(doc->GetTextSize() == 1);
+    CHECK(doc->GetControlChar(0) == STYLE_EOF);
+    CHECK(doc->GetPosition() == 0);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Test that Undo()/Redo() close the open typing group first,
+/// so undo right after typing removes the typed text (not an older step), and
+/// typing afterwards starts a new undo step.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Editor Undo closes the typing group before undoing")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert("Line\r");
+    doc->ClearUndoHistory();
+    layout->LayoutDocument(doc);
+
+    doc->SetPosition(0);
+    editor.Delete(0, 1);                    // committed step: "ine\r"
+    editor.InsertText("abc");               // typing group still open
+    CHECK(doc->GetParagraphText(0) == "abcine\r");
+
+    editor.Undo();
+    CHECK(doc->GetParagraphText(0) == "ine\r");
+
+    editor.Redo();
+    CHECK(doc->GetParagraphText(0) == "abcine\r");
+
+    editor.Undo();
+    CHECK(doc->GetParagraphText(0) == "ine\r");
+
+    // typing after an undo starts a new step
+    doc->SetPosition(0);
+    editor.InsertText("xy");
+    editor.Undo();
+    CHECK(doc->GetParagraphText(0) == "ine\r");
+
+    editor.Undo();
+    CHECK(doc->GetParagraphText(0) == "Line\r");
+    editor.Undo();
+}
+
+
+namespace
+{
+
+class cPromptEditor : public cEditorCtrl
+{
+public:
+    bool AskYesNo(const std::string& title, const std::string& question) override
+    {
+        UNUSED_ARGUMENT(title);
+        UNUSED_ARGUMENT(question);
+        mPrompts++;
+        return mAnswer;
+    }
+
+    int mPrompts = 0;
+    bool mAnswer = false;
+};
+
+}
+
+
+TEST_CASE("Editor modified state follows undo back to the save point")
+{
+    ensureQApplication();
+    cPromptEditor editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->LayoutDocument(doc);
+    doc->ClearUndoHistory();
+    editor.MarkDocumentSaved();
+
+    auto typeText = [&](const std::string& text)
+    {
+        for (char ch : text)
+        {
+            editor.InsertText(std::string(1, ch));
+        }
+    };
+
+    SUBCASE("typing in an open typing group is modified; undo clears it")
+    {
+        typeText("ab");
+        CHECK(doc->IsModified() == true);
+        editor.Undo();
+        CHECK(doc->IsModified() == false);
+        editor.Redo();
+        CHECK(doc->IsModified() == true);
+    }
+
+    SUBCASE("MarkDocumentSaved closes the typing group")
+    {
+        typeText("ab");
+        editor.MarkDocumentSaved();
+        CHECK(doc->IsModified() == false);
+        typeText("cd");
+        CHECK(doc->IsModified() == true);
+        editor.Undo();
+        CHECK(doc->GetBlockText(0, 2) == "ab");
+        CHECK(doc->GetTextSize() == 3);
+        CHECK(doc->IsModified() == false);
+
+        // typing after the save is still grouped (not one step per character)
+        typeText("xyz");
+        editor.Undo();
+        CHECK(doc->GetTextSize() == 3);
+    }
+
+    SUBCASE("^KQ does not prompt after undoing every change")
+    {
+        typeText("hello");
+        editor.Undo();
+        editor.AbandonFile();
+        CHECK(editor.mPrompts == 0);
+        CHECK(doc->GetTextSize() == 1);
+        CHECK(doc->IsModified() == false);
+    }
+
+    SUBCASE("^KQ prompts when modified; No keeps the document")
+    {
+        typeText("hello");
+        editor.mAnswer = false;
+        editor.AbandonFile();
+        CHECK(editor.mPrompts == 1);
+        CHECK(doc->GetTextSize() == 6);
+        CHECK(doc->IsModified() == true);
+    }
+
+    SUBCASE("^KQ Yes clears to an unmodified document and typing still groups")
+    {
+        typeText("hello");
+        editor.mAnswer = true;
+        editor.AbandonFile();
+        CHECK(editor.mPrompts == 1);
+        CHECK(doc->GetTextSize() == 1);
+        CHECK(doc->IsModified() == false);
+        typeText("new");
+        editor.Undo();
+        CHECK(doc->GetTextSize() == 1);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Test that leaving a dot command shown only because the caret was on it
+/// (SHOW_NONE) re-lays out the paragraphs after it, so their line numbers and
+/// screen Y match a full layout and the caret Y is correct.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Leaving a shown dot command in SHOW_NONE re-lays out following paragraphs")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    // positions: "Line1\r" 0-5, ".. comment\r" 6-16, "Line2\r" 17-22, "Line3\r" 23-28
+    doc->Insert("Line1\r");
+    doc->Insert(".. comment\r");
+    doc->Insert("Line2\r");
+    doc->Insert("Line3\r");
+    editor.SetShowControls(SHOW_NONE);
+    layout->LayoutDocument(doc);
+
+    // caret on the comment: it becomes the active paragraph and is shown
+    doc->SetPosition(6);
+    editor.CalculateCaretPosition();
+    layout->LayoutDocument(doc);
+    editor.CalculateCaretPosition();
+    REQUIRE(layout->GetParagraphLayout(1)->lines.size() == 1);
+
+    SUBCASE("moving down")
+    {
+        editor.MoveCaretLine(+1);
+        editor.CalculateCaretPosition();
+        REQUIRE(editor.GetCaretParagraph() == 2);
+        CHECK(layout->GetParagraphLayout(1)->lines.empty());
+
+        // incremental result
+        sLineLayout line2 = layout->GetParagraphLayout(2)->lines.front();
+        sLineLayout line3 = layout->GetParagraphLayout(3)->lines.front();
+        std::optional<LINE_T> caretRaw = layout->GetLineFromPosition(doc->GetPosition());
+        COORD_T caretY = editor.GetCaretY() + editor.GetScrollOffset();
+
+        // full layout with the same active paragraph is the reference
+        layout->LayoutDocument(doc);
+        const sLineLayout& full2 = layout->GetParagraphLayout(2)->lines.front();
+        const sLineLayout& full3 = layout->GetParagraphLayout(3)->lines.front();
+
+        CHECK(line2.screeny == full2.screeny);
+        CHECK(line2.rawLineNumber == full2.rawLineNumber);
+        CHECK(line2.contentLineNumber == full2.contentLineNumber);
+        CHECK(line3.screeny == full3.screeny);
+        CHECK(line3.rawLineNumber == full3.rawLineNumber);
+        CHECK(caretRaw == full2.rawLineNumber);
+        CHECK(caretY == full2.screeny);
+    }
+
+    SUBCASE("moving up")
+    {
+        editor.MoveCaretLine(-1);
+        editor.CalculateCaretPosition();
+        REQUIRE(editor.GetCaretParagraph() == 0);
+        CHECK(layout->GetParagraphLayout(1)->lines.empty());
+
+        sLineLayout line2 = layout->GetParagraphLayout(2)->lines.front();
+        sLineLayout line3 = layout->GetParagraphLayout(3)->lines.front();
+
+        layout->LayoutDocument(doc);
+        const sLineLayout& full2 = layout->GetParagraphLayout(2)->lines.front();
+        const sLineLayout& full3 = layout->GetParagraphLayout(3)->lines.front();
+
+        CHECK(line2.screeny == full2.screeny);
+        CHECK(line2.rawLineNumber == full2.rawLineNumber);
+        CHECK(line3.screeny == full3.screeny);
+        CHECK(line3.rawLineNumber == full3.rawLineNumber);
+    }
+
+    SUBCASE("dot command at document start")
+    {
+        cEditorCtrl topEditor;
+        cDocument* topDoc = topEditor.GetDocument();
+        cLayout* topLayout = dynamic_cast<cLayout*>(topEditor.GetLayout());
+
+        // positions: ".. comment\r" 0-10, "Line1\r" 11-16, "Line2\r" 17-22
+        topDoc->Insert(".. comment\r");
+        topDoc->Insert("Line1\r");
+        topDoc->Insert("Line2\r");
+        topEditor.SetShowControls(SHOW_NONE);
+        topLayout->LayoutDocument(topDoc);
+        topDoc->SetPosition(0);
+        topEditor.CalculateCaretPosition();
+        topLayout->LayoutDocument(topDoc);
+        topEditor.CalculateCaretPosition();
+        REQUIRE(topLayout->GetParagraphLayout(0)->lines.size() == 1);
+
+        topEditor.MoveCaretLine(+1);
+        topEditor.CalculateCaretPosition();
+        REQUIRE(topEditor.GetCaretParagraph() == 1);
+
+        sLineLayout line1 = topLayout->GetParagraphLayout(1)->lines.front();
+        std::optional<LINE_T> caretRaw = topLayout->GetLineFromPosition(topDoc->GetPosition());
+        COORD_T caretY = topEditor.GetCaretY() + topEditor.GetScrollOffset();
+
+        topLayout->LayoutDocument(topDoc);
+        const sLineLayout& full1 = topLayout->GetParagraphLayout(1)->lines.front();
+
+        CHECK(line1.rawLineNumber == 0);
+        CHECK(line1.rawLineNumber == full1.rawLineNumber);
+        CHECK(line1.screeny == full1.screeny);
+        CHECK(caretRaw == full1.rawLineNumber);
+        CHECK(caretY == full1.screeny);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Test that leaving a dot command in SHOW_ALL (no visibility change) leaves
+/// the following paragraphs' layout unchanged.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Leaving a dot command in SHOW_ALL keeps following layout")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert("Line1\r");
+    doc->Insert(".. comment\r");
+    doc->Insert("Line2\r");
+    editor.SetShowControls(SHOW_ALL);
+    layout->LayoutDocument(doc);
+    doc->SetPosition(6);
+    editor.CalculateCaretPosition();
+    layout->LayoutDocument(doc);
+    editor.CalculateCaretPosition();
+
+    sLineLayout before = layout->GetParagraphLayout(2)->lines.front();
+
+    editor.MoveCaretLine(+1);
+    editor.CalculateCaretPosition();
+
+    CHECK(layout->GetParagraphLayout(1)->lines.size() == 1);
+    const sLineLayout& after = layout->GetParagraphLayout(2)->lines.front();
+    CHECK(after.screeny == before.screeny);
+    CHECK(after.rawLineNumber == before.rawLineNumber);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Test that leaving a shown dot command for a caret far down the document
+/// re-lays out every line up to the caret: the caret's raw line is within
+/// GetNumberOfLines() and resolves to the caret's own line, and after idle
+/// layout the caret paragraph matches a full layout.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Leaving a shown dot command for a distant caret keeps line data consistent")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    // ".. comment\r" 0-10, then 1500 lines of "Line\r"
+    doc->Insert(".. comment\r");
+    PARAGRAPH_T lineCount = 1500;
+    for (PARAGRAPH_T i = 0; i < lineCount; i++)
+    {
+        doc->Insert("Line\r");
+    }
+    editor.SetShowControls(SHOW_NONE);
+    layout->LayoutDocument(doc);
+    doc->SetPosition(0);
+    editor.CalculateCaretPosition();
+    layout->LayoutDocument(doc);
+    editor.CalculateCaretPosition();
+    REQUIRE(layout->GetParagraphLayout(0)->lines.size() == 1);
+
+    // jump to the last "Line" paragraph
+    PARAGRAPH_T lastPara = lineCount;
+    POSITION_T start = 0;
+    POSITION_T end = 0;
+    doc->GetParagraphStartandEnd(lastPara, start, end);
+    doc->SetPosition(start);
+    editor.CalculateCaretPosition();
+    REQUIRE(editor.GetCaretParagraph() == lastPara);
+    CHECK(layout->GetParagraphLayout(0)->lines.empty());
+
+    std::optional<LINE_T> caretRaw = layout->GetLineFromPosition(start);
+    REQUIRE(caretRaw);
+    CHECK(*caretRaw < layout->GetNumberOfLines());
+    const sLineLayout* caretLine = layout->GetLineByRawLineNumber(*caretRaw);
+    REQUIRE(caretLine != nullptr);
+    CHECK(caretLine->documentPosition == start);
+    CHECK(editor.GetCaretY() + editor.GetScrollOffset() == caretLine->screeny);
+
+    int passes = 0;
+    while (editor.IdleLayout() && passes < 100000)
+    {
+        passes++;
+    }
+    sLineLayout incremental = layout->GetParagraphLayout(lastPara)->lines.front();
+
+    layout->LayoutDocument(doc);
+    const sLineLayout& full = layout->GetParagraphLayout(lastPara)->lines.front();
+    CHECK(incremental.screeny == full.screeny);
+    CHECK(incremental.rawLineNumber == full.rawLineNumber);
+    CHECK(incremental.contentLineNumber == full.contentLineNumber);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Test that after leaving a shown dot command and running the next
+/// command's PerformPostCommandUpdate(), idle layout brings the paragraphs
+/// beyond the synchronously laid-out range up to date.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Idle layout completes the re-layout after leaving a shown dot command")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    // "Line\r" 0-4, ".. comment\r" 5-15, then 500 lines of "Line\r"
+    doc->Insert("Line\r");
+    doc->Insert(".. comment\r");
+    PARAGRAPH_T lineCount = 500;
+    for (PARAGRAPH_T i = 0; i < lineCount; i++)
+    {
+        doc->Insert("Line\r");
+    }
+    editor.resize(400, 200);
+    editor.SetShowControls(SHOW_NONE);
+    layout->LayoutDocument(doc);
+    doc->SetPosition(5);
+    editor.CalculateCaretPosition();
+    layout->LayoutDocument(doc);
+    editor.CalculateCaretPosition();
+    REQUIRE(layout->GetParagraphLayout(1)->lines.size() == 1);
+
+    // leave the comment, then the next command's update runs
+    editor.MoveCaretLine(+1);
+    editor.CalculateCaretPosition();
+    editor.MoveCaretLine(+1);
+    editor.PerformPostCommandUpdate();
+
+    int passes = 0;
+    while (editor.IdleLayout() && passes < 100000)
+    {
+        passes++;
+    }
+
+    PARAGRAPH_T lastPara = lineCount + 1;
+    sLineLayout incremental = layout->GetParagraphLayout(lastPara)->lines.front();
+
+    layout->LayoutDocument(doc);
+    const sLineLayout& full = layout->GetParagraphLayout(lastPara)->lines.front();
+    CHECK(incremental.screeny == full.screeny);
+    CHECK(incremental.rawLineNumber == full.rawLineNumber);
+    CHECK(incremental.contentLineNumber == full.contentLineNumber);
+}

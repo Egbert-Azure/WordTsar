@@ -109,6 +109,9 @@ struct sWSColor
     unsigned char prevcolornumber ;
 };
 
+// Number of colors in the WordStar palette (gBaseWSColors)
+constexpr int WS_PALETTE_SIZE = 16 ;
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///

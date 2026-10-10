@@ -234,6 +234,7 @@ public:
 
 private:
     bool SaveFileImpl(const std::string& filename, bool silent);
+    bool WriteBackup(void);                      // Write the -bak backup; status message on failure
 
     // Title / message state
     std::string mTitle;                          // Current window/document title

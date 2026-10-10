@@ -120,7 +120,8 @@ public:
     void HandleChar(unsigned char c, size_t loop) ;
 
 private :
-    void HandleSequence(size_t &loop) ;
+    void HandleSequence(void) ;
+    bool ReadBytes(size_t count, std::string &bytes) ;
     
     void InsertExtendedChar(unsigned char c) ;
     

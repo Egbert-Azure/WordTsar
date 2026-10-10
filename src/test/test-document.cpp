@@ -7324,6 +7324,270 @@ TEST_CASE("cGraphemeOffsets - shrink_to_fit reduces allocation")
     CHECK(after == offsets.memoryUsed()) ;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  graphemeCount [in] number of graphemes to generate
+/// @param  buffer [out] UTF-8 buffer of mixed 1/2/3/4-byte graphemes
+/// @param  rawOffsets [out] byte offset of each grapheme in buffer
+///
+/// @return nothing
+///
+/// @brief
+/// Test helper: builds a multi-byte paragraph buffer cycling through 1, 2,
+/// 3 and 4 byte graphemes, with its raw grapheme byte offsets.
+///
+/////////////////////////////////////////////////////////////////////////////
+static void BuildMixedGraphemes(size_t graphemeCount, std::string &buffer, std::vector<POSITION_T> &rawOffsets)
+{
+    const char *samples[] = {"a", "\xc3\xa9", "\xe4\xb8\x96", "\xf0\x9f\x8e\x89"} ;
+
+    buffer.clear() ;
+    rawOffsets.clear() ;
+    for (size_t i = 0 ; i < graphemeCount ; ++i)
+    {
+        rawOffsets.push_back(static_cast<POSITION_T>(buffer.size())) ;
+        buffer += samples[(i * 7 + i / 3) % 4] ;
+    }
+}
+
+TEST_CASE("cGraphemeOffsets - delta mode lookups across checkpoint boundaries")
+{
+    // sizes around the 64-grapheme checkpoint interval, plus a large paragraph
+    const size_t counts[] = {1, 2, 63, 64, 65, 127, 128, 129, 1000} ;
+
+    for (size_t count : counts)
+    {
+        CAPTURE(count) ;
+        std::string buffer ;
+        std::vector<POSITION_T> rawOffsets ;
+        BuildMixedGraphemes(count, buffer, rawOffsets) ;
+        if (buffer.size() == count)
+        {
+            // all single-byte: identity mode, covered elsewhere
+            continue ;
+        }
+
+        cGraphemeOffsets offsets ;
+        offsets.Store(buffer, rawOffsets) ;
+        REQUIRE(offsets.size() == count) ;
+
+        // every grapheme, in order and in reverse
+        for (size_t i = 0 ; i < count ; ++i)
+        {
+            CHECK(offsets[i] == rawOffsets[i]) ;
+        }
+        for (size_t i = count ; i > 0 ; --i)
+        {
+            CHECK(offsets[i - 1] == rawOffsets[i - 1]) ;
+        }
+
+        // one past the last grapheme is the buffer end
+        CHECK(offsets[count] == static_cast<POSITION_T>(buffer.size())) ;
+
+        std::vector<POSITION_T> exported ;
+        offsets.CopyTo(exported) ;
+        CHECK(exported == rawOffsets) ;
+    }
+}
+
+TEST_CASE("cGraphemeOffsets - delta mode memory includes checkpoints")
+{
+    std::string buffer ;
+    std::vector<POSITION_T> rawOffsets ;
+
+    // under one checkpoint interval: deltas only
+    BuildMixedGraphemes(63, buffer, rawOffsets) ;
+    cGraphemeOffsets small ;
+    small.Store(buffer, rawOffsets) ;
+    CHECK(small.memoryUsed() == 63) ;
+
+    // 1000 graphemes: 1000 deltas + one checkpoint per 64 graphemes (15)
+    BuildMixedGraphemes(1000, buffer, rawOffsets) ;
+    cGraphemeOffsets large ;
+    large.Store(buffer, rawOffsets) ;
+    CHECK(large.memoryUsed() == 1000 + 15 * sizeof(POSITION_T)) ;
+    large.shrink_to_fit() ;
+    CHECK(large.memoryAllocated() == large.memoryUsed()) ;
+
+    // clear releases the checkpoints too
+    large.clear() ;
+    CHECK(large.memoryUsed() == 0) ;
+
+    // re-storing identity (ASCII) data drops delta data
+    large.Store(buffer, rawOffsets) ;
+    std::string ascii(100, 'a') ;
+    std::vector<POSITION_T> asciiOffsets ;
+    for (POSITION_T i = 0 ; i < 100 ; ++i)
+    {
+        asciiOffsets.push_back(i) ;
+    }
+    large.Store(ascii, asciiOffsets) ;
+    CHECK(large.memoryUsed() == 0) ;
+    CHECK(large[99] == 99) ;
+}
+
+TEST_CASE("cGraphemeOffsets - delta mode lookup cost is independent of position")
+{
+    // 50,000 multi-byte graphemes: a prefix-sum lookup costs ~1.25e9 additions
+    // for a full walk, a checkpointed lookup at most 64 per grapheme
+    std::string buffer ;
+    std::vector<POSITION_T> rawOffsets ;
+    BuildMixedGraphemes(50000, buffer, rawOffsets) ;
+
+    cGraphemeOffsets offsets ;
+    offsets.Store(buffer, rawOffsets) ;
+
+    auto start = std::chrono::steady_clock::now() ;
+    POSITION_T sum = 0 ;
+    for (size_t i = 0 ; i < 50000 ; ++i)
+    {
+        sum += offsets[i] ;
+    }
+    auto elapsed = std::chrono::steady_clock::now() - start ;
+    double ms = std::chrono::duration<double, std::milli>(elapsed).count() ;
+
+    POSITION_T expected = 0 ;
+    for (POSITION_T value : rawOffsets)
+    {
+        expected += value ;
+    }
+    CHECK(sum == expected) ;
+    CHECK(ms < 200.0) ;
+}
+
+TEST_CASE("cGraphemeOffsets - cDocument reads a long multi-byte paragraph")
+{
+    cDocument doc ;
+
+    // 2,000 CJK graphemes with a marker every 100 to check alignment
+    std::string text ;
+    for (int i = 0 ; i < 2000 ; ++i)
+    {
+        if (i % 100 == 0)
+        {
+            text += "x" ;
+        }
+        else
+        {
+            text += "\xe4\xb8\x96" ;
+        }
+    }
+    doc.Insert(text + "\r") ;
+
+    for (POSITION_T p = 0 ; p < 2000 ; ++p)
+    {
+        if (p % 100 == 0)
+        {
+            CHECK(doc.GetCharNoAdvance(p) == "x") ;
+        }
+        else
+        {
+            CHECK(doc.GetCharNoAdvance(p) == "\xe4\xb8\x96") ;
+        }
+    }
+    CHECK(doc.GetCharNoAdvance(2000) == "\r") ;
+}
+
+TEST_CASE("cGraphemeOffsets - grapheme longer than 255 bytes is not clamped")
+{
+    // "x", then "a" + 200 combining acutes (401 bytes, one grapheme), then "bc"
+    std::string longGrapheme = "a" ;
+    for (int i = 0 ; i < 200 ; ++i)
+    {
+        longGrapheme += "\xcc\x81" ;
+    }
+    std::string buffer = "x" + longGrapheme + "bc" ;
+    std::vector<POSITION_T> rawOffsets = {0, 1, 402, 403} ;
+
+    cGraphemeOffsets offsets ;
+    offsets.Store(buffer, rawOffsets) ;
+
+    REQUIRE(offsets.size() == 4) ;
+    for (size_t i = 0 ; i < 4 ; ++i)
+    {
+        CHECK(offsets[i] == rawOffsets[i]) ;
+    }
+    CHECK(offsets[4] == static_cast<POSITION_T>(buffer.size())) ;
+
+    std::vector<POSITION_T> exported ;
+    offsets.CopyTo(exported) ;
+    CHECK(exported == rawOffsets) ;
+
+    // full offset table: one POSITION_T per grapheme plus the end offset
+    CHECK(offsets.memoryUsed() == 5 * sizeof(POSITION_T)) ;
+    offsets.shrink_to_fit() ;
+    CHECK(offsets.memoryAllocated() == offsets.memoryUsed()) ;
+
+    // storing normal multi-byte data again returns to the compact form
+    std::string small = "Caf\xc3\xa9" ;
+    std::vector<POSITION_T> smallOffsets = {0, 1, 2, 3} ;
+    offsets.Store(small, smallOffsets) ;
+    CHECK(offsets.memoryUsed() == 4) ;
+    CHECK(offsets[3] == 3) ;
+    CHECK(offsets[4] == 5) ;
+
+    offsets.Store(buffer, rawOffsets) ;
+    offsets.clear() ;
+    CHECK(offsets.size() == 0) ;
+    CHECK(offsets.memoryUsed() == 0) ;
+}
+
+TEST_CASE("cGraphemeOffsets - long grapheme among many multi-byte graphemes")
+{
+    // 1000 mixed graphemes with a 300-byte grapheme in the middle
+    std::string buffer ;
+    std::vector<POSITION_T> rawOffsets ;
+    BuildMixedGraphemes(500, buffer, rawOffsets) ;
+    rawOffsets.push_back(static_cast<POSITION_T>(buffer.size())) ;
+    buffer += "o" ;
+    for (int i = 0 ; i < 150 ; ++i)
+    {
+        buffer += "\xcc\x88" ;
+    }
+    std::string tail ;
+    std::vector<POSITION_T> tailOffsets ;
+    BuildMixedGraphemes(499, tail, tailOffsets) ;
+    POSITION_T base = static_cast<POSITION_T>(buffer.size()) ;
+    for (POSITION_T value : tailOffsets)
+    {
+        rawOffsets.push_back(base + value) ;
+    }
+    buffer += tail ;
+
+    cGraphemeOffsets offsets ;
+    offsets.Store(buffer, rawOffsets) ;
+    REQUIRE(offsets.size() == 1000) ;
+    for (size_t i = 0 ; i < 1000 ; ++i)
+    {
+        CHECK(offsets[i] == rawOffsets[i]) ;
+    }
+    CHECK(offsets[1000] == static_cast<POSITION_T>(buffer.size())) ;
+}
+
+TEST_CASE("cGraphemeOffsets - cDocument reads text after a grapheme longer than 255 bytes")
+{
+    cDocument doc ;
+    std::string longGrapheme = "a" ;
+    for (int i = 0 ; i < 200 ; ++i)
+    {
+        longGrapheme += "\xcc\x81" ;
+    }
+    doc.Insert("x" + longGrapheme + "bc\r") ;
+
+    std::vector<std::string> graphemes ;
+    std::vector<POSITION_T> byteOffsets ;
+    doc.GetParagraphGraphemes(0, graphemes, byteOffsets) ;
+    REQUIRE(graphemes.size() == 5) ;           // x, long grapheme, b, c, \r
+    CHECK(graphemes[0] == "x") ;
+    CHECK(graphemes[1].size() > 255) ;
+    CHECK(graphemes[2] == "b") ;
+    CHECK(graphemes[3] == "c") ;
+    CHECK(graphemes[4] == "\r") ;
+
+    CHECK(doc.GetCharNoAdvance(2) == "b") ;
+    CHECK(doc.GetCharNoAdvance(3) == "c") ;
+    CHECK(doc.GetCharNoAdvance(4) == "\r") ;
+}
 TEST_CASE("cGraphemeOffsets - integration with cDocument ASCII paragraph")
 {
     cDocument doc ;
@@ -7979,7 +8243,7 @@ TEST_CASE("InsertColorFromWSPalette converts palette to RGB")
 
         sSeqRGBColor result ;
         CHECK(document.GetColor(2, result) == true) ;
-        CHECK(result.red == 155) ;
+        CHECK(result.red == 255) ;
         CHECK(result.green == 255) ;
         CHECK(result.blue == 255) ;
         CHECK(result.alpha == 255) ;
@@ -8004,6 +8268,29 @@ TEST_CASE("InsertColorFromWSPalette converts palette to RGB")
             CHECK(result.green == gBaseWSColors[i].green) ;
             CHECK(result.blue == gBaseWSColors[i].blue) ;
             CHECK(result.alpha == 255) ;
+        }
+    }
+}
+
+
+TEST_CASE("InsertColorFromWSPalette - an index outside the palette")
+{
+    SUBCASE("an index outside the palette inserts Automatic")
+    {
+        for (int index : {WS_PALETTE_SIZE, 200, 255})
+        {
+            CAPTURE(index) ;
+            cDocument doc ;
+            doc.Insert("ABCDEFGHIJ\r") ;
+            doc.SetPosition(2) ;
+            sWSColor ws ;
+            ws.colornumber = static_cast<unsigned char>(index) ;
+            ws.prevcolornumber = 0 ;
+            doc.InsertColorFromWSPalette(ws) ;
+
+            sSeqRGBColor result ;
+            CHECK(doc.GetColor(2, result) == true) ;
+            CHECK(result.IsDefault() == true) ;
         }
     }
 }
@@ -9744,4 +10031,423 @@ TEST_CASE("Delete cleans up control-code marker tables")
         }
     }
     CHECK(orphan == false) ;
+}
+
+
+static std::string EofTestDocumentText(cDocument &doc)
+{
+    std::string text ;
+    for (PARAGRAPH_T para = 0 ; para < doc.GetNumberofParagraphs() ; ++para)
+    {
+        text += doc.GetParagraphText(para) ;
+    }
+    return text ;
+}
+
+
+TEST_CASE("Delete never removes the EOF marker")
+{
+    SUBCASE("range ending at the text size stops before EOF")
+    {
+        cDocument doc ;
+        doc.Insert("abc\r") ;                   // 0-3 text, 4 = EOF
+        doc.ClearUndoHistory() ;
+        std::string before = EofTestDocumentText(doc) ;
+        POSITION_T size = doc.GetTextSize() ;
+        REQUIRE(size == 5) ;
+
+        CHECK(doc.Delete(2, size - 2)) ;          // "c\r" + EOF requested
+        CHECK(doc.GetTextSize() == 3) ;
+        CHECK(EofTestDocumentText(doc) == "ab\x7f") ;
+        CHECK(doc.GetControlChar(doc.GetTextSize() - 1) == STYLE_EOF) ;
+
+        doc.Undo() ;
+        CHECK(EofTestDocumentText(doc) == before) ;
+        CHECK(doc.GetControlChar(doc.GetTextSize() - 1) == STYLE_EOF) ;
+    }
+
+    SUBCASE("deleting everything leaves only EOF")
+    {
+        cDocument doc ;
+        doc.Insert("one\rtwo\r") ;
+        doc.ClearUndoHistory() ;
+        std::string before = EofTestDocumentText(doc) ;
+
+        CHECK(doc.Delete(0, doc.GetTextSize())) ;
+        CHECK(doc.GetTextSize() == 1) ;
+        CHECK(doc.GetNumberofParagraphs() == 1) ;
+        CHECK(doc.GetControlChar(0) == STYLE_EOF) ;
+
+        doc.Undo() ;
+        CHECK(EofTestDocumentText(doc) == before) ;
+    }
+
+    SUBCASE("length far past the end is clamped")
+    {
+        cDocument doc ;
+        doc.Insert("abc\r") ;
+        CHECK(doc.Delete(1, 1000)) ;
+        CHECK(EofTestDocumentText(doc) == "a\x7f") ;
+        CHECK(doc.GetControlChar(1) == STYLE_EOF) ;
+    }
+
+    SUBCASE("empty document: nothing to delete")
+    {
+        cDocument doc ;
+        CHECK_FALSE(doc.Delete(0, 1)) ;
+        CHECK(doc.GetTextSize() == 1) ;
+        CHECK(doc.GetControlChar(0) == STYLE_EOF) ;
+        CHECK_FALSE(doc.CanUndo()) ;
+    }
+
+    SUBCASE("deleting at the EOF position is refused")
+    {
+        cDocument doc ;
+        doc.Insert("ab\r") ;
+        CHECK_FALSE(doc.Delete(doc.GetTextSize() - 1, 1)) ;
+        CHECK(EofTestDocumentText(doc) == "ab\r\x7f") ;
+    }
+}
+
+
+TEST_CASE("Undo and Redo with an open undo group")
+{
+    SUBCASE("undo removes the open group's work, not the previous step")
+    {
+        cDocument doc ;
+        doc.Insert("abc\r") ;
+        doc.ClearUndoHistory() ;
+        std::string original = EofTestDocumentText(doc) ;
+
+        doc.SetPosition(3) ;
+        doc.Insert("X") ;                          // committed step
+        std::string withX = EofTestDocumentText(doc) ;
+
+        doc.BeginUndoGroup() ;                     // e.g. an editor typing group
+        doc.SetPosition(4) ;
+        doc.Insert("Y") ;
+        doc.Insert("Z") ;
+        std::string withXYZ = EofTestDocumentText(doc) ;
+
+        CHECK(doc.Undo()) ;
+        CHECK(EofTestDocumentText(doc) == withX) ;
+
+        // closing the (already committed) group pushes nothing stale
+        doc.EndUndoGroup() ;
+        CHECK(doc.Redo()) ;
+        CHECK(EofTestDocumentText(doc) == withXYZ) ;
+
+        CHECK(doc.Undo()) ;
+        CHECK(EofTestDocumentText(doc) == withX) ;
+        CHECK(doc.Undo()) ;
+        CHECK(EofTestDocumentText(doc) == original) ;
+        CHECK_FALSE(doc.Undo()) ;
+    }
+
+    SUBCASE("nested open groups are committed as one step")
+    {
+        cDocument doc ;
+        doc.Insert("abc\r") ;
+        doc.ClearUndoHistory() ;
+        std::string original = EofTestDocumentText(doc) ;
+
+        doc.BeginUndoGroup() ;
+        doc.BeginUndoGroup() ;
+        doc.SetPosition(0) ;
+        doc.Insert("12") ;
+        doc.EndUndoGroup() ;                       // inner closed, outer still open
+        doc.Insert("3") ;
+
+        CHECK(doc.Undo()) ;
+        CHECK(EofTestDocumentText(doc) == original) ;
+        doc.EndUndoGroup() ;                       // outer: nothing left to push
+        CHECK_FALSE(doc.Undo()) ;
+        CHECK(doc.Redo()) ;
+        CHECK(EofTestDocumentText(doc) == "123abc\r\x7f") ;
+    }
+
+    SUBCASE("redo with an open group commits it and has nothing to redo")
+    {
+        cDocument doc ;
+        doc.Insert("abc\r") ;
+        doc.ClearUndoHistory() ;
+        doc.SetPosition(0) ;
+        doc.Insert("X") ;
+        doc.Undo() ;                                // redo stack: X
+
+        doc.BeginUndoGroup() ;
+        doc.SetPosition(0) ;
+        doc.Insert("Y") ;                           // new edit clears the redo stack
+        CHECK_FALSE(doc.Redo()) ;
+        CHECK(EofTestDocumentText(doc) == "Yabc\r\x7f") ;
+
+        CHECK(doc.Undo()) ;                         // the committed Y group
+        CHECK(EofTestDocumentText(doc) == "abc\r\x7f") ;
+        doc.EndUndoGroup() ;
+    }
+
+    SUBCASE("an open group with no actions is not pushed")
+    {
+        cDocument doc ;
+        doc.Insert("abc\r") ;
+        doc.ClearUndoHistory() ;
+        doc.SetPosition(0) ;
+        doc.Insert("X") ;
+
+        doc.BeginUndoGroup() ;
+        CHECK(doc.Undo()) ;                         // undoes X
+        CHECK(EofTestDocumentText(doc) == "abc\r\x7f") ;
+        doc.EndUndoGroup() ;
+        CHECK_FALSE(doc.Undo()) ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// The modified state is a save point in the undo history: undo / redo back
+/// to the saved state makes the document unmodified again.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Modified state: save point in the undo history")
+{
+    cDocument doc ;
+
+    SUBCASE("new and cleared documents are unmodified")
+    {
+        CHECK(doc.IsModified() == false) ;
+        doc.Insert("abc") ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Clear() ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("edit, MarkSaved, edit")
+    {
+        doc.Insert("abc") ;
+        doc.MarkSaved() ;
+        CHECK(doc.IsModified() == false) ;
+        doc.Insert("d") ;
+        CHECK(doc.IsModified() == true) ;
+    }
+
+    SUBCASE("undo everything since load returns to unmodified")
+    {
+        doc.Insert("one") ;
+        doc.Insert(" two") ;
+        doc.Delete(0, 1) ;
+        CHECK(doc.IsModified() == true) ;
+        while (doc.Undo())
+        {
+        }
+        CHECK(EofTestDocumentText(doc) == "\x7f") ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("save, type, undo, redo, undo")
+    {
+        doc.Insert("saved") ;
+        doc.MarkSaved() ;
+        doc.Insert("X") ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == false) ;
+        doc.Redo() ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("undo past the save point and redo back to it")
+    {
+        doc.Insert("a") ;
+        doc.Insert("b") ;
+        doc.MarkSaved() ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Redo() ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Redo() ;
+        CHECK(doc.IsModified() == false) ;
+        CHECK(EofTestDocumentText(doc) == "ab\x7f") ;
+    }
+
+    SUBCASE("a new edit after undoing past the save point loses it")
+    {
+        doc.Insert("a") ;
+        doc.Insert("b") ;
+        doc.MarkSaved() ;
+        doc.Undo() ;                            // save point "b" is on the redo stack
+        doc.Insert("c") ;                       // clears the redo stack
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(EofTestDocumentText(doc) == "a\x7f") ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == true) ;
+        CHECK(doc.CanRedo() == true) ;
+        doc.MarkSaved() ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("clearing a redo stack without the save point keeps it")
+    {
+        doc.MarkSaved() ;
+        doc.Insert("a") ;
+        doc.Insert("b") ;
+        doc.Undo() ;                            // "b" on the redo stack, save point is the empty stack
+        doc.Insert("c") ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        doc.Undo() ;
+        CHECK(EofTestDocumentText(doc) == "\x7f") ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("save point group trimmed off the stack moves to the bottom")
+    {
+        doc.Insert("A") ;
+        doc.MarkSaved() ;
+        for (int loop = 0 ; loop < MAX_UNDO_STEPS ; loop++)
+        {
+            doc.Insert("x") ;
+        }
+        CHECK(doc.IsModified() == true) ;
+        int undone = 0 ;
+        while (doc.Undo())
+        {
+            undone++ ;
+        }
+        CHECK(undone == MAX_UNDO_STEPS) ;
+        CHECK(EofTestDocumentText(doc) == "A\x7f") ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("an empty-stack save point trimmed away is unreachable")
+    {
+        doc.MarkSaved() ;
+        for (int loop = 0 ; loop < MAX_UNDO_STEPS + 1 ; loop++)
+        {
+            doc.Insert("x") ;
+        }
+        while (doc.Undo())
+        {
+        }
+        CHECK(EofTestDocumentText(doc) == "x\x7f") ;
+        CHECK(doc.IsModified() == true) ;
+        doc.MarkSaved() ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("more than MAX_UNDO_STEPS edits after save stay modified")
+    {
+        doc.Insert("base") ;
+        doc.MarkSaved() ;
+        for (int loop = 0 ; loop < MAX_UNDO_STEPS + 5 ; loop++)
+        {
+            doc.Insert("y") ;
+        }
+        while (doc.Undo())
+        {
+        }
+        CHECK(doc.IsModified() == true) ;
+    }
+
+    SUBCASE("an open undo group with edits is modified")
+    {
+        doc.BeginUndoGroup() ;
+        CHECK(doc.IsModified() == false) ;
+        doc.Insert("a") ;
+        CHECK(doc.IsModified() == true) ;
+        doc.EndUndoGroup() ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("MarkSaved commits an open group; later edits are a new step")
+    {
+        doc.BeginUndoGroup() ;
+        doc.Insert("a") ;
+        doc.MarkSaved() ;
+        CHECK(doc.IsModified() == false) ;
+        doc.Insert("b") ;
+        CHECK(doc.IsModified() == true) ;
+        doc.EndUndoGroup() ;                    // the owner's late End is harmless
+        doc.Undo() ;
+        CHECK(EofTestDocumentText(doc) == "a\x7f") ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("loading is an unrecorded change until MarkSaved")
+    {
+        doc.SetLoading(true) ;
+        doc.Insert("loaded text") ;
+        doc.SetLoading(false) ;
+        CHECK(doc.CanUndo() == false) ;
+        CHECK(doc.IsModified() == true) ;
+        doc.ClearUndoHistory() ;
+        CHECK(doc.IsModified() == true) ;
+        doc.MarkSaved() ;
+        CHECK(doc.IsModified() == false) ;
+    }
+
+    SUBCASE("ClearUndoHistory keeps the modified state")
+    {
+        doc.Insert("a") ;
+        doc.MarkSaved() ;
+        doc.ClearUndoHistory() ;
+        CHECK(doc.IsModified() == false) ;
+        doc.Insert("b") ;
+        doc.ClearUndoHistory() ;
+        CHECK(doc.IsModified() == true) ;
+        CHECK(doc.Undo() == false) ;
+        CHECK(doc.IsModified() == true) ;
+    }
+
+    SUBCASE("attribute inserts undo back to unmodified")
+    {
+        doc.Insert("Hello World\r") ;
+        doc.MarkSaved() ;
+
+        doc.SetPosition(5) ;
+        sWSTab tab ;
+        tab.type = TAB_TAB ;
+        tab.tabsize = 0 ;
+        tab.abstabsize = 0 ;
+        tab.size = 0 ;
+        doc.InsertTab(tab) ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == false) ;
+
+        sSeqRGBColor color ;
+        color.red = 1 ;
+        color.green = 2 ;
+        color.blue = 3 ;
+        color.alpha = 255 ;
+        doc.InsertColor(color) ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == false) ;
+
+    }
+
+    SUBCASE("hard return insert and delete undo back to unmodified")
+    {
+        doc.Insert("line one") ;
+        doc.MarkSaved() ;
+        doc.SetPosition(4) ;
+        doc.Insert("\r") ;
+        CHECK(doc.GetNumberofParagraphs() == 2) ;
+        CHECK(doc.IsModified() == true) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == false) ;
+        doc.Delete(0, 4) ;
+        doc.Undo() ;
+        CHECK(doc.IsModified() == false) ;
+    }
 }

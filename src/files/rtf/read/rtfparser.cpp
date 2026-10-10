@@ -251,6 +251,19 @@ void cRTFParser::Parse(void)
             continue ;
         }
 
+        // ignore input outside the document group
+        if(mGroup == nullptr)
+        {
+            if(mRoot != nullptr)
+            {
+                break ;
+            }
+            if(mChar != '{')
+            {
+                continue ;
+            }
+        }
+
         switch(mChar)
         {
             case '{' :
@@ -1484,7 +1497,7 @@ void cRTFParser::FormatControlSymbol(cRTFControlSymbol *symbol)
                 else
                 {
                     // Unmapped byte: insert as Latin-1 fallback
-                    mDocument->Insert(symbol->mParameter) ;
+                    mDocument->Insert(static_cast<CHAR_T>(symbol->mParameter)) ;
                 }
             }
             mFirstColumn = false ;

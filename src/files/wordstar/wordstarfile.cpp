@@ -71,6 +71,7 @@
  */
 
 #include <bitset>
+#include <climits>
 #include <cstring>
 #include <cstdint>
 #include <numeric>
@@ -88,7 +89,7 @@
 /// @ingroup File
 /// @{
 
-extern sSeqRGBColor gBaseWSColors[] ;
+extern sSeqRGBColor gBaseWSColors[WS_PALETTE_SIZE] ;
 
 std::vector<std::string>gSysFontName ;  ///< closest matching system font name
 
@@ -751,7 +752,7 @@ bool cWordstarFile::LoadFile(std::string filename)
             
             unsigned char ver = static_cast<unsigned char>(inchar) ;
             char low = ver & 0x0F ;
-            char high = (ver & 0xF0) >> 4 ;
+            char high = static_cast<char>((ver & 0xF0) >> 4) ;
 
             std::string text = string_sprintf("Loading File as Wordstar %d.%d...", high, low) ;
 
@@ -765,7 +766,8 @@ bool cWordstarFile::LoadFile(std::string filename)
         }
 
         // WordStar is a 7 bit format, so that's what we read in here.
-        for(int64_t readloop = 0; readloop < filesize; readloop++)
+        // Sequences read their own bytes, so the end of the file ends the loop, not readloop.
+        for(int64_t readloop = 0; ; readloop++)
         {
             int percent =  static_cast<int>(static_cast<double>(readloop) / static_cast<double>(filesize) * 100.0) ;
             if(readloop % modulo == 0)
@@ -776,8 +778,12 @@ bool cWordstarFile::LoadFile(std::string filename)
             readresult = fread(&inchar, 1, 1, mFile) ;
             if(readresult == 0)
             {
-                fclose(mFile) ;
-                return false ;
+                if(ferror(mFile) != 0)
+                {
+                    fclose(mFile) ;
+                    return false ;
+                }
+                break ;
             }
 
             if((inchar == static_cast<unsigned char>(STYLE_EOF)) && (mExtendedChar == false))
@@ -1011,7 +1017,7 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
                                     // Find nearest palette color by Euclidean distance
                                     int bestIndex = 0 ;
                                     int bestDistance = INT_MAX ;
-                                    for (int i = 0; i < 16; ++i)
+                                    for (int i = 0; i < WS_PALETTE_SIZE; ++i)
                                     {
                                         int dr = rgbColor.red - gBaseWSColors[i].red ;
                                         int dg = rgbColor.green - gBaseWSColors[i].green ;
@@ -1262,8 +1268,12 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
         fwrite(&header, sizeof(sWSHeader), 1, mFile) ;
         fwrite(&close, sizeof(sSeqClose), 1, mFile) ;
 
-        retval = true ;
-        fclose(mFile) ;
+        // success only when every write and the final flush succeeded
+        retval = (ferror(mFile) == 0) ;
+        if(fclose(mFile) != 0)
+        {
+            retval = false ;
+        }
     }
     return retval ;
 }
@@ -1469,7 +1479,7 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
                 mInVariable = false;
                 mVariableChar = 0;
                 mDocument->Insert(static_cast<char>('&'));
-                mDocument->Insert(static_cast<char>(savedVarChar));
+                mDocument->Insert(static_cast<CHAR_T>(static_cast<unsigned char>(savedVarChar)));
                 // Fall through to process current character normally
             }
         }
@@ -1555,7 +1565,7 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
                 break ;
 
             case STYLE_SEQUENCE :
-                HandleSequence(loop) ;
+                HandleSequence() ;
                 insert = false  ;
                 break ;
 
@@ -1605,10 +1615,10 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
                 break ;
         }
 
-        char print ;
+        CHAR_T print ;
         if(c > 128)                 // strip the high bit if it is set, on an ASCII character only
         {
-            print = c - 128 ;
+            print = static_cast<CHAR_T>(c - 128) ;
         }
         else
         {
@@ -1640,7 +1650,7 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
  * the sequence size (2 bytes), then the sequence type, and dispatches to the appropriate
  * parsing method based on the sequence type.
  * 
- * @param loop Reference to the current loop counter, updated when skipping unknown sequences
+ * A sequence whose body runs past the end of the file is dropped.
  * 
  * @details The method handles the following sequence types:
  * - SEQ_HEADER: Document header information
@@ -1656,14 +1666,13 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
  * are skipped entirely.
  * 
  * @note The method always skips 3 trailing bytes at the end of each sequence
- * @note For unknown sequences, the loop counter is incremented by (size - 1)
  * 
  * @see cWordstarFile::ParseHeader() for header parsing
  * @see cWordstarFile::ParseColor() for color parsing
  * @see cWordstarFile::ParseFont() for font parsing
  * @see cWordstarFile::ParseNewFont() for new font parsing  
  */
-void cWordstarFile::HandleSequence(size_t &loop)
+void cWordstarFile::HandleSequence(void)
 {
     // Caller (HandleChar) has already consumed the STYLE_SEQUENCE start byte;
     // fread the remaining intro bytes (size + type) directly into the packed
@@ -1683,7 +1692,7 @@ void cWordstarFile::HandleSequence(size_t &loop)
     }
 
     eSequence type = static_cast<eSequence>(intro.type) ;
-    long size = intro.size ;
+    size_t bodySize = static_cast<size_t>(intro.size - 4) ;
 
     switch(type)
     {
@@ -1711,13 +1720,10 @@ void cWordstarFile::HandleSequence(size_t &loop)
         case eSequence::SEQ_FOOTNOTE :
         case eSequence::SEQ_ENDNOTE :
             {
-                char inchar ;
                 std::string str ;
-
-                for(long loop = 0; loop < size - 4; loop++)
+                if(ReadBytes(bodySize, str) == false)
                 {
-                    inchar = fgetc(mFile) ;
-                    str.push_back(inchar) ;
+                    return ;
                 }
 
                 ParseNote(str, type) ;
@@ -1727,13 +1733,10 @@ void cWordstarFile::HandleSequence(size_t &loop)
         case eSequence::SEQ_ANNOTATION :
         case eSequence::SEQ_COMMENT :
             {
-                char inchar ;
                 std::string str ;
-
-                for(long loop = 0; loop < size - 4; loop++)
+                if(ReadBytes(bodySize, str) == false)
                 {
-                    inchar = fgetc(mFile) ;
-                    str.push_back(inchar) ;
+                    return ;
                 }
 
                 ParseComment(str, type) ;
@@ -1750,12 +1753,14 @@ void cWordstarFile::HandleSequence(size_t &loop)
         case eSequence::SEQ_PARAGRAPHSTYLE :
         case eSequence::SEQ_ALTFONT :
         default :
-            // we skip what we don't know (size - 1 == last byte of sequence)
-            for(long skip = 0; skip < size - 4; skip++)
             {
-                fgetc(mFile) ;
+                // we skip what we don't know
+                std::string skipped ;
+                if(ReadBytes(bodySize, skipped) == false)
+                {
+                    return ;
+                }
             }
-            loop += size - 1 ;
             break ;
     }
 
@@ -1763,6 +1768,23 @@ void cWordstarFile::HandleSequence(size_t &loop)
     fgetc(mFile) ;
     fgetc(mFile) ;
     fgetc(mFile) ;
+}
+
+
+/**
+ * @brief Reads a number of bytes from the file.
+ *
+ * @param count Number of bytes to read
+ * @param bytes [out] The bytes read (fewer than count at the end of the file)
+ *
+ * @return true if all count bytes were read, false at the end of the file or on a read error
+ */
+bool cWordstarFile::ReadBytes(size_t count, std::string &bytes)
+{
+    bytes.resize(count) ;
+    size_t got = fread(bytes.data(), 1, count, mFile) ;
+    bytes.resize(got) ;
+    return got == count ;
 }
 
 
@@ -1957,8 +1979,8 @@ void cWordstarFile::ParseFont(void)
 
     char genericstyle = static_cast<char>((style.test(11) << 1) + style.test(10)) ;
 
-    size_t fontindex = (style.test(8) << 8) + (style.test(7) << 7) + (style.test(6) << 6) + (style.test(5) << 5) +
-                      (style.test(4) << 4) + (style.test(3) << 3) + (style.test(2) << 2) + (style.test(1) << 1) + style.test(0) ;
+    size_t fontindex = static_cast<size_t>((style.test(8) << 8) + (style.test(7) << 7) + (style.test(6) << 6) + (style.test(5) << 5) +
+                      (style.test(4) << 4) + (style.test(3) << 3) + (style.test(2) << 2) + (style.test(1) << 1) + style.test(0)) ;
 
     // build new font
     std::string fontname2 ;
@@ -2153,6 +2175,9 @@ void cWordstarFile::ParseTab(void)
  * - Creates a note object with the parsed symbol format and text
  * - Inserts the note into the document as either a footnote or endnote
  * 
+ * @note A note shorter than its 4-byte header, an embedded footnote shorter than its
+ *       13 bytes of sub-sequence data, or a sub-sequence with no closing STYLE_SEQUENCE
+ *       is dropped (nothing is inserted).
  * @note The conversion field in sub-sequence data is currently not implemented (see @todo)
  * @todo Use subdata.note.conversion if set to change note type and insert properly
  * 
@@ -2183,6 +2208,12 @@ void cWordstarFile::ParseNote(std::string sequence, eSequence type)
     subdata.note.format = 3 ;
 
 
+    // a note shorter than its header is dropped
+    if(sequence.size() < 4)
+    {
+        return ;
+    }
+
     size_t loop ;
     for(loop = 0; loop < 4; loop++)
     {
@@ -2192,15 +2223,22 @@ void cWordstarFile::ParseNote(std::string sequence, eSequence type)
     // see if we have an embedded footnote
     if(data.note.tag == 1)
     {
+        // an embedded footnote without its sub sequence data is dropped
+        if(sequence.size() < 13)
+        {
+            return ;
+        }
+
         for(loop = 9; loop < 13; loop++)
         {
             subdata.byte[loop - 9] = sequence[loop] ;
         }
 
-        // get to end of sub sequence
-        while(sequence[loop] != STYLE_SEQUENCE)
+        // get to end of sub sequence; one that never ends is dropped
+        loop = sequence.find(static_cast<char>(STYLE_SEQUENCE), loop) ;
+        if(loop == std::string::npos)
         {
-            loop++ ;
+            return ;
         }
     }
 

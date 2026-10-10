@@ -55,11 +55,15 @@ public:
     // MEMBER VARIABLES
     // =================================================================
 private:
-    enum eMode { MODE_EMPTY, MODE_IDENTITY, MODE_DELTA } ;
+    enum eMode { MODE_EMPTY, MODE_IDENTITY, MODE_DELTA, MODE_FULL } ;
+
+    static constexpr size_t OFFSET_CHECKPOINT_INTERVAL = 64 ;   ///< graphemes between stored offsets (MODE_DELTA)
 
     eMode mMode ;
     size_t mCount ;                     ///< number of graphemes
     std::vector<uint8_t> mDeltas ;      ///< byte-length of each grapheme (MODE_DELTA only)
+    std::vector<POSITION_T> mCheckpoints ;  ///< [k-1] = byte offset of grapheme k * OFFSET_CHECKPOINT_INTERVAL (MODE_DELTA only)
+    std::vector<POSITION_T> mFull ;     ///< byte offset of each grapheme plus the buffer length (MODE_FULL only)
 } ;
 
 

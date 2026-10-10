@@ -2290,27 +2290,6 @@ TEST_CASE("GetNumberOfPages returns 0 for empty layout")
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief
-/// Test GetNumberOfPages returns highest page number
-///
-/////////////////////////////////////////////////////////////////////////////
-TEST_CASE("GetNumberOfPages returns highest page number")
-{
-    cLayoutBaseTest layout;
-
-    layout.CreatePageBox(1);
-    CHECK(layout.GetNumberOfPages() == 1);
-
-    layout.CreatePageBox(2);
-    CHECK(layout.GetNumberOfPages() == 2);
-
-    layout.CreatePageBox(5);
-    CHECK(layout.GetNumberOfPages() == 5);
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @brief
 /// Test GetPageFromLine returns NOT_SET for non-existent line
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -8020,4 +7999,24 @@ TEST_CASE("ParseDotCommand increment/decrement with units")
 
         CHECK(layout.GetLeftMargin() == doctest::Approx(0.0)) ;
     }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Test GetNumberOfPages does not count page boxes after the last line
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("GetNumberOfPages does not count page boxes without lines")
+{
+    cLayoutBaseTest layout;
+
+    layout.CreatePageBox(1);
+    CHECK(layout.GetNumberOfPages() == 1);
+
+    // Boxes created ahead of content that never came are not pages
+    layout.CreatePageBox(2);
+    layout.CreatePageBox(5);
+    CHECK(layout.GetNumberOfPages() == 1);
 }

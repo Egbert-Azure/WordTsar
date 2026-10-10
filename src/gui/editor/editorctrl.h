@@ -258,6 +258,9 @@ private:
     // Common initialization shared by both constructors
     void Init(void) ;
 
+    // --- Backup ---
+    bool WriteBackup(void);             // Write the -bak backup; status message on failure
+
     // --- Caret sync helper ---
     // Helper method to sync base class coordinates to Qt rectangle
     void SyncCaretToQt(void);

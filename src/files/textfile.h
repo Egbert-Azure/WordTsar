@@ -68,12 +68,14 @@ public:
 
     std::string GetExtensions(void);
 
+    static bool IsValidUTF8(const unsigned char* data, size_t length);
+    static bool IsAcceptableFileSize(long long fileSize);
+
 protected:
 
 private:
     eTextEncoding DetectBOM(const std::vector<unsigned char>& buffer, size_t& bomSize);
     eTextEncoding DetectEncodingHeuristic(const std::vector<unsigned char>& buffer, size_t length);
-    bool IsValidUTF8(const unsigned char* data, size_t length);
     bool IsBinaryFile(const std::vector<unsigned char>& buffer, size_t length);
     eTextEncoding GuessCodePage(const std::vector<unsigned char>& buffer, size_t length);
     std::string ConvertUTF16ToUTF8(const std::vector<unsigned char>& buffer, size_t length, bool littleEndian);

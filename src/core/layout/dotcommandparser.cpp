@@ -2007,6 +2007,11 @@ eDotCommandStatus cDotCommandParser::ParseParagraphSpacing(const std::string& co
 ///
 /// Position is calculated as: character_index * RULER_CHAR_WIDTH
 ///
+/// The ruler is at least 0.5 inch wide, and the right margin is clamped to
+/// the paper (paper width minus the larger odd / even page offset). A ruler
+/// that is narrower than the minimum after clamping is an error and leaves
+/// the margins and tabs unchanged.
+///
 /// @note
 /// Ruler character width uses Courier New 12pt monospace width (144 twips
 /// = 1/10 inch = 10 pitch). Each character position in the ruler maps to
@@ -2152,14 +2157,22 @@ eDotCommandStatus cDotCommandParser::ParseRuler(const std::string& command)
         mLayoutState->SetRightMargin(mLayoutState->GetLeftMargin() + MIN_RULER_WIDTH);
     }
 
+    // Keep the right margin on the paper (for the larger of the odd / even page offsets)
+    COORD_T pageOffset = std::max(mLayoutState->GetPageOffsetOdd(), mLayoutState->GetPageOffsetEven());
+    COORD_T maxRight = mLayoutState->GetPaperWidth() - pageOffset;
+    if (mLayoutState->GetPaperWidth() > 0 && mLayoutState->GetRightMargin() > maxRight)
+    {
+        mLayoutState->SetRightMargin(maxRight);
+    }
+
     // Right margin is always the last tab stop in the vector.
     // This guarantees the tab vector is never empty (the ruler widget
     // calls pop_back to remove it, so it must always be present).
     tabs.push_back(sTabStop(mLayoutState->GetRightMargin(), TAB_TAB));
     mLayoutState->SetTabs(tabs);
 
-    // Safety net: validate margins (should always pass after minimum enforcement)
-    if (mLayoutState->GetRightMargin() <= mLayoutState->GetLeftMargin())
+    // A ruler narrower than the minimum after clamping (L too close to the paper edge) is invalid
+    if (mLayoutState->GetRightMargin() - mLayoutState->GetLeftMargin() < MIN_RULER_WIDTH)
     {
         // Restore original state on failure
         mLayoutState->SetTabs(savedTabs);

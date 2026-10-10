@@ -301,6 +301,28 @@ void cEditorBase::OnDocumentCleared(void)
 /// @return nothing
 ///
 /// @brief
+/// Mark the document saved (after a save or load): closes the typing group
+/// so typing after the save starts a new undo step, then
+/// cDocument::MarkSaved().
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::MarkDocumentSaved(void)
+{
+    if (!mDocument)
+    {
+        return ;
+    }
+
+    CloseTypingGroup() ;
+    mDocument->MarkSaved() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
 /// Abandon the current file (^KQ). Prompts to save if the document has
 /// unsaved changes. Clears the document and resets the filename to
 /// "Unknown.ws". Subclasses can override to change behavior (e.g. TUI
@@ -309,7 +331,7 @@ void cEditorBase::OnDocumentCleared(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::AbandonFile(void)
 {
-    if (mDocument && mDocument->mChanged)
+    if (mDocument && mDocument->IsModified())
     {
         if (!AskYesNo("Quit", "Quit without Saving?"))
         {
@@ -321,7 +343,7 @@ void cEditorBase::AbandonFile(void)
     {
         mDocument->Clear();
         LayoutDocument(true);
-        mDocument->mChanged = false;
+        MarkDocumentSaved();
     }
 
     mFileDir = DefaultFileDir();
@@ -2121,28 +2143,16 @@ void cEditorBase::Delete(POSITION_T pos, POSITION_T length)
         return;
     }
 
-    // Guard: position is valid
-    POSITION_T textSize = mDocument->GetTextSize();
-
-    // Don't delete if position is at or past text size
-    if (pos >= textSize || textSize == 0)
+    // Guard: position is valid. The last grapheme is the permanent EOF
+    // marker, which is never deleted.
+    POSITION_T eofPosition = mDocument->GetTextSize() - 1;
+    if (pos >= eofPosition)
     {
         return;  // Nothing to delete
     }
 
-    // Clamp length to available text
-    POSITION_T maxDelete = textSize - pos;
-    if (maxDelete <= 0)
-    {
-        return;  // Nothing to delete
-    }
-
-    if (length > maxDelete)
-    {
-        length = maxDelete;
-    }
-
-    // Safety: ensure length is positive
+    // Clamp length so the range ends before the EOF marker
+    length = std::min(length, eofPosition - pos);
     if (length <= 0)
     {
         return;
@@ -5545,11 +5555,14 @@ bool cEditorBase::LookupCaretParagraph(sCaretCalcState& state)
         }
         if (oldLayout && (oldLayout->isCommand || oldLayout->isComment))
         {
+            size_t oldLineCount = oldLayout->lines.size() ;
             mLayout->LayoutParagraph(oldPara) ;
-            // Reset background layout position to re-process screeny cascade
-            if (oldPara < mLayoutParagraph)
+
+            // Line count changed (dot command hidden): shift the following lines
+            const sParagraphLayout* newLayout = mLayout->GetParagraphLayout(oldPara) ;
+            if (newLayout && newLayout->lines.size() != oldLineCount)
             {
-                mLayoutParagraph = oldPara ;
+                RelayoutFromParagraph(oldPara + 1, state.para) ;
             }
         }
     }
@@ -5561,6 +5574,67 @@ bool cEditorBase::LookupCaretParagraph(sCaretCalcState& state)
     mCaretParagraph = state.para ;
 
     return false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  fromPara [in] first paragraph to lay out
+/// @param  caretPara [in] paragraph containing the caret
+///
+/// @return nothing
+///
+/// @brief
+/// Re-layouts from fromPara onward so line numbers and screen Y follow a
+/// change at or before fromPara. Lays out synchronously through the caret's
+/// paragraph and one viewport height below it, so caret position and
+/// scrolling use current line data. The rest of the document is left to
+/// idle layout, which is forced to run to the end (mLayoutRest).
+///
+/// @see LookupCaretParagraph() calls this when a dot command is hidden
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::RelayoutFromParagraph(PARAGRAPH_T fromPara, PARAGRAPH_T caretPara)
+{
+    PARAGRAPH_T totalParas = mDocument->GetNumberofParagraphs() ;
+    COORD_T viewportHeight = GetViewportHeight() ;
+    COORD_T stopY = 0 ;
+    bool haveStopY = false ;
+
+    PARAGRAPH_T nextPara = std::max(fromPara, PARAGRAPH_T(0)) ;
+    while (nextPara < totalParas)
+    {
+        PARAGRAPH_T para = nextPara ;
+        mLayout->LayoutParagraph(para) ;
+        nextPara++ ;
+
+        // Stop one viewport height below the last line of the first visible
+        // paragraph at or after the caret
+        const sParagraphLayout* paraLayout = mLayout->GetParagraphLayout(para) ;
+        if (para >= caretPara && paraLayout && !paraLayout->lines.empty())
+        {
+            if (!haveStopY)
+            {
+                stopY = paraLayout->lines.back().screeny + viewportHeight ;
+                haveStopY = true ;
+            }
+            else if (paraLayout->lines.front().screeny > stopY)
+            {
+                break ;
+            }
+        }
+    }
+
+    // Idle layout continues after the synchronous range
+    if (mLayoutParagraph >= fromPara)
+    {
+        mLayoutParagraph = nextPara ;
+    }
+    if (nextPara < totalParas)
+    {
+        mLayoutRest = true ;
+        TriggerIdleLayout() ;
+    }
 }
 
 
