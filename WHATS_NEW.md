@@ -2,6 +2,35 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.14.0 Beta (2026-10-10)
+
+### Merged from upstream WordTsar 0.5.1850
+
+This release brings in the bug fixes and the editor-core work from Gerald Brandt's WordTsar 0.5.1850 (the upstream this fork started from), adapted to the macOS builds and tested against the existing suites.
+
+**Fixes**
+
+- Fixed: a paragraph containing a very long unbroken run of text (a grapheme over 255 bytes) could be measured and edited wrongly; long multi-byte paragraphs are also faster to navigate.
+- Fixed: a malformed or truncated WordStar file could crash the loader or load garbage; truncated files now end cleanly, damaged notes are dropped, and a failed save is reported instead of silently ignored.
+- Fixed: an RTF file with content outside its document group could crash the importer.
+- Fixed: a WordStar color index outside the palette, and white itself, came out as the wrong color.
+- Fixed: a plain-text file with invalid UTF-8, or an oversized one, was not rejected safely.
+- Fixed: `.rr` could set a right margin past the paper edge; the margin is now clamped, and a ruler too narrow to use is reported as an error.
+- Fixed: deleting at the very end of a document could remove the end-of-file marker and corrupt the undo history.
+- Fixed: the document could show as modified after undoing back to the saved state; it now follows the undo history.
+- Fixed: a failure to write the backup copy was silent; it now shows on the status bar.
+- Fixed: the page count could include empty trailing pages, and leaving a dot command line could leave the following paragraphs laid out stale.
+- Fixed: the emergency save now writes next to the document.
+
+**Editor core**
+
+- **Block and place markers are positions, not text.** `<B>`, `<K>` and `<0>`..`<9>` are no longer characters in the document: they never appear in undo, never mark the document modified, never print and are not written to files. They are shown inline before the marked character. `^KH` hides a block together with its markers, and a document's block and bookmarks are restored exactly on reopening (previously they could drift, and a bookmark at the very start was lost).
+- **Reveal codes never change the layout.** Showing formatting codes no longer re-wraps the document, and the Show Formatting pane wraps the same as the page. The code badges sit beside the text; the GUI scrolls sideways to keep the caret in view.
+- **Word count** counts real words (Unicode word boundaries), is kept per paragraph, and no longer lags behind by a background timer. An empty document is 0 words.
+- **Default font** from Preferences is now applied at startup in both the GUI and the terminal UI. The generic Monospace family maps to the system fixed-width font, and Times and Courier no longer fall back to another font on macOS.
+- **Headers and footers** are built per page from their stored definitions, each with its own page's margins, always in the default font, and without disturbing the document's formatting state. A header defined mid-document now keeps the earlier pages unchanged. Automatic page numbers (`.pg`, `.pc`) are unchanged.
+- **Undo and Redo** share one implementation in the GUI and the terminal UI.
+
 ## 0.13.0 Beta (2026-09-07)
 .hy auto-hyphenation implemented which makes it look right instead of leaving rivers of whitespace
 ^OE soft hyphen, ^OH auto-hyphenation toggle
