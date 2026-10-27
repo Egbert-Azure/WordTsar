@@ -2918,9 +2918,7 @@ void cEditorBase::UpperCaseBlock(void)
     POSITION_T end = 0;
     mDocument->GetBlock(start, end);
 
-    // GetBlock()'s end (mEndBlock) is already the exclusive upper bound
-    // (see SortBlock()'s comment above, confirmed against the same test
-    // this function's own test suite uses) -- no +1 here.
+    // GetBlock() returns an exclusive end; GetBlockText() takes it as is.
     std::string str = mDocument->GetBlockText(start, end);
 
     // Convert to uppercase via cDocument (Unicode-aware)
@@ -2980,9 +2978,7 @@ void cEditorBase::LowerCaseBlock(void)
     POSITION_T end = 0;
     mDocument->GetBlock(start, end);
 
-    // GetBlock()'s end (mEndBlock) is already the exclusive upper bound
-    // (see SortBlock()'s comment above, confirmed against the same test
-    // this function's own test suite uses) -- no +1 here.
+    // GetBlock() returns an exclusive end; GetBlockText() takes it as is.
     std::string str = mDocument->GetBlockText(start, end);
 
     // Convert to lowercase via cDocument (Unicode-aware)
@@ -3036,9 +3032,7 @@ void cEditorBase::SentenceCaseBlock(void)
     POSITION_T end = 0;
     mDocument->GetBlock(start, end);
 
-    // GetBlock()'s end (mEndBlock) is already the exclusive upper bound
-    // (see SortBlock()'s comment above, confirmed against the same test
-    // this function's own test suite uses) -- no +1 here.
+    // GetBlock() returns an exclusive end; GetBlockText() takes it as is.
     std::string str = mDocument->GetBlockText(start, end);
 
     str = mDocument->SentenceCase(str) ;
@@ -3196,13 +3190,7 @@ void cEditorBase::SortBlock(bool ascending)
     POSITION_T start = 0, end = 0 ;
     mDocument->GetBlock(start, end) ;
 
-    // GetBlock()'s end (mEndBlock) is the EXCLUSIVE upper bound already --
-    // confirmed directly against test-guieditor.cpp's own UpperCaseBlock
-    // test, which marks an 11-character block via SetPosition(11) (cursor
-    // sitting right after the 11th character) and reads it back with
-    // GetBlockText(0, 11), no +1. (UpperCaseBlock()/LowerCaseBlock()'s own
-    // "+1" and matching comment look like a latent bug of the same shape
-    // this method almost inherited -- not fixed here, flagged separately.)
+    // GetBlock() returns an exclusive end; GetBlockText() takes it as is.
     std::string str = mDocument->GetBlockText(start, end) ;
 
     // Split on the paragraph separator (\r), sort the lines, rejoin with
