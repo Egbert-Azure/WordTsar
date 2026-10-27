@@ -4896,6 +4896,23 @@ TEST_CASE("P1 Auxiliary: UpperCaseBlock - Convert block to uppercase")
         CHECK(doc->GetTextSize() == sizeBefore);
         CHECK(doc->GetNumberofParagraphs() == paragraphsBefore);
     }
+
+    SUBCASE("Block ending at the last caret position converts the last character")
+    {
+        // No trailing \r: the block end is the last caret position,
+        // GetTextSize()-1, just before the end-of-file marker.
+        doc->Insert("hello world");
+        REQUIRE(doc->GetTextSize() - 1 == 11);
+        doc->SetPosition(0);
+        doc->SetBeginBlock();
+        doc->SetPosition(doc->GetTextSize() - 1);
+        doc->SetEndBlock();
+
+        editor.UpperCaseBlock();
+
+        CHECK(doc->GetBlockText(0, 11) == "HELLO WORLD");
+        CHECK(doc->mEndBlock == 11);
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -4986,6 +5003,23 @@ TEST_CASE("P1 Auxiliary: LowerCaseBlock - Convert block to lowercase")
 
         CHECK(doc->GetTextSize() == sizeBefore);
         CHECK(doc->GetNumberofParagraphs() == paragraphsBefore);
+    }
+
+    SUBCASE("Block ending at the last caret position converts the last character")
+    {
+        // No trailing \r: the block end is the last caret position,
+        // GetTextSize()-1, just before the end-of-file marker.
+        doc->Insert("HELLO WORLD");
+        REQUIRE(doc->GetTextSize() - 1 == 11);
+        doc->SetPosition(0);
+        doc->SetBeginBlock();
+        doc->SetPosition(doc->GetTextSize() - 1);
+        doc->SetEndBlock();
+
+        editor.LowerCaseBlock();
+
+        CHECK(doc->GetBlockText(0, 11) == "hello world");
+        CHECK(doc->mEndBlock == 11);
     }
 }
 
@@ -5087,6 +5121,23 @@ TEST_CASE("P1 Auxiliary: SentenceCaseBlock - real WordStar 7 Sentence Case")
 
         CHECK(doc->GetTextSize() == sizeBefore);
         CHECK(doc->GetNumberofParagraphs() == paragraphsBefore);
+    }
+
+    SUBCASE("Block ending at the last caret position converts the last character")
+    {
+        // No trailing \r: the block end is the last caret position,
+        // GetTextSize()-1, just before the end-of-file marker.
+        doc->Insert("hello worlD");
+        REQUIRE(doc->GetTextSize() - 1 == 11);
+        doc->SetPosition(0);
+        doc->SetBeginBlock();
+        doc->SetPosition(doc->GetTextSize() - 1);
+        doc->SetEndBlock();
+
+        editor.SentenceCaseBlock();
+
+        CHECK(doc->GetBlockText(0, 11) == "hello world");
+        CHECK(doc->mEndBlock == 11);
     }
 }
 
