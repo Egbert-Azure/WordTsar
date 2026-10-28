@@ -8262,6 +8262,55 @@ SUBCASE("Center tab on second line at caret position")
     }
 }
 
+TEST_CASE("P3.2: Inserted tabs have zeroed size fields")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    doc->Insert("Hello World\r");
+    layout->LayoutDocument(doc);
+
+    SUBCASE("InsertCenterTab")
+    {
+        doc->SetPosition(5);
+        editor.InsertCenterTab();
+
+        sWSTab tab = doc->GetTab(5);
+        CHECK(tab.type == TAB_CENTER);
+        CHECK(tab.tabsize == 0);
+        CHECK(tab.abstabsize == 0);
+        CHECK(tab.size == 0);
+    }
+
+    SUBCASE("InsertRightTab")
+    {
+        doc->SetPosition(5);
+        editor.InsertRightTab();
+
+        sWSTab tab = doc->GetTab(5);
+        CHECK(tab.type == TAB_RIGHT);
+        CHECK(tab.tabsize == 0);
+        CHECK(tab.abstabsize == 0);
+        CHECK(tab.size == 0);
+    }
+
+    SUBCASE("WordStar Ctrl+I")
+    {
+        doc->SetPosition(5);
+        bool handled = editor.mInput->HandleKey(CTRL_I, false);
+        CHECK(handled == true);
+
+        sWSTab tab = doc->GetTab(5);
+        CHECK(tab.type == TAB_TAB);
+        CHECK(tab.tabsize == 0);
+        CHECK(tab.abstabsize == 0);
+        CHECK(tab.size == 0);
+    }
+}
+
 
 /////////////////////////////////////////////////////////////////////////////
 // P3.5: SETTINGS

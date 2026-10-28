@@ -243,10 +243,10 @@ struct sWSComment
 /////////////////////////////////////////////////////////////////////////////
 struct sWSTab
 {
-    int16_t tabsize ;                           ///< 1/1800 inch
-    int16_t abstabsize ;                        ///< 1/1800 inch
-    unsigned char type ;                        ///< tab type (tab, center just, right just, etc) (use char, not enum, to get size right)
-    char size ;                                 ///< 1/10 inch
+    int16_t tabsize = 0 ;                       ///< 1/1800 inch
+    int16_t abstabsize = 0 ;                    ///< 1/1800 inch
+    unsigned char type = 0 ;                    ///< tab type (tab, center just, right just, etc) (use char, not enum, to get size right)
+    char size = 0 ;                             ///< 1/10 inch
 } ; // __attribute__((packed)) ;
 
 

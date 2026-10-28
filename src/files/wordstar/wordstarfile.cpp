@@ -1545,6 +1545,7 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
                 break ;
 
             case STYLE_TAB :
+            {
                 sWSTab tab ;
                 tab.abstabsize = 0 ;
                 tab.size = 0 ;
@@ -1554,6 +1555,7 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
                 mDocument->InsertTab(tab) ;
                 insert = false ;
                 break ;
+            }
 
             case STYLE_NOBREAK_SPACE :
                 insert = true ;
