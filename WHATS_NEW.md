@@ -2,6 +2,12 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.14.1 Beta (2026-10-27)
+
+**Fixes**
+
+- Fixed: a tab inserted with the Tab key, a center tab or a right tab saved uninitialized bytes into WordStar files. It now saves zeros.
+
 ## 0.14.0 Beta (2026-10-10)
 
 ### Merged from upstream WordTsar 0.5.1850
