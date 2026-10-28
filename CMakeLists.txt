@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
+# Minimum macOS version; matches the minos of the linked Qt frameworks.
+set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
+
 project(WordTsar)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -433,6 +436,56 @@ set(WORDTSAR_ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/gui/images/icon.icns")
 target_sources(WordTsar PRIVATE ${WORDTSAR_ICON_FILE})
 set_source_files_properties(${WORDTSAR_ICON_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
+# Version configuration
+set(WORDTSAR_AUTO_INCREMENT_BUILD OFF CACHE BOOL "Auto-increment build number on Release builds")
+
+# Read version from persistent version.txt file
+set(VERSION_FILE "${CMAKE_SOURCE_DIR}/version.txt")
+if(EXISTS "${VERSION_FILE}")
+    file(STRINGS "${VERSION_FILE}" VERSION_LINES)
+    foreach(LINE ${VERSION_LINES})
+        if(LINE MATCHES "^MAJOR=([0-9]+)")
+            set(FILE_MAJOR ${CMAKE_MATCH_1})
+        elseif(LINE MATCHES "^MINOR=([0-9]+)")
+            set(FILE_MINOR ${CMAKE_MATCH_1})
+        elseif(LINE MATCHES "^BUILD=([0-9]+)")
+            set(FILE_BUILD ${CMAKE_MATCH_1})
+        endif()
+    endforeach()
+else()
+    # Fallback defaults if version.txt doesn't exist
+    set(FILE_MAJOR 0)
+    set(FILE_MINOR 4)
+    set(FILE_BUILD 1)
+endif()
+
+# Always use file values as the source of truth, override any cache
+set(WORDTSAR_VERSION_MAJOR ${FILE_MAJOR})
+set(WORDTSAR_VERSION_MINOR ${FILE_MINOR})
+set(WORDTSAR_VERSION_BUILD ${FILE_BUILD})
+
+# Auto-increment build number for Release builds if enabled
+if(WORDTSAR_AUTO_INCREMENT_BUILD AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    math(EXPR NEW_BUILD_NUM "${WORDTSAR_VERSION_BUILD} + 1")
+    set(WORDTSAR_VERSION_BUILD ${NEW_BUILD_NUM})
+
+    # Update version.txt with new build number
+    file(WRITE "${VERSION_FILE}" "MAJOR=${WORDTSAR_VERSION_MAJOR}\nMINOR=${WORDTSAR_VERSION_MINOR}\nBUILD=${NEW_BUILD_NUM}")
+
+    message(STATUS "Build number incremented from ${FILE_BUILD} to ${NEW_BUILD_NUM}")
+    message(STATUS "Updated ${VERSION_FILE}")
+endif()
+
+message(STATUS "WordTsar Version: ${WORDTSAR_VERSION_MAJOR}.${WORDTSAR_VERSION_MINOR}.${WORDTSAR_VERSION_BUILD}")
+
+# Configure version header
+configure_file(
+    "${CMAKE_SOURCE_DIR}/version.h.in"
+    "${CMAKE_SOURCE_DIR}/src/core/include/version.h"
+    @ONLY
+)
+
+
 # macOS app bundle settings
 set_target_properties(WordTsar PROPERTIES
     MACOSX_BUNDLE TRUE
@@ -482,56 +535,6 @@ add_custom_command(TARGET WordTsar POST_BUILD
             "$<TARGET_BUNDLE_DIR:WordTsar>"
     COMMENT "Code signing WordTsar.app"
     VERBATIM
-)
-
-
-# Version configuration
-set(WORDTSAR_AUTO_INCREMENT_BUILD OFF CACHE BOOL "Auto-increment build number on Release builds")
-
-# Read version from persistent version.txt file
-set(VERSION_FILE "${CMAKE_SOURCE_DIR}/version.txt")
-if(EXISTS "${VERSION_FILE}")
-    file(STRINGS "${VERSION_FILE}" VERSION_LINES)
-    foreach(LINE ${VERSION_LINES})
-        if(LINE MATCHES "^MAJOR=([0-9]+)")
-            set(FILE_MAJOR ${CMAKE_MATCH_1})
-        elseif(LINE MATCHES "^MINOR=([0-9]+)")
-            set(FILE_MINOR ${CMAKE_MATCH_1})
-        elseif(LINE MATCHES "^BUILD=([0-9]+)")
-            set(FILE_BUILD ${CMAKE_MATCH_1})
-        endif()
-    endforeach()
-else()
-    # Fallback defaults if version.txt doesn't exist
-    set(FILE_MAJOR 0)
-    set(FILE_MINOR 4)
-    set(FILE_BUILD 1)
-endif()
-
-# Always use file values as the source of truth, override any cache
-set(WORDTSAR_VERSION_MAJOR ${FILE_MAJOR})
-set(WORDTSAR_VERSION_MINOR ${FILE_MINOR})
-set(WORDTSAR_VERSION_BUILD ${FILE_BUILD})
-
-# Auto-increment build number for Release builds if enabled
-if(WORDTSAR_AUTO_INCREMENT_BUILD AND CMAKE_BUILD_TYPE STREQUAL "Release")
-    math(EXPR NEW_BUILD_NUM "${WORDTSAR_VERSION_BUILD} + 1")
-    set(WORDTSAR_VERSION_BUILD ${NEW_BUILD_NUM})
-
-    # Update version.txt with new build number
-    file(WRITE "${VERSION_FILE}" "MAJOR=${WORDTSAR_VERSION_MAJOR}\nMINOR=${WORDTSAR_VERSION_MINOR}\nBUILD=${NEW_BUILD_NUM}")
-
-    message(STATUS "Build number incremented from ${FILE_BUILD} to ${NEW_BUILD_NUM}")
-    message(STATUS "Updated ${VERSION_FILE}")
-endif()
-
-message(STATUS "WordTsar Version: ${WORDTSAR_VERSION_MAJOR}.${WORDTSAR_VERSION_MINOR}.${WORDTSAR_VERSION_BUILD}")
-
-# Configure version header
-configure_file(
-    "${CMAKE_SOURCE_DIR}/version.h.in"
-    "${CMAKE_SOURCE_DIR}/src/core/include/version.h"
-    @ONLY
 )
 
 
