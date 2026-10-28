@@ -2026,7 +2026,7 @@ sWSTab cDocument::GetTab(POSITION_T position)
 {
     if(position < 0 || position >= GetTextSize())
     {
-        sWSTab tab ;
+        sWSTab tab{} ;
         tab.type = TAB_BAD ;
         return tab ;
     }
@@ -2041,7 +2041,7 @@ sWSTab cDocument::GetTab(POSITION_T position)
 
     if(iter1 == paraiter->tab.end() || iter1->first != position)
     {
-        sWSTab tab ;
+        sWSTab tab{} ;
         tab.type = TAB_BAD ;
         return tab ;
     }

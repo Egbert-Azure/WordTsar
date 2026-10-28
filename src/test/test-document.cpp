@@ -6085,6 +6085,38 @@ TEST_CASE("Font and Formatting" * doctest::may_fail())
     }
 }
 
+TEST_CASE("GetTab - not-found results are zeroed")
+{
+    cDocument document;
+    document.SetShowControl(SHOW_ALL);
+    document.Clear();
+    document.Insert("Plain text");
+
+    SUBCASE("position with no tab")
+    {
+        sWSTab tab = document.GetTab(3);
+        CHECK(tab.type == TAB_BAD);
+        CHECK(tab.size == 0);
+        CHECK(tab.tabsize == 0);
+        CHECK(tab.abstabsize == 0);
+    }
+
+    SUBCASE("position out of range")
+    {
+        sWSTab beyond = document.GetTab(1000);
+        CHECK(beyond.type == TAB_BAD);
+        CHECK(beyond.size == 0);
+        CHECK(beyond.tabsize == 0);
+        CHECK(beyond.abstabsize == 0);
+
+        sWSTab negative = document.GetTab(-1);
+        CHECK(negative.type == TAB_BAD);
+        CHECK(negative.size == 0);
+        CHECK(negative.tabsize == 0);
+        CHECK(negative.abstabsize == 0);
+    }
+}
+
 // =====================================================================
 // COMPREHENSIVE TEST COVERAGE - PHASE 3: UNICODE PROCESSING
 // =====================================================================
