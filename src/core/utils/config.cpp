@@ -1639,6 +1639,28 @@ std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
     sfwriter.scrollbarBackground             = cgaBlack;
     palettes.push_back(sfwriter);
 
+    // ---------------------------------------------------------------
+    // Palette 5: "WordStar 7" -- "WordTsar" editor colors with
+    // white on black title and status bars, black on white menus
+    // ---------------------------------------------------------------
+    sTUIPalette ws7 = wordtsar;
+    ws7.name = "WordStar 7";
+    ws7.titleBarForeground              = cgaWhite;
+    ws7.titleBarBackground              = cgaBlack;
+    ws7.statusBarForeground             = cgaWhite;
+    ws7.statusBarBackground             = cgaBlack;
+    ws7.helpPanelForeground             = cgaBlack;
+    ws7.helpPanelBackground             = cgaWhite;
+    ws7.helpPanelKeystrokeForeground    = cgaLightBlue;
+    ws7.helpPanelKeystrokeBackground    = cgaWhite;
+    ws7.menuBarForeground               = cgaBlack;
+    ws7.menuBarBackground               = cgaWhite;
+    ws7.menuAcceleratorForeground       = cgaLightBlue;
+    ws7.menuAcceleratorBackground       = cgaWhite;
+    ws7.menuHighlightForeground         = cgaWhite;
+    ws7.menuHighlightBackground         = cgaBlack;
+    palettes.push_back(ws7);
+
     return palettes;
 }
 

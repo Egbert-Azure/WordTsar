@@ -135,6 +135,153 @@ TEST_CASE("UT-2d: cConfig GetTUIPalettes returns built-in palettes")
     CHECK(palettes[0].background.r <= 255);
 }
 
+static bool SameRGB(const sRGB& a, sRGB b)
+{
+    return a.r == b.r && a.g == b.g && a.b == b.b;
+}
+
+static void CheckEditorAndStyleColors(const sTUIPalette& p)
+{
+    CHECK(SameRGB(p.foreground,               {170, 170, 170}));
+    CHECK(SameRGB(p.background,               {0, 0, 170}));
+    CHECK(SameRGB(p.highlightForeground,      {0, 0, 0}));
+    CHECK(SameRGB(p.highlightBackground,      {100, 200, 255}));
+    CHECK(SameRGB(p.dotForeground,            {170, 170, 170}));
+    CHECK(SameRGB(p.dotBackground,            {100, 220, 180}));
+    CHECK(SameRGB(p.blockForeground,          {255, 255, 255}));
+    CHECK(SameRGB(p.blockBackground,          {80, 130, 255}));
+    CHECK(SameRGB(p.commentForeground,        {0, 0, 0}));
+    CHECK(SameRGB(p.commentBackground,        {255, 191, 0}));
+    CHECK(SameRGB(p.errorForeground,          {0, 0, 0}));
+    CHECK(SameRGB(p.errorBackground,          {255, 100, 100}));
+    CHECK(SameRGB(p.unknownForeground,        {0, 0, 0}));
+    CHECK(SameRGB(p.unknownBackground,        {255, 255, 0}));
+    CHECK(SameRGB(p.notImplementedForeground, {0, 0, 0}));
+    CHECK(SameRGB(p.notImplementedBackground, {220, 200, 80}));
+    CHECK(SameRGB(p.searchForeground,         {255, 255, 255}));
+    CHECK(SameRGB(p.searchBackground,         {80, 130, 255}));
+    CHECK(SameRGB(p.boldForeground,           {255, 255, 255}));
+    CHECK(SameRGB(p.boldBackground,           {0, 0, 170}));
+    CHECK(SameRGB(p.italicForeground,         {0, 128, 128}));
+    CHECK(SameRGB(p.italicBackground,         {0, 0, 170}));
+    CHECK(SameRGB(p.underlineForeground,      {255, 105, 180}));
+    CHECK(SameRGB(p.underlineBackground,      {0, 0, 170}));
+    CHECK(SameRGB(p.strikethroughForeground,  {180, 0, 0}));
+    CHECK(SameRGB(p.strikethroughBackground,  {0, 0, 170}));
+    CHECK(SameRGB(p.superscriptForeground,    {128, 0, 128}));
+    CHECK(SameRGB(p.superscriptBackground,    {0, 0, 170}));
+    CHECK(SameRGB(p.subscriptForeground,      {0, 128, 0}));
+    CHECK(SameRGB(p.subscriptBackground,      {0, 0, 170}));
+    CHECK(SameRGB(p.rulerForeground,          {170, 170, 170}));
+    CHECK(SameRGB(p.rulerBackground,          {0, 0, 0}));
+    CHECK(SameRGB(p.flagColumnForeground,     {170, 170, 170}));
+    CHECK(SameRGB(p.flagColumnBackground,     {0, 0, 0}));
+    CHECK(SameRGB(p.scrollbarForeground,      {0, 0, 170}));
+    CHECK(SameRGB(p.scrollbarBackground,      {85, 85, 128}));
+}
+
+TEST_CASE("UT-2g: cConfig GetTUIPalettes provides a WordStar 7 preset last")
+{
+    std::vector<sTUIPalette> palettes = cConfig::GetTUIPalettes();
+    REQUIRE(palettes.size() == 6);
+
+    // Existing presets keep their positions
+    CHECK(palettes[0].name == "WordTsar");
+    CHECK(palettes[1].name == "Standard CGA");
+    CHECK(palettes[2].name == "Monochrome");
+    CHECK(palettes[3].name == "Alternate CGA");
+    CHECK(palettes[4].name == "Sawyer");
+
+    const sTUIPalette& ws7 = palettes.back();
+    CHECK(ws7.name == "WordStar 7");
+    CheckEditorAndStyleColors(ws7);
+    CHECK(SameRGB(ws7.titleBarForeground,           {170, 170, 170}));
+    CHECK(SameRGB(ws7.titleBarBackground,           {0, 0, 0}));
+    CHECK(SameRGB(ws7.statusBarForeground,          {170, 170, 170}));
+    CHECK(SameRGB(ws7.statusBarBackground,          {0, 0, 0}));
+    CHECK(SameRGB(ws7.menuBarForeground,            {0, 0, 0}));
+    CHECK(SameRGB(ws7.menuBarBackground,            {170, 170, 170}));
+    CHECK(SameRGB(ws7.menuAcceleratorForeground,    {85, 85, 255}));
+    CHECK(SameRGB(ws7.menuAcceleratorBackground,    {170, 170, 170}));
+    CHECK(SameRGB(ws7.menuHighlightForeground,      {170, 170, 170}));
+    CHECK(SameRGB(ws7.menuHighlightBackground,      {0, 0, 0}));
+    CHECK(SameRGB(ws7.helpPanelForeground,          {0, 0, 0}));
+    CHECK(SameRGB(ws7.helpPanelBackground,          {170, 170, 170}));
+    CHECK(SameRGB(ws7.helpPanelKeystrokeForeground, {85, 85, 255}));
+    CHECK(SameRGB(ws7.helpPanelKeystrokeBackground, {170, 170, 170}));
+
+    // "WordTsar" preset is unchanged
+    const sTUIPalette& wt = palettes[0];
+    CheckEditorAndStyleColors(wt);
+    CHECK(SameRGB(wt.titleBarForeground,           {0, 0, 170}));
+    CHECK(SameRGB(wt.titleBarBackground,           {170, 170, 170}));
+    CHECK(SameRGB(wt.statusBarForeground,          {0, 0, 170}));
+    CHECK(SameRGB(wt.statusBarBackground,          {170, 170, 170}));
+    CHECK(SameRGB(wt.helpPanelForeground,          {0, 0, 34}));
+    CHECK(SameRGB(wt.helpPanelBackground,          {170, 170, 170}));
+    CHECK(SameRGB(wt.helpPanelKeystrokeForeground, {0, 0, 180}));
+    CHECK(SameRGB(wt.helpPanelKeystrokeBackground, {170, 170, 170}));
+    CHECK(SameRGB(wt.menuBarForeground,            {0, 0, 34}));
+    CHECK(SameRGB(wt.menuBarBackground,            {170, 170, 170}));
+    CHECK(SameRGB(wt.menuAcceleratorForeground,    {170, 0, 0}));
+    CHECK(SameRGB(wt.menuAcceleratorBackground,    {170, 170, 170}));
+    CHECK(SameRGB(wt.menuHighlightForeground,      {170, 170, 170}));
+    CHECK(SameRGB(wt.menuHighlightBackground,      {0, 0, 170}));
+
+    // Default-constructed config TUI colors are unchanged
+    cConfig config;
+    CHECK(SameRGB(config.mTuiBackground,                   {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiForeground,                   {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiHighlightBackground,          {100, 200, 255}));
+    CHECK(SameRGB(config.mTuiHighlightForeground,          {0, 0, 0}));
+    CHECK(SameRGB(config.mTuiDotBackground,                {100, 220, 180}));
+    CHECK(SameRGB(config.mTuiDotForeground,                {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiBlockBackground,              {80, 130, 255}));
+    CHECK(SameRGB(config.mTuiBlockForeground,              {255, 255, 255}));
+    CHECK(SameRGB(config.mTuiCommentBackground,            {255, 191, 0}));
+    CHECK(SameRGB(config.mTuiCommentForeground,            {0, 0, 0}));
+    CHECK(SameRGB(config.mTuiErrorBackground,              {255, 100, 100}));
+    CHECK(SameRGB(config.mTuiErrorForeground,              {0, 0, 0}));
+    CHECK(SameRGB(config.mTuiUnknownBackground,            {255, 255, 0}));
+    CHECK(SameRGB(config.mTuiUnknownForeground,            {0, 0, 0}));
+    CHECK(SameRGB(config.mTuiNotImplementedBackground,     {220, 200, 80}));
+    CHECK(SameRGB(config.mTuiNotImplementedForeground,     {0, 0, 0}));
+    CHECK(SameRGB(config.mTuiSearchBackground,             {80, 130, 255}));
+    CHECK(SameRGB(config.mTuiSearchForeground,             {255, 255, 255}));
+    CHECK(SameRGB(config.mTuiBoldForeground,               {0, 0, 180}));
+    CHECK(SameRGB(config.mTuiBoldBackground,               {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiItalicForeground,             {0, 128, 128}));
+    CHECK(SameRGB(config.mTuiItalicBackground,             {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiUnderlineForeground,          {0, 0, 180}));
+    CHECK(SameRGB(config.mTuiUnderlineBackground,          {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiStrikethroughForeground,      {180, 0, 0}));
+    CHECK(SameRGB(config.mTuiStrikethroughBackground,      {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiSuperscriptForeground,        {128, 0, 128}));
+    CHECK(SameRGB(config.mTuiSuperscriptBackground,        {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiSubscriptForeground,          {0, 128, 0}));
+    CHECK(SameRGB(config.mTuiSubscriptBackground,          {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiTitleBarForeground,           {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiTitleBarBackground,           {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiStatusBarForeground,          {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiStatusBarBackground,          {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiHelpPanelForeground,          {0, 0, 34}));
+    CHECK(SameRGB(config.mTuiHelpPanelBackground,          {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiHelpPanelKeystrokeForeground, {0, 0, 180}));
+    CHECK(SameRGB(config.mTuiHelpPanelKeystrokeBackground, {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiMenuBarForeground,            {0, 0, 34}));
+    CHECK(SameRGB(config.mTuiMenuBarBackground,            {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiMenuAcceleratorForeground,    {170, 0, 0}));
+    CHECK(SameRGB(config.mTuiMenuAcceleratorBackground,    {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiMenuHighlightForeground,      {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiMenuHighlightBackground,      {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiRulerForeground,              {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiRulerBackground,              {0, 0, 0}));
+    CHECK(SameRGB(config.mTuiFlagColumnForeground,         {170, 170, 170}));
+    CHECK(SameRGB(config.mTuiFlagColumnBackground,         {0, 0, 0}));
+    CHECK(SameRGB(config.mTuiScrollbarForeground,          {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiScrollbarBackground,          {85, 85, 128}));
+}
+
 TEST_CASE("UT-2e: cConfig ApplyGUIPalette")
 {
     cConfig config;
