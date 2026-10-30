@@ -64,6 +64,10 @@ public:
     // dispatch-resolution regression test). Not compiled into ws/WordTsar.
     void TestBuildMenus(void) { BuildMenus(); }
     const wordstartui::cMenuBar& TestGetMenu(void) const { return mMenu; }
+    cWSEditorCtrl* TestGetEditor(void) { return mEditor; }
+    std::string TestTitleText(void) const { return TitleText(); }
+    // Load a file the way the command line and the Opening screen do.
+    void TestOpenFromOpening(const std::string& path);
 #endif
 
     // ---- iWSDialogHost ----
@@ -126,6 +130,7 @@ private:
 
     void DrawEditor(wordstartui::cScreen& screen, const wordstartui::cTheme& theme);
     void DrawTitleBar(wordstartui::cScreen& screen, int row);
+    std::string TitleText(void) const;
     void DrawTopStatus(wordstartui::cScreen& screen, int row);
     // Dispatch a left click on the top status bar (font/style label, B/I/U,
     // command-tags "*", and L/C/R/J alignment). Returns true if a region was hit.

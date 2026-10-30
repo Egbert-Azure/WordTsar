@@ -230,6 +230,24 @@ cWSWordTsar::~cWSWordTsar(void)
     delete mMenuInput;
 }
 
+#ifdef WORDTSAR_TUI_TEST_HOOKS
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  path [in] file to load
+///
+/// @return nothing
+///
+/// @brief
+/// Test-only: load a file the way the command line and the Opening screen do.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::TestOpenFromOpening(const std::string& path)
+{
+    mFilename = path;
+    mEditor->LoadFile(mFilename);
+}
+#endif
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @param  int argc [in] argument count
@@ -2117,7 +2135,31 @@ void cWSWordTsar::DrawTitleBar(cScreen& screen, int row)
     bar.cols = mCols;
     screen.FillRect(bar, " ", style);
 
-    std::string name = mFilename;
+    std::string title = TitleText();
+    int col = (mCols - static_cast<int>(title.size())) / 2;
+    if (col < 0)
+    {
+        col = 0;
+    }
+    screen.PutText(row, col, title, style);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return std::string - the title bar text
+///
+/// @brief
+/// Build the title bar text: "filename - WordTsar <version> <status>", with
+/// the editor's file name, or "untitled" when the editor has none.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cWSWordTsar::TitleText(void) const
+{
+    std::string name;
+    if (mEditor->mFileSet == true)
+    {
+        name = mEditor->mFileName;
+    }
     size_t slash = name.find_last_of("/\\");
     if (slash != std::string::npos)
     {
@@ -2128,13 +2170,7 @@ void cWSWordTsar::DrawTitleBar(cScreen& screen, int row)
         name = "untitled";
     }
 
-    std::string title = name + " - WordTsar " + std::string(FULLVERSION_STRING) + " " + std::string(STATUS);
-    int col = (mCols - static_cast<int>(title.size())) / 2;
-    if (col < 0)
-    {
-        col = 0;
-    }
-    screen.PutText(row, col, title, style);
+    return name + " - WordTsar " + std::string(FULLVERSION_STRING) + " " + std::string(STATUS);
 }
 
 /////////////////////////////////////////////////////////////////////////////

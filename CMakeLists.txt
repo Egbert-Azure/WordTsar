@@ -328,6 +328,7 @@ if(BUILD_TUI)
         src/test/test-tuicolorutils.cpp
         src/test/test-tuicolorpicker.cpp
         src/test/test-tuimenuwalk.cpp
+        src/test/test-tuititlebar.cpp
         src/test/test-tuieditorview.cpp
         src/test/test-isolation.cpp
         src/tui/print/tuiprintout.cpp
