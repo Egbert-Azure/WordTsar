@@ -21,10 +21,6 @@
 #ifndef VERSION_H
 #define VERSION_H
 
-//Software Status
-static const char STATUS[] =  "Beta";
-static const char STATUS_SHORT[] =  "b";
-
 //Standard Version Type
 static const long MAJOR  = @WORDTSAR_VERSION_MAJOR@;
 static const long MINOR  = @WORDTSAR_VERSION_MINOR@;

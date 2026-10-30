@@ -4909,8 +4909,8 @@ void cEditorCtrl::SetTitle(const std::string& title)
     //   New system uses Qt's window() to get top-level window
 
     // Format title with version information
-    std::string formattedTitle = string_sprintf("%s - WordTsar %ld.%ld build %ld %s",
-                                                 title.c_str(), MAJOR, MINOR, BUILD, STATUS);
+    std::string formattedTitle = string_sprintf("%s - WordTsar %ld.%ld build %ld",
+                                                 title.c_str(), MAJOR, MINOR, BUILD);
 
     // Set window title on top-level window
     QWidget* topWindow = window();

@@ -2352,7 +2352,7 @@ void cWordTsar::PrintPreview(void)
 void cWordTsar::AboutWordTsar(void)
 {
     std::string abouttext ;
-    abouttext = string_sprintf("<h2>WordTsar %s %s</h2>" \
+    abouttext = string_sprintf("<h2>WordTsar %s</h2>" \
                     "<p>Wordstar for the 21st century. This is a macOS-focused fork of "
                     "Gerald Brandt's WordTsar &mdash; the Wordstar-clone editing engine, "
                     "document formats, and original design are his work; this fork adds "
@@ -2369,7 +2369,7 @@ void cWordTsar::AboutWordTsar(void)
                     "https://github.com/Egbert-Azure/WordTsar<br>" \
                     "<h4>Embedded Third-Party Code</h4>" \
                     "</p>"
-                    , FULLVERSION_STRING, STATUS) ;
+                    , FULLVERSION_STRING) ;
 
     abouttext += "Chillout - MIT License - crash handling<br>" ;
     abouttext += "cpp-unicodelib - MIT License - Unicode text processing<br>" ;

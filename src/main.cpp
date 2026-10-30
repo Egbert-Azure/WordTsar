@@ -209,8 +209,6 @@ int main(int argc, char *argv[])
     QSplashScreen splash(screen, pixmap) ;
     splash.setWindowFlag(Qt::WindowStaysOnTopHint, true) ;
     QString vers = FULLVERSION_STRING ;
-    vers += " " ;
-    vers += STATUS ;
     splash.showMessage(vers, Qt::AlignBottom | Qt::AlignCenter, QColor(152, 114, 14)) ;
     splash.show() ;
     app.processEvents();

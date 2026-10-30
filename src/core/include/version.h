@@ -21,15 +21,11 @@
 #ifndef VERSION_H
 #define VERSION_H
 
-//Software Status
-static const char STATUS[] =  "Beta";
-static const char STATUS_SHORT[] =  "b";
-
 //Standard Version Type
 static const long MAJOR  = 0;
 static const long MINOR  = 14;
-static const long BUILD  = 1;
+static const long BUILD  = 2;
 
-static const char FULLVERSION_STRING [] = "0.14.1";
+static const char FULLVERSION_STRING [] = "0.14.2";
 
 #endif //VERSION_H

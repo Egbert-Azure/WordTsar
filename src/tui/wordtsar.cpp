@@ -1805,7 +1805,7 @@ void cWSWordTsar::DrawSplash(cScreen& screen)
     screen.PutText(titleRow + 1, (mCols - static_cast<int>(wordmark.size())) / 2, rule, back);
     screen.PutText(titleRow + 3, (mCols - static_cast<int>(subtitle.size())) / 2, subtitle, back);
 
-    std::string version = std::string(FULLVERSION_STRING) + " " + std::string(STATUS);
+    std::string version = std::string(FULLVERSION_STRING);
     screen.PutText(titleRow + 5, (mCols - static_cast<int>(version.size())) / 2, version, back);
 }
 
@@ -2165,7 +2165,7 @@ std::string cWSWordTsar::TitleText(void) const
         name = "untitled";
     }
 
-    return name + " - WordTsar " + std::string(FULLVERSION_STRING) + " " + std::string(STATUS);
+    return name + " - WordTsar " + std::string(FULLVERSION_STRING);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -3015,7 +3015,7 @@ void cWSWordTsar::ShowOpeningStatus(void)
 {
     std::string directory = mBrowser.GetCurrentDirectory();
 
-    std::string text = std::string("WordTsar ") + FULLVERSION_STRING + " " + STATUS + "\n";
+    std::string text = std::string("WordTsar ") + FULLVERSION_STRING + "\n";
     text += "Current directory: " + directory + "\n";
 
     std::error_code ec;
@@ -3046,7 +3046,7 @@ void cWSWordTsar::ShowOpeningStatus(void)
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::ShowAboutWordTsar(void)
 {
-    std::string text = std::string("WordTsar ") + FULLVERSION_STRING + " " + STATUS + "\n\n";
+    std::string text = std::string("WordTsar ") + FULLVERSION_STRING + "\n\n";
 
     text += "Wordstar for the 21st century. This is a macOS-focused fork of "
             "Gerald Brandt's WordTsar -- the Wordstar-clone editing engine, "

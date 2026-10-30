@@ -27,6 +27,7 @@
 #include "src/tui/wordstartui/src/dialog.h"
 #include "src/tui/wordstartui/src/theme.h"
 #include "src/tui/wordstartui/src/tuidefs.h"
+#include "src/core/include/version.h"
 
 #include <cstdlib>
 #include <deque>
@@ -256,6 +257,25 @@ TEST_CASE("TUI title bar - shows the file the editor holds")
         CHECK(app.TestTitleText().find("first.txt") == std::string::npos);
         CHECK(StartsWith(app.TestTitleText(), "untitled - WordTsar "));
     }
+}
+
+
+TEST_CASE("TUI title bar - file name and version without status")
+{
+    cTempDir dir;
+    std::string file = dir.WriteText("plain.txt", "plain file\n");
+
+    cWSWordTsar app;
+    cWSEditorCtrl* editor = app.TestGetEditor();
+    REQUIRE(editor != nullptr);
+    CHECK(app.TestTitleText() == "untitled - WordTsar " + std::string(FULLVERSION_STRING));
+
+    app.TestOpenFromOpening(file);
+    REQUIRE(editor->mFileName == "plain.txt");
+    std::string title = app.TestTitleText();
+    CHECK(title == "plain.txt - WordTsar " + std::string(FULLVERSION_STRING));
+    CHECK(title.find("Beta") == std::string::npos);
+    CHECK(title.back() != ' ');
 }
 
 
