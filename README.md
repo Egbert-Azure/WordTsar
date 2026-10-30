@@ -15,9 +15,9 @@ All credit for WordTsar's design and implementation goes to Gerald Brandt — th
   <sub>Michael Shrayer's <em>Electric Pencil</em> (1976, TRS-80) — generally credited as the first word processor for a microcomputer, and the ancestor this whole lineage owes a nod to.</sub>
 </p>
 
-WordTsar is currently Beta. In practice: I write in it every day — this isn't a project I test and set aside, it's the tool I'm using right now — and it holds up. I'm still finding things as I go, and fixing them as I find them; see `WHATS_NEW.md` for the running list.
+WordTsar is no longer Beta. I write in it every day. It isn't a project I test and set aside, it's the tool I'm using right now. I still find things as I go and fix them as I find them; see `WHATS_NEW.md` for the running list.
 
-This is version **0.14.1 Beta**, macOS only.
+This is version **0.14.2**, macOS only.
 
 ## Install
 

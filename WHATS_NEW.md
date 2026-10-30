@@ -2,6 +2,21 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.14.2 (2026-10-30)
+
+WordTsar is no longer Beta.
+
+**Fixes**
+
+- Fixed: the title bar kept the previous document's name after opening another file, saving under a new name, or closing. It now shows the file being edited.
+- Fixed: Save and Close (^KD) now returns to the Opening screen, as in WordStar 7 (#32).
+- Fixed: Save from the unsaved-changes prompt on an untitled document now asks for a file name instead of saving to Unknown.ws, and a named document is saved in its own folder (#37).
+
+**Changes**
+
+- Changed: the Find and Replace dialogs use the WordStar 7 wording ("Find and Replace", "OK", "For Next Occurrence", "Entire File/Global", "Use ? Wildcard Character", "Don't Ask", and so on) (#29, wording only).
+- Changed: WordTsar is no longer Beta.
+
 ## 0.14.1 Beta (2026-10-27)
 
 **Fixes**

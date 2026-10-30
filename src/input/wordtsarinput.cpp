@@ -280,9 +280,10 @@ const char *LookupKChordHelp(char lower)
             return "^KT - Save as\n\n"
                    "Prompts for a new filename and saves the current file under it." ;
         case 'd' :
-            return "^KD - Save and clear\n\n"
-                   "Saves the current file, then clears the editor back to a new, "
-                   "unnamed document." ;
+            return "^KD - Save and Close\n\n"
+                   "Saves the current file and closes it. The text interface "
+                   "returns to the Opening screen; the graphical interface shows "
+                   "a new, unnamed document." ;
         case 'x' :
             return "^KX - Save and exit\n\n"
                    "Saves the current file and quits WordTsar." ;
