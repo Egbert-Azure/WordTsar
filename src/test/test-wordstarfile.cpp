@@ -27,9 +27,13 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
+#include "src/core/codepage/cp437.h"
 #include "src/core/include/config.h"
 #include "src/core/document/document.h"
 #include "src/files/wordstar/wordstarfile.h"
@@ -81,6 +85,231 @@ std::string SequenceBytes(unsigned char type, const std::string &body)
     seq += static_cast<char>(size >> 8);
     seq += '\x1D';
     return seq;
+}
+
+std::string LowerCase(std::string text)
+{
+    std::transform(text.begin(), text.end(), text.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+}
+
+// Regular files under dir (recursive) whose extension matches ext without regard to case, sorted
+std::vector<std::filesystem::path> FindFilesWithExtension(const std::filesystem::path& dir, const std::string& ext)
+{
+    std::vector<std::filesystem::path> files;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(dir))
+    {
+        if (entry.is_regular_file() && LowerCase(entry.path().extension().string()) == ext)
+        {
+            files.push_back(entry.path());
+        }
+    }
+    std::sort(files.begin(), files.end());
+    return files;
+}
+
+void AppendUtf8(std::string& out, unsigned long cp)
+{
+    if (cp < 0x80)
+    {
+        out += static_cast<char>(cp);
+    }
+    else if (cp < 0x800)
+    {
+        out += static_cast<char>(0xC0 | (cp >> 6));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else if (cp < 0x10000)
+    {
+        out += static_cast<char>(0xE0 | (cp >> 12));
+        out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else
+    {
+        out += static_cast<char>(0xF0 | (cp >> 18));
+        out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+        out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+}
+
+// Word separators: ASCII whitespace and U+00A0
+bool IsWordSeparator(const std::string& grapheme)
+{
+    return grapheme == " " || grapheme == "\t" || grapheme == "\r" || grapheme == "\n" ||
+           grapheme == "\f" || grapheme == "\v" || grapheme == "\xC2\xA0";
+}
+
+// Appends the grapheme to the current word, or ends the current word on a separator
+void AddGrapheme(std::vector<std::string>& words, std::string& word, const std::string& grapheme)
+{
+    if (IsWordSeparator(grapheme))
+    {
+        if (word.empty() == false)
+        {
+            words.push_back(word);
+            word.clear();
+        }
+    }
+    else
+    {
+        word += grapheme;
+    }
+}
+
+// Words of the loaded document. Paragraphs starting with '.' (dot commands
+// and comments) are skipped. A marker is a word separator when it is a tab
+// or a non-break space and is dropped otherwise. Paragraph ends separate words.
+std::vector<std::string> DocumentWords(cDocument* doc)
+{
+    std::vector<std::string> words;
+    std::string word;
+    PARAGRAPH_T count = doc->GetNumberofParagraphs();
+    for (PARAGRAPH_T para = 0; para < count; para++)
+    {
+        std::string raw = doc->GetParagraphText(para);
+        if (raw.empty() == false && raw[0] == '.')
+        {
+            continue;
+        }
+        POSITION_T start = 0;
+        POSITION_T end = 0;
+        doc->GetParagraphStartandEnd(para, start, end);
+        for (POSITION_T pos = start; pos <= end; pos++)
+        {
+            POSITION_T at = pos;
+            std::string grapheme = doc->GetChar(at);
+            if (grapheme.size() == 1 && static_cast<unsigned char>(grapheme[0]) == MARKER_CHAR)
+            {
+                eModifiers control = doc->GetControlChar(pos);
+                if (control == STYLE_TAB || control == STYLE_NOBREAK_SPACE)
+                {
+                    AddGrapheme(words, word, " ");
+                }
+                continue;
+            }
+            AddGrapheme(words, word, grapheme);
+        }
+        AddGrapheme(words, word, "\r");
+    }
+    return words;
+}
+
+// Words of a text file read as CP437, up to the first ^Z
+std::vector<std::string> Cp437FileWords(const std::filesystem::path& path)
+{
+    std::ifstream file(path, std::ios::binary);
+    std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    cCodePage437 cp;
+    std::vector<std::string> words;
+    std::string word;
+    for (char ch : bytes)
+    {
+        unsigned char c = static_cast<unsigned char>(ch);
+        if (c == 0x1A)
+        {
+            break;
+        }
+        unsigned long cpoint = cp.toUTF8(c);
+        std::string grapheme;
+        AppendUtf8(grapheme, cpoint == UINT32_MAX ? c : cpoint);
+        AddGrapheme(words, word, grapheme);
+    }
+    AddGrapheme(words, word, "\r");
+    return words;
+}
+
+std::string JoinWords(const std::vector<std::string>& words, size_t from, size_t to)
+{
+    std::string out;
+    for (size_t i = from; i < to && i < words.size(); i++)
+    {
+        if (out.empty() == false)
+        {
+            out += ' ';
+        }
+        out += words[i];
+    }
+    return out;
+}
+
+// One stretch of words that differs between the two sequences
+struct sWordHunk
+{
+    size_t aIndex;
+    size_t aCount;
+    size_t bIndex;
+    size_t bCount;
+};
+
+// Differences between two word sequences. After a mismatch both sides are
+// resynchronised at the nearest point where three words (or the rest of both
+// sequences) agree, searching up to `window` words ahead. Without such a point
+// the rest of both sequences is one hunk.
+std::vector<sWordHunk> DiffWords(const std::vector<std::string>& a, const std::vector<std::string>& b, size_t window = 200)
+{
+    const size_t run = 3;
+    auto agrees = [&](size_t i, size_t j) -> bool
+    {
+        if (i == a.size() && j == b.size())
+        {
+            return true;
+        }
+        size_t n = std::min(run, std::min(a.size() - i, b.size() - j));
+        if (n == 0)
+        {
+            return false;
+        }
+        for (size_t k = 0; k < n; k++)
+        {
+            if (a[i + k] != b[j + k])
+            {
+                return false;
+            }
+        }
+        return n == run || (i + n == a.size() && j + n == b.size());
+    };
+
+    std::vector<sWordHunk> hunks;
+    size_t i = 0;
+    size_t j = 0;
+    while (i < a.size() || j < b.size())
+    {
+        if (i < a.size() && j < b.size() && a[i] == b[j])
+        {
+            i++;
+            j++;
+            continue;
+        }
+        bool found = false;
+        for (size_t k = 1; k <= 2 * window && found == false; k++)
+        {
+            for (size_t x = 0; x <= k; x++)
+            {
+                size_t y = k - x;
+                if (x > window || y > window || i + x > a.size() || j + y > b.size())
+                {
+                    continue;
+                }
+                if (agrees(i + x, j + y))
+                {
+                    hunks.push_back({i, x, j, y});
+                    i += x;
+                    j += y;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (found == false)
+        {
+            hunks.push_back({i, a.size() - i, j, b.size() - j});
+            break;
+        }
+    }
+    return hunks;
 }
 
 }
@@ -336,22 +565,7 @@ TEST_CASE("cEditorCtrl::LoadFile - every .WS file in WORDTSAR_ARCHIVE_DIR loads"
     REQUIRE_MESSAGE(std::filesystem::is_directory(archiveDir),
                     "WORDTSAR_ARCHIVE_DIR is not a directory: " << archiveDir.string());
 
-    std::vector<std::filesystem::path> files;
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(archiveDir))
-    {
-        if (entry.is_regular_file() == false)
-        {
-            continue;
-        }
-        std::string ext = entry.path().extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (ext == ".ws")
-        {
-            files.push_back(entry.path());
-        }
-    }
-    std::sort(files.begin(), files.end());
+    std::vector<std::filesystem::path> files = FindFilesWithExtension(archiveDir, ".ws");
     REQUIRE_MESSAGE(files.empty() == false, "no .WS files in " << archiveDir.string());
 
     ensureQApplication();
@@ -394,4 +608,126 @@ TEST_CASE("cEditorCtrl::LoadFile - every .WS file in WORDTSAR_ARCHIVE_DIR loads"
     }
     MESSAGE(files.size() << " .WS files loaded, " << failures.size() << " failed" << report);
     CHECK_MESSAGE(failures.empty(), failures.size() << " of " << files.size() << " .WS files failed to load" << report);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// For every NAME.WS under WORDTSAR_ARCHIVE_DIR (recursive) with a NAME.TXT
+/// in the same folder (base name and extension matched without regard to
+/// case), compares the word sequence of the loaded document with the word
+/// sequence of the .TXT read as CP437. Words are split on whitespace; line
+/// breaks do not count. Dot-command paragraphs are left out on the .WS side.
+/// Word differences are reported as messages only. A pair fails when the
+/// .WS load returns false or throws, or the comparison throws. Without
+/// WORDTSAR_ARCHIVE_DIR the test does nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("cEditorCtrl::LoadFile - .WS text matches the .TXT beside it in WORDTSAR_ARCHIVE_DIR")
+{
+    const char* archiveEnv = std::getenv("WORDTSAR_ARCHIVE_DIR");
+    if (archiveEnv == nullptr || archiveEnv[0] == '\0')
+    {
+        MESSAGE("WORDTSAR_ARCHIVE_DIR is not set, archive text test skipped");
+        return;
+    }
+
+    const std::filesystem::path archiveDir(archiveEnv);
+    REQUIRE_MESSAGE(std::filesystem::is_directory(archiveDir),
+                    "WORDTSAR_ARCHIVE_DIR is not a directory: " << archiveDir.string());
+
+    // folder + lower-case base name -> .TXT path
+    std::map<std::string, std::filesystem::path> texts;
+    for (const std::filesystem::path& txt : FindFilesWithExtension(archiveDir, ".txt"))
+    {
+        texts[txt.parent_path().string() + "/" + LowerCase(txt.stem().string())] = txt;
+    }
+
+    std::vector<std::pair<std::filesystem::path, std::filesystem::path>> pairs;
+    for (const std::filesystem::path& ws : FindFilesWithExtension(archiveDir, ".ws"))
+    {
+        auto found = texts.find(ws.parent_path().string() + "/" + LowerCase(ws.stem().string()));
+        if (found != texts.end())
+        {
+            pairs.emplace_back(ws, found->second);
+        }
+    }
+    if (pairs.empty())
+    {
+        MESSAGE("no .WS file with a .TXT beside it in " << archiveDir.string());
+        return;
+    }
+
+    ensureQApplication();
+
+    const size_t shownHunks = 5;
+    const size_t context = 4;
+    const size_t shownWords = 12;
+    std::ostringstream report;
+    std::vector<std::string> failures;
+    size_t identical = 0;
+    for (const auto& pair : pairs)
+    {
+        std::string name = std::filesystem::relative(pair.first, archiveDir).string();
+        try
+        {
+            cEditorCtrl editor;
+            if (editor.LoadFile(pair.first.string()) == false)
+            {
+                failures.push_back(name + ": LoadFile returned false");
+                report << "\n" << name << ": LoadFile returned false";
+                continue;
+            }
+            std::vector<std::string> wsWords = DocumentWords(editor.GetDocument());
+            std::vector<std::string> txtWords = Cp437FileWords(pair.second);
+            std::vector<sWordHunk> hunks = DiffWords(wsWords, txtWords);
+
+            report << "\n" << name << ": " << wsWords.size() << " words in .WS, "
+                   << txtWords.size() << " words in .TXT, ";
+            if (hunks.empty())
+            {
+                identical++;
+                report << "identical";
+                continue;
+            }
+            report << hunks.size() << " differences";
+            for (size_t h = 0; h < hunks.size() && h < shownHunks; h++)
+            {
+                const sWordHunk& hunk = hunks[h];
+                size_t before = hunk.aIndex >= context ? hunk.aIndex - context : 0;
+                report << "\n  at WS word " << hunk.aIndex << " / TXT word " << hunk.bIndex
+                       << ", after \"" << JoinWords(wsWords, before, hunk.aIndex) << "\""
+                       << "\n    WS : [" << JoinWords(wsWords, hunk.aIndex, hunk.aIndex + std::min(hunk.aCount, shownWords))
+                       << (hunk.aCount > shownWords ? " ..." : "") << "] (" << hunk.aCount << " words) then \""
+                       << JoinWords(wsWords, hunk.aIndex + hunk.aCount, hunk.aIndex + hunk.aCount + context) << "\""
+                       << "\n    TXT: [" << JoinWords(txtWords, hunk.bIndex, hunk.bIndex + std::min(hunk.bCount, shownWords))
+                       << (hunk.bCount > shownWords ? " ..." : "") << "] (" << hunk.bCount << " words) then \""
+                       << JoinWords(txtWords, hunk.bIndex + hunk.bCount, hunk.bIndex + hunk.bCount + context) << "\"";
+            }
+            if (hunks.size() > shownHunks)
+            {
+                report << "\n  ... " << hunks.size() - shownHunks << " more";
+            }
+        }
+        catch (const std::exception& e)
+        {
+            failures.push_back(name + ": exception: " + e.what());
+            report << "\n" << name << ": exception: " << e.what();
+        }
+        catch (...)
+        {
+            failures.push_back(name + ": unknown exception");
+            report << "\n" << name << ": unknown exception";
+        }
+    }
+
+    MESSAGE(pairs.size() << " .WS/.TXT pairs, " << identical << " identical, "
+            << failures.size() << " failed" << report.str());
+    std::string failed;
+    for (const std::string& failure : failures)
+    {
+        failed += "\n  " + failure;
+    }
+    CHECK_MESSAGE(failures.empty(), failures.size() << " of " << pairs.size() << " pairs failed" << failed);
 }
