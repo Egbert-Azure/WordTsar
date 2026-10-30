@@ -64,7 +64,7 @@ struct sFindOptions
     bool backward = false;
     bool wildcard = false;
     int scope = 0;          // 0 = next, 1 = global
-    bool ok = false;        // true if the user pressed Find/OK
+    bool ok = false;        // true if the user pressed OK
 };
 
 sFindOptions FindDialog(iWSDialogHost* host, const sFindOptions& initial);

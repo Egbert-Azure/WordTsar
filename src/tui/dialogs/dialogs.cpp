@@ -1012,7 +1012,7 @@ void TextViewer(iWSDialogHost* host, const std::string& title,
 /// @param  iWSDialogHost* host [in] dialog host
 /// @param  const sFindOptions& initial [in] initial values
 ///
-/// @return the find options with ok set when Find was pressed
+/// @return the find options with ok set when OK was pressed
 ///
 /// @brief
 /// Display the Find dialog.
@@ -1051,7 +1051,7 @@ sFindOptions FindDialog(iWSDialogHost* host, const sFindOptions& initial)
     wholeRect.col = rect.col + 2;
     wholeRect.rows = 1;
     wholeRect.cols = 22;
-    auto wholeBox = std::make_unique<cCheckBox>(wholeRect, "Whole word", BoolToTri(initial.wholeWord));
+    auto wholeBox = std::make_unique<cCheckBox>(wholeRect, "Whole Words", BoolToTri(initial.wholeWord));
     cCheckBox* wholePtr = wholeBox.get();
     dialog.AddWidget(std::move(wholeBox));
 
@@ -1060,7 +1060,7 @@ sFindOptions FindDialog(iWSDialogHost* host, const sFindOptions& initial)
     caseRect.col = rect.col + 26;
     caseRect.rows = 1;
     caseRect.cols = 22;
-    auto caseBox = std::make_unique<cCheckBox>(caseRect, "Ignore case", BoolToTri(initial.ignoreCase));
+    auto caseBox = std::make_unique<cCheckBox>(caseRect, "Ignore Case (U)", BoolToTri(initial.ignoreCase));
     cCheckBox* casePtr = caseBox.get();
     dialog.AddWidget(std::move(caseBox));
 
@@ -1077,8 +1077,8 @@ sFindOptions FindDialog(iWSDialogHost* host, const sFindOptions& initial)
     wildRect.row = rect.row + 5;
     wildRect.col = rect.col + 26;
     wildRect.rows = 1;
-    wildRect.cols = 22;
-    auto wildBox = std::make_unique<cCheckBox>(wildRect, "Wildcard", BoolToTri(initial.wildcard));
+    wildRect.cols = 26;
+    auto wildBox = std::make_unique<cCheckBox>(wildRect, "Use ? Wildcard Character", BoolToTri(initial.wildcard));
     cCheckBox* wildPtr = wildBox.get();
     dialog.AddWidget(std::move(wildBox));
 
@@ -1088,8 +1088,8 @@ sFindOptions FindDialog(iWSDialogHost* host, const sFindOptions& initial)
     scopeRect.rows = 2;
     scopeRect.cols = rect.cols - 4;
     auto scope = std::make_unique<cRadioGroup>(scopeRect);
-    scope->AddChoice("This point forward", 0);
-    scope->AddChoice("Entire document", 1);
+    scope->AddChoice("For Next Occurrence", 0);
+    scope->AddChoice("Entire File/Global", 1);
     scope->SetSelectedIndex(Clamp(initial.scope, 0, 1));
     cRadioGroup* scopePtr = scope.get();
     dialog.AddWidget(std::move(scope));
@@ -1101,7 +1101,7 @@ sFindOptions FindDialog(iWSDialogHost* host, const sFindOptions& initial)
     findRect.cols = 10;
     findRect.row = rect.row + rect.rows - 2;
     findRect.col = rect.col + ((rect.cols - 24) / 2);
-    dialog.AddWidget(std::make_unique<cButton>(findRect, "Find", [dialogPtr]() {
+    dialog.AddWidget(std::make_unique<cButton>(findRect, "OK", [dialogPtr]() {
         dialogPtr->SetResult(DIALOG_RESULT_OK);
     }));
 
@@ -1136,10 +1136,10 @@ sFindOptions FindDialog(iWSDialogHost* host, const sFindOptions& initial)
 /// @param  iWSDialogHost* host [in] dialog host
 /// @param  const sReplaceOptions& initial [in] initial values
 ///
-/// @return the replace options with ok set when Replace was pressed
+/// @return the replace options with ok set when OK was pressed
 ///
 /// @brief
-/// Display the Replace dialog.
+/// Display the Find and Replace dialog.
 ///
 /////////////////////////////////////////////////////////////////////////////
 sReplaceOptions ReplaceDialog(iWSDialogHost* host, const sReplaceOptions& initial)
@@ -1151,7 +1151,7 @@ sReplaceOptions ReplaceDialog(iWSDialogHost* host, const sReplaceOptions& initia
     int height = 18;
 
     sRect rect = CenteredRect(host, height, width);
-    cDialog dialog(rect, "Replace");
+    cDialog dialog(rect, "Find and Replace");
 
     sRect findLabelRect;
     findLabelRect.row = rect.row + 2;
@@ -1190,7 +1190,7 @@ sReplaceOptions ReplaceDialog(iWSDialogHost* host, const sReplaceOptions& initia
     wholeRect.col = rect.col + 2;
     wholeRect.rows = 1;
     wholeRect.cols = 22;
-    auto wholeBox = std::make_unique<cCheckBox>(wholeRect, "Whole word", BoolToTri(initial.wholeWord));
+    auto wholeBox = std::make_unique<cCheckBox>(wholeRect, "Whole Words", BoolToTri(initial.wholeWord));
     cCheckBox* wholePtr = wholeBox.get();
     dialog.AddWidget(std::move(wholeBox));
 
@@ -1199,7 +1199,7 @@ sReplaceOptions ReplaceDialog(iWSDialogHost* host, const sReplaceOptions& initia
     caseRect.col = rect.col + 26;
     caseRect.rows = 1;
     caseRect.cols = 22;
-    auto caseBox = std::make_unique<cCheckBox>(caseRect, "Ignore case", BoolToTri(initial.ignoreCase));
+    auto caseBox = std::make_unique<cCheckBox>(caseRect, "Ignore Case (U)", BoolToTri(initial.ignoreCase));
     cCheckBox* casePtr = caseBox.get();
     dialog.AddWidget(std::move(caseBox));
 
@@ -1216,8 +1216,8 @@ sReplaceOptions ReplaceDialog(iWSDialogHost* host, const sReplaceOptions& initia
     wildRect.row = rect.row + 6;
     wildRect.col = rect.col + 26;
     wildRect.rows = 1;
-    wildRect.cols = 22;
-    auto wildBox = std::make_unique<cCheckBox>(wildRect, "Wildcard", BoolToTri(initial.wildcard));
+    wildRect.cols = 26;
+    auto wildBox = std::make_unique<cCheckBox>(wildRect, "Use ? Wildcard Character", BoolToTri(initial.wildcard));
     cCheckBox* wildPtr = wildBox.get();
     dialog.AddWidget(std::move(wildBox));
 
@@ -1226,7 +1226,7 @@ sReplaceOptions ReplaceDialog(iWSDialogHost* host, const sReplaceOptions& initia
     askRect.col = rect.col + 2;
     askRect.rows = 1;
     askRect.cols = 30;
-    auto askBox = std::make_unique<cCheckBox>(askRect, "Replace without asking", BoolToTri(initial.dontAsk));
+    auto askBox = std::make_unique<cCheckBox>(askRect, "Don't Ask", BoolToTri(initial.dontAsk));
     cCheckBox* askPtr = askBox.get();
     dialog.AddWidget(std::move(askBox));
 
@@ -1236,9 +1236,9 @@ sReplaceOptions ReplaceDialog(iWSDialogHost* host, const sReplaceOptions& initia
     scopeRect.rows = 3;
     scopeRect.cols = rect.cols - 4;
     auto scope = std::make_unique<cRadioGroup>(scopeRect);
-    scope->AddChoice("Next occurrence", 0);
-    scope->AddChoice("Entire document", 1);
-    scope->AddChoice("Rest of document", 2);
+    scope->AddChoice("For Next Occurrence", 0);
+    scope->AddChoice("Entire File/Global", 1);
+    scope->AddChoice("Rest of File", 2);
     scope->SetSelectedIndex(Clamp(initial.scope, 0, 2));
     cRadioGroup* scopePtr = scope.get();
     dialog.AddWidget(std::move(scope));
@@ -1250,7 +1250,7 @@ sReplaceOptions ReplaceDialog(iWSDialogHost* host, const sReplaceOptions& initia
     replaceButtonRect.cols = 11;
     replaceButtonRect.row = rect.row + rect.rows - 2;
     replaceButtonRect.col = rect.col + ((rect.cols - 25) / 2);
-    dialog.AddWidget(std::make_unique<cButton>(replaceButtonRect, "Replace", [dialogPtr]() {
+    dialog.AddWidget(std::make_unique<cButton>(replaceButtonRect, "OK", [dialogPtr]() {
         dialogPtr->SetResult(DIALOG_RESULT_OK);
     }));
 
