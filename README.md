@@ -6,7 +6,7 @@
 
 ## This is a macOS-focused fork of [WordTsar](https://sourceforge.net/p/wordtsar/mercurial/ci/default/tree/), created by Gerald Brandt.
 
-Wordstar for the 21st Century. WordTsar is a Wordstar 7.0D document mode clone. It loads Wordstar 4, Wordstar 7, RTF (partial), and DOCX (partial) files, and saves in Wordstar 7, RTF, and Word (.docx) format.
+WordStar for the 21st Century. WordTsar is a WordStar 7.0D document mode clone. It loads WordStar 4, WordStar 7, RTF (partial), and DOCX (partial) files, and saves in WordStar 7, RTF, and Word (.docx) format.
 
 All credit for WordTsar's design and implementation goes to Gerald Brandt — this fork simply trims the project down to a macOS-only build. The original, cross-platform project (Windows, Linux, and macOS) is developed at the link above on SourceForge — go there for the code and the Windows/Linux builds. [wordtsar.ca](http://wordtsar.ca) is the project's original home; its newest posted release is 0.3 (March 2023), so it's no longer where current builds live, but it's still the place for the project's history and forums. This fork is not endorsed by or affiliated with the upstream WordTsar project — the AGPL grants no rights in the name "WordTsar." macOS fork begun 2025, actively maintained through 2026.
 
@@ -18,6 +18,12 @@ All credit for WordTsar's design and implementation goes to Gerald Brandt — th
 WordTsar is currently Beta. In practice: I write in it every day — this isn't a project I test and set aside, it's the tool I'm using right now — and it holds up. I'm still finding things as I go, and fixing them as I find them; see `WHATS_NEW.md` for the running list.
 
 This is version **0.14.1 Beta**, macOS only.
+
+## Install
+
+Download `WordTsar.zip` from the [Releases page](https://github.com/Egbert-Azure/WordTsar/releases) and unzip it.
+
+The build is self-signed, so macOS warns about an unidentified developer. Right-click `WordTsar.app`, choose Open, then confirm.
 
 ## Building
 
@@ -67,7 +73,7 @@ And, **WordTsar** has simplicity. A quality people miss in our pressured time!
   - **⌘G** (Cmd+G) → Find Again
 
   F1 still works as a bonus for Help if you free it yourself in *System Settings > Keyboard > Keyboard Shortcuts* (Preferences moved fully to ⌘, since F1 now has a real WordStar job). See `KEY_MAPPING.md` for details, or [`docs/QUICKREF.WS`](docs/QUICKREF.WS) for a one-page cheat sheet — it's a WordStar 7 formatted document, so open it in WordTsar (or `ws`) to see it laid out properly; other viewers will just show the raw dot commands.
-- A backup of your file is made every 1 minute. Backups are in Wordstar format.
+- A backup of your file is made every 1 minute. Backups are in WordStar format.
 - The initial page/paper size is 8.5" x 11"
 - WordTsar uses UTF-8 for all in-memory storage of the document and supports Unicode version 16.
 - File → Print currently opens print preview, same as File → Print Preview — real WordStar's `^KP` prints directly instead, a known deviation not yet fixed (see `KEY_MAPPING.md`). The preview dialog has its own Print button, so printing is still reachable. The TUI's own Print menu item (not the `^KP` keystroke) does print directly via CUPS.
@@ -80,7 +86,7 @@ WordTsar is Gerald Brandt's. He designed it, wrote it, and has maintained it for
 
 He is also, by night, a novelist: the San Angeles cyberpunk trilogy — *The Courier*, *The Operative*, *The Rebel* — published by DAW, and the Quantum Empirica books. *The Courier* was a finalist for the Aurora Award and was named by the CBC as one of ten Canadian science fiction books you need to read. And he writes them in WordTsar. In [his own words](https://geraldbrandt.com/about/): IT administration and C++ by day, author by night, working entirely in the WordStar 7 clone he wrote and maintains himself.
 
-That is the rarest thing about this program. It isn't a nostalgia project or a museum piece or someone who like to have fun with vintage computer coding — it's a working writer's daily tool, built by someone who has to live with every decision in it. It shows in the details. And this was inspiring to mee too.
+That is the rarest thing about this program. It isn't a nostalgia project or a museum piece or someone who likes to have fun with vintage computer coding — it's a working writer's daily tool, built by someone who has to live with every decision in it. It shows in the details. And this was inspiring to me too.
 
 For me it has become the quiet place where writing actually happens: no ribbon, no sidebar, no notifications, nothing asking for attention. This fork exists only because I wanted that on one platform, with less to maintain. The original cross-platform WordTsar — Windows, Linux, and macOS — is developed on [SourceForge](https://sourceforge.net/p/wordtsar/mercurial/ci/default/tree/) and remains the one to use. Thank you, Gerald.
 
