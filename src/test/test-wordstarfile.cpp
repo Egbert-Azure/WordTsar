@@ -21,9 +21,14 @@
 
 #include "doctest.h"
 
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include "src/core/include/config.h"
 #include "src/core/document/document.h"
@@ -305,4 +310,88 @@ TEST_CASE("cWordstarFile::LoadFile - footnote sequences")
         CHECK_FALSE(hasFootnote());
         CHECK(document.GetParagraphText(0).rfind("Hi!", 0) == 0);
     }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Loads every .WS file under the directory named by WORDTSAR_ARCHIVE_DIR
+/// (searched recursively, extension matched without regard to case) through
+/// cEditorCtrl::LoadFile(). A file fails when the load returns false, throws,
+/// or leaves an empty document. All failures are reported together. Without
+/// WORDTSAR_ARCHIVE_DIR the test does nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("cEditorCtrl::LoadFile - every .WS file in WORDTSAR_ARCHIVE_DIR loads")
+{
+    const char* archiveEnv = std::getenv("WORDTSAR_ARCHIVE_DIR");
+    if (archiveEnv == nullptr || archiveEnv[0] == '\0')
+    {
+        MESSAGE("WORDTSAR_ARCHIVE_DIR is not set, archive load test skipped");
+        return;
+    }
+
+    const std::filesystem::path archiveDir(archiveEnv);
+    REQUIRE_MESSAGE(std::filesystem::is_directory(archiveDir),
+                    "WORDTSAR_ARCHIVE_DIR is not a directory: " << archiveDir.string());
+
+    std::vector<std::filesystem::path> files;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(archiveDir))
+    {
+        if (entry.is_regular_file() == false)
+        {
+            continue;
+        }
+        std::string ext = entry.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (ext == ".ws")
+        {
+            files.push_back(entry.path());
+        }
+    }
+    std::sort(files.begin(), files.end());
+    REQUIRE_MESSAGE(files.empty() == false, "no .WS files in " << archiveDir.string());
+
+    ensureQApplication();
+
+    std::vector<std::string> failures;
+    for (const std::filesystem::path& path : files)
+    {
+        std::string error;
+        try
+        {
+            cEditorCtrl editor;
+            if (editor.LoadFile(path.string()) == false)
+            {
+                error = "LoadFile returned false";
+            }
+            else if (editor.GetDocument()->GetTextSize() == 0)
+            {
+                error = "document is empty after load";
+            }
+        }
+        catch (const std::exception& e)
+        {
+            error = std::string("exception: ") + e.what();
+        }
+        catch (...)
+        {
+            error = "unknown exception";
+        }
+
+        if (error.empty() == false)
+        {
+            failures.push_back(path.string() + ": " + error);
+        }
+    }
+
+    std::string report;
+    for (const std::string& failure : failures)
+    {
+        report += "\n  " + failure;
+    }
+    MESSAGE(files.size() << " .WS files loaded, " << failures.size() << " failed" << report);
+    CHECK_MESSAGE(failures.empty(), failures.size() << " of " << files.size() << " .WS files failed to load" << report);
 }
