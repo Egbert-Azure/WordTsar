@@ -1296,8 +1296,9 @@ std::vector<sGUIPalette> cConfig::GetGUIPalettes(void)
 /// @return vector of built-in TUI palettes
 ///
 /// @brief
-/// Returns the built-in TUI color palettes. The first palette ("CGA Blue")
-/// matches the constructor defaults exactly.
+/// Returns the built-in TUI color palettes. The first palette ("WordTsar")
+/// matches the constructor defaults except boldForeground and
+/// underlineForeground.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
@@ -1306,8 +1307,8 @@ std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
 
     // ---------------------------------------------------------------
     // Palette 0: "WordTsar" -- default blue theme with custom accents
-    // Values match the cConfig constructor defaults and the user's
-    // hand-tuned config.ini.
+    // Values match the cConfig constructor defaults except
+    // boldForeground (white) and underlineForeground (pink).
     // ---------------------------------------------------------------
     sTUIPalette wordtsar;
     wordtsar.name = "WordTsar";
@@ -1573,7 +1574,7 @@ std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
     palettes.push_back(altCGA);
 
     // ---------------------------------------------------------------
-    // Palette 4: "SFWriter" -- green on black editor area
+    // Palette 4: "Sawyer" -- green on black editor area
     // ---------------------------------------------------------------
     sTUIPalette sfwriter;
     sfwriter.name = "Sawyer";
