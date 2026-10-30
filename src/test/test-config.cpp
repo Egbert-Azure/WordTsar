@@ -28,8 +28,10 @@
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @brief Helper RAII class to temporarily override XDG_CONFIG_HOME
-/// so that palette tests write to a temp directory instead of ~/.config.
+/// @brief Helper RAII class to temporarily override XDG_CONFIG_HOME and HOME
+/// so that config and palette tests write to a temp directory instead of
+/// the per-user config directory (~/.config on Linux,
+/// ~/Library/Application Support on macOS).
 ///
 /////////////////////////////////////////////////////////////////////////////
 class TempConfigDir
@@ -41,36 +43,61 @@ public:
         mTempDir = std::filesystem::temp_directory_path() / "wordtsar-test-palettes";
         std::filesystem::create_directories(mTempDir);
 
-        // Save existing XDG_CONFIG_HOME (if any) and override
-        const char* existing = std::getenv("XDG_CONFIG_HOME");
-        if (existing != nullptr)
-        {
-            mOldValue = existing;
-            mHadOldValue = true;
-        }
-        setenv("XDG_CONFIG_HOME", mTempDir.c_str(), 1);
+        mXdg.Override(mTempDir.c_str());
+        mHome.Override(mTempDir.c_str());
     }
 
     ~TempConfigDir()
     {
-        // Restore original XDG_CONFIG_HOME
-        if (mHadOldValue)
-        {
-            setenv("XDG_CONFIG_HOME", mOldValue.c_str(), 1);
-        }
-        else
-        {
-            unsetenv("XDG_CONFIG_HOME");
-        }
+        mHome.Restore();
+        mXdg.Restore();
 
         // Clean up temp directory
         std::filesystem::remove_all(mTempDir);
     }
 
+    const std::filesystem::path& Path() const { return mTempDir; }
+
 private:
+    // Saves one environment variable, sets it, and puts back the saved
+    // value (or unsets it when it was unset).
+    class SavedEnv
+    {
+    public:
+        explicit SavedEnv(const char* name) : mName(name) {}
+
+        void Override(const char* value)
+        {
+            const char* existing = std::getenv(mName);
+            if (existing != nullptr)
+            {
+                mOldValue = existing;
+                mHadOldValue = true;
+            }
+            setenv(mName, value, 1);
+        }
+
+        void Restore()
+        {
+            if (mHadOldValue)
+            {
+                setenv(mName, mOldValue.c_str(), 1);
+            }
+            else
+            {
+                unsetenv(mName);
+            }
+        }
+
+    private:
+        const char* mName;
+        std::string mOldValue;
+        bool mHadOldValue = false;
+    };
+
     std::filesystem::path mTempDir;
-    std::string mOldValue;
-    bool mHadOldValue = false;
+    SavedEnv mXdg{"XDG_CONFIG_HOME"};
+    SavedEnv mHome{"HOME"};
 };
 
 
@@ -358,6 +385,30 @@ TEST_CASE("Palette file paths are in config dir")
     CHECK(guiPath.find("gui-palettes.ini") != std::string::npos);
     CHECK(tuiPath.find("tui-palettes.ini") != std::string::npos);
 }
+
+
+TEST_CASE("TempConfigDir puts config and palette files inside its temp folder")
+{
+    TempConfigDir tmpDir;
+    const std::string root = tmpDir.Path().string();
+
+    INFO("temp folder: " << root);
+    CAPTURE(cConfig::GetConfigFilePath());
+    REQUIRE(cConfig::GetConfigDir().find(root) == 0);
+    REQUIRE(cConfig::GetConfigFilePath().find(root) == 0);
+    REQUIRE(cConfig::GetGUIPaletteFilePath().find(root) == 0);
+    REQUIRE(cConfig::GetTUIPaletteFilePath().find(root) == 0);
+
+    cConfig config;
+    config.Save();
+    CHECK(std::filesystem::exists(cConfig::GetConfigFilePath()));
+
+    sTUIPalette palette;
+    palette.name = "Isolation";
+    CHECK(cConfig::SaveCustomTUIPalette(palette));
+    CHECK(std::filesystem::exists(cConfig::GetTUIPaletteFilePath()));
+}
+
 
 }  // TEST_SUITE
 
