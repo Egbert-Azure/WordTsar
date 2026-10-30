@@ -75,6 +75,7 @@ public:
     void About(void) override;
     void Quit(void) override;
     void AbandonFile(void) override;
+    void OnSaveAndClose(void) override;
     void Preferences(void) override;
     void SetEnabled(bool enabled) override;
 
@@ -177,7 +178,7 @@ public:
     bool TermSupportsUnderline(void) const { return mTermSupportsUnderline; }
     bool TermSupportsStrikethrough(void) const { return mTermSupportsStrikethrough; }
 
-    // ---- Abandon-file return-to-opening-menu signal (^KQ) ----
+    // ---- Return-to-opening-menu signal (^KQ abandon, ^KD save and close) ----
     bool ReturnToOpeningRequested(void) const { return mReturnToOpening; }
     void ClearReturnToOpening(void) { mReturnToOpening = false; }
 
@@ -253,7 +254,7 @@ private:
 
     // Quit / caret state
     bool mQuit;                                  // True when Quit() requested
-    bool mReturnToOpening;                       // True when ^KQ abandon returns to opening menu
+    bool mReturnToOpening;                       // True when ^KQ abandon or ^KD returns to opening menu
 
     // Terminal attribute capabilities (native bold/italic/underline/strike).
     bool mTermSupportsBold;

@@ -1450,6 +1450,7 @@ bool cWordStarInput::OnControlKChar(char ch)
                 mEditor->SetTitle(mEditor->mFileName) ;
                 mEditor->GetLayout()->SetFilename(mEditor->mFileName) ;
                 mEditor->GetLayout()->SetFileDir(mEditor->mFileDir) ;
+                mEditor->OnSaveAndClose() ;
             }
             break ;
 

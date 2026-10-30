@@ -22,7 +22,13 @@
 
 #include "src/input/wordtsarinput.h"
 #include "src/gui/editor/editorctrl.h"
+#include "src/core/document/document.h"
 #include <QApplication>
+
+#include <filesystem>
+#include <string>
+
+#include <unistd.h>
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -113,4 +119,35 @@ TEST_CASE("cWordStarInput - ESC after a chord restores prior help status")
     // ESC cancels the chord and restores the saved help status.
     input.HandleKey(27);
     CHECK(editor.mHelpDisplay == HELP_MAIN);
+}
+
+
+TEST_CASE("cWordStarInput - GUI ^KD saves and clears, the editor stays open")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kd-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    {
+        cEditorCtrl editor;
+        cWordStarInput input(&editor);
+        POSITION_T emptySize = editor.GetDocument()->GetTextSize();
+
+        editor.mFileDir = dir.string();
+        editor.mFileName = "kd.txt";
+        editor.mFileSet = true;
+        editor.GetDocument()->Insert("some text");
+        REQUIRE(editor.GetDocument()->IsModified() == true);
+
+        CHECK(input.OnControlKChar('d') == true);
+        CHECK(std::filesystem::exists(dir / "kd.txt") == true);
+        CHECK(editor.GetDocument()->GetTextSize() == emptySize);
+        CHECK(editor.mFileSet == false);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
 }

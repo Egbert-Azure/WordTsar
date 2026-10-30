@@ -526,7 +526,7 @@ void cWSWordTsar::InjectControl(int controlCode)
 ///
 /// @brief
 /// After a command runs, act on editor signals: quit (^KX) or return to the
-/// opening menu (^KQ abandon).
+/// opening menu (^KQ abandon, ^KD save and close).
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::CheckCommandSignals(void)

@@ -1811,6 +1811,21 @@ void cWSEditorCtrl::AbandonFile(void)
     mReturnToOpening = true;
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// ^KD has saved and cleared the document: signal the application to return
+/// to the opening menu.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::OnSaveAndClose(void)
+{
+    mReturnToOpening = true;
+}
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @param  std::function<void()> hook [in] the preferences dialog callback

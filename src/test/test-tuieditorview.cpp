@@ -27,6 +27,12 @@
 #include "src/core/document/document.h"
 #include "src/core/layout/layoutbase.h"
 #include "src/core/include/config.h"
+#include "src/input/wordtsarinput.h"
+
+#include <filesystem>
+#include <string>
+
+#include <unistd.h>
 
 
 namespace
@@ -114,4 +120,44 @@ TEST_CASE("cWSEditorCtrl - a new default font updates the column width after rel
     editor.LayoutDocument(true);
     CHECK(editor.GetFont() == "Courier New|24.0|0|0|0|0|0");
     CHECK(editor.GetColumnWidth() > width12);
+}
+
+
+TEST_CASE("cWSEditorCtrl - ^KD saves, clears and returns to the Opening screen")
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-kd-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cWSEditorCtrl editor;
+    cWordStarInput input(&editor);
+    POSITION_T emptySize = editor.GetDocument()->GetTextSize();
+
+    SUBCASE("a named document is saved and closed")
+    {
+        editor.mFileDir = dir.string();
+        editor.mFileName = "kd.txt";
+        editor.mFileSet = true;
+        editor.GetDocument()->Insert("some text");
+        REQUIRE(editor.GetDocument()->IsModified() == true);
+
+        CHECK(input.OnControlKChar('d') == true);
+        CHECK(editor.ReturnToOpeningRequested() == true);
+        CHECK(editor.GetDocument()->GetTextSize() == emptySize);
+        CHECK(std::filesystem::exists(dir / "kd.txt") == true);
+    }
+
+    SUBCASE("an untitled document whose Save As is cancelled stays open")
+    {
+        editor.GetDocument()->Insert("some text");
+        REQUIRE(editor.mFileSet == false);
+
+        CHECK(input.OnControlKChar('d') == false);
+        CHECK(editor.ReturnToOpeningRequested() == false);
+        CHECK(editor.GetDocument()->GetTextSize() == emptySize + 9);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
 }

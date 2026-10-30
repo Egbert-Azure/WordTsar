@@ -188,6 +188,7 @@ public:
     virtual void SystemPreferences(void) {}                   // Show system preferences dialog (default no-op)
     virtual void ToggleFullscreen(void) {}                    // Toggle fullscreen mode (default no-op)
     virtual void AbandonFile(void);                           // Abandon current file (^KQ)
+    virtual void OnSaveAndClose(void) {}                      // After ^KD has saved and cleared the document (default no-op)
 
     // Post-Command Update
     void PerformPostCommandUpdate(void);
