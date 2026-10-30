@@ -15,7 +15,6 @@ WordTsar is no longer Beta.
 **Changes**
 
 - Changed: the Find and Replace dialogs use the WordStar 7 wording ("Find and Replace", "OK", "For Next Occurrence", "Entire File/Global", "Use ? Wildcard Character", "Don't Ask", and so on) (#29, wording only).
-- Changed: WordTsar is no longer Beta.
 
 ## 0.14.1 Beta (2026-10-27)
 

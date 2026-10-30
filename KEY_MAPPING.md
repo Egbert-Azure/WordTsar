@@ -194,7 +194,7 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | W | ^K,W | -- | Write block to file (WS only) |
 | S | ^K,S | -- | Save current file (WS only) |
 | T | ^K,T | -- | Save file with new name (WS only) |
-| D | ^K,D | -- | Save, clear document, reset (WS only) |
+| D | ^K,D | -- | Save and Close (WS only) |
 | X | ^K,X | -- | Save file then quit (WS only) |
 | Q | ^K,Q | -- | Abandon without saving (WS only) |
 | P | ^K,P | -- | Print preview (WS only) |
@@ -322,7 +322,7 @@ Menu shortcuts shown to the user change based on the active input mode. The func
 | Open/Read | -- | Ctrl+O | Load file, replacing the current document |
 | Save | ^KS | Ctrl+S | Save file |
 | Save As | ^KT | Ctrl+Shift+S | Save with new name |
-| Save and Close | ^KD | -- | Save, clear, reset |
+| Save and Close | ^KD | -- | Save and close. The text interface returns to the Opening screen; the graphical interface clears to a new, unnamed document |
 | Print | ^KP | Ctrl+P | Opens print preview [^print-deviation] |
 | Print Preview | ^OP | -- | Print preview |
 | Preferences | -- | -- | System Preferences dialog |
@@ -652,7 +652,7 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^KW | Write block to disk | Write marked block to a file | Yes |
 | ^KS | Save file | Save file | Yes |
 | ^KT | Save as | Save file as | Yes |
-| ^KD | Save and clear | Save file and clear editor | Yes |
+| ^KD | Save and Close | Save file and close it. The text interface returns to the Opening screen; the graphical interface clears to a new, unnamed document | Yes |
 | ^KX | Save and exit | Save file and exit | Yes |
 | ^KQ | Abandon file | Abandon changes and close | Yes |
 | ^KP | Print preview | Print preview | Yes |
