@@ -208,8 +208,9 @@ void AddGrapheme(std::vector<std::string>& words, std::string& word, const std::
 }
 
 // Words of the loaded document. Paragraphs starting with '.' (dot commands
-// and comments) are skipped. A marker is a word separator when it is a tab
-// or a non-break space and is dropped otherwise. Paragraph ends separate words.
+// and comments) are skipped. A marker is a word separator when it is a tab,
+// a non-break space or a line or page break, and is dropped otherwise.
+// Paragraph ends separate words.
 std::vector<std::string> DocumentWords(cDocument* doc)
 {
     std::vector<std::string> words;
@@ -232,7 +233,8 @@ std::vector<std::string> DocumentWords(cDocument* doc)
             if (grapheme.size() == 1 && static_cast<unsigned char>(grapheme[0]) == MARKER_CHAR)
             {
                 eModifiers control = doc->GetControlChar(pos);
-                if (control == STYLE_TAB || control == STYLE_NOBREAK_SPACE)
+                if (control == STYLE_TAB || control == STYLE_NOBREAK_SPACE || control == STYLE_RETURN ||
+                    control == STYLE_LINEFEED || control == STYLE_FORMFEED)
                 {
                     AddGrapheme(words, word, " ");
                 }
