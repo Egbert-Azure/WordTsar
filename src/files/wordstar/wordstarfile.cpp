@@ -85,6 +85,9 @@
 #include "src/core/codepage/cp1252.h"
 #include "src/core/include/utils.h"
 
+// a WordStar binding space (0x0F) is a U+00A0 non-breaking space in the document
+static constexpr CHAR_T NOBREAK_SPACE = 0x00A0 ;
+static const std::string NOBREAK_SPACE_UTF8 = "\xC2\xA0" ;
 
 /// @ingroup File
 /// @{
@@ -844,7 +847,7 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
     for(POSITION_T scan = 0; scan < length; scan++)
     {
         std::string str = mDocument->GetChar(scan) ;
-        if(str.length() > 1)
+        if(str.length() > 1 && str != NOBREAK_SPACE_UTF8)
         {
             // Multi-byte UTF-8 grapheme -- check if the code page can represent it
             std::u32string codepoints ;
@@ -1147,6 +1150,11 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
                         break ;
                 }    // switch
             }  // if
+            else if(str == NOBREAK_SPACE_UTF8)
+            {
+                fputc(STYLE_CTRL_O, mFile) ;          // binding space
+                stylecounter++ ;
+            }
             else            // this is a unicode (UTF-8 char)
             {
                 // check if this is a extended char.
@@ -1561,6 +1569,11 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
                 insert = true ;
                 break ;
 
+            case STYLE_CTRL_O :                 // binding space
+                mDocument->Insert(NOBREAK_SPACE) ;
+                insert = false ;
+                break ;
+
             case STYLE_SEQUENCE :
                 HandleSequence() ;
                 insert = false  ;
@@ -1602,7 +1615,6 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
             case STYLE_NOT_USED1 :
             case STYLE_NOT_USED3 :
             case STYLE_NOT_USED4 :
-            case STYLE_CTRL_O :
             case STYLE_NOT_USED7 :
             case STYLE_NOT_USED8 :
             case STYLE_NOT_USED9 :

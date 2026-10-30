@@ -87,6 +87,54 @@ std::string SequenceBytes(unsigned char type, const std::string &body)
     return seq;
 }
 
+// A WordStar 7 file as cWordstarFile::SaveFile() writes it: the 128 byte
+// header, the body, then ^Z up to the next multiple of 128 bytes
+std::string WordStar7File(const std::string &body)
+{
+    size_t total = 128 + body.size();
+    total += 128 - (total % 128);
+
+    sWSHeader header;
+    memset(&header, 0, sizeof(header));
+    header.version = 0x70;
+    memcpy(header.driver, "LASERJET", 9);
+    header.styles = static_cast<uint32_t>(total);
+
+    std::string bytes("\x1D\x7D\x00\x00", 4);
+    bytes.append(reinterpret_cast<const char*>(&header), sizeof(header));
+    bytes.append("\x7D\x00\x1D", 3);
+    bytes += body;
+    bytes.append(total - bytes.size(), '\x1A');
+    return bytes;
+}
+
+std::string ReadFileBytes(const std::filesystem::path &path)
+{
+    std::ifstream file(path, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+}
+
+// Loads bytes into the editor's document through cWordstarFile, saves the
+// document back and returns the saved bytes
+std::string RoundTrip(cEditorCtrl &editor, const std::string &bytes)
+{
+    cWordstarFile loader;
+    loader.mDocument = editor.GetDocument();
+    cWordstarFile saver(&editor);
+    std::filesystem::path in = TempPath();
+    std::filesystem::path out = TempPath();
+    WriteFileBytes(in, bytes);
+    std::string saved;
+    if (loader.LoadFile(in.string()) &&
+        saver.SaveFile(out.string(), editor.GetDocument()->GetTextSize()))
+    {
+        saved = ReadFileBytes(out);
+    }
+    std::filesystem::remove(in);
+    std::filesystem::remove(out);
+    return saved;
+}
+
 std::string LowerCase(std::string text)
 {
     std::transform(text.begin(), text.end(), text.begin(),
@@ -730,4 +778,27 @@ TEST_CASE("cEditorCtrl::LoadFile - .WS text matches the .TXT beside it in WORDTS
         failed += "\n  " + failure;
     }
     CHECK_MESSAGE(failures.empty(), failures.size() << " of " << pairs.size() << " pairs failed" << failed);
+}
+
+
+TEST_CASE("cWordstarFile - a binding space (0x0F) loads as a non-breaking space and saves back")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    SUBCASE("text without a binding space saves back unchanged")
+    {
+        std::string input = WordStar7File("a b\x0D\x0A");
+        CHECK(RoundTrip(editor, input) == input);
+    }
+
+    SUBCASE("a binding space")
+    {
+        std::string input = WordStar7File(std::string("a\x0F" "b\x0D\x0A", 5));
+        std::string saved = RoundTrip(editor, input);
+
+        CHECK(editor.GetDocument()->GetParagraphText(0).rfind("a\xC2\xA0" "b", 0) == 0);
+        CHECK(saved == input);
+    }
 }
