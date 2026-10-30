@@ -23,10 +23,16 @@
 #include "src/tui/wordtsar.h"
 #include "src/tui/editor/editorctrl.h"
 #include "src/input/wordtsarinput.h"
+#include "src/tui/dialogs/dialoghost.h"
+#include "src/tui/wordstartui/src/dialog.h"
+#include "src/tui/wordstartui/src/theme.h"
+#include "src/tui/wordstartui/src/tuidefs.h"
 
 #include <cstdlib>
+#include <deque>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 
 #include <unistd.h>
@@ -78,6 +84,143 @@ bool StartsWith(const std::string& text, const std::string& prefix)
 {
     return text.compare(0, prefix.size(), prefix) == 0;
 }
+
+std::string ReadText(const std::string& path)
+{
+    std::ifstream in(path);
+    std::stringstream text;
+    text << in.rdbuf();
+    return text.str();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief Changes the working directory and restores it on scope exit.
+///
+/////////////////////////////////////////////////////////////////////////////
+class cWorkingDir
+{
+public:
+    explicit cWorkingDir(const std::string& dir)
+        : mPrevious(std::filesystem::current_path())
+    {
+        std::filesystem::current_path(dir);
+    }
+
+    ~cWorkingDir()
+    {
+        std::error_code ec;
+        std::filesystem::current_path(mPrevious, ec);
+    }
+
+private:
+    std::filesystem::path mPrevious;
+};
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief Dialog host that feeds queued key events to modal dialogs and
+///        counts the file browser modals it runs.
+///
+/////////////////////////////////////////////////////////////////////////////
+class cScriptedHost : public iWSDialogHost
+{
+public:
+    void QueueEnter(void)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_SPECIAL;
+        event.special = wordstartui::SPECIAL_KEY_ENTER;
+        mEvents.push_back(event);
+    }
+
+    void QueueEscape(void)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_SPECIAL;
+        event.special = wordstartui::SPECIAL_KEY_ESCAPE;
+        mEvents.push_back(event);
+    }
+
+    void QueueText(const std::string& text)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_TEXT;
+        event.textUtf8 = text;
+        mEvents.push_back(event);
+    }
+
+    void HostRunModal(wordstartui::cDialog& dialog) override
+    {
+        dialog.FocusFirst();
+        while (dialog.GetResult() == wordstartui::DIALOG_RESULT_NONE)
+        {
+            if (mEvents.empty() == true)
+            {
+                dialog.SetResult(wordstartui::DIALOG_RESULT_CANCEL);
+                break;
+            }
+            dialog.HandleEvent(mEvents.front());
+            mEvents.pop_front();
+        }
+    }
+
+    void HostRunModalRaw(
+        const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
+        const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
+    {
+        (void)draw;
+        mRawModals = mRawModals + 1;
+        while (true)
+        {
+            if (mEvents.empty() == true)
+            {
+                QueueEscape();
+            }
+            wordstartui::sInputEvent event = mEvents.front();
+            mEvents.pop_front();
+            if (handle(event) == false)
+            {
+                break;
+            }
+        }
+    }
+
+    const wordstartui::cTheme& HostTheme(void) override
+    {
+        return mTheme;
+    }
+
+    wordstartui::sTerminalSize HostScreenSize(void) override
+    {
+        wordstartui::sTerminalSize size;
+        size.rows = 40;
+        size.cols = 120;
+        return size;
+    }
+
+    wordstartui::sTerminalCapabilities HostCapabilities(void) override
+    {
+        wordstartui::sTerminalCapabilities caps{};
+        return caps;
+    }
+
+    void HostShowLoadProgress(const std::string& message, int percent) override
+    {
+        (void)message;
+        (void)percent;
+    }
+
+    void HostHideLoadProgress(void) override
+    {
+    }
+
+    int mRawModals = 0;
+
+private:
+    std::deque<wordstartui::sInputEvent> mEvents;
+    wordstartui::cTheme mTheme;
+};
 
 }
 
@@ -143,4 +286,98 @@ TEST_CASE("TUI title bar - untitled document after a save")
         CHECK(editor->mFileSet == false);
         CHECK(StartsWith(app.TestTitleText(), "untitled - WordTsar "));
     }
+}
+
+
+TEST_CASE("TUI close prompt - Save on an untitled document asks for a name")
+{
+    cTempDir dir;
+    cTempDir cwd;
+    cWorkingDir inCwd(cwd.Path(""));
+    std::string chosen = dir.Path("chosen.txt");
+
+    cWSWordTsar app;
+    cWSEditorCtrl* editor = app.TestGetEditor();
+    REQUIRE(editor != nullptr);
+    cScriptedHost host;
+    editor->SetDialogHost(&host);
+    REQUIRE(editor->mFileSet == false);
+    editor->InsertText("first text");
+    REQUIRE(editor->GetDocument()->IsModified() == true);
+
+    host.QueueEnter();
+    host.QueueText(chosen);
+    host.QueueEnter();
+
+    CHECK(editor->CloseEvent() == true);
+    CHECK(host.mRawModals == 1);
+    CHECK(std::filesystem::exists(chosen) == true);
+    CHECK(std::filesystem::is_empty(cwd.Path("")) == true);
+    CHECK(editor->mFileDir == std::filesystem::path(chosen).parent_path().string());
+    CHECK(editor->mFileName == "chosen.txt");
+    CHECK(StartsWith(app.TestTitleText(), "chosen.txt - WordTsar "));
+
+    editor->InsertText(" more");
+    REQUIRE(editor->GetDocument()->IsModified() == true);
+    cWordStarInput input(editor);
+    input.OnControlKChar('s');
+    CHECK(editor->GetDocument()->IsModified() == false);
+    CHECK(ReadText(chosen).find("more") != std::string::npos);
+    CHECK(std::filesystem::is_empty(cwd.Path("")) == true);
+
+    editor->SetDialogHost(&app);
+}
+
+
+TEST_CASE("TUI close prompt - cancelled name prompt keeps an untitled document open")
+{
+    cTempDir cwd;
+    cWorkingDir inCwd(cwd.Path(""));
+
+    cWSWordTsar app;
+    cWSEditorCtrl* editor = app.TestGetEditor();
+    REQUIRE(editor != nullptr);
+    cScriptedHost host;
+    editor->SetDialogHost(&host);
+    editor->InsertText("unsaved text");
+    REQUIRE(editor->GetDocument()->IsModified() == true);
+
+    host.QueueEnter();
+    host.QueueEscape();
+
+    CHECK(editor->CloseEvent() == false);
+    CHECK(host.mRawModals == 1);
+    CHECK(std::filesystem::is_empty(cwd.Path("")) == true);
+    CHECK(editor->GetDocument()->IsModified() == true);
+    CHECK(editor->mFileSet == false);
+
+    editor->SetDialogHost(&app);
+}
+
+
+TEST_CASE("TUI close prompt - Save on a named document saves in place")
+{
+    cTempDir dir;
+    cTempDir cwd;
+    cWorkingDir inCwd(cwd.Path(""));
+    std::string named = dir.WriteText("named.txt", "named file\n");
+
+    cWSWordTsar app;
+    cWSEditorCtrl* editor = app.TestGetEditor();
+    REQUIRE(editor != nullptr);
+    app.TestOpenFromOpening(named);
+    REQUIRE(editor->mFileName == "named.txt");
+    cScriptedHost host;
+    editor->SetDialogHost(&host);
+    editor->InsertText("added ");
+    REQUIRE(editor->GetDocument()->IsModified() == true);
+
+    host.QueueEnter();
+
+    CHECK(editor->CloseEvent() == true);
+    CHECK(host.mRawModals == 0);
+    CHECK(ReadText(named).find("added") != std::string::npos);
+    CHECK(std::filesystem::is_empty(cwd.Path("")) == true);
+
+    editor->SetDialogHost(&app);
 }

@@ -1524,10 +1524,11 @@ std::string cWSEditorCtrl::PromptForSaveFile(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return bool - always true
+/// @return bool - true when it may close (unmodified, Don't Save, or saved);
+///                false on Cancel, a cancelled name prompt or a failed save
 ///
 /// @brief
-/// Handle close. Allows closing unconditionally for now.
+/// Confirm closing a modified document.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::CloseEvent(void)
@@ -1548,9 +1549,13 @@ bool cWSEditorCtrl::CloseEvent(void)
 
     if (choice == 0)
     {
-        std::string filename = mFileName;
+        std::string filename;
 
-        if (filename.empty() == true)
+        if (mFileSet == true)
+        {
+            filename = (std::filesystem::path(mFileDir) / mFileName).string();
+        }
+        else
         {
             filename = PromptForSaveFile();
             if (filename.empty() == true)
