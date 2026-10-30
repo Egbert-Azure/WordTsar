@@ -34,6 +34,21 @@ TUI (terminal-based version):
 
 ![WordTsar running in the terminal](docs/screenshots/ws-terminal.png)
 
+**The terminal version now has the WordStar 7 look.** Grey menu panels, blue hotkey letters, black title and status bars. Select it as the "WordStar 7" palette under System Preferences > Colors.
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/ws-look-block-menu.png" width="100%" alt="Block and Save menu in the WordStar 7 look"></td>
+    <td width="33%"><img src="docs/screenshots/ws-look-edit-menu.png" width="100%" alt="Edit menu in the WordStar 7 look"></td>
+    <td width="33%"><img src="docs/screenshots/ws-look-utilities-menu.png" width="100%" alt="Utilities menu in the WordStar 7 look"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Block &amp; Save menu</sub></td>
+    <td align="center"><sub>Edit menu</sub></td>
+    <td align="center"><sub>Utilities menu</sub></td>
+  </tr>
+</table>
+
 GUI (macOS app version):
 
 ![WordTsar running as a macOS app](docs/screenshots/WordTsar-gui.png)
