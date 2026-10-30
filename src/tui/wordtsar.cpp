@@ -2160,11 +2160,6 @@ std::string cWSWordTsar::TitleText(void) const
     {
         name = mEditor->mFileName;
     }
-    size_t slash = name.find_last_of("/\\");
-    if (slash != std::string::npos)
-    {
-        name = name.substr(slash + 1);
-    }
     if (name.empty() == true)
     {
         name = "untitled";

@@ -1329,6 +1329,10 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
     {
         mFileName = filepath.filename().string();
         mFileDir = filepath.parent_path().string();
+        if (silent == false)
+        {
+            mFileSet = true;
+        }
         mLayout->SetFilename(mFileName);
         mLayout->SetFileDir(mFileDir);
 

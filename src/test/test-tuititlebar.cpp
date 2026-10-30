@@ -23,7 +23,6 @@
 #include "src/tui/wordtsar.h"
 #include "src/tui/editor/editorctrl.h"
 #include "src/input/wordtsarinput.h"
-#include "src/core/document/document.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -112,6 +111,36 @@ TEST_CASE("TUI title bar - shows the file the editor holds")
         cWordStarInput input(editor);
         input.OnControlKChar('d');
         CHECK(app.TestTitleText().find("first.txt") == std::string::npos);
+        CHECK(StartsWith(app.TestTitleText(), "untitled - WordTsar "));
+    }
+}
+
+
+TEST_CASE("TUI title bar - untitled document after a save")
+{
+    cTempDir dir;
+
+    cWSWordTsar app;
+    cWSEditorCtrl* editor = app.TestGetEditor();
+    REQUIRE(editor != nullptr);
+    REQUIRE(editor->mFileSet == false);
+    REQUIRE(StartsWith(app.TestTitleText(), "untitled - WordTsar "));
+
+    SUBCASE("save shows the saved name")
+    {
+        REQUIRE(editor->SaveFile(dir.Path("saved.txt")) == true);
+        CHECK(editor->mFileSet == true);
+        CHECK(StartsWith(app.TestTitleText(), "saved.txt - WordTsar "));
+    }
+
+    SUBCASE("emergency save keeps the document untitled")
+    {
+        editor->mFileDir = dir.Path("");
+        editor->InsertText("unsaved text");
+        std::string emergency = dir.Path(editor->mFileName + ".emergency");
+        editor->EmergencySaveFile(nullptr);
+        REQUIRE(std::filesystem::exists(emergency) == true);
+        CHECK(editor->mFileSet == false);
         CHECK(StartsWith(app.TestTitleText(), "untitled - WordTsar "));
     }
 }
