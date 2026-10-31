@@ -20,6 +20,8 @@
 
 #include "src/tui/dialogs/filebrowser.h"
 
+#include "src/tui/wordstartui/src/utf8helper.h"
+
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
@@ -239,16 +241,17 @@ void cFileBrowser::Rebuild(void)
 /////////////////////////////////////////////////////////////////////////////
 int cFileBrowser::ColumnWidth(void) const
 {
-    size_t longest = 4;
+    int longest = 4;
     for (const sEntry& entry : mEntries)
     {
-        if (entry.name.size() > longest)
+        const int nameWidth = wordstartui::cUtf8Helper::TextWidth(entry.name);
+        if (nameWidth > longest)
         {
-            longest = entry.name.size();
+            longest = nameWidth;
         }
     }
 
-    int width = static_cast<int>(longest) + 2;
+    int width = longest + 2;
     if (width < 12)
     {
         width = 12;
@@ -389,11 +392,7 @@ void cFileBrowser::Draw(cScreen& screen, const cTheme& theme, bool focused)
             }
         }
 
-        std::string name = mEntries[static_cast<size_t>(index)].name;
-        if (static_cast<int>(name.size()) > (width - 1))
-        {
-            name = name.substr(0, static_cast<size_t>(width - 1));
-        }
+        std::string name = wordstartui::cUtf8Helper::FitWidth(mEntries[static_cast<size_t>(index)].name, width - 1);
 
         sRect cell;
         cell.row = screenRow;

@@ -269,6 +269,8 @@ private:
     // --- Caret sync helper ---
     // Helper method to sync base class coordinates to Qt rectangle
     void SyncCaretToQt(void);
+    // Caret area in widget pixels, padded by one pixel; empty if the caret is empty
+    QRect CaretPixelRect(void) const;
 
     // --- Dialog helpers ---
     // Helper method to build file filter string for dialogs

@@ -1345,6 +1345,34 @@ void cEditorCtrl::SyncCaretToQt(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return QRect - caret area in widget pixels, padded by one pixel; empty
+///                 if mCaretPosQt is empty
+///
+/// @brief
+/// Maps mCaretPosQt through the same scale and translation the caret
+/// painter uses.
+///
+/////////////////////////////////////////////////////////////////////////////
+QRect cEditorCtrl::CaretPixelRect(void) const
+{
+    if (mCaretPosQt.isEmpty())
+    {
+        return QRect();
+    }
+
+    QTransform toPixels;
+    toPixels.scale(mPageScale, mPageScale);
+    if (mDisplaySettings.mode == DISPLAY_PAGE)
+    {
+        toPixels.translate(mDisplaySettings.pageBorder, mDisplaySettings.pageBorder);
+    }
+    toPixels.translate(-mHorizScrollOffset, 0);
+    return toPixels.mapRect(mCaretPosQt).toAlignedRect().adjusted(-1, -1, 1, 1);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  value [in] new scrollbar value (in twips)
 ///
 /// @return nothing
@@ -1487,7 +1515,6 @@ void cEditorCtrl::wheelEvent(QWheelEvent* event)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::paintEvent(QPaintEvent* event)
 {
-    UNUSED_ARGUMENT(event);  // Qt passes event, but we repaint entire widget
     QPainter painter(this);
 
     // Check if this is a timer-triggered caret blink
@@ -1503,8 +1530,11 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
         // just the caret toggling on top of it -- visible as flicker/stutter
         // during sustained fast scrolling (e.g. holding an arrow key). Only take
         // the cheap path if nothing has moved since the last full repaint.
+        // The caret-only path paints nothing outside the caret, so it also
+        // requires the paint region to lie inside the caret area.
         SyncCaretToQt();
-        if (mScrollOffset == mLastPaintedScrollOffset && mCaretPosQt == mLastPaintedCaretPosQt)
+        if (mScrollOffset == mLastPaintedScrollOffset && mCaretPosQt == mLastPaintedCaretPosQt
+            && event->region().subtracted(QRegion(CaretPixelRect())).isEmpty())
         {
             painter.save();
             painter.scale(mPageScale, mPageScale);
@@ -3232,7 +3262,19 @@ void cEditorCtrl::DrawCaret(QPainter& painter)
 void cEditorCtrl::OnCaretTimer(void)
 {
     mDoDrawCaret = true;
-    update();
+
+    // The blink-only paint draws just the caret, so request only the caret
+    // area; a moved caret or scroll needs the whole widget.
+    SyncCaretToQt();
+    if (mScrollOffset == mLastPaintedScrollOffset && mCaretPosQt == mLastPaintedCaretPosQt
+        && mCaretPosQt.isEmpty() == false)
+    {
+        update(CaretPixelRect());
+    }
+    else
+    {
+        update();
+    }
 
     // mCaretTimer is single-shot, so it must be restarted every tick to keep
     // blinking. It used to be restarted only inside DrawCaret() -- but the

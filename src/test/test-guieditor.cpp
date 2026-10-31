@@ -33,6 +33,7 @@
 #include <QClipboard>
 #include <QTimer>
 #include <QMetaObject>
+#include <QPaintEvent>
 
 #include <filesystem>
 #include <fstream>
@@ -14886,4 +14887,93 @@ TEST_CASE("cEditorCtrl - a default font descriptor sets the body text font")
     CAPTURE(line->segments[0].font);
     CHECK(body.fixedPitch());
     CHECK(body.pointSizeF() == doctest::Approx(10.0));
+}
+
+
+namespace {
+class cPaintRegionRecorder : public QObject
+{
+public:
+    QRegion painted;
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override
+    {
+        if (event->type() == QEvent::Paint)
+        {
+            painted += static_cast<QPaintEvent*>(event)->region();
+        }
+        return QObject::eventFilter(watched, event);
+    }
+};
+}
+
+// The blink-only paint draws nothing but the caret, so a blink tick must not
+// request a repaint of the whole widget: the rest of a full-widget update
+// region is left unpainted.
+TEST_CASE("cEditorCtrl - a caret blink tick repaints only the caret area")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    editor.resize(800, 600);
+    editor.GetDocument()->Insert("Hello world\rSecond line of text\r");
+    editor.LayoutDocument(true);
+    editor.GetDocument()->SetPosition(3);
+    editor.PerformVisualUpdate();
+    editor.show();
+    for (int i = 0; i < 5; ++i)
+    {
+        QApplication::processEvents();
+    }
+
+    cPaintRegionRecorder recorder;
+    editor.installEventFilter(&recorder);
+
+    QMetaObject::invokeMethod(&editor, "OnCaretTimer", Qt::DirectConnection);
+    for (int i = 0; i < 5; ++i)
+    {
+        QApplication::processEvents();
+    }
+    editor.removeEventFilter(&recorder);
+    editor.hide();
+
+    REQUIRE(recorder.painted.isEmpty() == false);
+    QRect bounds = recorder.painted.boundingRect();
+    CAPTURE(bounds);
+    CHECK(bounds.height() < editor.height() / 4);
+    CHECK(bounds.width() < editor.width() / 4);
+}
+
+// A paint whose region extends past the caret must take the full-repaint
+// path even when a blink tick is pending: the caret-only path leaves the
+// rest of the region unpainted.
+TEST_CASE("cEditorCtrl - a full-widget paint after a blink tick repaints the whole widget")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    editor.resize(800, 600);
+    editor.GetDocument()->Insert("Hello world\rSecond line of text\r");
+    editor.LayoutDocument(true);
+    editor.GetDocument()->SetPosition(3);
+    editor.PerformVisualUpdate();
+    editor.show();
+    for (int i = 0; i < 5; ++i)
+    {
+        QApplication::processEvents();
+    }
+
+    QMetaObject::invokeMethod(&editor, "OnCaretTimer", Qt::DirectConnection);
+
+    const QColor sentinel(255, 0, 255);
+    QImage image(editor.size(), QImage::Format_ARGB32);
+    image.fill(sentinel);
+    editor.render(&image);
+    editor.hide();
+
+    QPoint farCorner(editor.width() - 2, editor.height() - 2);
+    CAPTURE(farCorner);
+    CHECK(image.pixelColor(farCorner) != sentinel);
+    CHECK(image.pixelColor(QPoint(editor.width() / 2, editor.height() / 2)) != sentinel);
 }
