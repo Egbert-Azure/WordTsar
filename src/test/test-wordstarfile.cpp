@@ -29,6 +29,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -781,6 +782,470 @@ TEST_CASE("cEditorCtrl::LoadFile - .WS text matches the .TXT beside it in WORDTS
         failed += "\n  " + failure;
     }
     CHECK_MESSAGE(failures.empty(), failures.size() << " of " << pairs.size() << " pairs failed" << failed);
+}
+
+
+namespace
+{
+
+// .HE, .H1-.H5, .FO, .F1-.F5 without regard to case
+bool IsHeaderFooterCommand(const std::string& text)
+{
+    if (text.size() < 3 || text[0] != '.')
+    {
+        return false;
+    }
+    char a = static_cast<char>(std::tolower(static_cast<unsigned char>(text[1])));
+    char b = static_cast<char>(std::tolower(static_cast<unsigned char>(text[2])));
+    if (a == 'h')
+    {
+        return b == 'e' || (b >= '1' && b <= '5');
+    }
+    if (a == 'f')
+    {
+        return b == 'o' || (b >= '1' && b <= '5');
+    }
+    return false;
+}
+
+// Category of a difference at a marker of type control
+std::string MarkerCategory(eModifiers control)
+{
+    if (control == STYLE_TAB)
+    {
+        return "tab";
+    }
+    if (control == STYLE_FOOTNOTE || control == STYLE_ENDNOTE)
+    {
+        return "note";
+    }
+    return "formatting";
+}
+
+// Category of the first difference between paragraph para of a and of b,
+// or an empty string when they agree. Text graphemes are compared as UTF-8;
+// markers by control type and, for tabs, fonts, colours and variables, by
+// their attribute values. Differences in a dot-command paragraph are
+// "dot command", in a header or footer command "header-footer".
+std::string CompareParagraph(cDocument* a, cDocument* b, PARAGRAPH_T para)
+{
+    std::string textA = a->GetParagraphText(para);
+    std::string textB = b->GetParagraphText(para);
+    std::string kind;
+    if (IsHeaderFooterCommand(textA) || IsHeaderFooterCommand(textB))
+    {
+        kind = "header-footer";
+    }
+    else if ((textA.empty() == false && textA[0] == '.') || (textB.empty() == false && textB[0] == '.'))
+    {
+        kind = "dot command";
+    }
+
+    POSITION_T startA = 0;
+    POSITION_T endA = 0;
+    POSITION_T startB = 0;
+    POSITION_T endB = 0;
+    a->GetParagraphStartandEnd(para, startA, endA);
+    b->GetParagraphStartandEnd(para, startB, endB);
+    POSITION_T lengthA = endA - startA + 1;
+    POSITION_T lengthB = endB - startB + 1;
+
+    std::string category;
+    for (POSITION_T i = 0; i < std::max(lengthA, lengthB) && category.empty(); i++)
+    {
+        bool haveA = i < lengthA;
+        bool haveB = i < lengthB;
+        std::string chA = haveA ? a->GetCharNoAdvance(startA + i) : std::string();
+        std::string chB = haveB ? b->GetCharNoAdvance(startB + i) : std::string();
+        bool markerA = chA.size() == 1 && static_cast<unsigned char>(chA[0]) == MARKER_CHAR;
+        bool markerB = chB.size() == 1 && static_cast<unsigned char>(chB[0]) == MARKER_CHAR;
+        eModifiers controlA = markerA ? a->GetControlChar(startA + i) : STYLE_EOF;
+        eModifiers controlB = markerB ? b->GetControlChar(startB + i) : STYLE_EOF;
+
+        if (markerA == false && markerB == false)
+        {
+            if (chA != chB)
+            {
+                category = "text";
+            }
+            continue;
+        }
+        if (markerA != markerB || controlA != controlB)
+        {
+            category = MarkerCategory(markerA ? controlA : controlB);
+            if (category == "formatting")
+            {
+                category += markerA == markerB ? " (marker type)" : " (marker against text)";
+            }
+            continue;
+        }
+        POSITION_T posA = startA + i;
+        POSITION_T posB = startB + i;
+        if (controlA == STYLE_TAB)
+        {
+            sWSTab tabA = a->GetTab(posA);
+            sWSTab tabB = b->GetTab(posB);
+            if (tabA.tabsize != tabB.tabsize || tabA.abstabsize != tabB.abstabsize ||
+                tabA.type != tabB.type || tabA.size != tabB.size)
+            {
+                category = "tab";
+            }
+        }
+        else if (controlA == STYLE_FONT1)
+        {
+            sInternalFonts fontA{};
+            sInternalFonts fontB{};
+            bool gotA = a->GetFont(posA, fontA);
+            bool gotB = b->GetFont(posB, fontB);
+            if (gotA != gotB || fontA.fontname != fontB.fontname || fontA.size != fontB.size ||
+                fontA.name != fontB.name || fontA.haveWSFont != fontB.haveWSFont ||
+                (fontA.haveWSFont && memcmp(&fontA.wsfont, &fontB.wsfont, sizeof(sWSFont)) != 0))
+            {
+                category = "formatting (font)";
+            }
+        }
+        else if (controlA == STYLE_INTERNAL_COLOR)
+        {
+            sSeqRGBColor colorA{};
+            sSeqRGBColor colorB{};
+            bool gotA = a->GetColor(posA, colorA);
+            bool gotB = b->GetColor(posB, colorB);
+            if (gotA != gotB || colorA.red != colorB.red || colorA.green != colorB.green ||
+                colorA.blue != colorB.blue || colorA.alpha != colorB.alpha)
+            {
+                category = "formatting (colour)";
+            }
+        }
+        else if (controlA == STYLE_VARIABLE)
+        {
+            if (a->GetVariable(posA) != b->GetVariable(posB))
+            {
+                category = "formatting (variable)";
+            }
+        }
+    }
+
+    if (category.empty() || kind.empty())
+    {
+        return category;
+    }
+    return kind;
+}
+
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// For every WordStar file under WORDTSAR_ARCHIVE_DIR (recursive): files
+/// with extension .WS (any case), and files of any other extension that
+/// cWordstarFile::CheckType() accepts by content. Each file is loaded, saved
+/// through cWordstarFile::SaveFile() into a temporary directory, the saved
+/// copy is loaded, and the two documents are compared paragraph by
+/// paragraph (see CompareParagraph()). A file fails when the two loads
+/// differ, a load or save fails, or anything throws. A failing file listed
+/// in kKnownRoundTripFailures is reported as a message; an unlisted failing
+/// file and a listed file that passes fail the test. Byte differences
+/// between the original and the saved file are reported as messages only.
+/// Output names files, paragraph indices and categories, never text.
+/// Without WORDTSAR_ARCHIVE_DIR the test does nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+// Archive files (relative to WORDTSAR_ARCHIVE_DIR) whose two loads differ
+const std::set<std::string> kKnownRoundTripFailures =
+{
+    "ARTICLES/FORMFEED.WS",
+    "ARTICLES/YOURWAY.WS",
+    "ASCWS.COM",
+    "CONVERT/FLTRMENU.DEF",
+    "DEFAULT/CONVERT/FLTRMENU.DEF",
+    "DEFAULT/DB00.DTB",
+    "DEFAULT/DB00.DTC",
+    "DEFAULT/DB00.DTD",
+    "DEFAULT/DB00.DTE",
+    "DEFAULT/DB00.DTI",
+    "DEFAULT/DB02.DTD",
+    "DEFAULT/DB02.DTF",
+    "DEFAULT/DB02.DTH",
+    "DEFAULT/DB02.DTI",
+    "DEFAULT/INSET/CAPMSG.TXT",
+    "DEFAULT/OPTIONS/LABEL3A",
+    "DEFAULT/OPTIONS/LABELA",
+    "DEFAULT/OPTIONS/LABELXLA",
+    "DEFAULT/OPTIONS/ROLODEXA",
+    "DEFAULT/OPTIONS/WSLIST.OVR",
+    "DEFAULT/PRINT.TST",
+    "DEFAULT/REVIEW.DOC",
+    "DEFAULT/TABLES2.OVR",
+    "DEFAULT/WSCHANGE.OVR",
+    "DICT/THESR002.DCT",
+    "DICT/THESR033.DCT",
+    "DICT/THESR034.DCT",
+    "DICT/THESR039.DCT",
+    "DICT/THESR049.DCT",
+    "DOSBox-X/languages/es_ES.lng",
+    "DOSBox-X/languages/fr_FR.lng",
+    "DOSBox-X/languages/zh_CN.lng",
+    "FONTS/PS/BKIQTD.PFB",
+    "FONTS/PS/BLIQTD.PFB",
+    "FONTS/PS/BMIQTD.PFB",
+    "FONTS/PS/BNKGOTHM.PFB",
+    "FONTS/PS/coo_____.pfb",
+    "FONTS/PS/Cur10ptn.pfb",
+    "FONTS/PS/SYMST_LM.PFB",
+    "FONTS/PS/zx______.pfb",
+    "FONTS/PS/zy______.pfb",
+    "HIJAAK/ISI0.TMP",
+    "HIJAAK/ISI2.TMP",
+    "INSET/CAPMSG.TXT",
+    "INSTALL/TABLES2.OVR",
+    "LJ6DTP.WS",
+    "LSRBOX/LSRBOX.WS",
+    "LSRBOX/LSRBOXES.MRG",
+    "LSRBOX/LSRLINES.MRG",
+    "LSRBOX/PAGE.RND",
+    "MACROS/HOLYMAC/-HOLYMAC.WS",
+    "MACROS/HOLYMAC/4MAC2",
+    "MACROS/HOLYMAC/4MAC3",
+    "MACROS/SAWYER/_BULLSML.WSM",
+    "MACROS/SAWYER/_NEXT.WSM",
+    "MACROS/SAWYER/_NX-3.WSM",
+    "MACROS/SAWYER/_NX-4.WSM",
+    "MACROS/SAWYER/_PREV.WSM",
+    "MACROS/SAWYER/_PV-3.WSM",
+    "MACROS/SAWYER/_PV-4.WSM",
+    "MACROS/SAWYER/_RTF-0.WSM",
+    "MACROS/SAWYER/-MAKEDTP.WS",
+    "MACROS/SAWYER/BULLTAB.WSM",
+    "MACROS/SAWYER/GO2PG&LN.WSM",
+    "MACROS/SAWYER/QAP0.WSM",
+    "MACROS/SAWYER/QFP0.WSM",
+    "MACROS/SAWYER/WW.WSM",
+    "MAILLIST/LABEL3A",
+    "MAILLIST/LABELA",
+    "MAILLIST/LABELXLA",
+    "MAILLIST/ROLODEXA",
+    "MAILLIST/WSLIST.OVR",
+    "MICKEE/MICKEE.WS",
+    "MICKEE/WS.DEF",
+    "PRINT.TST",
+    "PRINTER.PS",
+    "PRINTERS/DB00.DTB",
+    "PRINTERS/DB00.DTC",
+    "PRINTERS/DB00.DTD",
+    "PRINTERS/DB00.DTE",
+    "PRINTERS/DB00.DTI",
+    "PRINTERS/DB02.DTD",
+    "PRINTERS/DB02.DTF",
+    "PRINTERS/DB02.DTH",
+    "PRINTERS/DB02.DTI",
+    "PRINTERS/FONTCRIB.PS",
+    "PRINTERS/fontcrib.ws",
+    "PSPRINT.TST",
+    "REF/ASCIITAB.WS",
+    "REF/BOOKLET.WS",
+    "REF/BULLET.WS",
+    "REF/PP.WS",
+    "REF/SYMBOL.CHT",
+    "REF/WINGDING.CHT",
+    "REVIEW.DOC",
+    "RTF-RJS/_RTF-0.WSM",
+    "RTF-RJS/NOVEL.WS",
+    "RTF-RJS/SKIPTEST.WS",
+    "TABLES2.OVR",
+    "UTIL/ASCWS.COM",
+    "UTIL/WS5WS4.COM",
+    "UTIL/WSOLD.COM",
+    "vDosPlus/Language.ini",
+    "WSCHANGE.OVR",
+    "WSOLD.COM",
+};
+
+TEST_CASE("cWordstarFile - every WordStar file in WORDTSAR_ARCHIVE_DIR loads the same after a save")
+{
+    const char* archiveEnv = std::getenv("WORDTSAR_ARCHIVE_DIR");
+    if (archiveEnv == nullptr || archiveEnv[0] == '\0')
+    {
+        MESSAGE("WORDTSAR_ARCHIVE_DIR is not set, archive round-trip test skipped");
+        return;
+    }
+
+    const std::filesystem::path archiveDir(archiveEnv);
+    REQUIRE_MESSAGE(std::filesystem::is_directory(archiveDir),
+                    "WORDTSAR_ARCHIVE_DIR is not a directory: " << archiveDir.string());
+
+    ensureQApplication();
+
+    std::vector<std::filesystem::path> files;
+    size_t wsCount = 0;
+    size_t otherCount = 0;
+    std::map<std::string, size_t> otherExtensions;
+    {
+        cWordstarFile checker;
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(archiveDir))
+        {
+            if (entry.is_regular_file() == false)
+            {
+                continue;
+            }
+            std::string ext = LowerCase(entry.path().extension().string());
+            if (ext == ".ws")
+            {
+                files.push_back(entry.path());
+                wsCount++;
+            }
+            else if (checker.CheckType(entry.path().string()))
+            {
+                files.push_back(entry.path());
+                otherCount++;
+                otherExtensions[ext.empty() ? "(none)" : ext]++;
+            }
+        }
+    }
+    std::sort(files.begin(), files.end());
+    REQUIRE_MESSAGE(files.empty() == false, "no WordStar files in " << archiveDir.string());
+
+    std::filesystem::path tempDir = std::filesystem::temp_directory_path() / "wordtsar_archive_roundtrip";
+    std::filesystem::remove_all(tempDir);
+    std::filesystem::create_directories(tempDir);
+
+    const size_t shownParagraphs = 10;
+    size_t passed = 0;
+    size_t failed = 0;
+    size_t knownFailed = 0;
+    std::vector<std::string> byteDifferences;
+    std::map<std::string, std::vector<std::string>> filesByCategory;
+    size_t index = 0;
+    for (const std::filesystem::path& path : files)
+    {
+        std::string name = std::filesystem::relative(path, archiveDir).string();
+        std::filesystem::path saved = tempDir / (std::to_string(index++) + ".ws");
+        std::map<std::string, size_t> categoryCounts;
+        std::ostringstream details;
+        size_t shown = 0;
+        auto record = [&](const std::string& category, long paragraph)
+        {
+            categoryCounts[category]++;
+            if (shown < shownParagraphs)
+            {
+                details << "\n  ";
+                if (paragraph >= 0)
+                {
+                    details << "paragraph " << paragraph << ": ";
+                }
+                details << category;
+                shown++;
+            }
+        };
+
+        try
+        {
+            cEditorCtrl first;
+            if (first.LoadFile(path.string()) == false)
+            {
+                record("load", -1);
+            }
+            else
+            {
+                cWordstarFile saver(&first);
+                saver.SetSilent(true);
+                if (saver.SaveFile(saved.string(), first.GetDocument()->GetTextSize()) == false)
+                {
+                    record("save", -1);
+                }
+                else
+                {
+                    if (ReadFileBytes(path) != ReadFileBytes(saved))
+                    {
+                        byteDifferences.push_back(name);
+                    }
+                    cEditorCtrl second;
+                    if (second.LoadFile(saved.string()) == false)
+                    {
+                        record("reload", -1);
+                    }
+                    else
+                    {
+                        cDocument* a = first.GetDocument();
+                        cDocument* b = second.GetDocument();
+                        PARAGRAPH_T countA = a->GetNumberofParagraphs();
+                        PARAGRAPH_T countB = b->GetNumberofParagraphs();
+                        if (countA != countB)
+                        {
+                            record("paragraph count", -1);
+                        }
+                        for (PARAGRAPH_T para = 0; para < std::min(countA, countB); para++)
+                        {
+                            std::string category = CompareParagraph(a, b, para);
+                            if (category.empty() == false)
+                            {
+                                record(category, static_cast<long>(para));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (const std::exception&)
+        {
+            record("exception", -1);
+        }
+        catch (...)
+        {
+            record("exception", -1);
+        }
+        std::filesystem::remove(saved);
+
+        bool known = kKnownRoundTripFailures.count(name) > 0;
+        if (categoryCounts.empty())
+        {
+            passed++;
+            CHECK_MESSAGE(known == false, name << ": passes now, remove it from kKnownRoundTripFailures");
+            continue;
+        }
+        failed++;
+        std::ostringstream counts;
+        for (const auto& category : categoryCounts)
+        {
+            filesByCategory[category.first].push_back(name);
+            counts << " " << category.first << "=" << category.second;
+        }
+        if (known)
+        {
+            knownFailed++;
+            MESSAGE(name << ": known round-trip failure:" << counts.str() << details.str());
+        }
+        else
+        {
+            CHECK_MESSAGE(false, name << ": two loads differ:" << counts.str() << details.str());
+        }
+    }
+    std::filesystem::remove_all(tempDir);
+
+    std::ostringstream extensions;
+    for (const auto& ext : otherExtensions)
+    {
+        extensions << " " << ext.first << "=" << ext.second;
+    }
+    std::ostringstream categories;
+    for (const auto& category : filesByCategory)
+    {
+        categories << "\n" << category.first << ": " << category.second.size() << " files";
+        for (const std::string& name : category.second)
+        {
+            categories << "\n  " << name;
+        }
+    }
+    std::ostringstream bytes;
+    for (const std::string& name : byteDifferences)
+    {
+        bytes << "\n  " << name;
+    }
+    MESSAGE("round trip: " << files.size() << " files (" << wsCount << " .WS, " << otherCount
+            << " other extensions:" << extensions.str() << "), " << passed << " passed, " << failed
+            << " failed (" << knownFailed << " listed as known)" << categories.str()
+            << "\nsaved bytes differ from the original: " << byteDifferences.size() << " files" << bytes.str());
 }
 
 
