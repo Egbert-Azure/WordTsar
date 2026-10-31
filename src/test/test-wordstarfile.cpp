@@ -1502,3 +1502,130 @@ TEST_CASE("cWordstarFile - a soft tab after a style marker at the start of a par
     REQUIRE(layout != nullptr);
     CHECK(layout->isCommand == false);
 }
+
+
+namespace
+{
+
+// Saves the editor's document through cWordstarFile, clears it, loads the
+// saved file back and returns the saved bytes
+std::string SaveAndReload(cEditorCtrl &editor)
+{
+    cDocument *doc = editor.GetDocument();
+    cWordstarFile saver(&editor);
+    std::filesystem::path out = TempPath();
+    std::string saved;
+    if (saver.SaveFile(out.string(), doc->GetTextSize()))
+    {
+        saved = ReadFileBytes(out);
+        doc->Clear();
+        cWordstarFile loader;
+        loader.mDocument = doc;
+        if (loader.LoadFile(out.string()) == false)
+        {
+            saved.clear();
+        }
+    }
+    std::filesystem::remove(out);
+    return saved;
+}
+
+}
+
+
+TEST_CASE("cWordstarFile - a soft tab moved inside a paragraph is kept after a save")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+    cDocument *doc = editor.GetDocument();
+
+    SUBCASE("joining two paragraphs")
+    {
+        std::string input = WordStar7File("abc\x0D\x0A" + TabSequence(TAB_SOFT) + ".xx text\x0D\x0A");
+        RoundTrip(editor, input);
+
+        doc->SetPosition(3);
+        doc->Delete(3, 1);
+
+        std::string text = doc->GetParagraphText(0);
+        REQUIRE(text.size() > 4);
+        REQUIRE(text.rfind("abc", 0) == 0);
+        REQUIRE(static_cast<unsigned char>(text[3]) == MARKER_CHAR);
+        REQUIRE(doc->GetTab(3).type == TAB_SOFT);
+
+        REQUIRE(SaveAndReload(editor).empty() == false);
+
+        text = doc->GetParagraphText(0);
+        REQUIRE(text.size() > 3);
+        CHECK(text.rfind("abc", 0) == 0);
+        CHECK(static_cast<unsigned char>(text[3]) == MARKER_CHAR);
+        CHECK(doc->GetControlChar(3) == STYLE_TAB);
+        CHECK(doc->GetTab(3).type == TAB_TAB);
+        CHECK(text.find(".xx text") == 4);
+    }
+
+    SUBCASE("typing in front of a leading soft tab")
+    {
+        std::string input = WordStar7File(TabSequence(TAB_SOFT) + ".xx text\x0D\x0A");
+        RoundTrip(editor, input);
+
+        doc->SetPosition(0);
+        doc->Insert(static_cast<CHAR_T>('Z'));
+        REQUIRE(doc->GetTab(1).type == TAB_SOFT);
+
+        REQUIRE(SaveAndReload(editor).empty() == false);
+
+        std::string text = doc->GetParagraphText(0);
+        REQUIRE(text.size() > 2);
+        CHECK(text[0] == 'Z');
+        CHECK(static_cast<unsigned char>(text[1]) == MARKER_CHAR);
+        CHECK(doc->GetControlChar(1) == STYLE_TAB);
+        CHECK(doc->GetTab(1).type == TAB_TAB);
+        CHECK(text.find(".xx text") == 2);
+    }
+
+    SUBCASE("pasting a soft tab into the middle of a paragraph")
+    {
+        std::string input = WordStar7File(TabSequence(TAB_SOFT) + ".xx text\x0D\x0A" "hello world\x0D\x0A");
+        RoundTrip(editor, input);
+
+        doc->SetPosition(0);
+        doc->SetBeginBlock();
+        doc->SetPosition(1);
+        doc->SetEndBlock();
+        doc->Copy();
+
+        POSITION_T start;
+        POSITION_T end;
+        doc->GetParagraphStartandEnd(1, start, end);
+        doc->SetPosition(start + 5);
+        doc->Paste();
+
+        std::string text = doc->GetParagraphText(1);
+        REQUIRE(text.size() > 6);
+        REQUIRE(static_cast<unsigned char>(text[5]) == MARKER_CHAR);
+        REQUIRE(doc->GetTab(start + 5).type == TAB_SOFT);
+
+        REQUIRE(SaveAndReload(editor).empty() == false);
+
+        REQUIRE(doc->GetNumberofParagraphs() >= 2);
+        doc->GetParagraphStartandEnd(1, start, end);
+        text = doc->GetParagraphText(1);
+        REQUIRE(text.size() > 6);
+        CHECK(text.rfind("hello", 0) == 0);
+        CHECK(static_cast<unsigned char>(text[5]) == MARKER_CHAR);
+        CHECK(doc->GetControlChar(start + 5) == STYLE_TAB);
+        CHECK(doc->GetTab(start + 5).type == TAB_TAB);
+        CHECK(text.find(" world") == 6);
+
+        // the copied soft tab is still at the start of paragraph 0
+        CHECK(doc->GetTab(0).type == TAB_SOFT);
+    }
+
+    SUBCASE("a leading soft tab still saves byte-identical")
+    {
+        std::string input = WordStar7File(TabSequence(TAB_SOFT) + ".xx text\x0D\x0A");
+        CHECK(RoundTrip(editor, input) == input);
+    }
+}

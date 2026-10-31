@@ -982,6 +982,18 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
 
                             tab = mDocument->GetTab(loop) ;
 
+                            // a soft tab is written as such only at the start of a paragraph
+                            if(tab.type == TAB_SOFT)
+                            {
+                                POSITION_T start ;
+                                POSITION_T end ;
+                                mDocument->GetParagraphStartandEnd(mDocument->GetParagraphFromPosition(loop), start, end) ;
+                                if(loop != start)
+                                {
+                                    tab.type = TAB_TAB ;
+                                }
+                            }
+
                             intro.size = 10 ;
                             intro.type = eSequence::SEQ_TAB ;
 
