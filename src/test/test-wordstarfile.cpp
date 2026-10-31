@@ -807,6 +807,28 @@ TEST_CASE("cWordstarFile - a binding space (0x0F) loads as a non-breaking space 
 }
 
 
+TEST_CASE("cWordstarFile - binding spaces between words survive load and two saves")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    std::string input = WordStar7File("00h\x0F" "through\x0F" "1Fh.\x0D\x0A");
+    std::string saved = RoundTrip(editor, input);
+
+    std::string text = editor.GetDocument()->GetParagraphText(0);
+    CHECK(text.rfind("00h\xC2\xA0" "through\xC2\xA0" "1Fh.", 0) == 0);
+    CHECK(text.find("00hthrough") == std::string::npos);
+    CHECK(text.find('\x0F') == std::string::npos);
+    CHECK(saved == input);
+
+    editor.GetDocument()->Clear();
+    std::string resaved = RoundTrip(editor, saved);
+    CHECK(editor.GetDocument()->GetParagraphText(0).rfind("00h\xC2\xA0" "through\xC2\xA0" "1Fh.", 0) == 0);
+    CHECK(resaved == input);
+}
+
+
 namespace
 {
 
