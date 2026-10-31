@@ -142,6 +142,7 @@ std::string cTextMeasurement::GetDisplayCharacter(POSITION_T documentPos,
             switch (tabInfo.type)
             {
                 case TAB_TAB:
+                case TAB_SOFT:
                 {
                     displayChar = '>';
                     break;

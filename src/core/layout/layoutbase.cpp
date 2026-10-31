@@ -4754,7 +4754,7 @@ void cLayoutBase::WordWrapSegmentsIntoLines(const std::vector<sSegmentLayout>& s
             }
             else
             {
-                // TAB_TAB / TAB_DECIMAL -- expand to next tab stop
+                // TAB_TAB / TAB_SOFT / TAB_DECIMAL -- expand to next tab stop
                 COORD_T currentLineX = currentLine.pagex + currentLineWidth;
 
                 // Tab stops are margin-relative, currentLineX is absolute page coords.
@@ -5505,8 +5505,8 @@ void cLayoutBase::FinalizeLine(sLineLayout& line, COORD_T maxLineWidth, bool isF
 
             // TAB_CENTER/TAB_RIGHT are line-alignment markers -- no expanding width.
             // Their effect is handled by alignmentOffset above via centerLine/rightLine.
-            // Only TAB_TAB and TAB_DECIMAL advance currentX by tabWidth.
-            if (segment.tabType == TAB_TAB || segment.tabType == TAB_DECIMAL)
+            // Only TAB_TAB, TAB_SOFT and TAB_DECIMAL advance currentX by tabWidth.
+            if (segment.tabType == TAB_TAB || segment.tabType == TAB_SOFT || segment.tabType == TAB_DECIMAL)
             {
                 // Advance to the tab stop position
                 currentX += segment.tabWidth;

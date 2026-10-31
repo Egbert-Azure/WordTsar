@@ -36,6 +36,7 @@
 #include "src/core/codepage/cp437.h"
 #include "src/core/include/config.h"
 #include "src/core/document/document.h"
+#include "src/core/layout/layoutbase.h"
 #include "src/files/wordstar/wordstarfile.h"
 #include "src/gui/editor/editorctrl.h"
 #include <QApplication>
@@ -802,5 +803,126 @@ TEST_CASE("cWordstarFile - a binding space (0x0F) loads as a non-breaking space 
 
         CHECK(editor.GetDocument()->GetParagraphText(0).rfind("a\xC2\xA0" "b", 0) == 0);
         CHECK(saved == input);
+    }
+}
+
+
+namespace
+{
+
+// sWSTab body: tabsize 720, abstabsize 720, type, size 5
+std::string TabBody(unsigned char type)
+{
+    std::string body("\xD0\x02\xD0\x02", 4);
+    body += static_cast<char>(type);
+    body += '\x05';
+    return body;
+}
+
+std::string TabSequence(unsigned char type)
+{
+    return SequenceBytes(SEQ_TAB, TabBody(type));
+}
+
+const sParagraphLayout* LayoutParagraph(cEditorCtrl &editor, PARAGRAPH_T para)
+{
+    editor.GetLayout()->LayoutDocument(editor.GetDocument());
+    return editor.GetLayout()->GetParagraphLayout(para);
+}
+
+}
+
+
+TEST_CASE("cWordstarFile - a soft tab at the start of a paragraph keeps a following period as text")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+    cDocument *doc = editor.GetDocument();
+
+    std::string input = WordStar7File(TabSequence(TAB_SOFT) + ".xx text\x0D\x0A");
+
+    SUBCASE("loads as a tab marker followed by text")
+    {
+        RoundTrip(editor, input);
+
+        std::string text = doc->GetParagraphText(0);
+        REQUIRE(text.empty() == false);
+        CHECK(text[0] == MARKER_CHAR);
+        CHECK(text.find(".xx text") == 1);
+        CHECK(doc->GetTab(0).type == TAB_SOFT);
+        CHECK(doc->GetTab(0).tabsize == 720);
+        CHECK(doc->GetTab(0).abstabsize == 720);
+        CHECK(doc->GetTab(0).size == 5);
+        CHECK(doc->GetWordCount() > 0);
+
+        const sParagraphLayout *layout = LayoutParagraph(editor, 0);
+        REQUIRE(layout != nullptr);
+        CHECK(layout->isCommand == false);
+    }
+
+    SUBCASE("saves back byte-identical")
+    {
+        CHECK(RoundTrip(editor, input) == input);
+    }
+
+    SUBCASE("is still text after a reload")
+    {
+        std::string saved = RoundTrip(editor, input);
+        REQUIRE(saved.empty() == false);
+        editor.GetDocument()->Clear();
+        CHECK(RoundTrip(editor, saved) == input);
+
+        std::string text = doc->GetParagraphText(0);
+        REQUIRE(text.empty() == false);
+        CHECK(text[0] == MARKER_CHAR);
+        CHECK(doc->GetTab(0).type == TAB_SOFT);
+        CHECK(doc->GetWordCount() > 0);
+    }
+}
+
+
+TEST_CASE("cWordstarFile - a period at the start of a paragraph without a soft tab")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+    cDocument *doc = editor.GetDocument();
+
+    SUBCASE("with no tab is a dot command")
+    {
+        std::string input = WordStar7File(".xx text\x0D\x0A");
+        CHECK(RoundTrip(editor, input) == input);
+
+        CHECK(doc->GetParagraphText(0).rfind(".xx text", 0) == 0);
+        CHECK(doc->GetWordCount() == 0);
+
+        const sParagraphLayout *layout = LayoutParagraph(editor, 0);
+        REQUIRE(layout != nullptr);
+        CHECK(layout->isCommand == true);
+    }
+
+    SUBCASE("after a normal tab is text")
+    {
+        std::string input = WordStar7File(TabSequence(TAB_TAB) + ".xx text\x0D\x0A");
+        CHECK(RoundTrip(editor, input) == input);
+
+        std::string text = doc->GetParagraphText(0);
+        REQUIRE(text.empty() == false);
+        CHECK(text[0] == MARKER_CHAR);
+        CHECK(doc->GetTab(0).type == TAB_TAB);
+        CHECK(doc->GetWordCount() > 0);
+
+        const sParagraphLayout *layout = LayoutParagraph(editor, 0);
+        REQUIRE(layout != nullptr);
+        CHECK(layout->isCommand == false);
+    }
+
+    SUBCASE("a soft tab inside a paragraph is dropped")
+    {
+        std::string input = WordStar7File("ab" + TabSequence(TAB_SOFT) + "cd\x0D\x0A");
+        CHECK(RoundTrip(editor, input) == WordStar7File("abcd\x0D\x0A"));
+
+        CHECK(doc->GetParagraphText(0).rfind("abcd", 0) == 0);
     }
 }

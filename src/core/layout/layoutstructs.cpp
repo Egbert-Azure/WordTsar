@@ -740,7 +740,7 @@ COORD_T sLineLayout::LayoutEndX(void) const
     }
 
     const sSegmentLayout& segment = *last;
-    if (segment.isTab && (segment.tabType == TAB_TAB || segment.tabType == TAB_DECIMAL))
+    if (segment.isTab && (segment.tabType == TAB_TAB || segment.tabType == TAB_SOFT || segment.tabType == TAB_DECIMAL))
     {
         return segment.position.front() + segment.tabWidth;
     }

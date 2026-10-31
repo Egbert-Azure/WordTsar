@@ -2152,9 +2152,22 @@ void cWordstarFile::ParseTab(void)
         case TAB_CENTER:
         case TAB_RIGHT:
         case TAB_RIGHT1:
-        // case TAB_SOFT:
             // Valid tab type - insert it
             mDocument->InsertTab(tab) ;
+            break;
+
+        case TAB_SOFT:
+            {
+                // kept only at the start of a paragraph; dropped elsewhere
+                POSITION_T pos = mDocument->GetPosition() ;
+                POSITION_T start ;
+                POSITION_T end ;
+                mDocument->GetParagraphStartandEnd(mDocument->GetParagraphFromPosition(pos), start, end) ;
+                if(pos == start)
+                {
+                    mDocument->InsertTab(tab) ;
+                }
+            }
             break;
 
         default:

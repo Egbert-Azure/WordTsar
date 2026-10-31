@@ -14262,3 +14262,63 @@ TEST_CASE("Building header / footer lines leaves the layout state unchanged")
 }
 
 
+
+
+TEST_CASE("Layout: a soft tab at the start of a paragraph lays out like a normal tab")
+{
+    ensureQApplication();
+
+    // x of the period after a tab of the given type at the start of ".xx text"
+    auto periodX = [](unsigned char type, bool &isCommand)
+    {
+        cDocument doc;
+        cLayout layout;
+        layout.SetDocument(&doc);
+
+        sWSTab tab;
+        tab.type = type;
+        tab.tabsize = 720;
+        tab.abstabsize = 720;
+        tab.size = 5;
+        doc.InsertTab(tab);
+        doc.Insert(".xx text\r");
+        layout.LayoutDocument(&doc);
+
+        const sParagraphLayout* para = layout.GetParagraphLayout(0);
+        REQUIRE(para != nullptr);
+        isCommand = para->isCommand;
+        return CoordOf(layout, 1);
+    };
+
+    bool tabCommand = true;
+    bool softCommand = true;
+    COORD_T tabX = periodX(TAB_TAB, tabCommand);
+    COORD_T softX = periodX(TAB_SOFT, softCommand);
+
+    CHECK(tabCommand == false);
+    CHECK(softCommand == false);
+    CHECK(tabX > 0);
+    CHECK(softX == doctest::Approx(tabX));
+}
+
+
+TEST_CASE("Layout: GetDisplayCharacter shows a soft tab as '>' in SHOW_ALL")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetShowControl(SHOW_ALL);
+
+    sWSTab tab;
+    tab.type = TAB_SOFT;
+    tab.tabsize = 720;
+    tab.abstabsize = 720;
+    tab.size = 5;
+    doc->InsertTab(tab);
+    doc->Insert(".xx text\r");
+    layout->LayoutDocument(doc);
+
+    std::string grapheme = doc->GetCharNoAdvance(0);
+    CHECK(layout->GetDisplayCharacter(0, grapheme) == ">");
+}
