@@ -97,13 +97,10 @@ public:
                     mCells[static_cast<size_t>(run.row)][static_cast<size_t>(col)] = run.cells[index].textUtf8;
                     mWidths[static_cast<size_t>(run.row)][static_cast<size_t>(col)] = run.cells[index].width;
                     mTails[static_cast<size_t>(run.row)][static_cast<size_t>(col)] = run.cells[index].wideTail;
-<<<<<<< HEAD
                 }
                 else
                 {
                     ++mOutside;
-=======
->>>>>>> ff1900873a2c228a1a0998c020861f39f7626a39
                 }
             }
         }
@@ -123,10 +120,7 @@ public:
     std::vector<std::vector<std::string>> mCells;
     std::vector<std::vector<int>> mWidths;
     std::vector<std::vector<bool>> mTails;
-<<<<<<< HEAD
     int mOutside = 0;                                   // cells presented outside the grid
-=======
->>>>>>> ff1900873a2c228a1a0998c020861f39f7626a39
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -302,7 +296,6 @@ public:
         return mDriver.mCells[static_cast<size_t>(row)][static_cast<size_t>(col)];
     }
 
-<<<<<<< HEAD
     // Number of cells presented outside the grid
     int OutsideWrites(void) const
     {
@@ -327,8 +320,6 @@ public:
         return corners;
     }
 
-=======
->>>>>>> ff1900873a2c228a1a0998c020861f39f7626a39
 private:
     cGridDriver mDriver;
     wordstartui::cTheme mTheme;
@@ -758,7 +749,6 @@ TEST_CASE("TUI Open File dialog - a long UTF-8 folder line is cut by columns, no
 
     std::filesystem::remove_all(base);
 }
-<<<<<<< HEAD
 
 
 TEST_CASE("TUI Open and Save File dialogs - a tiny terminal keeps the box inside the screen")
@@ -867,5 +857,3 @@ TEST_CASE("TUI Open File dialog - a wide folder line cut at an odd width splits 
 
     std::filesystem::remove_all(base);
 }
-=======
->>>>>>> ff1900873a2c228a1a0998c020861f39f7626a39
