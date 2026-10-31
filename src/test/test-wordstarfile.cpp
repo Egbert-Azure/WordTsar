@@ -35,6 +35,8 @@
 #include <vector>
 
 #include "src/core/codepage/cp437.h"
+#include "src/core/codepage/cp737.h"
+#include "src/core/codepage/cp850.h"
 #include "src/core/include/config.h"
 #include "src/core/document/document.h"
 #include "src/core/layout/layoutbase.h"
@@ -1759,4 +1761,141 @@ TEST_CASE("cWordstarFile - ESC x FS with x at 0x80 or above loads as the CP437 c
     REQUIRE(doc->GetNumberofParagraphs() >= 2);
     CHECK(doc->GetParagraphText(1).rfind("next line", 0) == 0);
     CHECK(saved == input);
+}
+
+
+namespace
+{
+
+std::string Utf8(unsigned long cp)
+{
+    std::string out;
+    if (cp < 0x80)
+    {
+        out += static_cast<char>(cp);
+    }
+    else if (cp < 0x800)
+    {
+        out += static_cast<char>(0xC0 | (cp >> 6));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else
+    {
+        out += static_cast<char>(0xE0 | (cp >> 12));
+        out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    return out;
+}
+
+// Bytes 0x01-0x1F and 0x7F, without 0x1C
+std::vector<unsigned char> ControlBytes(void)
+{
+    std::vector<unsigned char> bytes;
+    for (int ch = 0x01; ch < 0x20; ch++)
+    {
+        if (ch != 0x1C)
+        {
+            bytes.push_back(static_cast<unsigned char>(ch));
+        }
+    }
+    bytes.push_back(0x7F);
+    return bytes;
+}
+
+}
+
+
+TEST_CASE("cWordstarFile - ESC x FS with x below 0x20 loads as the CP437 glyph under CP737 and CP850")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+    cCodePage437 cp437;
+
+    const eCodePage pages[] = { CP737, CP850 };
+    for (eCodePage page : pages)
+    {
+        CAPTURE(static_cast<int>(page));
+        editor.SetCodePage(page);
+
+        std::string plain = WordStar7File("aXb\x0D\x0A" "next line\x0D\x0A");
+        EditorRoundTrip(editor, plain);
+        PARAGRAPH_T plainCount = doc->GetNumberofParagraphs();
+
+        for (unsigned char code : ControlBytes())
+        {
+            CAPTURE(static_cast<int>(code));
+            std::string input = WordStar7File("a" + ExtChar(code) + "b\x0D\x0A" "next line\x0D\x0A");
+            std::string expected = "a" + Utf8(cp437.controlGlyph(code)) + "b";
+
+            std::string saved = EditorRoundTrip(editor, input);
+
+            std::string text = doc->GetParagraphText(0);
+            CHECK(Hex(text, 0, expected.size()) == Hex(expected));
+            CHECK(HasControlByte(text) == false);
+            CHECK(doc->GetNumberofParagraphs() == plainCount);
+            REQUIRE(doc->GetNumberofParagraphs() >= 2);
+            CHECK(doc->GetParagraphText(1).rfind("next line", 0) == 0);
+
+            // CP850 saves the pilcrow and the section sign as its own 0xF4 and 0xF5
+            std::string expectedSaved = input;
+            if (page == CP850 && (code == 0x14 || code == 0x15))
+            {
+                expectedSaved = WordStar7File("a" + ExtChar(code == 0x14 ? 0xF4 : 0xF5) + "b\x0D\x0A" "next line\x0D\x0A");
+            }
+            CHECK(Hex(saved, 128) == Hex(expectedSaved, 128));
+            CHECK(saved == expectedSaved);
+
+            std::string resaved = EditorRoundTrip(editor, saved);
+            CHECK(Hex(doc->GetParagraphText(0), 0, expected.size()) == Hex(expected));
+            CHECK(doc->GetNumberofParagraphs() == plainCount);
+            CHECK(Hex(resaved, 128) == Hex(saved, 128));
+        }
+    }
+}
+
+
+TEST_CASE("cWordstarFile - ESC x FS with x at 0x80 or above follows the editor code page")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+
+    std::string input = WordStar7File("a" + ExtChar(0x80) + "b" + ExtChar(0x9B) + "c\x0D\x0A");
+
+    editor.SetCodePage(CP737);
+    CHECK(EditorRoundTrip(editor, input) == input);
+    CHECK(doc->GetParagraphText(0).rfind("a\xCE\x91" "b", 0) == 0);           // U+0391
+
+    editor.SetCodePage(CP850);
+    CHECK(EditorRoundTrip(editor, input) == input);
+    CHECK(doc->GetParagraphText(0).rfind("a\xC3\x87" "b\xC3\xB8" "c", 0) == 0);    // U+00C7, U+00F8
+}
+
+
+TEST_CASE("cWordstarFile - ESC x FS with x below 0x20 under CP1252 keeps the raw byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+    editor.SetCodePage(CP1252);
+
+    for (unsigned char code : ControlBytes())
+    {
+        CAPTURE(static_cast<int>(code));
+        EditorRoundTrip(editor, WordStar7File("a" + ExtChar(code) + "b\x0D\x0A"));
+
+        // 0x01 is dropped, 0x0D ends the paragraph, every other byte is a marker
+        std::string expected("a\x7F" "b\x0D");
+        if (code == 0x01)
+        {
+            expected = "ab\x0D";
+        }
+        else if (code == 0x0D)
+        {
+            expected = "a\x0D";
+        }
+        CHECK(Hex(doc->GetParagraphText(0), 0, 8) == Hex(expected));
+    }
 }

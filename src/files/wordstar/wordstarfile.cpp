@@ -1859,7 +1859,11 @@ void cWordstarFile::InsertExtendedChar(unsigned char c)
         case CP737 :
         {
             cCodePage737 cp ;
-            unsigned long chutf8 = cp.toUTF8(c) ;
+            unsigned long chutf8 = cp.controlGlyph(c) ;     // bytes 1-31 and 127 are glyphs here
+            if(chutf8 == UINT32_MAX)
+            {
+                chutf8 = cp.toUTF8(c) ;
+            }
             if(chutf8 != UINT32_MAX)
             {
                 mDocument->Insert(chutf8) ;
@@ -1871,7 +1875,11 @@ void cWordstarFile::InsertExtendedChar(unsigned char c)
         case CP850 :
         {
             cCodePage850 cp ;
-            unsigned long chutf8 = cp.toUTF8(c) ;
+            unsigned long chutf8 = cp.controlGlyph(c) ;     // bytes 1-31 and 127 are glyphs here
+            if(chutf8 == UINT32_MAX)
+            {
+                chutf8 = cp.toUTF8(c) ;
+            }
             if(chutf8 != UINT32_MAX)
             {
                 mDocument->Insert(chutf8) ;

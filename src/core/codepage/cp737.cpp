@@ -47,6 +47,7 @@
  */
 
 #include "cp737.h"
+#include "cp437.h"
 
 #include <cstdint>
 
@@ -296,4 +297,24 @@ unsigned long cCodePage737::toUTF8(unsigned char wschar)
     }
 
     return UINT32_MAX ;
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  unsigned char wschar [in] byte value 1-31 or 127
+///
+/// @return the Unicode code point of the CP437 glyph, or UINT32_MAX if the
+///         byte has none
+///
+/// @brief
+/// Convert a control byte to its graphic glyph. The lower 128 glyphs are
+/// those of CP437.
+///
+/////////////////////////////////////////////////////////////////////////////
+unsigned long cCodePage737::controlGlyph(unsigned char wschar)
+{
+    cCodePage437 cp ;
+    return cp.controlGlyph(wschar) ;
 }

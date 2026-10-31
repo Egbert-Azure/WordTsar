@@ -46,6 +46,7 @@
  */
 
 #include "cp850.h"
+#include "cp437.h"
 
 #include <cstdint>
 
@@ -230,6 +231,14 @@ unsigned char cCodePage850::toChar(unsigned long utf8char)
         }
     }
 
+    // glyphs of bytes 1-31 and 127, shared with CP437
+    cCodePage437 cp ;
+    unsigned char control = cp.toChar(utf8char) ;
+    if((control > 0 && control < 0x20) || control == 0x7F)
+    {
+        return control ;
+    }
+
     return 0 ;
 }
 
@@ -264,4 +273,24 @@ unsigned long cCodePage850::toUTF8(unsigned char wschar)
     }
 
     return UINT32_MAX ;
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  unsigned char wschar [in] byte value 1-31 or 127
+///
+/// @return the Unicode code point of the CP437 glyph, or UINT32_MAX if the
+///         byte has none
+///
+/// @brief
+/// Convert a control byte to its graphic glyph. The lower 128 glyphs are
+/// those of CP437.
+///
+/////////////////////////////////////////////////////////////////////////////
+unsigned long cCodePage850::controlGlyph(unsigned char wschar)
+{
+    cCodePage437 cp ;
+    return cp.controlGlyph(wschar) ;
 }

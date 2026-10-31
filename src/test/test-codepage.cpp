@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <ios>
+#include <utility>
 
 #include "src/core/codepage/cp437.h"
 #include "src/core/codepage/cp737.h"
@@ -1248,5 +1249,91 @@ TEST_CASE("Survey - unmapped high-byte set per codepage")
         int n = countUnmapped(cp) ;
         INFO("MacRoman unmapped byte count = " << n) ;
         CHECK(n <= 5) ;
+    }
+}
+
+namespace
+{
+
+// controlGlyph() of a code page class, or 0 when the class has none
+template <typename T>
+auto ControlGlyphOf(T &cp, unsigned char ch, int) -> decltype(cp.controlGlyph(ch))
+{
+    return cp.controlGlyph(ch) ;
+}
+
+template <typename T>
+unsigned long ControlGlyphOf(T &, unsigned char, long)
+{
+    return 0 ;
+}
+
+template <typename T>
+auto HasControlGlyph(int) -> decltype(std::declval<T&>().controlGlyph(0), bool())
+{
+    return true ;
+}
+
+template <typename T>
+bool HasControlGlyph(long)
+{
+    return false ;
+}
+
+// CP437 glyphs for bytes 0x01-0x1F, then 0x7F
+const unsigned long kCp437ControlGlyphs[32] =
+{
+    0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022, 0x25D8,
+    0x25CB, 0x25D9, 0x2642, 0x2640, 0x266A, 0x266C, 0x263C, 0x25BA,
+    0x25C4, 0x2195, 0x203C, 0x00B6, 0x00A7, 0x25AC, 0x21A8, 0x2191,
+    0x2193, 0x2192, 0x2190, 0x221F, 0x2194, 0x25B2, 0x25BC, 0x2302
+} ;
+
+template <typename T>
+void CheckControlGlyphs(T &cp)
+{
+    for(int index = 0; index < 32; index++)
+    {
+        unsigned char ch = static_cast<unsigned char>(index < 31 ? index + 1 : 0x7F) ;
+        CAPTURE(static_cast<int>(ch)) ;
+        CHECK(ControlGlyphOf(cp, ch, 0) == kCp437ControlGlyphs[index]) ;
+    }
+
+    const unsigned char none[] = { 0x00, 0x20, 0x41, 0x80, 0xFF } ;
+    for(unsigned char ch : none)
+    {
+        CAPTURE(static_cast<int>(ch)) ;
+        CHECK(ControlGlyphOf(cp, ch, 0) == UINT32_MAX) ;
+    }
+}
+
+}
+
+
+TEST_CASE("controlGlyph - bytes 0x01-0x1F and 0x7F map to the CP437 glyphs")
+{
+    SUBCASE("CP437")
+    {
+        cCodePage437 cp ;
+        CheckControlGlyphs(cp) ;
+    }
+
+    SUBCASE("CP737")
+    {
+        cCodePage737 cp ;
+        CHECK(HasControlGlyph<cCodePage737>(0)) ;
+        CheckControlGlyphs(cp) ;
+    }
+
+    SUBCASE("CP850")
+    {
+        cCodePage850 cp ;
+        CHECK(HasControlGlyph<cCodePage850>(0)) ;
+        CheckControlGlyphs(cp) ;
+    }
+
+    SUBCASE("CP1252 has no controlGlyph")
+    {
+        CHECK(HasControlGlyph<cCodePageWin1252>(0) == false) ;
     }
 }

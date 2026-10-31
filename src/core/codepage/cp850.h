@@ -55,6 +55,7 @@ public :
 
     unsigned char toChar(unsigned long utf8char) ;
     unsigned long toUTF8(unsigned char) ;
+    unsigned long controlGlyph(unsigned char wschar) ;
 
 private :
     // This structure converts between the extended characters of codepage 850
