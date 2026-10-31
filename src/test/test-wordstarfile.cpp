@@ -1410,6 +1410,95 @@ TEST_CASE("cWordstarFile - a period at the start of a paragraph without a soft t
         std::string input = WordStar7File("ab" + TabSequence(TAB_SOFT) + "cd\x0D\x0A");
         CHECK(RoundTrip(editor, input) == WordStar7File("abcd\x0D\x0A"));
 
-        CHECK(doc->GetParagraphText(0).rfind("abcd", 0) == 0);
+        std::string text = doc->GetParagraphText(0);
+        CHECK(text.rfind("abcd", 0) == 0);
+        CHECK(text.find(static_cast<char>(MARKER_CHAR)) == std::string::npos);
+        for (POSITION_T pos = 0; pos < 4; ++pos)
+        {
+            CHECK(doc->GetTab(pos).type == TAB_BAD);
+        }
     }
+}
+
+
+TEST_CASE("cWordstarFile - a soft tab at the start of a paragraph after a hard return")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+    cDocument *doc = editor.GetDocument();
+
+    std::string input = WordStar7File("line one\x0D\x0A" + TabSequence(TAB_SOFT) + ".xx text\x0D\x0A");
+    CHECK(RoundTrip(editor, input) == input);
+
+    REQUIRE(doc->GetNumberofParagraphs() >= 2);
+    CHECK(doc->GetParagraphText(0).rfind("line one", 0) == 0);
+
+    std::string text = doc->GetParagraphText(1);
+    REQUIRE(text.empty() == false);
+    CHECK(text[0] == MARKER_CHAR);
+    CHECK(text.find(".xx text") == 1);
+
+    POSITION_T start;
+    POSITION_T end;
+    doc->GetParagraphStartandEnd(1, start, end);
+    CHECK(doc->GetTab(start).type == TAB_SOFT);
+    CHECK(doc->GetWordCount() == 4);
+
+    const sParagraphLayout *layout = LayoutParagraph(editor, 1);
+    REQUIRE(layout != nullptr);
+    CHECK(layout->isCommand == false);
+}
+
+
+TEST_CASE("cWordstarFile - two soft tabs at the start of a paragraph keep only the first")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+    cDocument *doc = editor.GetDocument();
+
+    std::string input = WordStar7File(TabSequence(TAB_SOFT) + TabSequence(TAB_SOFT) + ".xx text\x0D\x0A");
+
+    // lossy: the second soft tab is not at the paragraph start and is not saved
+    CHECK(RoundTrip(editor, input) == WordStar7File(TabSequence(TAB_SOFT) + ".xx text\x0D\x0A"));
+
+    std::string text = doc->GetParagraphText(0);
+    REQUIRE(text.empty() == false);
+    CHECK(text[0] == MARKER_CHAR);
+    CHECK(text.find(".xx text") == 1);
+    CHECK(doc->GetTab(0).type == TAB_SOFT);
+    CHECK(doc->GetTab(1).type == TAB_BAD);
+    CHECK(doc->GetWordCount() > 0);
+
+    const sParagraphLayout *layout = LayoutParagraph(editor, 0);
+    REQUIRE(layout != nullptr);
+    CHECK(layout->isCommand == false);
+}
+
+
+TEST_CASE("cWordstarFile - a soft tab after a style marker at the start of a paragraph is dropped")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+    cDocument *doc = editor.GetDocument();
+
+    std::string input = WordStar7File("\x02" + TabSequence(TAB_SOFT) + ".xx text\x02\x0D\x0A");
+
+    // the bold marker is at the paragraph start, so the soft tab is not
+    CHECK(RoundTrip(editor, input) == WordStar7File("\x02.xx text\x02\x0D\x0A"));
+
+    std::string text = doc->GetParagraphText(0);
+    REQUIRE(text.empty() == false);
+    CHECK(text[0] == MARKER_CHAR);
+    CHECK(text.find(".xx text") == 1);
+    CHECK(doc->GetControlChar(0) == STYLE_BOLD);
+    CHECK(doc->GetTab(0).type == TAB_BAD);
+    CHECK(doc->GetTab(1).type == TAB_BAD);
+    CHECK(doc->GetWordCount() > 0);
+
+    const sParagraphLayout *layout = LayoutParagraph(editor, 0);
+    REQUIRE(layout != nullptr);
+    CHECK(layout->isCommand == false);
 }
