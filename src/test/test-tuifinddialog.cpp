@@ -27,9 +27,14 @@
 #include "src/tui/wordstartui/src/terminaldriver.h"
 #include "src/tui/wordstartui/src/theme.h"
 #include "src/tui/wordstartui/src/tuidefs.h"
+#include "src/tui/wordstartui/src/utf8helper.h"
 
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
+
+#include <unistd.h>
 
 
 namespace
@@ -46,8 +51,12 @@ const int SCREEN_COLS = 120;
 class cGridDriver : public wordstartui::cTerminalDriver
 {
 public:
-    cGridDriver(void)
-        : mCells(SCREEN_ROWS, std::vector<std::string>(SCREEN_COLS, " "))
+    explicit cGridDriver(int rows = SCREEN_ROWS, int cols = SCREEN_COLS)
+        : mRows(rows),
+          mCols(cols),
+          mCells(static_cast<size_t>(rows), std::vector<std::string>(static_cast<size_t>(cols), " ")),
+          mWidths(static_cast<size_t>(rows), std::vector<int>(static_cast<size_t>(cols), 1)),
+          mTails(static_cast<size_t>(rows), std::vector<bool>(static_cast<size_t>(cols), false))
     {
     }
 
@@ -57,8 +66,8 @@ public:
     wordstartui::sTerminalSize GetSize(void) const override
     {
         wordstartui::sTerminalSize size;
-        size.rows = SCREEN_ROWS;
-        size.cols = SCREEN_COLS;
+        size.rows = mRows;
+        size.cols = mCols;
         return size;
     }
 
@@ -82,9 +91,11 @@ public:
             for (size_t index = 0; index < run.cells.size(); ++index)
             {
                 int col = run.col + static_cast<int>(index);
-                if ((run.row >= 0) && (run.row < SCREEN_ROWS) && (col >= 0) && (col < SCREEN_COLS))
+                if ((run.row >= 0) && (run.row < mRows) && (col >= 0) && (col < mCols))
                 {
                     mCells[static_cast<size_t>(run.row)][static_cast<size_t>(col)] = run.cells[index].textUtf8;
+                    mWidths[static_cast<size_t>(run.row)][static_cast<size_t>(col)] = run.cells[index].width;
+                    mTails[static_cast<size_t>(run.row)][static_cast<size_t>(col)] = run.cells[index].wideTail;
                 }
             }
         }
@@ -99,7 +110,11 @@ public:
 
     void Flush(void) override {}
 
+    int mRows;
+    int mCols;
     std::vector<std::vector<std::string>> mCells;
+    std::vector<std::vector<int>> mWidths;
+    std::vector<std::vector<bool>> mTails;
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -110,10 +125,15 @@ public:
 class cRenderHost : public iWSDialogHost
 {
 public:
+    explicit cRenderHost(int rows = SCREEN_ROWS, int cols = SCREEN_COLS)
+        : mDriver(rows, cols)
+    {
+    }
+
     void HostRunModal(wordstartui::cDialog& dialog) override
     {
         wordstartui::cScreen screen;
-        screen.Resize(SCREEN_ROWS, SCREEN_COLS);
+        screen.Resize(mDriver.mRows, mDriver.mCols);
         dialog.Draw(screen, mTheme);
         screen.Present(mDriver);
         dialog.SetResult(wordstartui::DIALOG_RESULT_CANCEL);
@@ -123,8 +143,11 @@ public:
         const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
         const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
     {
-        (void)draw;
         (void)handle;
+        wordstartui::cScreen screen;
+        screen.Resize(mDriver.mRows, mDriver.mCols);
+        draw(screen, mTheme);
+        screen.Present(mDriver);
     }
 
     const wordstartui::cTheme& HostTheme(void) override
@@ -168,6 +191,30 @@ public:
         return rows;
     }
 
+    // True when the text appears on any row with the tail cells of wide characters left out
+    bool ShowsText(const std::string& text) const
+    {
+        for (size_t row = 0; row < mDriver.mCells.size(); ++row)
+        {
+            std::string line;
+            for (size_t col = 0; col < mDriver.mCells[row].size(); ++col)
+            {
+                if (mDriver.mTails[row][col] == false)
+                {
+                    line += mDriver.mCells[row][col];
+                }
+            }
+            if (line.find(text) != std::string::npos)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // True when every presented cell is valid UTF-8 and none is "?"
+    bool AllCellsValid(void) const;
+
     // True when the text appears on any row
     bool Shows(const std::string& text) const
     {
@@ -181,15 +228,35 @@ public:
         return false;
     }
 
+    // True when no presented cell holds a C0 control byte or DEL
+    bool NoControlBytes(void) const
+    {
+        for (const std::vector<std::string>& cells : mDriver.mCells)
+        {
+            for (const std::string& cell : cells)
+            {
+                for (char byte : cell)
+                {
+                    unsigned char value = static_cast<unsigned char>(byte);
+                    if ((value < 0x20U) || (value == 0x7FU))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
     // True when every row between the top and bottom border keeps its right border
     bool RightBorderIntact(void) const
     {
         int top = -1;
         int bottom = -1;
         int right = -1;
-        for (int row = 0; row < SCREEN_ROWS; ++row)
+        for (int row = 0; row < mDriver.mRows; ++row)
         {
-            for (int col = 0; col < SCREEN_COLS; ++col)
+            for (int col = 0; col < mDriver.mCols; ++col)
             {
                 const std::string& cell = mDriver.mCells[static_cast<size_t>(row)][static_cast<size_t>(col)];
                 if (cell == "┐")
@@ -215,6 +282,12 @@ public:
             }
         }
         return true;
+    }
+
+    // The cell at a screen position
+    const std::string& Cell(int row, int col) const
+    {
+        return mDriver.mCells[static_cast<size_t>(row)][static_cast<size_t>(col)];
     }
 
 private:
@@ -265,4 +338,384 @@ TEST_CASE("TUI Find and Replace dialog - WordStar 7 wording")
     CHECK(host.Shows("Backward"));
     CHECK(host.Shows("Use ? Wildcard Character"));
     CHECK(host.RightBorderIntact());
+}
+
+
+TEST_CASE("TUI Save File dialog - a control character in a file name reaches no screen cell")
+{
+    std::filesystem::path dir = std::filesystem::temp_directory_path() /
+                                ("wstest-savefile-" + std::to_string(getpid()));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "alpha.ws").put('x');
+    std::ofstream(dir / "Icon\r").put('x');
+    std::ofstream(dir / "zulu.ws").put('x');
+
+    cRenderHost host;
+    std::string result;
+    wsdialogs::FileBrowser(&host, "Save File", true, dir.string(), result);
+
+    CHECK(host.Shows("alpha.ws"));
+    CHECK(host.Shows("zulu.ws"));
+    CHECK(host.Shows("Icon?"));
+    CHECK(host.NoControlBytes());
+    CHECK(host.RightBorderIntact());
+
+    std::filesystem::remove_all(dir);
+}
+
+
+TEST_CASE("TUI Open and Save File dialogs - the box covers the whole screen")
+{
+    const int sizes[][2] = { { SCREEN_ROWS, SCREEN_COLS }, { 25, 80 } };
+    for (const auto& size : sizes)
+    {
+        for (bool saveMode : { false, true })
+        {
+            CAPTURE(size[0]);
+            CAPTURE(size[1]);
+            CAPTURE(saveMode);
+            cRenderHost host(size[0], size[1]);
+            std::string result;
+            wsdialogs::FileBrowser(&host, saveMode ? "Save File" : "Open File", saveMode,
+                                   std::filesystem::temp_directory_path().string(), result);
+
+            CHECK(host.Cell(0, 0) == "┌");
+            CHECK(host.Cell(0, size[1] - 1) == "┐");
+            CHECK(host.Cell(size[0] - 1, 0) == "└");
+            CHECK(host.Cell(size[0] - 1, size[1] - 1) == "┘");
+            CHECK(host.RightBorderIntact());
+        }
+    }
+}
+
+
+namespace
+{
+
+// True when a cell holds a C0 control, DEL or a C1 control (UTF-8 C2 80..C2 9F)
+bool CellHasControl(const std::string& cell)
+{
+    for (size_t index = 0; index < cell.size(); ++index)
+    {
+        unsigned char value = static_cast<unsigned char>(cell[index]);
+        if ((value < 0x20U) || (value == 0x7FU))
+        {
+            return true;
+        }
+        if ((value == 0xC2U) && ((index + 1) < cell.size()))
+        {
+            unsigned char next = static_cast<unsigned char>(cell[index + 1]);
+            if ((next >= 0x80U) && (next <= 0x9FU))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Render one text run at row 0, column 0 and return the presented row
+std::vector<std::string> PresentText(const std::string& text)
+{
+    cGridDriver driver;
+    wordstartui::cScreen screen;
+    screen.Resize(SCREEN_ROWS, SCREEN_COLS);
+    wordstartui::sStyle style{};
+    screen.PutText(0, 0, text, style);
+    screen.Present(driver);
+    return driver.mCells[0];
+}
+
+}
+
+
+TEST_CASE("TUI screen - a C1 control character reaches no screen cell")
+{
+    // "A" CSI "B": U+009B is CSI for UTF-8 terminals
+    std::vector<std::string> cells = PresentText("A\xC2\x9B" "B");
+
+    CHECK(cells[0] == "A");
+    CHECK(cells[1] == "?");
+    CHECK(cells[2] == "B");
+    for (const std::string& cell : cells)
+    {
+        CHECK(CellHasControl(cell) == false);
+    }
+}
+
+
+TEST_CASE("TUI screen - a control character after a ZWJ reaches no screen cell")
+{
+    // One grapheme "A" ZWJ CR: the control is not the first codepoint
+    cGridDriver driver;
+    wordstartui::cScreen screen;
+    screen.Resize(SCREEN_ROWS, SCREEN_COLS);
+    wordstartui::sStyle style{};
+    screen.PutCell(0, 0, "A\xE2\x80\x8D\r", style);
+    screen.PutCell(0, 1, "B", style);
+    screen.Present(driver);
+    const std::vector<std::string>& cells = driver.mCells[0];
+
+    CHECK(cells[0] == "?");
+    CHECK(cells[1] == "B");
+    for (const std::string& cell : cells)
+    {
+        CHECK(CellHasControl(cell) == false);
+    }
+}
+
+
+namespace
+{
+
+// True when the text is well-formed UTF-8 (no overlongs, surrogates or values above U+10FFFF)
+bool IsValidUtf8(const std::string& text)
+{
+    size_t index = 0;
+    while (index < text.size())
+    {
+        unsigned char lead = static_cast<unsigned char>(text[index]);
+        size_t count = 0;
+        char32_t value = 0;
+        if (lead < 0x80U)
+        {
+            ++index;
+            continue;
+        }
+        else if ((lead >= 0xC2U) && (lead <= 0xDFU))
+        {
+            count = 2;
+            value = lead & 0x1FU;
+        }
+        else if ((lead & 0xF0U) == 0xE0U)
+        {
+            count = 3;
+            value = lead & 0x0FU;
+        }
+        else if ((lead >= 0xF0U) && (lead <= 0xF4U))
+        {
+            count = 4;
+            value = lead & 0x07U;
+        }
+        else
+        {
+            return false;
+        }
+        if ((index + count) > text.size())
+        {
+            return false;
+        }
+        for (size_t i = 1; i < count; ++i)
+        {
+            unsigned char next = static_cast<unsigned char>(text[index + i]);
+            if ((next & 0xC0U) != 0x80U)
+            {
+                return false;
+            }
+            value = (value << 6U) | (next & 0x3FU);
+        }
+        if (((count == 3) && (value < 0x800U)) || ((count == 4) && (value < 0x10000U)) ||
+            ((value >= 0xD800U) && (value <= 0xDFFFU)) || (value > 0x10FFFFU))
+        {
+            return false;
+        }
+        index += count;
+    }
+    return true;
+}
+
+}
+
+
+TEST_CASE("TUI screen - invalid UTF-8 reaches no screen cell")
+{
+    // Lone 0x9B, a 3-byte sequence cut after two bytes, and a cut at the end
+    std::vector<std::string> cells = PresentText("A\x9B" "B\xE6\xBC" "C\xE6\xBC");
+
+    CHECK(cells[0] == "A");
+    CHECK(cells[1] == "?");
+    CHECK(cells[2] == "B");
+    CHECK(cells[3] == "?");
+    CHECK(cells[4] == "?");
+    CHECK(cells[5] == "C");
+    CHECK(cells[6] == "?");
+    for (const std::string& cell : cells)
+    {
+        CHECK(IsValidUtf8(cell) == true);
+    }
+
+    // An encoded U+FFFD stays as it is
+    std::vector<std::string> replacement = PresentText("\xEF\xBF\xBD");
+    CHECK(replacement[0] == "\xEF\xBF\xBD");
+}
+
+
+TEST_CASE("TUI screen - a wide grapheme shown as \"?\" takes one column plus a blank")
+{
+    // U+6F22 followed by CR in one grapheme
+    cGridDriver driver;
+    wordstartui::cScreen screen;
+    screen.Resize(SCREEN_ROWS, SCREEN_COLS);
+    wordstartui::sStyle style{};
+    screen.PutCell(0, 0, "\xE6\xBC\xA2\r", style);
+    screen.PutCell(0, 2, "B", style);
+    screen.Present(driver);
+
+    CHECK(driver.mCells[0][0] == "?");
+    CHECK(driver.mWidths[0][0] == 1);
+    CHECK(driver.mTails[0][0] == false);
+    CHECK(driver.mCells[0][1] == " ");
+    CHECK(driver.mWidths[0][1] == 1);
+    CHECK(driver.mTails[0][1] == false);
+    CHECK(driver.mCells[0][2] == "B");
+}
+
+
+TEST_CASE("TUI screen - characters U+00A0..U+00FF reach the screen unchanged")
+{
+    for (char32_t codepoint = 0xA0U; codepoint <= 0xFFU; ++codepoint)
+    {
+        std::string text = wordstartui::cUtf8Helper::Encode(codepoint);
+        std::vector<std::string> cells = PresentText(text);
+        CHECK(cells[0] == text);
+    }
+}
+
+
+TEST_CASE("TUI utf8 - a codepoint after a ZWJ joins the grapheme")
+{
+    // "A" ZWJ "B"
+    std::vector<std::string> joined = wordstartui::cUtf8Helper::SplitGraphemes("A\xE2\x80\x8D" "B");
+    REQUIRE(joined.size() == 1);
+    CHECK(joined[0] == "A\xE2\x80\x8D" "B");
+
+    // U+1F468 ZWJ U+1F469 ZWJ U+1F467, then "C"
+    const std::string family = "\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7";
+    std::vector<std::string> emoji = wordstartui::cUtf8Helper::SplitGraphemes(family + "C");
+    REQUIRE(emoji.size() == 2);
+    CHECK(emoji[0] == family);
+    CHECK(emoji[1] == "C");
+}
+
+
+TEST_CASE("TUI screen - a control character after a ZWJ in text reaches no screen cell")
+{
+    // "A" ZWJ CR is one grapheme, then "B"
+    std::vector<std::string> cells = PresentText("A\xE2\x80\x8D\r" "B");
+
+    CHECK(cells[0] == "?");
+    CHECK(cells[1] == "B");
+    for (const std::string& cell : cells)
+    {
+        CHECK(CellHasControl(cell) == false);
+    }
+}
+
+
+bool cRenderHost::AllCellsValid(void) const
+{
+    for (const std::vector<std::string>& cells : mDriver.mCells)
+    {
+        for (const std::string& cell : cells)
+        {
+            if ((IsValidUtf8(cell) == false) || (cell == "?"))
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+
+TEST_CASE("TUI utf8 - text width and fitting by whole graphemes")
+{
+    using wordstartui::cUtf8Helper;
+
+    const std::string wide = "\xE6\xBC\xA2";            // U+6F22, 2 columns
+    const std::string umlaut = "\xC3\xA4";              // U+00E4, 1 column
+    const std::string accented = "e\xCC\x81";           // "e" U+0301, 1 column
+
+    CHECK(cUtf8Helper::TextWidth("") == 0);
+    CHECK(cUtf8Helper::TextWidth("abc") == 3);
+    CHECK(cUtf8Helper::TextWidth(wide + wide) == 4);
+    CHECK(cUtf8Helper::TextWidth(umlaut + umlaut) == 2);
+    CHECK(cUtf8Helper::TextWidth(accented + "x") == 2);
+
+    // A wide grapheme at the limit is left out, not split
+    CHECK(cUtf8Helper::FitWidth("a" + wide + "b", 2) == "a");
+    CHECK(cUtf8Helper::FitWidth("a" + wide + "b", 3) == "a" + wide);
+    CHECK(cUtf8Helper::FitWidth("a" + wide + "b", 4) == "a" + wide + "b");
+    CHECK(cUtf8Helper::FitWidth("a" + wide + "b", 9) == "a" + wide + "b");
+    CHECK(cUtf8Helper::FitWidth(accented + "x", 1) == accented);
+    CHECK(cUtf8Helper::FitWidth("abc", 0) == "");
+    CHECK(cUtf8Helper::FitWidth("abc", -1) == "");
+
+    CHECK(cUtf8Helper::FitWidthTail("a" + wide + "b", 2) == "b");
+    CHECK(cUtf8Helper::FitWidthTail("a" + wide + "b", 3) == wide + "b");
+    CHECK(cUtf8Helper::FitWidthTail("a" + wide + "b", 9) == "a" + wide + "b");
+    CHECK(cUtf8Helper::FitWidthTail("x" + accented, 1) == accented);
+    CHECK(cUtf8Helper::FitWidthTail("abc", 0) == "");
+}
+
+
+TEST_CASE("TUI Open File dialog - long UTF-8 file names are cut by columns, not bytes")
+{
+    std::filesystem::path dir = std::filesystem::temp_directory_path() /
+                                ("wstest-utf8names-" + std::to_string(getpid()));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+
+    std::string wideName;                               // 40 x U+6F22: 120 bytes, 80 columns
+    for (int i = 0; i < 40; ++i)
+    {
+        wideName += "\xE6\xBC\xA2";
+    }
+    std::string umlautName;                             // 60 x U+00E4: 120 bytes, 60 columns
+    for (int i = 0; i < 60; ++i)
+    {
+        umlautName += "\xC3\xA4";
+    }
+    std::ofstream(dir / wideName).put('x');
+    std::ofstream(dir / umlautName).put('x');
+
+    cRenderHost host;
+    std::string result;
+    wsdialogs::FileBrowser(&host, "Open File", false, dir.string(), result);
+
+    CHECK(host.ShowsText(wideName));
+    CHECK(host.ShowsText(umlautName));
+    CHECK(host.AllCellsValid());
+    CHECK(host.RightBorderIntact());
+
+    std::filesystem::remove_all(dir);
+}
+
+
+TEST_CASE("TUI Open File dialog - a long UTF-8 folder line is cut by columns, not bytes")
+{
+    std::string umlautName;                             // 60 x U+00E4: 120 bytes, 60 columns
+    for (int i = 0; i < 60; ++i)
+    {
+        umlautName += "\xC3\xA4";
+    }
+    std::filesystem::path base = std::filesystem::temp_directory_path() /
+                                 ("wstest-utf8folder-" + std::to_string(getpid()) +
+                                  "-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+    std::filesystem::path dir = base / umlautName;
+    std::filesystem::remove_all(base);
+    std::filesystem::create_directories(dir);
+
+    cRenderHost host;
+    std::string result;
+    wsdialogs::FileBrowser(&host, "Open File", false, dir.string(), result);
+
+    // The folder line is wider than the dialog; its last 116 columns hold "/" and the full name
+    REQUIRE(wordstartui::cUtf8Helper::TextWidth(dir.string()) > 116);
+    CHECK(host.ShowsText("x/" + umlautName));
+    CHECK(host.AllCellsValid());
+    CHECK(host.RightBorderIntact());
+
+    std::filesystem::remove_all(base);
 }

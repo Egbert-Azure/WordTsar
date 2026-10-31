@@ -43,6 +43,7 @@
 #include "src/tui/wordstartui/src/textfield.h"
 #include "src/tui/wordstartui/src/theme.h"
 #include "src/tui/wordstartui/src/tuidefs.h"
+#include "src/tui/wordstartui/src/utf8helper.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -750,21 +751,14 @@ bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
 {
     sTerminalSize size = host->HostScreenSize();
 
-    int width = (size.cols * 9) / 10;
-    if (width > (size.cols - 2))
-    {
-        width = size.cols - 2;
-    }
+    // The box covers the whole screen
+    int width = size.cols;
     if (width < 30)
     {
         width = 30;
     }
 
-    int height = (size.rows * 8) / 10;
-    if (height > (size.rows - 2))
-    {
-        height = size.rows - 2;
-    }
+    int height = size.rows;
     if (height < 8)
     {
         height = 8;
@@ -773,16 +767,8 @@ bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
     sRect rect;
     rect.rows = height;
     rect.cols = width;
-    rect.row = (size.rows - height) / 2;
-    rect.col = (size.cols - width) / 2;
-    if (rect.row < 0)
-    {
-        rect.row = 0;
-    }
-    if (rect.col < 0)
-    {
-        rect.col = 0;
-    }
+    rect.row = 0;
+    rect.col = 0;
 
     wsui::cFileBrowser browser;
     if (startPath.empty() == false)
@@ -832,9 +818,9 @@ bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
 
         std::string dir = browser.GetCurrentDirectory();
         int maxDir = rect.cols - 4;
-        if ((maxDir > 0) && (static_cast<int>(dir.size()) > maxDir))
+        if (maxDir > 0)
         {
-            dir = dir.substr(dir.size() - static_cast<size_t>(maxDir));
+            dir = cUtf8Helper::FitWidthTail(dir, maxDir);
         }
         screen.PutText(rect.row + 1, rect.col + 2, dir, dialogStyle);
 

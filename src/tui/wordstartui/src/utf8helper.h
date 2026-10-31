@@ -39,6 +39,9 @@ public:
     static std::string Encode(char32_t codepoint);
     static std::vector<std::string> SplitGraphemes(const std::string& text);
     static int GraphemeWidth(const std::string& text);
+    static int TextWidth(const std::string& text);
+    static std::string FitWidth(const std::string& text, int cols);
+    static std::string FitWidthTail(const std::string& text, int cols);
     static bool IsCombining(char32_t codepoint);
     static bool IsControl(char32_t codepoint);
     static char32_t FirstCodepoint(const std::string& text);

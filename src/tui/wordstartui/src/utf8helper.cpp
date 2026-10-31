@@ -176,6 +176,7 @@ std::vector<std::string> cUtf8Helper::SplitGraphemes(const std::string& text)
 {
     std::vector<std::string> graphemes;
     std::string current;
+    char32_t lastCodepoint = 0;
     size_t index = 0;
 
     while (index < text.size())
@@ -207,7 +208,7 @@ std::vector<std::string> cUtf8Helper::SplitGraphemes(const std::string& text)
         {
             appendToCurrent = true;
         }
-        else if (FirstCodepoint(current.substr(current.size() - 1U)) == 0x200DU)
+        else if (lastCodepoint == 0x200DU)
         {
             appendToCurrent = true;
         }
@@ -221,6 +222,8 @@ std::vector<std::string> cUtf8Helper::SplitGraphemes(const std::string& text)
             graphemes.push_back(current);
             current = encoded;
         }
+
+        lastCodepoint = codepoint;
     }
 
     if (current.empty() == false)
@@ -269,6 +272,101 @@ int cUtf8Helper::GraphemeWidth(const std::string& text)
     }
 
     return width;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const std::string& text [in] UTF-8 text
+///
+/// @return terminal column width of the text
+///
+/// @brief
+/// Sum the grapheme widths of a UTF-8 string.
+///
+/////////////////////////////////////////////////////////////////////////////
+int cUtf8Helper::TextWidth(const std::string& text)
+{
+    int width = 0;
+
+    for (const std::string& grapheme : SplitGraphemes(text))
+    {
+        width += GraphemeWidth(grapheme);
+    }
+
+    return width;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const std::string& text [in] UTF-8 text
+/// @param  int cols [in] available terminal columns
+///
+/// @return longest prefix of whole graphemes that fits in cols
+///
+/// @brief
+/// Cut UTF-8 text at the end to a column width without splitting a grapheme.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cUtf8Helper::FitWidth(const std::string& text, int cols)
+{
+    std::string result;
+    int width = 0;
+
+    for (const std::string& grapheme : SplitGraphemes(text))
+    {
+        const int graphemeWidth = GraphemeWidth(grapheme);
+
+        if ((width + graphemeWidth) > cols)
+        {
+            break;
+        }
+
+        result += grapheme;
+        width += graphemeWidth;
+    }
+
+    return result;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const std::string& text [in] UTF-8 text
+/// @param  int cols [in] available terminal columns
+///
+/// @return longest suffix of whole graphemes that fits in cols
+///
+/// @brief
+/// Cut UTF-8 text at the start to a column width without splitting a
+/// grapheme.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cUtf8Helper::FitWidthTail(const std::string& text, int cols)
+{
+    const std::vector<std::string> graphemes = SplitGraphemes(text);
+    size_t first = graphemes.size();
+    int width = 0;
+
+    while (first > 0)
+    {
+        const int graphemeWidth = GraphemeWidth(graphemes[first - 1U]);
+
+        if ((width + graphemeWidth) > cols)
+        {
+            break;
+        }
+
+        width += graphemeWidth;
+        --first;
+    }
+
+    std::string result;
+
+    for (size_t index = first; index < graphemes.size(); ++index)
+    {
+        result += graphemes[index];
+    }
+
+    return result;
 }
 
 /////////////////////////////////////////////////////////////////////////////

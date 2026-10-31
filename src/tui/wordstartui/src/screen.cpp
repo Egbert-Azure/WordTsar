@@ -172,8 +172,34 @@ void cScreen::PutCell(int row, int col, const std::string& graphemeUtf8, const s
 
     sCell cell;
     cell.textUtf8 = graphemeUtf8;
+    // A grapheme holding any C0, DEL or C1 control (U+0080..U+009F) or
+    // invalid UTF-8 shows "?" in one column.
+    bool substituted = false;
+    size_t index = 0;
+    size_t start = 0;
+    char32_t codepoint = 0;
+    while (cUtf8Helper::DecodeNext(graphemeUtf8, index, codepoint) == true)
+    {
+        const bool invalid = (codepoint == 0xFFFDU) &&
+                             (graphemeUtf8.compare(start, index - start, "\xEF\xBF\xBD") != 0);
+
+        if ((invalid == true) ||
+            (cUtf8Helper::IsControl(codepoint) == true) ||
+            ((codepoint >= 0x80U) && (codepoint <= 0x9FU)))
+        {
+            substituted = true;
+            break;
+        }
+
+        start = index;
+    }
+
+    if (substituted == true)
+    {
+        cell.textUtf8 = "?";
+    }
     cell.style = style;
-    cell.width = width;
+    cell.width = (substituted == true) ? 1 : width;
     cell.wideTail = false;
 
     SetCell(row, col, cell);
@@ -183,8 +209,11 @@ void cScreen::PutCell(int row, int col, const std::string& graphemeUtf8, const s
         if (IsInsideClip(row, col + 1) == true)
         {
             sCell tail = MakeBlankCell(style);
-            tail.width = 0;
-            tail.wideTail = true;
+            if (substituted == false)
+            {
+                tail.width = 0;
+                tail.wideTail = true;
+            }
             SetCell(row, col + 1, tail);
         }
     }
