@@ -298,3 +298,37 @@ unsigned long cCodePage437::toUTF8(unsigned char wschar)
 
     return UINT32_MAX ;
 }
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  unsigned char wschar [in] CP437 byte value 1-31 or 127
+///
+/// @return the Unicode code point of the CP437 glyph, or UINT32_MAX if the
+///         byte has no glyph in the table
+///
+/// @brief
+/// Convert a CP437 control byte to its graphic glyph, without the ASCII
+/// identity mapping of toUTF8().
+///
+/////////////////////////////////////////////////////////////////////////////
+unsigned long cCodePage437::controlGlyph(unsigned char wschar)
+{
+    if(wschar >= 0x20 && wschar != 0x7F)
+    {
+        return UINT32_MAX ;
+    }
+
+    size_t len = mCodePage437.size() ;
+
+    for(size_t loop = 0; loop < len; loop++)
+    {
+        if(mCodePage437[loop].wordstarchar == wschar)
+        {
+            return mCodePage437[loop].utf8char ;
+        }
+    }
+
+    return UINT32_MAX ;
+}

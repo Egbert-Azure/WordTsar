@@ -956,7 +956,6 @@ std::string CompareParagraph(cDocument* a, cDocument* b, PARAGRAPH_T para)
 const std::set<std::string> kKnownRoundTripFailures =
 {
     "ARTICLES/FORMFEED.WS",
-    "ARTICLES/YOURWAY.WS",
     "ASCWS.COM",
     "CONVERT/FLTRMENU.DEF",
     "DEFAULT/CONVERT/FLTRMENU.DEF",
@@ -970,10 +969,6 @@ const std::set<std::string> kKnownRoundTripFailures =
     "DEFAULT/DB02.DTH",
     "DEFAULT/DB02.DTI",
     "DEFAULT/INSET/CAPMSG.TXT",
-    "DEFAULT/OPTIONS/LABEL3A",
-    "DEFAULT/OPTIONS/LABELA",
-    "DEFAULT/OPTIONS/LABELXLA",
-    "DEFAULT/OPTIONS/ROLODEXA",
     "DEFAULT/OPTIONS/WSLIST.OVR",
     "DEFAULT/PRINT.TST",
     "DEFAULT/REVIEW.DOC",
@@ -1000,32 +995,12 @@ const std::set<std::string> kKnownRoundTripFailures =
     "HIJAAK/ISI2.TMP",
     "INSET/CAPMSG.TXT",
     "INSTALL/TABLES2.OVR",
-    "LJ6DTP.WS",
     "LSRBOX/LSRBOX.WS",
-    "LSRBOX/LSRBOXES.MRG",
-    "LSRBOX/LSRLINES.MRG",
-    "LSRBOX/PAGE.RND",
     "MACROS/HOLYMAC/-HOLYMAC.WS",
     "MACROS/HOLYMAC/4MAC2",
     "MACROS/HOLYMAC/4MAC3",
-    "MACROS/SAWYER/_BULLSML.WSM",
-    "MACROS/SAWYER/_NEXT.WSM",
-    "MACROS/SAWYER/_NX-3.WSM",
-    "MACROS/SAWYER/_NX-4.WSM",
-    "MACROS/SAWYER/_PREV.WSM",
-    "MACROS/SAWYER/_PV-3.WSM",
-    "MACROS/SAWYER/_PV-4.WSM",
-    "MACROS/SAWYER/_RTF-0.WSM",
-    "MACROS/SAWYER/-MAKEDTP.WS",
     "MACROS/SAWYER/BULLTAB.WSM",
-    "MACROS/SAWYER/GO2PG&LN.WSM",
-    "MACROS/SAWYER/QAP0.WSM",
     "MACROS/SAWYER/QFP0.WSM",
-    "MACROS/SAWYER/WW.WSM",
-    "MAILLIST/LABEL3A",
-    "MAILLIST/LABELA",
-    "MAILLIST/LABELXLA",
-    "MAILLIST/ROLODEXA",
     "MAILLIST/WSLIST.OVR",
     "MICKEE/MICKEE.WS",
     "MICKEE/WS.DEF",
@@ -1045,12 +1020,9 @@ const std::set<std::string> kKnownRoundTripFailures =
     "PSPRINT.TST",
     "REF/ASCIITAB.WS",
     "REF/BOOKLET.WS",
-    "REF/BULLET.WS",
-    "REF/PP.WS",
     "REF/SYMBOL.CHT",
     "REF/WINGDING.CHT",
     "REVIEW.DOC",
-    "RTF-RJS/_RTF-0.WSM",
     "RTF-RJS/NOVEL.WS",
     "RTF-RJS/SKIPTEST.WS",
     "TABLES2.OVR",
@@ -1628,4 +1600,163 @@ TEST_CASE("cWordstarFile - a soft tab moved inside a paragraph is kept after a s
         std::string input = WordStar7File(TabSequence(TAB_SOFT) + ".xx text\x0D\x0A");
         CHECK(RoundTrip(editor, input) == input);
     }
+}
+
+
+namespace
+{
+
+// ESC x FS: an extended character in a WordStar file
+std::string ExtChar(unsigned char x)
+{
+    std::string bytes("\x1B", 1);
+    bytes += static_cast<char>(x);
+    bytes += '\x1C';
+    return bytes;
+}
+
+// Loads bytes through cEditorCtrl::LoadFile, saves the document back
+// through cWordstarFile and returns the saved bytes
+std::string EditorRoundTrip(cEditorCtrl &editor, const std::string &bytes)
+{
+    cWordstarFile saver(&editor);
+    saver.SetSilent(true);
+    std::filesystem::path in = TempPath();
+    std::filesystem::path out = TempPath();
+    WriteFileBytes(in, bytes);
+    std::string saved;
+    if (editor.LoadFile(in.string()) &&
+        saver.SaveFile(out.string(), editor.GetDocument()->GetTextSize()))
+    {
+        saved = ReadFileBytes(out);
+    }
+    std::filesystem::remove(in);
+    std::filesystem::remove(out);
+    return saved;
+}
+
+// Hex dump of up to count bytes from offset, for readable failure messages
+std::string Hex(const std::string &bytes, size_t offset = 0, size_t count = 32)
+{
+    static const char digits[] = "0123456789ABCDEF";
+    std::string hex;
+    for (size_t loop = offset; loop < bytes.size() && loop < offset + count; loop++)
+    {
+        unsigned char ch = static_cast<unsigned char>(bytes[loop]);
+        hex += digits[ch >> 4];
+        hex += digits[ch & 0x0F];
+        hex += ' ';
+    }
+    return hex;
+}
+
+bool HasControlByte(const std::string &text)
+{
+    for (unsigned char ch : text)
+    {
+        if (ch < 0x20 && ch != 0x0D && ch != 0x0A)
+        {
+            return true;
+        }
+    }
+    return text.find(static_cast<char>(MARKER_CHAR)) != std::string::npos;
+}
+
+struct sControlGlyph
+{
+    unsigned char code;
+    const char *utf8;
+};
+
+// CP437 glyphs for code points below 0x20, as in the cCodePage437 table
+const sControlGlyph kControlGlyphs[] =
+{
+    { 0x01, "\xE2\x98\xBA" },       // U+263A smiley
+    { 0x07, "\xE2\x80\xA2" },       // U+2022 bullet
+    { 0x09, "\xE2\x97\x8B" },       // U+25CB white circle
+    { 0x0D, "\xE2\x99\xAA" },       // U+266A eighth note
+    { 0x10, "\xE2\x96\xBA" },       // U+25BA right pointing triangle
+    { 0x1A, "\xE2\x86\x92" },       // U+2192 right arrow
+    { 0x1B, "\xE2\x86\x90" },       // U+2190 left arrow
+    { 0x1F, "\xE2\x96\xBC" },       // U+25BC down pointing triangle
+};
+
+}
+
+
+TEST_CASE("cWordstarFile - ESC x FS with x below 0x20 loads as the CP437 glyph")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+
+    std::string plain = WordStar7File("aXb\x0D\x0A" "next line\x0D\x0A");
+    EditorRoundTrip(editor, plain);
+    PARAGRAPH_T plainCount = doc->GetNumberofParagraphs();
+
+    for (const sControlGlyph &glyph : kControlGlyphs)
+    {
+        CAPTURE(static_cast<int>(glyph.code));
+        std::string input = WordStar7File("a" + ExtChar(glyph.code) + "b\x0D\x0A" "next line\x0D\x0A");
+        std::string expected = std::string("a") + glyph.utf8 + "b";
+
+        std::string saved = EditorRoundTrip(editor, input);
+
+        std::string text = doc->GetParagraphText(0);
+        CHECK(Hex(text, 0, expected.size()) == Hex(expected));
+        CHECK(HasControlByte(text) == false);
+        CHECK(doc->GetNumberofParagraphs() == plainCount);
+        REQUIRE(doc->GetNumberofParagraphs() >= 2);
+        CHECK(doc->GetParagraphText(1).rfind("next line", 0) == 0);
+
+        CHECK(Hex(saved, 128) == Hex(input, 128));
+        CHECK(saved == input);
+
+        std::string resaved = EditorRoundTrip(editor, saved);
+        CHECK(Hex(doc->GetParagraphText(0), 0, expected.size()) == Hex(expected));
+        CHECK(doc->GetNumberofParagraphs() == plainCount);
+        CHECK(Hex(resaved, 128) == Hex(saved, 128));
+        CHECK(resaved == saved);
+    }
+}
+
+
+TEST_CASE("cWordstarFile - ESC x FS with x below 0x20 inside a dot command line")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+
+    std::string input = WordStar7File(".he " + ExtChar(0x10) + " text\x0D\x0A" "body\x0D\x0A");
+    std::string saved = EditorRoundTrip(editor, input);
+
+    std::string text = doc->GetParagraphText(0);
+    std::string expected(".he \xE2\x96\xBA text");
+    CHECK(Hex(text, 0, expected.size()) == Hex(expected));
+    CHECK(HasControlByte(text) == false);
+    REQUIRE(doc->GetNumberofParagraphs() >= 2);
+    CHECK(doc->GetParagraphText(1).rfind("body", 0) == 0);
+
+    const sParagraphLayout *layout = LayoutParagraph(editor, 0);
+    REQUIRE(layout != nullptr);
+    CHECK(layout->isCommand == true);
+
+    CHECK(Hex(saved, 128) == Hex(input, 128));
+    CHECK(saved == input);
+}
+
+
+TEST_CASE("cWordstarFile - ESC x FS with x at 0x80 or above loads as the CP437 character")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+
+    std::string input = WordStar7File("a" + ExtChar(0x81) + "b" + ExtChar(0xDB) + "c\x0D\x0A" "next line\x0D\x0A");
+    std::string saved = EditorRoundTrip(editor, input);
+
+    CHECK(doc->GetParagraphText(0).rfind("a\xC3\xBC" "b\xE2\x96\x88" "c", 0) == 0);    // U+00FC, U+2588
+    REQUIRE(doc->GetNumberofParagraphs() >= 2);
+    CHECK(doc->GetParagraphText(1).rfind("next line", 0) == 0);
+    CHECK(saved == input);
 }
