@@ -1066,6 +1066,7 @@ void cWSWordTsar::BuildMenus(void)
     // mode, matching the GUI. SC() appends the mode's right-aligned shortcut
     // (empty when the command has none in that mode); LB() picks the label.
     mMenu.Clear();
+    mMenu.SetWideOpenTitle(true);
 
     bool modern = (mEditor->GetInputMode() == INPUT_MODERN);
     auto SC = [modern](const std::string& ws, const std::string& mod) -> std::string

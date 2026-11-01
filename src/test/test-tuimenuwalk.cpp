@@ -2044,3 +2044,42 @@ TEST_CASE("TUI menu bar - menu titles, highlighted entries and hotkeys carry no 
         CHECK(NoBoldInRows(screen, 1, 24) == true);
     }
 }
+
+
+TEST_CASE("TUI menu bar - the edit-screen open title is highlighted one column wider each side")
+{
+    wordstartui::sThemePalette palette = wordstartui::cTheme::GetDefaultPalette();
+    palette.menuFg = wordstartui::MakeRgb(0, 0, 0);
+    palette.menuBg = wordstartui::MakeRgb(170, 170, 170);
+    palette.menuAccelFg = wordstartui::MakeRgb(85, 85, 255);
+    palette.menuAccelBg = wordstartui::MakeRgb(170, 170, 170);
+    palette.menuActiveFg = wordstartui::MakeRgb(170, 170, 170);
+    palette.menuActiveBg = wordstartui::MakeRgb(0, 0, 0);
+    palette.menuActiveAccelFg = wordstartui::MakeRgb(11, 12, 13);
+    palette.menuActiveAccelBg = wordstartui::MakeRgb(14, 15, 16);
+    wordstartui::cTheme theme;
+    theme.LoadPalette(palette);
+
+    cWSWordTsar app;
+    app.TestBuildMenus();
+    wordstartui::cScreen screen = DrawOpenMenuWithTheme(app.TestGetMenu(), 'u', theme);
+
+    // Utilities sits at columns 42 to 50; the highlight covers 41 to 51 and
+    // the hotkey letter U is in the highlighted hotkey colours.
+    const int titleCol = static_cast<int>(MenuRowText(screen, 1).find("Utilities"));
+    REQUIRE(titleCol == 42);
+    CheckCellColours(screen, 1, 40, wordstartui::MakeRgb(0, 0, 0), wordstartui::MakeRgb(170, 170, 170));
+    CheckCellColours(screen, 1, 41, wordstartui::MakeRgb(170, 170, 170), wordstartui::MakeRgb(0, 0, 0));
+    CHECK(CellAt(screen, 1, 42).textUtf8 == "U");
+    CheckCellColours(screen, 1, 42, wordstartui::MakeRgb(11, 12, 13), wordstartui::MakeRgb(14, 15, 16));
+    CheckCellColours(screen, 1, 43, wordstartui::MakeRgb(170, 170, 170), wordstartui::MakeRgb(0, 0, 0));
+    CheckCellColours(screen, 1, 51, wordstartui::MakeRgb(170, 170, 170), wordstartui::MakeRgb(0, 0, 0));
+    CheckCellColours(screen, 1, 52, wordstartui::MakeRgb(0, 0, 0), wordstartui::MakeRgb(170, 170, 170));
+
+    // The highlighted first entry: its hotkey letter in the highlighted
+    // hotkey colours, the rest of the bar in the menu highlight colours.
+    CHECK(CellAt(screen, 3, 44).textUtf8 == "S");
+    CheckCellColours(screen, 3, 44, wordstartui::MakeRgb(11, 12, 13), wordstartui::MakeRgb(14, 15, 16));
+    CheckCellColours(screen, 3, 43, wordstartui::MakeRgb(170, 170, 170), wordstartui::MakeRgb(0, 0, 0));
+    CheckCellColours(screen, 3, 45, wordstartui::MakeRgb(170, 170, 170), wordstartui::MakeRgb(0, 0, 0));
+}
