@@ -2402,3 +2402,61 @@ TEST_CASE("TUI Opening screen - arrows and Enter work the file list")
         }
     }
 }
+
+
+TEST_CASE("TUI Opening screen - Alt letters never run the letter actions")
+{
+    for (int level : {0, 3, 4})
+    {
+        CAPTURE(level);
+        sOpeningListDir dir;
+
+        for (const char* letter : {"x", "d", "s", "p", "X", "l", "i", "t", "?"})
+        {
+            INFO("Alt+", letter);
+            cWSWordTsar app;
+            PrepareOpeningList(app, level, dir);
+            CHECK(app.TestHandleEvent(OpeningAltText(letter)) == true);
+            CHECK(app.TestQuitRequested() == false);
+            CHECK(app.TestInOpening() == true);
+            CHECK(app.TestOpeningBrowserFocus() == false);
+            CHECK(app.TestOpeningWantPrint() == false);
+            CHECK(app.TestOpeningWantTOC() == false);
+            CHECK(app.TestOpeningWantIndex() == false);
+            CHECK(app.TestGetOpeningMenu().IsOpen() == false);
+        }
+
+        {
+            // With the letters on the list, an Alt letter does not move it.
+            cWSWordTsar app;
+            PrepareOpeningList(app, level, dir);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_TAB));
+            REQUIRE(app.TestOpeningBrowserFocus() == true);
+            app.TestHandleEvent(OpeningAltText("x"));
+            app.TestHandleEvent(OpeningAltText("f"));
+            if (level == 4)
+            {
+                CHECK(app.TestGetOpeningMenu().GetOpenMenu() == 0);
+            }
+            else
+            {
+                CHECK(app.TestOpeningSelectedName() == "../");
+            }
+            CHECK(app.TestQuitRequested() == false);
+        }
+    }
+
+    SUBCASE("help level 4: Alt+F, U, A and H open their menus")
+    {
+        sOpeningListDir dir;
+        const char* letters[] = {"f", "u", "a", "h"};
+        for (int index = 0; index < 4; ++index)
+        {
+            INFO("Alt+", letters[index]);
+            cWSWordTsar app;
+            PrepareOpeningList(app, 4, dir);
+            CHECK(app.TestHandleEvent(OpeningAltText(letters[index])) == true);
+            CHECK(app.TestGetOpeningMenu().GetOpenMenu() == index);
+        }
+    }
+}
