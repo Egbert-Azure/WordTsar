@@ -209,6 +209,7 @@ cWSWordTsar::cWSWordTsar(void)
     mShowStartupScreen = true;
     mStartupDuration = std::chrono::milliseconds(1500);
     mStartupTiming = false;
+    mDropTypeAhead = false;
     mOpeningBrowserFocus = false;
     mOpeningListActive = false;
     mOpeningWantPrint = false;
@@ -412,7 +413,8 @@ void cWSWordTsar::TickStartupScreen(void)
 ///
 /// @brief
 /// Leave the startup screen: open the command-line file in the editor, or
-/// show the Opening screen.
+/// show the Opening screen. After a startup screen, input that follows
+/// the file opening without a pause is dropped.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::EndStartupScreen(void)
@@ -422,6 +424,7 @@ void cWSWordTsar::EndStartupScreen(void)
         SetMode(APP_EDITOR);
         mEditor->LoadFile(mFilename);
         mEditor->RelayoutAndRedraw();
+        mDropTypeAhead = mShowStartupScreen;
     }
     else
     {
@@ -3164,8 +3167,15 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
 /////////////////////////////////////////////////////////////////////////////
 bool cWSWordTsar::HandleEvent(const sInputEvent& event)
 {
-    // A key ends the startup screen and goes on to the next screen. Escape
-    // and a mouse button press only end it; other mouse events are ignored.
+    // Input that arrived while the startup screen showed for a file name.
+    if (mDropTypeAhead == true)
+    {
+        return true;
+    }
+
+    // A key ends the startup screen and goes on to the Opening screen; with
+    // a file name it is dropped. Escape and a mouse button press only end
+    // it; other mouse events are ignored.
     if (mMode == APP_STARTUP)
     {
         if (event.type == wordstartui::INPUT_TYPE_MOUSE)
@@ -3177,8 +3187,9 @@ bool cWSWordTsar::HandleEvent(const sInputEvent& event)
             return true;
         }
         EndStartupScreen();
-        if ((event.type == wordstartui::INPUT_TYPE_SPECIAL) &&
-            (event.special == wordstartui::SPECIAL_KEY_ESCAPE))
+        if ((mHaveFileArg == true) ||
+            ((event.type == wordstartui::INPUT_TYPE_SPECIAL) &&
+             (event.special == wordstartui::SPECIAL_KEY_ESCAPE)))
         {
             return true;
         }
@@ -3889,6 +3900,20 @@ void cWSWordTsar::InsertIndexEntry(void)
     }
 
     mEditor->InsertDotCommandEntry(".ix", text);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// A read of the terminal found no input: the input typed during the
+/// startup screen has all been read.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::OnIdle(void)
+{
+    mDropTypeAhead = false;
 }
 
 /////////////////////////////////////////////////////////////////////////////

@@ -950,3 +950,127 @@ TEST_CASE("TUI startup screen - an unknown CSI sequence does not exit ws")
         CHECK(app.TestInOpening() == true);
     }
 }
+
+
+namespace
+{
+
+// An app started with a file name, showing the startup screen, drawn once.
+std::string StartShowingWithFile(cWSWordTsar& app, cStartupTempDir& dir)
+{
+    std::string file = dir.WriteText("letter.txt", "dear reader\n");
+    PrepareWs7(app);
+    app.TestCountModals();
+    char name[] = "ws";
+    char* argv[] = { name, file.data(), nullptr };
+    app.TestStartSession(2, argv);
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDraw(screen);
+    REQUIRE(app.TestInStartup() == true);
+    return file;
+}
+
+void CheckLetterUnchanged(cWSWordTsar& app, const std::string& text)
+{
+    CHECK(app.TestInEditor() == true);
+    CHECK(app.TestQuitRequested() == false);
+    CHECK(app.TestModalCount() == 0);
+    CHECK(app.TestGetEditor()->mFileName == "letter.txt");
+    CHECK(app.TestGetEditor()->GetDocument()->IsModified() == false);
+    CHECK(app.TestGetEditor()->GetDocument()->GetText() == text);
+}
+
+}
+
+
+TEST_CASE("TUI startup screen - with a file name the keys typed during the startup screen are dropped")
+{
+    cStartupTempDir dir;
+    cWSWordTsar app;
+    StartShowingWithFile(app, dir);
+
+    SUBCASE("a letter, Enter or Backspace")
+    {
+        for (const wordstartui::sInputEvent& event : {Text("x"), Special(wordstartui::SPECIAL_KEY_ENTER),
+                                                      Special(wordstartui::SPECIAL_KEY_BACKSPACE)})
+        {
+            CHECK(app.TestHandleEvent(event) == true);
+        }
+        REQUIRE(app.TestInEditor() == true);
+        std::string text = app.TestGetEditor()->GetDocument()->GetText();
+        CHECK(text.find("dear reader") != std::string::npos);
+        CheckLetterUnchanged(app, text);
+    }
+
+    SUBCASE("each key alone ends the startup screen and is dropped")
+    {
+        std::string text;
+        {
+            cStartupTempDir otherDir;
+            cWSWordTsar other;
+            StartShowingWithFile(other, otherDir);
+            other.TestSetStartupDuration(std::chrono::milliseconds(0));
+            other.TestTickStartup();
+            REQUIRE(other.TestInEditor() == true);
+            text = other.TestGetEditor()->GetDocument()->GetText();
+        }
+
+        SUBCASE("letter") { CHECK(app.TestHandleEvent(Text("x")) == true); }
+        SUBCASE("Enter") { CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ENTER)) == true); }
+        SUBCASE("Backspace") { CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_BACKSPACE)) == true); }
+        SUBCASE("Ctrl+Y")
+        {
+            wordstartui::sInputEvent event{};
+            event.type = wordstartui::INPUT_TYPE_CONTROL;
+            event.controlCode = 25;
+            event.ctrl = true;
+            CHECK(app.TestHandleEvent(event) == true);
+        }
+        SUBCASE("mouse click") { CHECK(app.TestHandleEvent(Mouse(wordstartui::MOUSE_ACTION_PRESS, 10, 10)) == true); }
+        CheckLetterUnchanged(app, text);
+    }
+
+    SUBCASE("a burst of 20 keys, then the next key after the input went quiet is typed")
+    {
+        const char* letters = "abcdefghijklmnopqrst";
+        for (int index = 0; index < 20; ++index)
+        {
+            CHECK(app.TestHandleEvent(Text(std::string(1, letters[index]))) == true);
+        }
+        REQUIRE(app.TestInEditor() == true);
+        std::string text = app.TestGetEditor()->GetDocument()->GetText();
+        CHECK(text.find("dear reader") != std::string::npos);
+        CHECK(text.find("abc") == std::string::npos);
+        CHECK(text.find('t') == std::string::npos);
+        CheckLetterUnchanged(app, text);
+
+        app.TestIdle();
+        CHECK(app.TestHandleEvent(Text("z")) == true);
+        CHECK(app.TestGetEditor()->GetDocument()->IsModified() == true);
+        CHECK(app.TestGetEditor()->GetDocument()->GetText().find('z') != std::string::npos);
+    }
+
+    SUBCASE("keys queued when the startup screen times out are dropped too")
+    {
+        app.TestSetStartupDuration(std::chrono::milliseconds(0));
+        app.TestTickStartup();
+        REQUIRE(app.TestInEditor() == true);
+        std::string text = app.TestGetEditor()->GetDocument()->GetText();
+        CHECK(app.TestHandleEvent(Text("x")) == true);
+        CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ENTER)) == true);
+        CheckLetterUnchanged(app, text);
+    }
+}
+
+
+TEST_CASE("TUI startup screen - without a file name the next key after the startup screen is not dropped")
+{
+    cWSWordTsar app;
+    wordstartui::cScreen screen;
+    StartShowing(app, screen);
+    CHECK(app.TestHandleEvent(Text("d")) == true);
+    CHECK(app.TestOpeningBrowserFocus() == true);
+    CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
+    CHECK(app.TestOpeningBrowserFocus() == false);
+}

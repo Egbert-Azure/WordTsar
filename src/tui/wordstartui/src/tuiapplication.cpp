@@ -95,6 +95,10 @@ int cTuiApplication::Run(void)
                 HandleEvent(event);
             }
         }
+        else
+        {
+            OnIdle();
+        }
     }
 
     mDriver->Close();
@@ -229,6 +233,18 @@ void cTuiApplication::OnResize(int rows, int cols)
 void cTuiApplication::OnAfterDraw(cTerminalDriver& driver)
 {
     driver.SetCursor(0, 0, false);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Hook called when a read of the terminal returned no event.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cTuiApplication::OnIdle(void)
+{
 }
 
 /////////////////////////////////////////////////////////////////////////////

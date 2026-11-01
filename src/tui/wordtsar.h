@@ -145,6 +145,8 @@ public:
         Draw(screen, GetTheme());
     }
     void TestTickStartup(void) { TickStartupScreen(); }
+    // A read of the terminal that found no input.
+    void TestIdle(void) { OnIdle(); }
     std::chrono::milliseconds TestStartupDuration(void) const { return mStartupDuration; }
     void TestSetStartupDuration(std::chrono::milliseconds duration) { mStartupDuration = duration; }
     // Modal dialogs are counted and cancelled instead of run.
@@ -171,6 +173,7 @@ protected:
     bool HandleEvent(const wordstartui::sInputEvent& event) override;
     void OnResize(int rows, int cols) override;
     void OnAfterDraw(wordstartui::cTerminalDriver& driver) override;
+    void OnIdle(void) override;
 
 private:
     // Startup phases before the editor takes over.
@@ -284,6 +287,7 @@ private:
     std::chrono::milliseconds mStartupDuration;              // how long the startup screen stays
     std::chrono::steady_clock::time_point mStartupShownAt;   // first frame of the startup screen
     bool mStartupTiming;                     // mStartupShownAt is set
+    bool mDropTypeAhead;                     // drop input until a read finds none
 #ifdef WORDTSAR_TUI_TEST_HOOKS
     bool mTestCountModals = false;
     int mTestModalCount = 0;
