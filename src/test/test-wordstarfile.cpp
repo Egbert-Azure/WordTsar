@@ -29,6 +29,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <random>
 #include <set>
 #include <sstream>
 #include <string>
@@ -67,6 +68,19 @@ std::filesystem::path TempPath(void)
     std::filesystem::path path = std::filesystem::temp_directory_path();
     path /= "wordtsar_wordstarfile_test_" + std::to_string(counter) + ".ws";
     return path;
+}
+
+// New empty directory under the system temp directory, unique per call
+std::filesystem::path UniqueTempDir(const std::string &prefix)
+{
+    std::random_device random;
+    std::filesystem::path dir;
+    do
+    {
+        dir = std::filesystem::temp_directory_path() / (prefix + "_" + std::to_string(random()) + std::to_string(random()));
+    }
+    while (std::filesystem::create_directory(dir) == false);
+    return dir;
 }
 
 void WriteFileBytes(const std::filesystem::path &path, const std::string &bytes)
@@ -942,13 +956,14 @@ std::string CompareParagraph(cDocument* a, cDocument* b, PARAGRAPH_T para)
 /// @brief
 /// For every WordStar file under WORDTSAR_ARCHIVE_DIR (recursive): files
 /// with extension .WS (any case), and files of any other extension that
-/// cWordstarFile::CheckType() accepts by content. Each file is loaded, saved
+/// cWordstarFile::CheckType() accepts. Each file is loaded, saved
 /// through cWordstarFile::SaveFile() into a temporary directory, the saved
 /// copy is loaded, and the two documents are compared paragraph by
 /// paragraph (see CompareParagraph()). A file fails when the two loads
 /// differ, a load or save fails, or anything throws. A failing file listed
 /// in kKnownRoundTripFailures is reported as a message; an unlisted failing
-/// file and a listed file that passes fail the test. Byte differences
+/// file, a listed file that passes and a listed file that is not scanned
+/// (missing from the archive or not accepted) fail the test. Byte differences
 /// between the original and the saved file are reported as messages only.
 /// Output names files, paragraph indices and categories, never text.
 /// Without WORDTSAR_ARCHIVE_DIR the test does nothing.
@@ -958,80 +973,26 @@ std::string CompareParagraph(cDocument* a, cDocument* b, PARAGRAPH_T para)
 const std::set<std::string> kKnownRoundTripFailures =
 {
     "ARTICLES/FORMFEED.WS",
-    "ASCWS.COM",
-    "CONVERT/FLTRMENU.DEF",
-    "DEFAULT/CONVERT/FLTRMENU.DEF",
-    "DEFAULT/DB00.DTB",
-    "DEFAULT/DB00.DTC",
-    "DEFAULT/DB00.DTD",
-    "DEFAULT/DB00.DTE",
-    "DEFAULT/DB00.DTI",
-    "DEFAULT/DB02.DTD",
-    "DEFAULT/DB02.DTF",
-    "DEFAULT/DB02.DTH",
-    "DEFAULT/DB02.DTI",
-    "DEFAULT/INSET/CAPMSG.TXT",
-    "DEFAULT/OPTIONS/WSLIST.OVR",
     "DEFAULT/PRINT.TST",
     "DEFAULT/REVIEW.DOC",
-    "DEFAULT/TABLES2.OVR",
-    "DEFAULT/WSCHANGE.OVR",
-    "DICT/THESR002.DCT",
-    "DICT/THESR033.DCT",
-    "DICT/THESR034.DCT",
-    "DICT/THESR039.DCT",
-    "DICT/THESR049.DCT",
-    "DOSBox-X/languages/es_ES.lng",
-    "DOSBox-X/languages/fr_FR.lng",
-    "DOSBox-X/languages/zh_CN.lng",
-    "FONTS/PS/BKIQTD.PFB",
-    "FONTS/PS/BLIQTD.PFB",
-    "FONTS/PS/BMIQTD.PFB",
-    "FONTS/PS/BNKGOTHM.PFB",
-    "FONTS/PS/coo_____.pfb",
-    "FONTS/PS/Cur10ptn.pfb",
-    "FONTS/PS/SYMST_LM.PFB",
-    "FONTS/PS/zx______.pfb",
-    "FONTS/PS/zy______.pfb",
-    "HIJAAK/ISI0.TMP",
-    "HIJAAK/ISI2.TMP",
-    "INSET/CAPMSG.TXT",
-    "INSTALL/TABLES2.OVR",
     "LSRBOX/LSRBOX.WS",
     "MACROS/HOLYMAC/-HOLYMAC.WS",
     "MACROS/HOLYMAC/4MAC2",
     "MACROS/HOLYMAC/4MAC3",
-    "MAILLIST/WSLIST.OVR",
     "MICKEE/MICKEE.WS",
-    "MICKEE/WS.DEF",
     "PRINT.TST",
     "PRINTER.PS",
-    "PRINTERS/DB00.DTB",
-    "PRINTERS/DB00.DTC",
-    "PRINTERS/DB00.DTD",
-    "PRINTERS/DB00.DTE",
-    "PRINTERS/DB00.DTI",
-    "PRINTERS/DB02.DTD",
-    "PRINTERS/DB02.DTF",
-    "PRINTERS/DB02.DTH",
-    "PRINTERS/DB02.DTI",
     "PRINTERS/FONTCRIB.PS",
     "PRINTERS/fontcrib.ws",
     "PSPRINT.TST",
     "REF/ASCIITAB.WS",
     "REF/BOOKLET.WS",
+    "REF/CONTROL.COD",
     "REF/SYMBOL.CHT",
     "REF/WINGDING.CHT",
     "REVIEW.DOC",
     "RTF-RJS/NOVEL.WS",
     "RTF-RJS/SKIPTEST.WS",
-    "TABLES2.OVR",
-    "UTIL/ASCWS.COM",
-    "UTIL/WS5WS4.COM",
-    "UTIL/WSOLD.COM",
-    "vDosPlus/Language.ini",
-    "WSCHANGE.OVR",
-    "WSOLD.COM",
 };
 
 TEST_CASE("cWordstarFile - every WordStar file in WORDTSAR_ARCHIVE_DIR loads the same after a save")
@@ -1078,9 +1039,7 @@ TEST_CASE("cWordstarFile - every WordStar file in WORDTSAR_ARCHIVE_DIR loads the
     std::sort(files.begin(), files.end());
     REQUIRE_MESSAGE(files.empty() == false, "no WordStar files in " << archiveDir.string());
 
-    std::filesystem::path tempDir = std::filesystem::temp_directory_path() / "wordtsar_archive_roundtrip";
-    std::filesystem::remove_all(tempDir);
-    std::filesystem::create_directories(tempDir);
+    std::filesystem::path tempDir = UniqueTempDir("wordtsar_archive_roundtrip");
 
     const size_t shownParagraphs = 10;
     size_t passed = 0;
@@ -1089,9 +1048,11 @@ TEST_CASE("cWordstarFile - every WordStar file in WORDTSAR_ARCHIVE_DIR loads the
     std::vector<std::string> byteDifferences;
     std::map<std::string, std::vector<std::string>> filesByCategory;
     size_t index = 0;
+    std::set<std::string> scanned;
     for (const std::filesystem::path& path : files)
     {
         std::string name = std::filesystem::relative(path, archiveDir).string();
+        scanned.insert(name);
         std::filesystem::path saved = tempDir / (std::to_string(index++) + ".ws");
         std::map<std::string, size_t> categoryCounts;
         std::ostringstream details;
@@ -1194,6 +1155,17 @@ TEST_CASE("cWordstarFile - every WordStar file in WORDTSAR_ARCHIVE_DIR loads the
         }
     }
     std::filesystem::remove_all(tempDir);
+
+    for (const std::string& name : kKnownRoundTripFailures)
+    {
+        if (scanned.count(name) == 0)
+        {
+            bool exists = std::filesystem::exists(archiveDir / name);
+            std::string reason = exists ? ": listed in kKnownRoundTripFailures but not accepted by CheckType()"
+                                        : ": listed in kKnownRoundTripFailures but missing from the archive";
+            CHECK_MESSAGE(false, name << reason);
+        }
+    }
 
     std::ostringstream extensions;
     for (const auto& ext : otherExtensions)
@@ -1917,5 +1889,175 @@ TEST_CASE("cWordstarFile - ESC x FS with x below 0x20 under CP1252 keeps the raw
             expected = "a\x0D";
         }
         CHECK(Hex(doc->GetParagraphText(0), 0, 8) == Hex(expected));
+    }
+}
+
+
+namespace
+{
+
+// Writes bytes to a file with the given name in a new temp directory and
+// returns cWordstarFile::CheckType() for it
+bool CheckTypeOf(const std::string &bytes, const std::string &name = "sample.xyz")
+{
+    std::filesystem::path dir = UniqueTempDir("wordtsar_checktype");
+    std::filesystem::path path = dir / name;
+    WriteFileBytes(path, bytes);
+    cWordstarFile checker;
+    bool result = checker.CheckType(path.string());
+    std::filesystem::remove_all(dir);
+    return result;
+}
+
+// Pads bytes with 0x1A up to the next multiple of 128
+std::string PadEof(std::string bytes)
+{
+    bytes.append(128 - (bytes.size() % 128), '\x1A');
+    return bytes;
+}
+
+}
+
+
+TEST_CASE("cWordstarFile::CheckType - content without WordStar structure is rejected")
+{
+    SUBCASE("UTF-8 text with umlauts")
+    {
+        CHECK(CheckTypeOf("Viele Gr\xC3\xBC\xC3\x9F" "e aus M\xC3\xBC" "nchen und sch\xC3\xB6" "ne Gr\xC3\xBC\xC3\x9F" "e an alle Freunde.\r\n") == false);
+    }
+
+    SUBCASE("UTF-8 text with a c caron at a line end")
+    {
+        CHECK(CheckTypeOf("Dobry den, to je muj klic\xC4\x8D\nA dalsi radek.\n") == false);
+    }
+
+    SUBCASE("plain ASCII")
+    {
+        CHECK(CheckTypeOf("Just some plain text.\r\nAnother line.\r\n") == false);
+    }
+
+    SUBCASE("plain ASCII with 0x1A padding")
+    {
+        CHECK(CheckTypeOf(PadEof("Just some plain text.\r\nAnother line.\r\n")) == false);
+    }
+
+    SUBCASE("a dot command line only")
+    {
+        CHECK(CheckTypeOf(".pa\r\nHello world.\r\n") == false);
+    }
+
+    SUBCASE("bold toggles only")
+    {
+        CHECK(CheckTypeOf("Some \x02" "bold\x02 text and more \x02" "bold\x02.\r\n") == false);
+    }
+
+    SUBCASE("a compiled macro")
+    {
+        std::string text;
+        while (text.size() < 390)
+        {
+            text += "macro text line\r\n";
+        }
+        text = text.substr(0, 390) + "\x1B\x81\x1C" "1234567";
+        std::string bytes = PadEof(text) + std::string("\x14\x00\x11", 3);
+        REQUIRE(bytes.size() == 515);
+        CHECK(CheckTypeOf(bytes) == false);
+    }
+
+    SUBCASE("a NUL and a soft return")
+    {
+        CHECK(CheckTypeOf(std::string("abc\x00" "def\x8D\x0A" "ghi\r\n", 13)) == false);
+    }
+
+    SUBCASE("a 0x1D that starts no sequence and a soft return")
+    {
+        CHECK(CheckTypeOf("abc\x1D\x05\x07" "xyz def\x8D\x0A" "ghi\r\n") == false);
+    }
+
+    SUBCASE("CP437 box drawing and a soft return")
+    {
+        CHECK(CheckTypeOf("A table of contents with a framed title.\r\n"
+                          "\xC9\xCD\xCD\xCD\xCD\xBB\r\n"
+                          "Some more text that wraps at the end of this\x8D\x0A"
+                          "line and continues here.\r\n") == false);
+    }
+
+    SUBCASE("Latin-1 text")
+    {
+        CHECK(CheckTypeOf("Viele Gr\xFC\xDF" "e aus M\xFC" "nchen.\r\n") == false);
+    }
+
+    SUBCASE("UTF-16LE with a byte order mark")
+    {
+        std::string bytes("\xFF\xFE", 2);
+        for (char ch : std::string("Hello world\r\n"))
+        {
+            bytes += ch;
+            bytes += '\0';
+        }
+        CHECK(CheckTypeOf(bytes) == false);
+    }
+
+    SUBCASE("a high bit on the last letter of words only")
+    {
+        // 0xF3 = 's' | 0x80, 0xE5 = 'e' | 0x80, 0xF4 = 't' | 0x80
+        CHECK(CheckTypeOf("Thi\xF3 i\xF3 som\xE5 tex\xF4 tha\xF4 look\xF3 lik\xE5 WordStar.\r\n") == false);
+    }
+}
+
+
+TEST_CASE("cWordstarFile::CheckType - content with WordStar structure is accepted")
+{
+    SUBCASE("a soft return")
+    {
+        CHECK(CheckTypeOf("This is a line\x8D\x0Athat wraps.\r\n"));
+    }
+
+    SUBCASE("a sequence in the middle of the file")
+    {
+        CHECK(CheckTypeOf("Text before.\r\n" + SequenceBytes(SEQ_COMMENT, "a note") + "Text after.\r\n"));
+    }
+
+    SUBCASE("a sequence whose body contains 0x1A")
+    {
+        CHECK(CheckTypeOf("Text before.\r\n" + SequenceBytes(SEQ_COMMENT, "a\x1A" "b") + "Text after.\r\n"));
+    }
+
+    SUBCASE("ESC 9C FS")
+    {
+        CHECK(CheckTypeOf("Price: 10\x1B\x9C\x1C\r\n"));
+    }
+
+    SUBCASE("a control byte and a dot command line")
+    {
+        CHECK(CheckTypeOf(".he Header\r\nSome \x02" "bold\x02 text.\r\n"));
+    }
+
+    SUBCASE("a soft return after byte 512")
+    {
+        std::string text;
+        while (text.size() < 600)
+        {
+            text += "plain text line\r\n";
+        }
+        CHECK(CheckTypeOf(text + "wrapped\x8D\x0A" "line\r\n"));
+    }
+
+    SUBCASE("the WordStar 5+ header")
+    {
+        CHECK(CheckTypeOf(WordStar7File("Hello\r\n")));
+    }
+
+    SUBCASE("plain ASCII with a .ws extension")
+    {
+        CHECK(CheckTypeOf("Just some plain text.\r\n", "sample.ws"));
+    }
+
+    SUBCASE("WordStar 4 text with soft returns and high-bit word ends")
+    {
+        // high bit on the last letter before a space or soft return
+        CHECK(CheckTypeOf("Sehr geehrt\xE5 Dame\xEE und Herren, wi\xF2 freue\xEE uns\x8D\x0A"
+                          "Ihne\xEE mitteile\xEE zu konnen, dass die Strass\xE5\x8D\x0A"
+                          "gesperrt ist.\r\n"));
     }
 }

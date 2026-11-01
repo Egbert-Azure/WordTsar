@@ -71,10 +71,12 @@
  */
 
 #include <bitset>
+#include <cctype>
 #include <climits>
 #include <cstring>
 #include <cstdint>
 #include <numeric>
+#include <vector>
 
 #include "wordstarfile.h"
 #include "fontclassifier.h"
@@ -388,19 +390,15 @@ static bool IsWordStarContent(const std::string& filename) ;
 /**
  * @brief Checks if a file is a WordStar document.
  *
- * First checks the file extension against known WordStar extensions.
- * If the extension is unknown or missing, falls back to content-based
- * detection by scanning the file for characteristic WordStar byte
- * patterns (WS5+ header or WS4 formatting codes).
+ * A file with a WordStar extension is accepted without reading it. Any
+ * other file is accepted when IsWordStarContent() accepts its content.
  *
  * @param filename The full filename (including path) to check
  * @return true if the file is a WordStar document, false otherwise
  *
- * @note Supported extensions: ws, ws3, ws4, ws5, ws6, ws7, ws8, ws-bak, ws-$$$
- * @note Content detection handles WS5+ (0x1D header) and WS4 (control bytes,
- *       high-bit word wrap markers, extended char sequences)
+ * @note WordStar extensions: ws, ws3, ws4, ws5, ws6, ws7, ws8, ws-bak, ws-$$$
  *
- * @see IsWordStarContent() for the content-based detection algorithm
+ * @see IsWordStarContent() for the content rules
  * @see cWordstarFile::GetExtensions() for the list of supported extensions.
  */
 bool cWordstarFile::CheckType(std::string filename)
@@ -437,19 +435,26 @@ bool cWordstarFile::CheckType(std::string filename)
 ///
 /// @brief
 /// Content-based WordStar detection for files with unknown or missing
-/// extensions. Checks for both WordStar 5+ and WordStar 4.0 formats.
+/// extensions.
 ///
-/// WordStar 5+ detection: reads the first 4 bytes and checks for a
-/// valid sequence header (0x1D start, SEQ_HEADER type, valid size).
+/// Accepts a file that starts with a WordStar 5+ header sequence (0x1D,
+/// size, type 0x00). Rejects known non-WordStar formats by their magic
+/// bytes. Otherwise scans up to 256 KiB, up to the first 0x1A outside a
+/// sequence or an ESC x FS triple. A sequence is valid when its 16-bit
+/// length L is at least 4, the bytes at +L and +L+1 repeat the length and
+/// the byte at +L+2 is 0x1D; a valid sequence is skipped whole.
 ///
-/// WordStar 4.0 detection: first rules out known non-WS formats
-/// (ZIP/DOCX, RTF, PDF, ELF), then scans the first 512 bytes for
-/// characteristic WS4 byte patterns:
-///   - Formatting control bytes (Bold=0x02, Underline=0x13, etc.)
-///   - Extended character sequences (0x1B ... 0x1C)
-///   - Soft line markers (0x8D = phantom CR with high bit)
-///   - High-bit-on-printable characters (word wrap markers where
-///     byte & 0x7F is a letter)
+/// Rejects when:
+///   - a 0x1D does not start a valid sequence
+///   - a 0x00 is outside a sequence
+///   - a byte 0xA1-0xFF is not followed by 0x20, 0x0D, 0x0A, 0x8D or 0xA0
+///   - the high bytes form valid UTF-8 with at least one multi-byte character
+///   - 0x1A padding to a multiple of 128 is followed by 14 00 11 (WordStar
+///     7 macro)
+///
+/// Then accepts when it finds a soft return (8D 0A), a valid sequence, an
+/// ESC x FS triple, or a control byte (0x01-0x08, 0x0B, 0x0E-0x19, 0x1E,
+/// 0x1F) together with a dot command line.
 ///
 /// @see sSeqIntro for the sequence header structure
 /// @see eModifiers for WordStar control byte definitions
@@ -463,11 +468,11 @@ static bool IsWordStarContent(const std::string& filename)
         return false ;
     }
 
-    // Read the first 512 bytes for content analysis
-    static const size_t SCAN_SIZE = 512 ;
-    unsigned char buf[SCAN_SIZE] ;
-    size_t bytesRead = fread(buf, 1, SCAN_SIZE, file) ;
+    static const size_t SCAN_SIZE = 256 * 1024 ;
+    std::vector<unsigned char> data(SCAN_SIZE) ;
+    size_t bytesRead = fread(data.data(), 1, SCAN_SIZE, file) ;
     fclose(file) ;
+    const unsigned char* buf = data.data() ;
 
     if (bytesRead < 4)
     {
@@ -606,81 +611,178 @@ static bool IsWordStarContent(const std::string& filename)
         return false ;
     }
 
-    // --- WordStar 4.0 detection ---
-    // WS4 files are mostly printable ASCII text with formatting control bytes
-    // sprinkled in. Binary files may contain the same control byte values by
-    // chance, so we first verify the file is predominantly text before checking
-    // for WS4 formatting signals.
+    // --- WordStar 4.0 and headerless content ---
+    size_t softReturns = 0 ;
+    size_t sequences = 0 ;
+    size_t extChars = 0 ;
+    size_t controls = 0 ;
+    size_t dotLines = 0 ;
+    size_t highBytes = 0 ;
+    size_t utf8Chars = 0 ;
+    bool utf8Valid = true ;
+    int utf8Need = 0 ;                      // continuation bytes still expected
+    unsigned char utf8Lead = 0 ;            // lead byte, for the first continuation byte
+    size_t end = bytesRead ;
+    bool sawEof = false ;
 
-    // Count text-like bytes: printable ASCII (0x20-0x7E), tab, CR, LF
-    size_t textByteCount = 0 ;
-    for (size_t i = 0; i < bytesRead; i++)
+    size_t i = 0 ;
+    while (i < bytesRead)
     {
         unsigned char c = buf[i] ;
-        if ((c >= 0x20 && c <= 0x7E) || c == 0x09 || c == 0x0D || c == 0x0A)
+
+        if (c == 0x1D)
         {
-            textByteCount++ ;
+            // 1D, length (2), type, body, length (2), 1D
+            size_t len = (i + 2 < bytesRead) ? (buf[i + 1] | (buf[i + 2] << 8)) : 0 ;
+            if (len >= 4 && i + len + 2 < bytesRead &&
+                buf[i + len] == buf[i + 1] && buf[i + len + 1] == buf[i + 2] &&
+                buf[i + len + 2] == 0x1D)
+            {
+                sequences++ ;
+                if (utf8Need != 0)
+                {
+                    utf8Valid = false ;
+                    utf8Need = 0 ;
+                }
+                i += len + 3 ;
+                continue ;
+            }
+            return false ;
+        }
+
+        if (c == 0x1A)
+        {
+            sawEof = true ;
+            end = i ;
+            break ;
+        }
+
+        if (c == 0x00)
+        {
+            return false ;
+        }
+
+        if (c == 0x1B && i + 2 < bytesRead && buf[i + 2] == 0x1C)
+        {
+            extChars++ ;
+            if (utf8Need != 0)
+            {
+                utf8Valid = false ;
+                utf8Need = 0 ;
+            }
+            i += 3 ;
+            continue ;
+        }
+
+        // WordStar 4 sets the high bit only on the last character of a word
+        if (c >= 0xA1)
+        {
+            unsigned char next = (i + 1 < bytesRead) ? buf[i + 1] : 0x20 ;
+            if (next != 0x20 && next != 0x0D && next != 0x0A && next != 0x8D && next != 0xA0)
+            {
+                return false ;
+            }
+        }
+
+        if (c < 0x20 && c != 0x09 && c != 0x0A && c != 0x0C && c != 0x0D &&
+            c != 0x1B && c != 0x1C)
+        {
+            controls++ ;
+        }
+
+        if (c == 0x8D && i + 1 < bytesRead && buf[i + 1] == 0x0A)
+        {
+            softReturns++ ;
+        }
+
+        // dot command: '.' at a line start followed by '.' or a letter and a letter, digit or '#'
+        if (c == '.' && (i == 0 || buf[i - 1] == 0x0A) && i + 2 < bytesRead)
+        {
+            unsigned char second = buf[i + 1] ;
+            unsigned char third = buf[i + 2] ;
+            if (second == '.' || (isalpha(second) && (isalnum(third) || third == '#')))
+            {
+                dotLines++ ;
+            }
+        }
+
+        if (utf8Need != 0)
+        {
+            if (c >= 0x80 && c <= 0xBF &&
+                !(utf8Lead == 0xE0 && c < 0xA0) && !(utf8Lead == 0xED && c > 0x9F) &&
+                !(utf8Lead == 0xF0 && c < 0x90) && !(utf8Lead == 0xF4 && c > 0x8F))
+            {
+                utf8Lead = 0 ;
+                utf8Need-- ;
+                if (utf8Need == 0)
+                {
+                    utf8Chars++ ;
+                }
+                highBytes++ ;
+                i++ ;
+                continue ;
+            }
+            utf8Valid = false ;
+            utf8Need = 0 ;
+        }
+
+        if (c >= 0x80)
+        {
+            highBytes++ ;
+            if (c >= 0xC2 && c <= 0xDF)
+            {
+                utf8Need = 1 ;
+                utf8Lead = c ;
+            }
+            else if (c >= 0xE0 && c <= 0xEF)
+            {
+                utf8Need = 2 ;
+                utf8Lead = c ;
+            }
+            else if (c >= 0xF0 && c <= 0xF4)
+            {
+                utf8Need = 3 ;
+                utf8Lead = c ;
+            }
+            else
+            {
+                utf8Valid = false ;
+            }
+        }
+        i++ ;
+    }
+
+    if (utf8Need != 0)
+    {
+        utf8Valid = false ;
+    }
+
+    // WordStar 7 macro: text, 0x1A padding to a multiple of 128, then 14 00 11
+    if (sawEof)
+    {
+        size_t trailer = end ;
+        while (trailer < bytesRead && buf[trailer] == 0x1A)
+        {
+            trailer++ ;
+        }
+        if (trailer % 128 == 0 && trailer + 2 < bytesRead &&
+            buf[trailer] == 0x14 && buf[trailer + 1] == 0x00 && buf[trailer + 2] == 0x11)
+        {
+            return false ;
         }
     }
 
-    // Require at least 75% text-like content to consider WS4 detection
-    // Binary files typically have much lower ASCII density
-    if (textByteCount * 100 / bytesRead < 75)
+    if (highBytes > 0 && utf8Valid && utf8Chars > 0)
     {
         return false ;
     }
 
-    // File is mostly text -- now scan for WS4 formatting signals
-    int highBitLetterCount = 0 ;
-
-    for (size_t i = 0; i < bytesRead; i++)
-    {
-        unsigned char c = buf[i] ;
-
-        // Strong signals: WS formatting control bytes
-        // In a mostly-ASCII file, these are definitive WS4 markers
-        if (c == 0x02 ||    // STYLE_BOLD
-            c == 0x13 ||    // STYLE_UNDERLINE
-            c == 0x14 ||    // STYLE_SUPERSCRIPT
-            c == 0x16 ||    // STYLE_SUBSCRIPT
-            c == 0x18 ||    // STYLE_STRIKETHROUGH
-            c == 0x19)      // STYLE_ITALICS
-        {
-            return true ;
-        }
-
-        // Strong signal: extended character sequence (0x1B ... 0x1C)
-        if (c == 0x1B && i + 2 < bytesRead && buf[i + 2] == 0x1C)
-        {
-            return true ;
-        }
-
-        // Strong signal: soft line marker (phantom CR with high bit)
-        if (c == 0x8D)
-        {
-            return true ;
-        }
-
-        // Supporting signal: high-bit-on-printable letter (word wrap marker)
-        // WS4 sets bit 7 on the first letter of words after soft returns
-        if (c >= 0x80)
-        {
-            unsigned char masked = c & 0x7F ;
-            if ((masked >= 'A' && masked <= 'Z') ||
-                (masked >= 'a' && masked <= 'z'))
-            {
-                highBitLetterCount++ ;
-            }
-        }
-    }
-
-    // Supporting signal threshold: 3+ high-bit letters suggest WS4 word wrap
-    if (highBitLetterCount >= 3)
+    if (softReturns > 0 || sequences > 0 || extChars > 0)
     {
         return true ;
     }
 
-    return false ;
+    return (controls > 0 && dotLines > 0) ;
 }
 
 
