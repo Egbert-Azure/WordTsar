@@ -606,3 +606,209 @@ TEST_CASE("TUI Opening screen - help level 3 keys do not open the Opening menus"
     CHECK(app.TestQuitRequested() == false);
     CHECK(app.TestOpeningBrowserFocus() == false);
 }
+
+
+TEST_CASE("TUI menu walk - every enabled Opening menu entry resolves to a real target")
+{
+    cWSWordTsar app;
+    const std::vector<wordstartui::sMenuItem>& items = app.TestGetOpeningMenu().GetItems();
+    REQUIRE(items.size() == 4);
+
+    for (const wordstartui::sMenuItem& item : items)
+    {
+        INFO("Opening menu: ", item.title);
+        CHECK(item.entries.empty() == false);
+        CheckEntries(item.entries, "Opening " + item.title);
+    }
+}
+
+
+namespace
+{
+
+struct sExpectedEntry
+{
+    const char* title;      // nullptr marks a separator
+    const char* shortcut;
+    bool enabled;
+};
+
+void CheckMenuContents(const wordstartui::sMenuItem& item, const std::vector<sExpectedEntry>& expected)
+{
+    INFO("Opening menu: ", item.title);
+    REQUIRE(item.entries.size() == expected.size());
+    for (size_t index = 0; index < expected.size(); ++index)
+    {
+        const wordstartui::sMenuEntry& entry = item.entries[index];
+        INFO("entry ", index);
+        if (expected[index].title == nullptr)
+        {
+            CHECK(entry.isSeparator == true);
+            continue;
+        }
+        CHECK(entry.isSeparator == false);
+        CHECK(entry.title == expected[index].title);
+        CHECK(entry.shortcut == expected[index].shortcut);
+        CHECK(entry.enabled == expected[index].enabled);
+        CHECK(entry.submenu.empty() == true);
+    }
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - Opening menu contents")
+{
+    cWSWordTsar app;
+    const std::vector<wordstartui::sMenuItem>& items = app.TestGetOpeningMenu().GetItems();
+    REQUIRE(items.size() == 4);
+
+    CheckMenuContents(items[0], {
+        {"New", "S", true},
+        {"Open Document...", "D", true},
+        {"Open Nondocument...", "N", false},
+        {"Recent Files...", "", true},
+        {nullptr, "", false},
+        {"Print...", "P", true},
+        {"Print from Keyboard...", "K", false},
+        {"Fax...", "\\", false},
+        {nullptr, "", false},
+        {"Copy...", "O", false},
+        {"Delete...", "Y", false},
+        {"Rename...", "E", false},
+        {"Protect/Unprotect...", "C", false},
+        {nullptr, "", false},
+        {"Change Drive/Directory...", "L", true},
+        {"Change Filename Display...", "", false},
+        {"Run DOS Command...", "R", false},
+        {"Status", "?", true},
+        {nullptr, "", false},
+        {"Exit WordTsar", "X", true},
+    });
+
+    CheckMenuContents(items[1], {
+        {"Index...", "I", true},
+        {"TOC...", "T", true},
+        {"Macros", "\xe2\x96\xba", false},
+        {nullptr, "", false},
+        {"System Preferences...", "", true},
+    });
+
+    CheckMenuContents(items[2], {
+        {"MailList", "AM", false},
+        {"TelMerge", "AT", false},
+        {"Star Exchange", "AS", false},
+    });
+
+    REQUIRE(items[3].entries.size() == 4);
+    CHECK(items[3].entries[0].title == "Help");
+    CHECK(items[3].entries[0].shortcut == "F1");
+    CHECK(items[3].entries[1].title == "Change Help Level...");
+    CHECK(items[3].entries[2].isSeparator == true);
+    CHECK(items[3].entries[3].title == "About WordTsar");
+    CHECK(items[3].entries[3].enabled == true);
+
+    SUBCASE("hotkey letters follow the reference")
+    {
+        std::string keys;
+        for (const wordstartui::sMenuEntry& entry : items[0].entries)
+        {
+            if (entry.isSeparator == false)
+            {
+                keys.push_back(entry.hotKey);
+            }
+        }
+        CHECK(keys == "wdnipkfotecvhrux");
+    }
+}
+
+
+TEST_CASE("TUI Opening screen - Opening menu entries run the panel actions")
+{
+    cWSWordTsar app;
+    app.TestGetEditor()->mHelpLevel = 4;
+    app.TestEnterOpening();
+    const wordstartui::cMenuBar& menu = app.TestGetOpeningMenu();
+
+    SUBCASE("File > New starts a new document")
+    {
+        app.TestHandleEvent(OpeningText("f"));
+        app.TestHandleEvent(OpeningText("w"));
+        CHECK(menu.IsOpen() == false);
+        CHECK(app.TestInEditor() == true);
+        CHECK(app.TestFilename().empty() == true);
+    }
+
+    SUBCASE("File > Open Document opens the file list")
+    {
+        app.TestHandleEvent(OpeningText("f"));
+        app.TestHandleEvent(OpeningText("d"));
+        CHECK(menu.IsOpen() == false);
+        CHECK(app.TestOpeningBrowserFocus() == true);
+        CHECK(app.TestOpeningWantPrint() == false);
+    }
+
+    SUBCASE("File > Print opens the file list to print")
+    {
+        app.TestHandleEvent(OpeningText("f"));
+        app.TestHandleEvent(OpeningText("p"));
+        CHECK(app.TestOpeningBrowserFocus() == true);
+        CHECK(app.TestOpeningWantPrint() == true);
+    }
+
+    SUBCASE("File > Change Drive/Directory opens the file list")
+    {
+        app.TestHandleEvent(OpeningText("f"));
+        app.TestHandleEvent(OpeningText("v"));
+        CHECK(app.TestOpeningBrowserFocus() == true);
+        CHECK(app.TestOpeningWantPrint() == false);
+    }
+
+    SUBCASE("File > Exit WordTsar exits")
+    {
+        app.TestHandleEvent(OpeningText("f"));
+        app.TestHandleEvent(OpeningText("x"));
+        CHECK(app.TestQuitRequested() == true);
+    }
+
+    SUBCASE("Utilities > Index opens the file list to index")
+    {
+        app.TestHandleEvent(OpeningText("u"));
+        app.TestHandleEvent(OpeningText("i"));
+        CHECK(app.TestOpeningBrowserFocus() == true);
+        CHECK(app.TestOpeningWantIndex() == true);
+    }
+
+    SUBCASE("Utilities > TOC opens the file list for a table of contents")
+    {
+        app.TestHandleEvent(OpeningText("u"));
+        app.TestHandleEvent(OpeningText("t"));
+        CHECK(app.TestOpeningBrowserFocus() == true);
+        CHECK(app.TestOpeningWantTOC() == true);
+    }
+
+    SUBCASE("greyed File entries do nothing")
+    {
+        app.TestHandleEvent(OpeningText("f"));
+        for (const char* letter : {"n", "k", "f", "o", "t", "e", "c", "h", "r"})
+        {
+            INFO("letter: ", letter);
+            CHECK(app.TestHandleEvent(OpeningText(letter)) == true);
+            CHECK(menu.GetOpenMenu() == 0);
+        }
+        CHECK(app.TestOpeningBrowserFocus() == false);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestQuitRequested() == false);
+    }
+
+    SUBCASE("Enter on a greyed Additional entry does nothing")
+    {
+        app.TestHandleEvent(OpeningText("a"));
+        REQUIRE(menu.GetOpenMenu() == 2);
+        CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
+        CHECK(menu.GetOpenMenu() == 2);
+        CHECK(app.TestOpeningBrowserFocus() == false);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestQuitRequested() == false);
+    }
+}

@@ -1371,19 +1371,53 @@ void cWSWordTsar::BuildOpeningMenus(void)
     mOpeningMenu.SetMenuGap(3);
     mOpeningMenu.SetLastMenuRightAligned(true);
 
+    // Entries show the classic Opening Menu letter right-aligned. Entries
+    // without an Opening screen action are greyed out.
     auto none = [](void) {};
+    auto run = [this](eOpeningAction action)
+    {
+        return [this, action](void) { RunOpeningAction(action); };
+    };
 
     int file = mOpeningMenu.AddMenu("File", 'F');
-    mOpeningMenu.AddSubItem(file, "Ne&w", none, false);
+    mOpeningMenu.AddSubItem(file, "Ne&w  S", run(eOpeningAction::SPEED_WRITE));
+    mOpeningMenu.AddSubItem(file, "Open &Document...  D", run(eOpeningAction::OPEN_DOCUMENT));
+    mOpeningMenu.AddSubItem(file, "Open &Nondocument...  N", none, false);
+    mOpeningMenu.AddSubItem(file, "Recent F&iles...", run(eOpeningAction::RECENT_FILES));
+    mOpeningMenu.AddSeparator(file);
+    mOpeningMenu.AddSubItem(file, "&Print...  P", run(eOpeningAction::PRINT_FILE));
+    mOpeningMenu.AddSubItem(file, "Print from &Keyboard...  K", none, false);
+    mOpeningMenu.AddSubItem(file, "&Fax...  \\", none, false);
+    mOpeningMenu.AddSeparator(file);
+    mOpeningMenu.AddSubItem(file, "C&opy...  O", none, false);
+    mOpeningMenu.AddSubItem(file, "Dele&te...  Y", none, false);
+    mOpeningMenu.AddSubItem(file, "R&ename...  E", none, false);
+    mOpeningMenu.AddSubItem(file, "Prote&ct/Unprotect...  C", none, false);
+    mOpeningMenu.AddSeparator(file);
+    mOpeningMenu.AddSubItem(file, "Change Dri&ve/Directory...  L", run(eOpeningAction::CHANGE_DIRECTORY));
+    mOpeningMenu.AddSubItem(file, "C&hange Filename Display...", none, false);
+    mOpeningMenu.AddSubItem(file, "&Run DOS Command...  R", none, false);
+    mOpeningMenu.AddSubItem(file, "Stat&us  ?", run(eOpeningAction::DISPLAY_STATUS));
+    mOpeningMenu.AddSeparator(file);
+    mOpeningMenu.AddSubItem(file, "E&xit WordTsar  X", run(eOpeningAction::EXIT));
 
     int util = mOpeningMenu.AddMenu("Utilities", 'U');
-    mOpeningMenu.AddSubItem(util, "&Index...", none, false);
+    mOpeningMenu.AddSubItem(util, "&Index...  I", run(eOpeningAction::INDEX_DOCUMENT));
+    mOpeningMenu.AddSubItem(util, "&TOC...  T", run(eOpeningAction::TABLE_OF_CONTENTS));
+    mOpeningMenu.AddSubItem(util, "&Macros  \xe2\x96\xba", none, false);   // U+25BA
+    mOpeningMenu.AddSeparator(util);
+    mOpeningMenu.AddSubItem(util, "System &Preferences...", run(eOpeningAction::PREFERENCES));
 
     int additional = mOpeningMenu.AddMenu("Additional", 'A');
-    mOpeningMenu.AddSubItem(additional, "&MailList", none, false);
+    mOpeningMenu.AddSubItem(additional, "&MailList  AM", none, false);
+    mOpeningMenu.AddSubItem(additional, "&TelMerge  AT", none, false);
+    mOpeningMenu.AddSubItem(additional, "&Star Exchange  AS", none, false);
 
     int help = mOpeningMenu.AddMenu("Help", 'H');
-    mOpeningMenu.AddSubItem(help, "&Help", none, false);
+    mOpeningMenu.AddSubItem(help, "&Help  F1", none, false);
+    mOpeningMenu.AddSubItem(help, "&Change Help Level...", none, false);
+    mOpeningMenu.AddSeparator(help);
+    mOpeningMenu.AddSubItem(help, "&About WordTsar", run(eOpeningAction::ABOUT));
 }
 
 // =========================================================================
