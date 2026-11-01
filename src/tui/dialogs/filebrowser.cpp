@@ -219,6 +219,47 @@ std::string cFileBrowser::ShortenName(const std::string& name, int width)
     return wordstartui::cUtf8Helper::FitWidth(name, width - 1) + ellipsis;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  std::uintmax_t bytes [in] free bytes
+///
+/// @return the amount as shown on the Opening screen
+///
+/// @brief
+/// Rounded, in units of 1000: whole megabytes below 1000M ("512M"), then
+/// gigabytes with one decimal ("2.0G").
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cFileBrowser::FormatFreeSpace(std::uintmax_t bytes)
+{
+    const std::uintmax_t mega = (bytes + 500000) / 1000000;
+    if (mega < 1000)
+    {
+        return std::to_string(mega) + "M";
+    }
+
+    const std::uintmax_t tenthsG = (bytes + 50000000) / 100000000;
+    return std::to_string(tenthsG / 10) + "." + std::to_string(tenthsG % 10) + "G";
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const std::string& directory [in] a directory
+///
+/// @return the free space on its volume, or an empty string if unknown
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cFileBrowser::FreeSpace(const std::string& directory)
+{
+    std::error_code ec;
+    fs::space_info space = fs::space(directory, ec);
+    if ((ec) || (space.available == static_cast<std::uintmax_t>(-1)))
+    {
+        return std::string();
+    }
+    return FormatFreeSpace(space.available);
+}
+
 std::string cFileBrowser::GetSelectedFile(void) const
 {
     return mSelectedFile;

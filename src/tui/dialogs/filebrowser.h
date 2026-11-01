@@ -77,6 +77,8 @@ public:
 
     static std::string FormatSize(std::uintmax_t bytes);
     static std::string ShortenName(const std::string& name, int width);
+    static std::string FormatFreeSpace(std::uintmax_t bytes);
+    static std::string FreeSpace(const std::string& directory);
 
 private:
     struct sEntry

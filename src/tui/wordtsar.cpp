@@ -43,6 +43,7 @@
 #include "src/core/document/document.h"
 #include "src/core/utils/config.h"
 #include "src/tui/wordstartui/src/listbox.h"
+#include "src/tui/wordstartui/src/utf8helper.h"
 
 #include <algorithm>
 #include <cctype>
@@ -1894,8 +1895,8 @@ void cWSWordTsar::DrawOpeningMenu(cScreen& screen)
 ///
 /// @brief
 /// Draw the help level 4 Opening screen: row 0 is the title bar, row 1 the
-/// Opening menu bar, then the file list. The menu bar is drawn last so its
-/// pull-downs overlay the file list.
+/// Opening menu bar, rows 2 to 5 empty, then the file list from row 6. The
+/// menu bar is drawn last so its pull-downs overlay the file list.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::DrawOpeningBars(cScreen& screen)
@@ -1932,8 +1933,6 @@ void cWSWordTsar::DrawOpeningBars(cScreen& screen)
     }
     screen.PutText(0, nameCol - 1, " " + name + " ", base);
 
-    // Rows 2 to 5 stay empty; row 6 closes them.
-    halfBlockBar(6);
     DrawOpeningFiles(screen, 7, 8);
 
     sRect menuRect;
@@ -1954,8 +1953,10 @@ void cWSWordTsar::DrawOpeningBars(cScreen& screen)
 /// @return nothing
 ///
 /// @brief
-/// Draw the Filenames/Path line and the file list below it to the bottom of
-/// the screen.
+/// Draw an upper half-block bar above the Filenames/Path line, the line
+/// itself ("Filenames:" at column 1, the path and free space from column 21,
+/// the scroll arrows at columns 71 to 77), the file list below it, and a
+/// lower half-block bar on the last row.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow)
@@ -1965,12 +1966,43 @@ void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow)
     base.bg = wordstartui::MakeDefaultColor();
     base.attrs = wordstartui::CELL_ATTR_NONE;
 
-    screen.PutText(headerRow, 0, "Filenames:       Path: " + mBrowser.GetCurrentDirectory(), base);
+    auto bar = [&](int r, const char* glyph)
+    {
+        sRect line;
+        line.row = r;
+        line.col = 0;
+        line.rows = 1;
+        line.cols = mCols;
+        screen.FillRect(line, glyph, base);
+    };
+    bar(headerRow - 1, "\xe2\x96\x80");   // U+2580 UPPER HALF BLOCK
+    bar(mRows - 1, "\xe2\x96\x84");       // U+2584 LOWER HALF BLOCK
+
+    screen.PutText(headerRow, 1, "Filenames:", base);
+
+    // The path text runs from column 21 and stops before column 70; a long
+    // directory is cut at its start.
+    const int pathCol = 21;
+    const int pathRoom = std::min(70, mCols) - pathCol;
+    std::string directory = mBrowser.GetCurrentDirectory();
+    std::string free = wsui::cFileBrowser::FreeSpace(directory);
+    std::string freeText = free.empty() ? std::string() : ("  " + free + " free");
+    const int dirRoom = pathRoom - 6 - wordstartui::cUtf8Helper::TextWidth(freeText);
+    if (wordstartui::cUtf8Helper::TextWidth(directory) > dirRoom)
+    {
+        directory = "\xe2\x80\xa6" + wordstartui::cUtf8Helper::FitWidthTail(directory, dirRoom - 1);   // U+2026
+    }
+    screen.PutText(headerRow, pathCol, "Path: " + directory + freeText, base);
+
+    screen.PutText(headerRow, 71, "\xe2\x96\xb2", base);   // U+25B2
+    screen.PutText(headerRow, 73, "\xe2\x96\xbc", base);   // U+25BC
+    screen.PutText(headerRow, 75, "\xe2\x86\x91", base);   // U+2191
+    screen.PutText(headerRow, 77, "\xe2\x86\x93", base);   // U+2193
 
     sRect browserRect;
     browserRect.row = listRow;
     browserRect.col = 0;
-    browserRect.rows = mRows - listRow;
+    browserRect.rows = mRows - 1 - listRow;
     if (browserRect.rows < 1)
     {
         browserRect.rows = 1;
@@ -2092,13 +2124,11 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
         screen.PutText(row, leftCol, std::string("F1"), keyStyle);
     }
 
-    // Separator, then the Filenames/Path header, then another separator.
-    // Positioned below whichever column (including the F1 row) is taller.
+    // The file list's upper bar sits at row 13, or directly below the
+    // panel when the taller column (including the F1 row) reaches row 13.
     int menuRows = std::max(kOpeningLeftCount + 1, rightCount);
-    int separatorRow = 2 + menuRows;
-    separator(separatorRow);
-    separator(separatorRow + 3);
-    DrawOpeningFiles(screen, separatorRow + 2, separatorRow + 4);
+    int barRow = std::max(13, 2 + menuRows);
+    DrawOpeningFiles(screen, barRow + 1, barRow + 2);
 }
 
 /////////////////////////////////////////////////////////////////////////////

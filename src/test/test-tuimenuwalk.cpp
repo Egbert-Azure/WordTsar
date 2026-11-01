@@ -29,6 +29,7 @@
 #include "src/input/wordtsarinput.h"
 #include "src/tui/dialogs/filebrowser.h"
 
+#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <cstdio>
@@ -1334,4 +1335,114 @@ TEST_CASE("TUI Opening screen - the file list uses the WordStar layout")
     CHECK(CellRun(screen, 8, 19, 1) == kBar);
     CHECK(CellRun(screen, 8, 39, 1) == kBar);
     CHECK(CellRun(screen, 8, 59, 1) == kBar);
+}
+
+
+TEST_CASE("TUI file browser - free space text")
+{
+    CHECK(wsui::cFileBrowser::FormatFreeSpace(512345678) == "512M");
+    CHECK(wsui::cFileBrowser::FormatFreeSpace(999499999) == "999M");
+    CHECK(wsui::cFileBrowser::FormatFreeSpace(999500000) == "1.0G");
+    CHECK(wsui::cFileBrowser::FormatFreeSpace(2013000000ULL) == "2.0G");
+    CHECK(wsui::cFileBrowser::FormatFreeSpace(1234567890123ULL) == "1234.6G");
+
+    CHECK(wsui::cFileBrowser::FreeSpace("/no/such/wordtsar/folder") == "");
+    std::error_code ec;
+    std::filesystem::space_info space = std::filesystem::space("/", ec);
+    REQUIRE(!ec);
+    CHECK(wsui::cFileBrowser::FreeSpace("/") == wsui::cFileBrowser::FormatFreeSpace(space.available));
+}
+
+
+namespace
+{
+
+// True when every cell of the row holds the glyph.
+bool RowIsFilledWith(const wordstartui::cScreen& screen, int row, const std::string& glyph)
+{
+    for (int col = 0; col < screen.GetCols(); ++col)
+    {
+        if (CellRun(screen, row, col, 1) != glyph)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+const char* const kUpperHalf = "\xe2\x96\x80";   // U+2580
+const char* const kLowerHalf = "\xe2\x96\x84";   // U+2584
+
+void CheckOpeningHeader(const wordstartui::cScreen& screen, int row, const std::string& directory)
+{
+    CHECK(CellRun(screen, row, 0, 11) == " Filenames:");
+    std::string path = "Path: " + directory + "  " + wsui::cFileBrowser::FreeSpace(directory) + " free";
+    CHECK(CellRun(screen, row, 21, static_cast<int>(path.size())) == path);
+    CHECK(CellRun(screen, row, 71, 1) == "\xe2\x96\xb2");   // U+25B2
+    CHECK(CellRun(screen, row, 73, 1) == "\xe2\x96\xbc");   // U+25BC
+    CHECK(CellRun(screen, row, 75, 1) == "\xe2\x86\x91");   // U+2191
+    CHECK(CellRun(screen, row, 77, 1) == "\xe2\x86\x93");   // U+2193
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - help level 4 header and bars")
+{
+    cWSWordTsar app;
+    app.TestGetEditor()->mHelpLevel = 4;
+    app.TestEnterOpening();
+    app.TestSetOpeningDirectory("/");
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    CHECK(RowIsFilledWith(screen, 6, kUpperHalf) == true);
+    CheckOpeningHeader(screen, 7, "/");
+    CHECK(CellRun(screen, 8, 1, 2) == "..");
+    CHECK(RowIsFilledWith(screen, 24, kLowerHalf) == true);
+
+    SUBCASE("a long path is cut at its start and stops before the arrows")
+    {
+        sBrowserDir dir("a-folder-with-a-long-name-for-the-path-line");
+        app.TestSetOpeningDirectory(dir.path.string());
+        app.TestDrawOpening(screen);
+
+        std::string row = CellRun(screen, 7, 21, 50);
+        CHECK(row.rfind("Path: \xe2\x80\xa6", 0) == 0);
+        CHECK(row.find(" free") != std::string::npos);
+        CHECK(CellRun(screen, 7, 70, 2) == " \xe2\x96\xb2");
+    }
+}
+
+
+TEST_CASE("TUI Opening screen - help level 3 header and bars")
+{
+    cWSWordTsar app;
+    app.TestGetEditor()->mHelpLevel = 3;
+    app.TestEnterOpening();
+    app.TestSetOpeningDirectory("/");
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    // The upper bar sits at row 13, or directly below a taller panel.
+    int panelBottom = 0;
+    for (int row = 0; row < 24; ++row)
+    {
+        if (MenuRowText(screen, row).find("preferences") != std::string::npos)
+        {
+            panelBottom = row;
+        }
+    }
+    REQUIRE(panelBottom > 0);
+    const int barRow = std::max(13, panelBottom + 1);
+
+    CHECK(RowIsFilledWith(screen, barRow, kUpperHalf) == true);
+    CheckOpeningHeader(screen, barRow + 1, "/");
+    CHECK(CellRun(screen, barRow + 2, 1, 2) == "..");
+    CHECK(CellRun(screen, barRow + 2, 19, 1) == kBar);
+    CHECK(RowIsFilledWith(screen, 24, kLowerHalf) == true);
 }

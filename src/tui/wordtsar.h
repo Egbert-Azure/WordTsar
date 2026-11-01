@@ -106,6 +106,7 @@ public:
     int TestOpeningSelection(void) const { return mOpeningSel; }
     const std::string& TestFilename(void) const { return mFilename; }
     const wordstartui::cMenuBar& TestGetOpeningMenu(void) const { return mOpeningMenu; }
+    void TestSetOpeningDirectory(const std::string& path) { mBrowser.SetDirectory(path); }
     void TestDrawOpening(wordstartui::cScreen& screen)
     {
         mRows = screen.GetRows();
