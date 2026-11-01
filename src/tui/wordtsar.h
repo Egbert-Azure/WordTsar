@@ -105,6 +105,13 @@ public:
     bool TestOpeningWantIndex(void) const { return mOpeningWantIndex; }
     int TestOpeningSelection(void) const { return mOpeningSel; }
     const std::string& TestFilename(void) const { return mFilename; }
+    const wordstartui::cMenuBar& TestGetOpeningMenu(void) const { return mOpeningMenu; }
+    void TestDrawOpening(wordstartui::cScreen& screen)
+    {
+        mRows = screen.GetRows();
+        mCols = screen.GetCols();
+        DrawOpeningMenu(screen);
+    }
 #endif
 
     // ---- iWSDialogHost ----
@@ -135,6 +142,7 @@ private:
 
     void LayoutChrome(void);
     void BuildMenus(void);
+    void BuildOpeningMenus(void);
     void InjectChord(int controlCode, char follow);
     void InjectControl(int controlCode);
     void CheckCommandSignals(void);
@@ -153,6 +161,9 @@ private:
 
     void DrawSplash(wordstartui::cScreen& screen);
     void DrawOpeningMenu(wordstartui::cScreen& screen);
+    void DrawOpeningBars(wordstartui::cScreen& screen);
+    void DrawOpeningPanel(wordstartui::cScreen& screen);
+    void DrawOpeningFiles(wordstartui::cScreen& screen, int headerRow, int listRow);
     bool HandleOpeningKey(const wordstartui::sInputEvent& event);
     void RunOpeningAction(eOpeningAction action);
     void ShowOpeningStatus(void);
@@ -205,6 +216,7 @@ private:
     // and can't collide with a chord the user has half-typed on the real one.
     cWordStarInput* mMenuInput; // owned
     wordstartui::cMenuBar mMenu;
+    wordstartui::cMenuBar mOpeningMenu;   // Opening screen menu bar (help level 4)
     std::string mFilename;
     int mRows;
     int mCols;

@@ -22,6 +22,7 @@
 #include "doctest.h"
 
 #include "src/tui/wordtsar.h"
+#include "src/tui/editor/editorctrl.h"
 #include "src/tui/wordstartui/src/menubar.h"
 
 #include <cctype>
@@ -381,4 +382,102 @@ TEST_CASE("TUI menu bar - the edit-screen menu keeps the default layout")
 
     CHECK(MenuRowText(screen, 0) ==
           " File  Edit  View  Insert  Style  Layout  Utilities  Help                       ");
+}
+
+
+namespace
+{
+
+// True when any row of the screen contains the text.
+bool ScreenHasText(const wordstartui::cScreen& screen, const std::string& text)
+{
+    for (int row = 0; row < screen.GetRows(); ++row)
+    {
+        if (MenuRowText(screen, row).find(text) != std::string::npos)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - help level 4 draws the title and menu bars")
+{
+    cWSWordTsar app;
+    app.TestGetEditor()->mHelpLevel = 4;
+    app.TestEnterOpening();
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    // Row 0: the name centred in a fill of upper half blocks.
+    const wordstartui::sCell* first = screen.GetCell(0, 0);
+    REQUIRE(first != nullptr);
+    CHECK(first->textUtf8 == "\xe2\x96\x80");
+    const wordstartui::sCell* last = screen.GetCell(0, 79);
+    REQUIRE(last != nullptr);
+    CHECK(last->textUtf8 == "\xe2\x96\x80");
+    std::string name;
+    for (int col = 36; col < 44; ++col)
+    {
+        name += screen.GetCell(0, col)->textUtf8;
+    }
+    CHECK(name == "WordTsar");
+
+    // Row 1: the Opening menu bar.
+    std::string bar = MenuRowText(screen, 1);
+    CHECK(bar.find("File") == 1);
+    CHECK(bar.find("Utilities") == 8);
+    CHECK(bar.find("Additional") == 20);
+    CHECK(bar.find("Help") == 74);
+
+    // No classic command panel.
+    CHECK(ScreenHasText(screen, "O P E N I N G") == false);
+    CHECK(ScreenHasText(screen, "open a document") == false);
+    CHECK(ScreenHasText(screen, "speed write") == false);
+}
+
+
+TEST_CASE("TUI Opening screen - help level 3 draws the classic panel")
+{
+    cWSWordTsar app;
+    app.TestGetEditor()->mHelpLevel = 3;
+    app.TestEnterOpening();
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    CHECK(ScreenHasText(screen, "O P E N I N G   M E N U") == true);
+    CHECK(ScreenHasText(screen, "open a document") == true);
+    CHECK(MenuRowText(screen, 1).find("Utilities") == std::string::npos);
+}
+
+
+TEST_CASE("TUI Opening screen - each Opening menu opens")
+{
+    cWSWordTsar app;
+    wordstartui::cMenuBar menu = app.TestGetOpeningMenu();
+    const std::vector<wordstartui::sMenuItem>& items = menu.GetItems();
+    REQUIRE(items.size() == 4);
+    CHECK(items[0].title == "File");
+    CHECK(items[1].title == "Utilities");
+    CHECK(items[2].title == "Additional");
+    CHECK(items[3].title == "Help");
+
+    for (const char* letter : {"f", "u", "a", "h"})
+    {
+        INFO("Alt+", letter);
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_TEXT;
+        event.alt = true;
+        event.textUtf8 = letter;
+        menu.Close();
+        CHECK(menu.HandleEvent(event) == true);
+        CHECK(menu.IsOpen() == true);
+    }
 }

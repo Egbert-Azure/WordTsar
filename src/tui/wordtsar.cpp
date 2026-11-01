@@ -181,6 +181,8 @@ cWSWordTsar::cWSWordTsar(void)
     mHelpBg = wordstartui::MakeRgb(170, 170, 170);
     mHelpKeyFg = wordstartui::MakeRgb(0, 0, 180);
     mHelpKeyBg = wordstartui::MakeRgb(170, 170, 170);
+
+    BuildOpeningMenus();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1354,6 +1356,36 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(help, "&About WordTsar", [this](void) { ShowAboutWordTsar(); });
 }
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Build the Opening screen menu bar shown at help level 4: File, Utilities,
+/// Additional and Help, with Help at the right edge.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::BuildOpeningMenus(void)
+{
+    mOpeningMenu.Clear();
+    mOpeningMenu.SetMenuGap(3);
+    mOpeningMenu.SetLastMenuRightAligned(true);
+
+    auto none = [](void) {};
+
+    int file = mOpeningMenu.AddMenu("File", 'F');
+    mOpeningMenu.AddSubItem(file, "Ne&w", none, false);
+
+    int util = mOpeningMenu.AddMenu("Utilities", 'U');
+    mOpeningMenu.AddSubItem(util, "&Index...", none, false);
+
+    int additional = mOpeningMenu.AddMenu("Additional", 'A');
+    mOpeningMenu.AddSubItem(additional, "&MailList", none, false);
+
+    int help = mOpeningMenu.AddMenu("Help", 'H');
+    mOpeningMenu.AddSubItem(help, "&Help", none, false);
+}
+
 // =========================================================================
 // Layout
 // =========================================================================
@@ -1791,10 +1823,128 @@ void cWSWordTsar::DrawSplash(cScreen& screen)
 /// @return nothing
 ///
 /// @brief
-/// Draw the WordStar opening menu (two columns of choices).
+/// Draw the Opening screen: the title and menu bars at help level 4, the
+/// classic command panel at levels 0 to 3.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::DrawOpeningMenu(cScreen& screen)
+{
+    if (mEditor->mHelpLevel == 4)
+    {
+        DrawOpeningBars(screen);
+    }
+    else
+    {
+        DrawOpeningPanel(screen);
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  cScreen& screen [in,out] target screen
+///
+/// @return nothing
+///
+/// @brief
+/// Draw the help level 4 Opening screen: row 0 is the title bar, row 1 the
+/// Opening menu bar, then the file list. The menu bar is drawn last so its
+/// pull-downs overlay the file list.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::DrawOpeningBars(cScreen& screen)
+{
+    sStyle base;
+    base.fg = wordstartui::MakeDefaultColor();
+    base.bg = wordstartui::MakeDefaultColor();
+    base.attrs = wordstartui::CELL_ATTR_NONE;
+
+    sRect full;
+    full.row = 0;
+    full.col = 0;
+    full.rows = mRows;
+    full.cols = mCols;
+    screen.FillRect(full, " ", base);
+
+    auto halfBlockBar = [&](int r)
+    {
+        sRect line;
+        line.row = r;
+        line.col = 0;
+        line.rows = 1;
+        line.cols = mCols;
+        screen.FillRect(line, "\xe2\x96\x80", base);   // U+2580 UPPER HALF BLOCK
+    };
+
+    // Row 0: the name centred in the bar, one blank column on each side.
+    halfBlockBar(0);
+    std::string name = "WordTsar";
+    int nameCol = (mCols - static_cast<int>(name.size())) / 2;
+    if (nameCol < 1)
+    {
+        nameCol = 1;
+    }
+    screen.PutText(0, nameCol - 1, " " + name + " ", base);
+
+    // Rows 2 to 5 stay empty; row 6 closes them.
+    halfBlockBar(6);
+    DrawOpeningFiles(screen, 7, 8);
+
+    sRect menuRect;
+    menuRect.row = 1;
+    menuRect.col = 0;
+    menuRect.rows = 1;
+    menuRect.cols = mCols;
+    mOpeningMenu.SetBounds(menuRect);
+    mOpeningMenu.Draw(screen, GetTheme());
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  cScreen& screen [in,out] target screen
+/// @param  int headerRow [in] row of the Filenames/Path line
+/// @param  int listRow [in] first row of the file list
+///
+/// @return nothing
+///
+/// @brief
+/// Draw the Filenames/Path line and the file list below it to the bottom of
+/// the screen.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow)
+{
+    sStyle base;
+    base.fg = wordstartui::MakeDefaultColor();
+    base.bg = wordstartui::MakeDefaultColor();
+    base.attrs = wordstartui::CELL_ATTR_NONE;
+
+    screen.PutText(headerRow, 0, "Filenames:       Path: " + mBrowser.GetCurrentDirectory(), base);
+
+    sRect browserRect;
+    browserRect.row = listRow;
+    browserRect.col = 0;
+    browserRect.rows = mRows - listRow;
+    if (browserRect.rows < 1)
+    {
+        browserRect.rows = 1;
+    }
+    browserRect.cols = mCols;
+    mBrowser.SetBounds(browserRect);
+    mBrowser.Draw(screen, GetTheme(), mOpeningBrowserFocus);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  cScreen& screen [in,out] target screen
+///
+/// @return nothing
+///
+/// @brief
+/// Draw the classic Opening Menu panel (two columns of choices) used at help
+/// levels 0 to 3, then the file list.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
 {
     // The opening screen uses the default terminal colors.
     sStyle base;
@@ -1900,22 +2050,8 @@ void cWSWordTsar::DrawOpeningMenu(cScreen& screen)
     int menuRows = std::max(kOpeningLeftCount + 1, rightCount);
     int separatorRow = 2 + menuRows;
     separator(separatorRow);
-    screen.PutText(separatorRow + 2, 0, "Filenames:       Path: " + mBrowser.GetCurrentDirectory(), base);
     separator(separatorRow + 3);
-
-    // File browser fills the rest, starting at column 0.
-    int browserTop = separatorRow + 4;
-    sRect browserRect;
-    browserRect.row = browserTop;
-    browserRect.col = 0;
-    browserRect.rows = mRows - browserTop;
-    if (browserRect.rows < 1)
-    {
-        browserRect.rows = 1;
-    }
-    browserRect.cols = mCols;
-    mBrowser.SetBounds(browserRect);
-    mBrowser.Draw(screen, GetTheme(), mOpeningBrowserFocus);
+    DrawOpeningFiles(screen, separatorRow + 2, separatorRow + 4);
 }
 
 /////////////////////////////////////////////////////////////////////////////
