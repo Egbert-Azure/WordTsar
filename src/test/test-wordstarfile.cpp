@@ -2067,3 +2067,94 @@ TEST_CASE("cWordstarFile::CheckType - content with WordStar structure is accepte
                           "gesperrt ist.\r\n"));
     }
 }
+
+
+namespace
+{
+
+// Paragraph texts of the document, each followed by '|'
+std::string ParagraphTexts(cDocument *doc)
+{
+    std::string text;
+    for (PARAGRAPH_T para = 0; para < doc->GetNumberofParagraphs(); para++)
+    {
+        text += doc->GetParagraphText(para) + "|";
+    }
+    return text;
+}
+
+}
+
+
+// ESC FS without a closing FS loads the glyph of the start byte, then the
+// following bytes as usual; it saves back as ESC <start byte> FS.
+// An unpadded file ending in ESC FS loads nothing for it and is not tested.
+TEST_CASE("cWordstarFile - ESC FS without a closing FS loads the glyph of the start byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+
+    const std::string leftArrow("\xE2\x86\x90");            // U+2190, glyph of ESC
+
+    struct sPage
+    {
+        eCodePage page;
+        const char *glyph9B;                                // glyph of 0x9B
+        const char *glyph81;                                // glyph of 0x81
+    };
+    const sPage pages[] =
+    {
+        { CP437, "\xC2\xA2", "\xC3\xBC" },                  // U+00A2, U+00FC
+        { CP737, "\xCE\xB4", "\xCE\x92" },                  // U+03B4, U+0392
+        { CP850, "\xC3\xB8", "\xC3\xBC" },                  // U+00F8, U+00FC
+    };
+
+    for (const sPage &page : pages)
+    {
+        CAPTURE(static_cast<int>(page.page));
+        editor.SetCodePage(page.page);
+
+        SUBCASE("followed by text")
+        {
+            std::string saved = EditorRoundTrip(editor, WordStar7File("a\x1B\x1C" "bc\x0D\x0A"));
+            CHECK(Hex(ParagraphTexts(doc)) == Hex("a" + leftArrow + "bc\x0D|\x7F|"));
+            CHECK(Hex(saved, 128, 8) == Hex("a\x1B\x1B\x1C" "bc\x0D\x0A"));
+        }
+
+        SUBCASE("followed by a style byte")
+        {
+            std::string saved = EditorRoundTrip(editor, WordStar7File("a\x1B\x1C\x02" "b\x02\x0D\x0A"));
+            CHECK(Hex(ParagraphTexts(doc)) == Hex("a" + leftArrow + "\x7F" "b\x7F\x0D|\x7F|"));
+            CHECK(Hex(saved, 128, 9) == Hex("a\x1B\x1B\x1C\x02" "b\x02\x0D\x0A"));
+        }
+
+        SUBCASE("followed by CR LF")
+        {
+            std::string saved = EditorRoundTrip(editor, WordStar7File("a\x1B\x1C\x0D\x0A" "b\x0D\x0A"));
+            CHECK(Hex(ParagraphTexts(doc)) == Hex("a" + leftArrow + "\x0D|b\x0D|\x7F|"));
+            CHECK(Hex(saved, 128, 9) == Hex("a\x1B\x1B\x1C\x0D\x0A" "b\x0D\x0A"));
+        }
+
+        SUBCASE("started by 0x9B")
+        {
+            std::string saved = EditorRoundTrip(editor, WordStar7File("a\x9B\x1C" "bc\x0D\x0A"));
+            CHECK(Hex(ParagraphTexts(doc)) == Hex(std::string("a") + page.glyph9B + "bc\x0D|\x7F|"));
+            CHECK(Hex(saved, 128, 8) == Hex("a\x1B\x9B\x1C" "bc\x0D\x0A"));
+        }
+
+        SUBCASE("followed by another ESC x FS")
+        {
+            std::string saved = EditorRoundTrip(editor, WordStar7File("a\x1B\x1C\x1B\x81\x1C" "b\x0D\x0A"));
+            CHECK(Hex(ParagraphTexts(doc)) == Hex("a" + leftArrow + page.glyph81 + "b\x0D|\x7F|"));
+            CHECK(Hex(saved, 128, 10) == Hex("a\x1B\x1B\x1C\x1B\x81\x1C" "b\x0D\x0A"));
+        }
+
+        SUBCASE("at the end of the text before the 0x1A padding")
+        {
+            std::string saved = EditorRoundTrip(editor, WordStar7File("ab\x1B\x1C"));
+            CHECK(Hex(ParagraphTexts(doc)) == Hex("ab" + leftArrow + "\x7F|"));
+            CHECK(Hex(saved, 128, 6) == Hex("ab\x1B\x1B\x1C\x1A"));
+        }
+    }
+}
