@@ -1001,8 +1001,6 @@ const std::set<std::string> kKnownRoundTripFailures =
     "MACROS/HOLYMAC/-HOLYMAC.WS",
     "MACROS/HOLYMAC/4MAC2",
     "MACROS/HOLYMAC/4MAC3",
-    "MACROS/SAWYER/BULLTAB.WSM",
-    "MACROS/SAWYER/QFP0.WSM",
     "MAILLIST/WSLIST.OVR",
     "MICKEE/MICKEE.WS",
     "MICKEE/WS.DEF",
@@ -1788,7 +1786,7 @@ std::string Utf8(unsigned long cp)
     return out;
 }
 
-// Bytes 0x01-0x1F and 0x7F, without 0x1C
+// Bytes 0x01-0x1F and 0x7F, without 0x1C (see the FS test below)
 std::vector<unsigned char> ControlBytes(void)
 {
     std::vector<unsigned char> bytes;
@@ -1871,6 +1869,28 @@ TEST_CASE("cWordstarFile - ESC x FS with x at 0x80 or above follows the editor c
     editor.SetCodePage(CP850);
     CHECK(EditorRoundTrip(editor, input) == input);
     CHECK(doc->GetParagraphText(0).rfind("a\xC3\x87" "b\xC3\xB8" "c", 0) == 0);    // U+00C7, U+00F8
+}
+
+
+TEST_CASE("cWordstarFile - ESC FS FS loads as one right angle glyph")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+
+    std::string input = WordStar7File("a" + ExtChar(0x1C) + "b\x0D\x0A" "next line\x0D\x0A");
+    std::string expected("a\xE2\x88\x9F" "b");     // U+221F
+
+    const eCodePage pages[] = { CP437, CP737, CP850 };
+    for (eCodePage page : pages)
+    {
+        CAPTURE(static_cast<int>(page));
+        editor.SetCodePage(page);
+        std::string saved = EditorRoundTrip(editor, input);
+
+        CHECK(Hex(doc->GetParagraphText(0), 0, expected.size() + 1) == Hex(expected + "\x0D"));
+        CHECK(Hex(saved, 128) == Hex(input, 128));
+    }
 }
 
 

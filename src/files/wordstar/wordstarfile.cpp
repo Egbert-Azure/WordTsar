@@ -371,6 +371,7 @@ cWordstarFile::cWordstarFile(cEditorBase *editor)
     mExtendedChar = false;
     mLastChar = 0 ;
     mExtStartPosition = 0 ;
+    mExtStartChar = 0 ;
     mInVariable = false ;
     mVariableChar = 0 ;
 }
@@ -1390,8 +1391,15 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
         if((loop - position >= 2) && (c != STYLE_EXTEND))       // if we should have seen a STYLE_EXTEND by now
         {
             mExtendedChar = false ;
-            size_t npos = position + 1 ;
-            HandleChar(last, npos) ;                    // treat the char after the STYLE_EXTSTART as a normal one
+            if(last == STYLE_EXTEND)                    // ESC FS without a closing FS
+            {
+                InsertExtendedChar(mExtStartChar) ;
+            }
+            else
+            {
+                size_t npos = position + 1 ;
+                HandleChar(last, npos) ;                // treat the char after the STYLE_EXTSTART as a normal one
+            }
         }
     }
 
@@ -1509,8 +1517,9 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
         return;
     }
 
-    // we'll only do this if we are not in an extended char or if we are and are about to exit an extended char
-    if((mExtendedChar == false) || ((mExtendedChar == true) && (c == STYLE_EXTEND)))
+    // we'll only do this if we are not in an extended char or if we are and are about to exit an extended char;
+    // an FS directly after the STYLE_EXTSTART is the character byte 0x1C
+    if((mExtendedChar == false) || ((mExtendedChar == true) && (c == STYLE_EXTEND) && (loop - position >= 2)))
     {
         switch(c)
         {
@@ -1614,6 +1623,7 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
             case STYLE_EXTSTART :
                 mExtendedChar = true ;
                 position = loop ;
+                mExtStartChar = c ;
                 insert = false ;
                 break ;
                 
