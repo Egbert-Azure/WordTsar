@@ -5068,8 +5068,7 @@ void cEditorCtrl::ClipboardCopy(void)
 
     if (mDocument->GetBlock(start, end))
     {
-        // Get block text from document
-        std::string str = mDocument->GetBlockText(start, end);
+        std::string str = GetClipboardText();
 
         // Copy to system clipboard
         QClipboard* clipboard = QApplication::clipboard();

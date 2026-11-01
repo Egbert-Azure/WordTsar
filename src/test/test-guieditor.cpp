@@ -15373,7 +15373,7 @@ TEST_CASE("GUI editor - plain-text output carries no end-of-file marker")
         doc->SetPosition(doc->GetTextSize());
         doc->SetEndBlock();
         editor.ClipboardCopy();
-        CHECK(QApplication::clipboard()->text().toStdString() == "Hello\rWorld");
+        CHECK(QApplication::clipboard()->text().toStdString() == "Hello\nWorld");
     }
 
     std::error_code ec;
@@ -15516,4 +15516,50 @@ TEST_CASE("GUI editor - Write Block to File writes plain text from a text docume
 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("GUI editor - clipboard copy writes plain text with LF line endings")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    sInternalFonts font;
+    font.fontname = "Courier";
+    font.size = 12.0;
+    font.haveWSFont = false;
+    font.name = "Courier";
+
+    sNote footnote;
+    footnote.symbol = NOTE_NUMBER;
+    footnote.text = "a footnote";
+
+    doc->Insert("A");
+    doc->InsertTab(tab);
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->Insert("B");
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->InsertFont(font);
+    doc->InsertFootnote(footnote);
+    doc->Insert("\rC\x7f" "D\r");
+
+    doc->SetPosition(0);
+    doc->SetBeginBlock();
+    doc->SetPosition(doc->GetTextSize());
+    doc->SetEndBlock();
+
+    std::string expected = "A\tB\nC\x7f" "D\n";
+    CHECK(editor.GetClipboardText() == expected);
+
+    editor.ClipboardCopy();
+    CHECK(QApplication::clipboard()->text().toStdString() == expected);
 }

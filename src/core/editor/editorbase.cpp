@@ -3792,6 +3792,26 @@ void cEditorBase::WriteBlockToFile(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return the marked block as ClipboardCopy() writes it, empty if no block
+///
+/// @brief
+/// Plain text (cDocument::GetPlainText) with LF line endings.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorBase::GetClipboardText(void)
+{
+    POSITION_T start = 0, end = 0 ;
+    if (!mDocument || !mDocument->GetBlock(start, end))
+    {
+        return std::string() ;
+    }
+
+    return mDocument->GetPlainText(start, end, "\n") ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief

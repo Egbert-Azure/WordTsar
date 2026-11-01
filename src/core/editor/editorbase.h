@@ -168,6 +168,7 @@ public:
     void CenterTextVertically(void);                          // Center cursor-to-page-break text on the page (^OV)
     void TemporaryIndent(void);                                // Indent current paragraph one more tab stop, reverting after it (^OG)
     void WriteBlockToFile(void);                               // Write marked block to another file (^KW)
+    std::string GetClipboardText(void);                        // Marked block as clipboard copy writes it
 
     // Undo/Redo (the frontend refreshes its display in UpdateAfterUndoRedo)
     bool Undo(void);                                          // Undo last action; false if nothing to undo

@@ -1959,7 +1959,7 @@ void cWSEditorCtrl::ClipboardCopy(void)
 
     if (mDocument->GetBlock(start, end))
     {
-        std::string str = mDocument->GetBlockText(start, end);
+        std::string str = GetClipboardText();
 
         const char* cmd = nullptr;
         switch (mClipboardTool)
