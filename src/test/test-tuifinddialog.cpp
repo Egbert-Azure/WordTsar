@@ -602,6 +602,41 @@ TEST_CASE("TUI screen - a wide grapheme shown as \"?\" takes one column plus a b
 }
 
 
+TEST_CASE("TUI screen - GetCell reads back the character and style of a drawn cell")
+{
+    wordstartui::cScreen screen;
+    screen.Resize(SCREEN_ROWS, SCREEN_COLS);
+    wordstartui::sStyle plain{};
+    wordstartui::sStyle bold{};
+    bold.fg = wordstartui::MakeRgb(255, 255, 0);
+    bold.bg = wordstartui::MakeRgb(0, 0, 170);
+    bold.attrs = wordstartui::CELL_ATTR_BOLD;
+    screen.Clear(plain);
+    screen.PutText(2, 5, "Hi", bold);
+
+    const wordstartui::sCell* first = screen.GetCell(2, 5);
+    REQUIRE(first != nullptr);
+    CHECK(first->textUtf8 == "H");
+    CHECK(first->style.fg == wordstartui::MakeRgb(255, 255, 0));
+    CHECK(first->style.bg == wordstartui::MakeRgb(0, 0, 170));
+    CHECK(first->style.attrs == wordstartui::CELL_ATTR_BOLD);
+
+    const wordstartui::sCell* second = screen.GetCell(2, 6);
+    REQUIRE(second != nullptr);
+    CHECK(second->textUtf8 == "i");
+
+    const wordstartui::sCell* blank = screen.GetCell(2, 7);
+    REQUIRE(blank != nullptr);
+    CHECK(blank->textUtf8 == " ");
+    CHECK(blank->style.attrs == wordstartui::CELL_ATTR_NONE);
+
+    CHECK(screen.GetCell(-1, 0) == nullptr);
+    CHECK(screen.GetCell(0, -1) == nullptr);
+    CHECK(screen.GetCell(SCREEN_ROWS, 0) == nullptr);
+    CHECK(screen.GetCell(0, SCREEN_COLS) == nullptr);
+}
+
+
 TEST_CASE("TUI screen - characters U+00A0..U+00FF reach the screen unchanged")
 {
     for (char32_t codepoint = 0xA0U; codepoint <= 0xFFU; ++codepoint)

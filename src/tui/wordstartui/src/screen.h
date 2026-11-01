@@ -40,6 +40,7 @@ public:
     void Resize(int rows, int cols);
     int GetRows(void) const;
     int GetCols(void) const;
+    const sCell* GetCell(int row, int col) const;
     void Clear(const sStyle& style);
     void PutCell(int row, int col, const std::string& graphemeUtf8, const sStyle& style);
     void PutText(int row, int col, const std::string& textUtf8, const sStyle& style);

@@ -118,6 +118,27 @@ int cScreen::GetCols(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  int row [in] zero-based row
+/// @param  int col [in] zero-based column
+///
+/// @return the cell in the back buffer, or nullptr outside the screen
+///
+/// @brief
+/// Read one cell of the logical back buffer.
+///
+/////////////////////////////////////////////////////////////////////////////
+const sCell* cScreen::GetCell(int row, int col) const
+{
+    if ((row < 0) || (row >= mRows) || (col < 0) || (col >= mCols))
+    {
+        return nullptr;
+    }
+
+    return &mBackBuffer[Index(row, col)];
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  const sStyle& style [in] style used to fill the screen
 ///
 /// @return nothing
