@@ -165,7 +165,7 @@ std::string PrinterLine(const std::string& printer)
 std::vector<std::string> TechnologyLines(void)
 {
     return {
-        "Spelling and hyphenation by macOS, thesaurus by the macOS Dictionary",
+        "Spelling, hyphenation and thesaurus by macOS",
         "Printing to PDF by Core Text and Quartz",
         "Open-source components: see Help > About WordTsar",
     };

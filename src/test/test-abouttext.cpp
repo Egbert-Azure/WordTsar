@@ -99,6 +99,22 @@ TEST_CASE("About text - tagline and legal lines")
 }
 
 
+TEST_CASE("About text - technology and trademark wording")
+{
+    std::vector<std::string> technology = abouttext::TechnologyLines();
+    REQUIRE(technology.size() == 3);
+    CHECK(technology[0] == "Spelling, hyphenation and thesaurus by macOS");
+    CHECK(technology[1] == "Printing to PDF by Core Text and Quartz");
+    CHECK(technology[2] == "Open-source components: see Help > About WordTsar");
+
+    CHECK(abouttext::TrademarkText() ==
+          "WordStar is a trademark of its owner. WordTsar is not affiliated with its owner.");
+    std::vector<std::string> legal = abouttext::LegalLines();
+    REQUIRE(legal.size() == 5);
+    CHECK(legal[3] + " " + legal[4] == abouttext::TrademarkText());
+}
+
+
 TEST_CASE("About text - no serial number, no WordStar copyright wording, WordStar spelled correctly")
 {
     std::string text = AllText();
