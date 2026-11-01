@@ -538,7 +538,7 @@ void cWSWordTsar::CheckCommandSignals(void)
         mFilename.clear();
         mOpeningBrowserFocus = false;
         mBrowser.SetDirectory(mBrowser.GetCurrentDirectory());
-        mMode = APP_OPENING;
+        SetMode(APP_OPENING);
     }
 }
 
@@ -1038,7 +1038,7 @@ void cWSWordTsar::OpenRecentFiles(void)
         mFilename = files[static_cast<size_t>(selected)];
         mEditor->LoadFile(mFilename);
         mEditor->RelayoutAndRedraw();
-        mMode = APP_EDITOR;
+        SetMode(APP_EDITOR);
     }
 }
 
@@ -3093,6 +3093,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         if (action == wsui::cFileBrowser::ACTION_FILE)
         {
             mFilename = mBrowser.GetSelectedFile();
+            mEditor->SetStatusMessage("", false, 0);
             mEditor->LoadFile(mFilename);
             mEditor->RelayoutAndRedraw();
             if (mOpeningWantPrint == true)
@@ -3110,6 +3111,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
                 mOpeningWantIndex = false;
                 GenerateIndexFromFile();
             }
+            // Assigned directly so a message from Print stays.
             mMode = APP_EDITOR;
             return true;
         }
@@ -3281,7 +3283,7 @@ void cWSWordTsar::RunOpeningAction(eOpeningAction action)
 
         case eOpeningAction::SPEED_WRITE:
             mFilename.clear();
-            mMode = APP_EDITOR;
+            SetMode(APP_EDITOR);
             break;
 
         case eOpeningAction::ABOUT:
@@ -3309,6 +3311,26 @@ void cWSWordTsar::RunOpeningAction(eOpeningAction action)
             // NotImplemented, since none of these can currently be selected.
             break;
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  eAppMode mode [in] screen to show
+///
+/// @return nothing
+///
+/// @brief
+/// Switch between the splash, Opening and edit screens. A status message
+/// does not carry over to a different screen.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::SetMode(eAppMode mode)
+{
+    if (mode != mMode)
+    {
+        mEditor->SetStatusMessage("", false, 0);
+    }
+    mMode = mode;
 }
 
 /////////////////////////////////////////////////////////////////////////////

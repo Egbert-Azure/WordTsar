@@ -2696,3 +2696,51 @@ TEST_CASE("TUI Opening screen - Tab drops a pending print, TOC or index request"
         }
     }
 }
+
+
+TEST_CASE("TUI - a status message does not cross between the Opening and edit screens")
+{
+    sOpeningListDir dir;
+    cWSWordTsar app;
+    app.TestBuildMenus();
+    PrepareOpeningList(app, 3, dir);
+
+    app.TestHandleEvent(OpeningText("n"));
+    REQUIRE(StatusMessage(app) == kNotAvailable);
+    app.TestHandleEvent(OpeningText("s"));
+    REQUIRE(app.TestInEditor() == true);
+    CHECK(StatusMessage(app).empty() == true);
+
+    app.TestHandleEvent(OpeningAltText("u"));
+    REQUIRE(app.TestGetMenu().IsOpen() == true);
+    app.TestHandleEvent(OpeningText("t"));
+    REQUIRE(StatusMessage(app) == kNotAvailable);
+    REQUIRE(app.TestGetEditor()->GetDocument()->IsModified() == false);
+
+    wordstartui::sInputEvent controlK{};
+    controlK.type = wordstartui::INPUT_TYPE_CONTROL;
+    controlK.controlCode = 11;
+    app.TestHandleEvent(controlK);
+    app.TestHandleEvent(OpeningText("q"));
+    REQUIRE(app.TestInOpening() == true);
+    CHECK(StatusMessage(app).empty() == true);
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+    CHECK(RowWithText(screen, kNotAvailable) == -1);
+}
+
+
+TEST_CASE("TUI - a status message does not follow a file opened from the Opening list")
+{
+    sOpeningListDir dir;
+    cWSWordTsar app;
+    PrepareOpeningList(app, 3, dir);
+
+    app.TestHandleEvent(OpeningText("n"));
+    REQUIRE(StatusMessage(app) == kNotAvailable);
+    app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+    app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER));
+    REQUIRE(app.TestInEditor() == true);
+    CHECK(StatusMessage(app).empty() == true);
+}

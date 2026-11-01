@@ -149,6 +149,7 @@ private:
         APP_EDITOR
     };
 
+    void SetMode(eAppMode mode);
     void LayoutChrome(void);
     void BuildMenus(void);
     void BuildOpeningMenus(void);
