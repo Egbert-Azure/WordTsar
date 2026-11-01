@@ -7121,7 +7121,8 @@ bool cEditorCtrl::InsertFileAtCursor(const std::string& filename)
 /// @brief
 /// Save the document. Detects file type from extension.
 /// Supports WordStar 7, RTF, Text formats for saving. An extension with no
-/// known format saves a document loaded as text as text, others as WordStar 7.
+/// known format keeps the format of the last load or successful save: text
+/// for a document loaded or saved as text, otherwise WordStar 7.
 ///
 /// [REFACTORED from editorctrl.cpp::SaveFile()]
 ///
@@ -7136,6 +7137,7 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
 
     // Detect file type from extension and create appropriate file handler
     cFile* fileWriter = nullptr;
+    bool savesAsText = false;
 
     if (qfilename.endsWith(".ws", Qt::CaseInsensitive) ||
         qfilename.endsWith(".ws7", Qt::CaseInsensitive) ||
@@ -7150,6 +7152,7 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
     else if (qfilename.endsWith(".txt", Qt::CaseInsensitive))
     {
         fileWriter = new cTextFile(this);
+        savesAsText = true;
     }
     else if (qfilename.endsWith(".docx", Qt::CaseInsensitive))
     {
@@ -7158,6 +7161,7 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
     else if (mDocument->IsTextFile())
     {
         fileWriter = new cTextFile(this);
+        savesAsText = true;
     }
     else
     {
@@ -7181,6 +7185,9 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
 
     if (success)
     {
+        // The format written is the format of the next save to an unknown extension
+        mDocument->SetTextFile(savesAsText);
+
         // Show "File saved" on status bar
         if (mWordTsar)
         {

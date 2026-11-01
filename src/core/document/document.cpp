@@ -1762,7 +1762,7 @@ void cDocument::InsertEndnote(sNote &note)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  textFile   [IN] - true if the document was loaded as plain text
+/// @param  textFile   [IN] - true if the document was loaded or last saved as plain text
 ///
 /// @return nothing
 ///
@@ -1780,7 +1780,7 @@ void cDocument::SetTextFile(bool textFile)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return bool - true if the document was loaded as plain text
+/// @return bool - true if the document was loaded or last saved as plain text
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cDocument::IsTextFile(void)

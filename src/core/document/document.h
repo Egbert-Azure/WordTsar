@@ -504,7 +504,7 @@ private:
     bool mIsLoading ;                                   ///< true if loading file, else false
     bool mSuppressNotify ;                              ///< true to suppress listener notifications without affecting undo
     bool mSuppressUndo ;                                ///< true to suppress undo recording without implying file-load semantics
-    bool mTextFile ;                                    ///< true if the document was loaded by the plain-text reader
+    bool mTextFile ;                                    ///< true if the document was loaded or last saved as plain text
 
     // --- Paragraph Lookup Cache ---
     POSITION_T mLastParagraphFromPosition ;

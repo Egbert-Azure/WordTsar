@@ -1266,9 +1266,10 @@ void cWSEditorCtrl::FileIOProgress(int percent)
 ///
 /// @brief
 /// Save the document. Detects the format from the extension and delegates to
-/// the appropriate handler. An extension with no known format saves a
-/// document loaded as text as text, others as WordStar 7. Also writes a
-/// WordStar backup (except DOCX).
+/// the appropriate handler. An extension with no known format keeps the
+/// format of the last load or successful save: text for a document loaded or
+/// saved as text, otherwise WordStar 7. Also writes a WordStar backup (except
+/// DOCX).
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::SaveFile(const std::string& filename)
@@ -1305,6 +1306,7 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
         [](unsigned char c) { return std::tolower(c); });
 
     cFile* fileWriter = nullptr;
+    bool savesAsText = false;
 
     if (ext == ".ws" || ext == ".ws7" || ext == ".ws4")
     {
@@ -1317,6 +1319,7 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
     else if (ext == ".txt" || mDocument->IsTextFile())
     {
         fileWriter = new cTextFile(this);
+        savesAsText = true;
     }
     else
     {
@@ -1332,6 +1335,9 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
 
     if (success)
     {
+        // The format written is the format of the next save to an unknown extension
+        mDocument->SetTextFile(savesAsText);
+
         mFileName = filepath.filename().string();
         mFileDir = filepath.parent_path().string();
         if (silent == false)
