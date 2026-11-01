@@ -3742,6 +3742,8 @@ bool cEditorBase::IsPageBreakDotCommand(PARAGRAPH_T para)
 /// Real WordStar 7 ^KW: writes the marked block to another file. Prompts
 /// for a filename; if it already exists, prompts to Overwrite, Append, or
 /// Cancel (matching the classic keyboard command's own O/A/Esc prompt).
+/// The block is written as plain text (cDocument::GetPlainText) with LF
+/// line endings.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::WriteBlockToFile(void)
@@ -3758,14 +3760,14 @@ void cEditorBase::WriteBlockToFile(void)
         return ;
     }
 
-    std::ios_base::openmode mode = std::ios::out ;
+    std::ios_base::openmode mode = std::ios::out | std::ios::binary ;
 
     if (std::filesystem::exists(filename))
     {
         eFileExistsChoice choice = ConfirmOverwriteOrAppend(filename) ;
         if (choice == eFileExistsChoice::Append)
         {
-            mode = std::ios::out | std::ios::app ;
+            mode = std::ios::out | std::ios::binary | std::ios::app ;
         }
         else if (choice != eFileExistsChoice::Overwrite)
         {
@@ -3775,7 +3777,7 @@ void cEditorBase::WriteBlockToFile(void)
 
     POSITION_T start = 0, end = 0 ;
     mDocument->GetBlock(start, end) ;
-    std::string text = mDocument->GetBlockText(start, end) ;
+    std::string text = mDocument->GetPlainText(start, end, "\n") ;
 
     std::ofstream file(filename, mode) ;
     if (!file.is_open())

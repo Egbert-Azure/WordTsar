@@ -393,9 +393,10 @@ TEST_CASE("cWSEditorCtrl - plain-text output carries no end-of-file marker")
         doc->SetBeginBlock();
         doc->SetPosition(doc->GetTextSize());
         doc->SetEndBlock();
+        doc->SetTextFile(true);
         editor.mTarget = (dir / "block.txt").string();
         editor.WriteBlockToFile();
-        CHECK(ReadFileBytes(dir / "block.txt") == "Hello\rWorld");
+        CHECK(ReadFileBytes(dir / "block.txt") == "Hello\nWorld");
     }
 
     std::error_code ec;
@@ -477,6 +478,59 @@ TEST_CASE("cWSEditorCtrl - a text file saves with the line endings it was opened
         REQUIRE(editor.LoadFile((dir / "doc.ws").string()));
         REQUIRE(editor.SaveFile((dir / "doc.txt").string()));
         CHECK(ReadFileBytes(dir / "doc.txt") == "Hello\n");
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("cWSEditorCtrl - Write Block to File writes plain text from a text document")
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-tui-kwtext-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cBlockTargetEditor editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    auto writeWholeDocument = [&](void)
+    {
+        doc->SetPosition(0);
+        doc->SetBeginBlock();
+        doc->SetPosition(doc->GetTextSize());
+        doc->SetEndBlock();
+        editor.mTarget = (dir / "block.txt").string();
+        editor.WriteBlockToFile();
+        return ReadFileBytes(dir / "block.txt");
+    };
+
+    SUBCASE("a CRLF text file with a tab")
+    {
+        WriteFileBytes(dir / "crlf.txt", "a\tb\r\nc\r\n");
+        REQUIRE(editor.LoadFile((dir / "crlf.txt").string()));
+        CHECK(writeWholeDocument() == "a\tb\nc\n");
+    }
+
+    SUBCASE("markers in a text document")
+    {
+        sWSTab tab;
+        tab.type = TAB_TAB;
+        tab.tabsize = 0;
+        tab.abstabsize = 0;
+        tab.size = 0;
+
+        doc->Insert("A");
+        doc->InsertTab(tab);
+        doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        doc->Insert("B");
+        doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        doc->InsertVariable(VAR_DATE);
+        doc->Insert("\rC\x7f" "D");
+        doc->SetTextFile(true);
+        CHECK(writeWholeDocument() == "A\tB\nC\x7f" "D");
     }
 
     std::error_code ec;
