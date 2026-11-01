@@ -28,6 +28,7 @@
 #include "src/tui/dialogs/dialoghost.h"
 #include "src/input/wordtsarinput.h"
 #include "src/tui/dialogs/filebrowser.h"
+#include "src/tui/dialogs/dialogs.h"
 #include "src/core/utils/config.h"
 
 #include <algorithm>
@@ -2205,4 +2206,120 @@ TEST_CASE("TUI Opening screen - help level 3 panel shows no selection bar")
     CHECK(CellAt(screen, 3, 43).textUtf8 == "C");
     CheckCellColours(screen, 3, 43, kWs7LightBlue, kWs7Grey);
     CheckCellColours(screen, 3, 45, kWs7Black, kWs7Grey);
+}
+
+
+namespace
+{
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief Dialog host that feeds queued special keys to a raw modal, draws
+///        it once, keeps the drawn rows, then cancels it with Escape.
+///
+/////////////////////////////////////////////////////////////////////////////
+class cKeysThenDrawHost : public iWSDialogHost
+{
+public:
+    void QueueSpecial(wordstartui::eSpecialKey key, int times)
+    {
+        for (int step = 0; step < times; ++step)
+        {
+            wordstartui::sInputEvent event{};
+            event.type = wordstartui::INPUT_TYPE_SPECIAL;
+            event.special = key;
+            mEvents.push_back(event);
+        }
+    }
+
+    void HostRunModal(wordstartui::cDialog& dialog) override
+    {
+        dialog.SetResult(wordstartui::DIALOG_RESULT_CANCEL);
+    }
+
+    void HostRunModalRaw(
+        const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
+        const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
+    {
+        wordstartui::cScreen screen;
+        screen.Resize(25, 80);
+        draw(screen, mTheme);
+        for (const wordstartui::sInputEvent& event : mEvents)
+        {
+            handle(event);
+        }
+        draw(screen, mTheme);
+        for (int row = 0; row < 25; ++row)
+        {
+            mRows.push_back(MenuRowText(screen, row));
+        }
+        wordstartui::sInputEvent escape{};
+        escape.type = wordstartui::INPUT_TYPE_SPECIAL;
+        escape.special = wordstartui::SPECIAL_KEY_ESCAPE;
+        handle(escape);
+    }
+
+    const wordstartui::cTheme& HostTheme(void) override
+    {
+        return mTheme;
+    }
+
+    wordstartui::sTerminalSize HostScreenSize(void) override
+    {
+        wordstartui::sTerminalSize size;
+        size.rows = 25;
+        size.cols = 80;
+        return size;
+    }
+
+    wordstartui::sTerminalCapabilities HostCapabilities(void) override
+    {
+        wordstartui::sTerminalCapabilities caps{};
+        return caps;
+    }
+
+    void HostShowLoadProgress(const std::string& message, int percent) override
+    {
+        (void)message;
+        (void)percent;
+    }
+
+    void HostHideLoadProgress(void) override
+    {
+    }
+
+    bool Shows(const std::string& text) const
+    {
+        for (const std::string& row : mRows)
+        {
+            if (row.find(text) != std::string::npos)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::vector<std::string> mRows;
+
+private:
+    std::vector<wordstartui::sInputEvent> mEvents;
+    wordstartui::cTheme mTheme;
+};
+
+}
+
+
+TEST_CASE("TUI System Preferences - the highlighted hotkey colour pair is labelled Selected hotkey")
+{
+    cConfig config;
+    cKeysThenDrawHost host;
+    // Right three times reaches the Colors tab; four more steps across the
+    // swatches of the colour list reach the Screen sub-tab.
+    host.QueueSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT, 7);
+    wsdialogs::SystemPreferences(&host, config);
+
+    REQUIRE(host.Shows("Menu Highlight") == true);
+    CHECK(host.Shows("Selected hotkey") == true);
+    CHECK(host.Shows("Highlight Accel.") == false);
 }

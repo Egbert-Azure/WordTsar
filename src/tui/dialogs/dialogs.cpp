@@ -2296,7 +2296,7 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         {"Ruler",            &config.mTuiRulerForeground,           &config.mTuiRulerBackground},
         {"Flag Column",      &config.mTuiFlagColumnForeground,      &config.mTuiFlagColumnBackground},
         {"Scrollbar",        &config.mTuiScrollbarForeground,       &config.mTuiScrollbarBackground},
-        {"Highlight Accel.", &config.mTuiMenuHighlightAcceleratorForeground, &config.mTuiMenuHighlightAcceleratorBackground},
+        {"Selected hotkey",  &config.mTuiMenuHighlightAcceleratorForeground, &config.mTuiMenuHighlightAcceleratorBackground},
     };
 
     int colorSubTab = 0;
