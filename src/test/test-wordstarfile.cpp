@@ -653,6 +653,26 @@ TEST_CASE("cWordstarFile - an endnote sequence loads as a marker and saves back 
 }
 
 
+TEST_CASE("cWordstarFile - an annotation sequence loads as a marker and saves back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    std::string body = std::string("\x01\x00\x00\x00\x00", 5) + "annotation text";
+    std::string input = WordStar7File("Hi" + SequenceBytes(SEQ_ANNOTATION, body) + "!\x0D\x0A");
+    std::string saved = RoundTrip(editor, input);
+
+    cDocument* doc = editor.GetDocument();
+    CHECK(doc->GetCharNoAdvance(2)[0] == static_cast<char>(MARKER_CHAR));
+    CHECK(doc->GetControlChar(2) == STYLE_FOOTNOTE);
+    sNote note{};
+    CHECK(doc->GetNote(2, note));
+    CHECK(note.kind == NOTE_KIND_ANNOTATION);
+    CHECK(saved == input);
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief
@@ -994,7 +1014,7 @@ std::string CompareParagraph(cDocument* a, cDocument* b, PARAGRAPH_T para)
             sNote noteB{};
             bool gotA = a->GetNote(posA, noteA);
             bool gotB = b->GetNote(posB, noteB);
-            if (gotA != gotB || noteA.raw != noteB.raw)
+            if (gotA != gotB || noteA.kind != noteB.kind || noteA.raw != noteB.raw)
             {
                 category = "note";
             }

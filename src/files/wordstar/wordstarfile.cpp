@@ -58,7 +58,7 @@
  *
  * @section limitations Current Limitations
  * - Some sequence types (graphics, paragraph styles) are not implemented
- * - ParseComment() is a stub (annotations and comments are read but not processed)
+ * - ParseComment() is a stub (comments are read but not processed)
  *
  * @author Gerald Brandt
  * @copyright GNU Affero General Public License v3.0
@@ -1270,7 +1270,18 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
                             if(mDocument->GetNote(loop, note) == true && note.raw.empty() == false)
                             {
                                 intro.size = static_cast<uint16_t>(note.raw.size() + 4) ;
-                                intro.type = ch1 == STYLE_FOOTNOTE ? eSequence::SEQ_FOOTNOTE : eSequence::SEQ_ENDNOTE ;
+                                if(ch1 == STYLE_ENDNOTE)
+                                {
+                                    intro.type = eSequence::SEQ_ENDNOTE ;
+                                }
+                                else if(note.kind == NOTE_KIND_ANNOTATION)
+                                {
+                                    intro.type = eSequence::SEQ_ANNOTATION ;
+                                }
+                                else
+                                {
+                                    intro.type = eSequence::SEQ_FOOTNOTE ;
+                                }
 
                                 close.size = intro.size ;
 
@@ -1885,6 +1896,7 @@ void cWordstarFile::HandleSequence(void)
 
         case eSequence::SEQ_FOOTNOTE :
         case eSequence::SEQ_ENDNOTE :
+        case eSequence::SEQ_ANNOTATION :
             {
                 std::string str ;
                 if(ReadBytes(bodySize, str) == false)
@@ -1896,7 +1908,6 @@ void cWordstarFile::HandleSequence(void)
             }
             break ;
 
-        case eSequence::SEQ_ANNOTATION :
         case eSequence::SEQ_COMMENT :
             {
                 std::string str ;
@@ -2352,19 +2363,21 @@ void cWordstarFile::ParseTab(void)
 /**
  * @brief Parses a WordStar note sequence and extracts note information
  * 
- * This function processes a WordStar file sequence containing note data (footnote or endnote)
+ * This function processes a WordStar file sequence containing note data (footnote, endnote
+ * or annotation)
  * and extracts the relevant information including note formatting, text content, and metadata.
  * The function handles both simple notes and embedded footnotes with sub-sequences.
  * 
  * @param sequence The raw byte sequence from the WordStar file containing note data
- * @param type The type of note sequence being parsed (footnote or endnote)
+ * @param type The type of note sequence being parsed (footnote, endnote or annotation)
  * 
  * @details The function performs the following operations:
  * - Extracts main sequence information using a union to interpret bytes as note structure
  * - Checks for embedded footnotes (tag == 1) and processes sub-sequence data if present
  * - Extracts the note text content from the remaining sequence
  * - Creates a note object with the parsed symbol format and text
- * - Inserts the note into the document as either a footnote or endnote
+ * - Inserts the note into the document as a footnote (footnotes and annotations,
+ *   told apart by sNote::kind) or as an endnote
  * 
  * @note A note shorter than its 4-byte header, an embedded footnote shorter than its
  *       13 bytes of sub-sequence data, or a sub-sequence with no closing STYLE_SEQUENCE
@@ -2450,10 +2463,17 @@ void cWordstarFile::ParseNote(std::string sequence, eSequence type)
     note.raw = sequence ;
     if(type == eSequence::SEQ_FOOTNOTE)
     {
+        note.kind = NOTE_KIND_FOOTNOTE ;
+        mDocument->InsertFootnote(note) ;
+    }
+    else if(type == eSequence::SEQ_ANNOTATION)
+    {
+        note.kind = NOTE_KIND_ANNOTATION ;
         mDocument->InsertFootnote(note) ;
     }
     else if(type == eSequence::SEQ_ENDNOTE)
     {
+        note.kind = NOTE_KIND_ENDNOTE ;
         mDocument->InsertEndnote(note) ;
     }
 }

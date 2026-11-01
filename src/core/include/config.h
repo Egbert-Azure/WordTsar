@@ -369,6 +369,22 @@ enum eNoteSymbol
 
 
 ///////////////////////////////////////////////////////////////////////
+/// @enum eNoteKind
+///
+/// @note kind of note behind a note marker. Endnotes use STYLE_ENDNOTE,
+///       all other kinds use STYLE_FOOTNOTE.
+///
+///////////////////////////////////////////////////////////////////////
+enum eNoteKind
+{
+    NOTE_KIND_FOOTNOTE,
+    NOTE_KIND_ENDNOTE,
+    NOTE_KIND_ANNOTATION,
+    NOTE_KIND_COMMENT
+};
+
+
+///////////////////////////////////////////////////////////////////////
 /// @enum eCodePage
 ///
 /// @note code page conversion selector. Set by user or via WS 7 file format
