@@ -2345,10 +2345,13 @@ TEST_CASE("TUI Opening screen - arrows and Enter work the file list")
         sOpeningListDir dir;
 
         {
-            // Arrows move the list selection; Up past the first row stays.
+            // The first arrow activates the list; the next ones move the
+            // selection; Up past the first row stays.
             cWSWordTsar app;
             PrepareOpeningList(app, level, dir);
             REQUIRE(app.TestOpeningSelectedName() == "../");
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT));
+            CHECK(app.TestOpeningSelectedName() == "../");
             app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT));
             CHECK(app.TestOpeningSelectedName() == "f0.txt");
             app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
@@ -2368,6 +2371,7 @@ TEST_CASE("TUI Opening screen - arrows and Enter work the file list")
             // Down then Enter opens the highlighted file, not a panel action.
             cWSWordTsar app;
             PrepareOpeningList(app, level, dir);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
             app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
             CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
             CHECK(app.TestQuitRequested() == false);
@@ -2400,6 +2404,147 @@ TEST_CASE("TUI Opening screen - arrows and Enter work the file list")
             CHECK(app.TestQuitRequested() == false);
             app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ESCAPE));
             CHECK(app.TestQuitRequested() == true);
+        }
+    }
+}
+
+
+namespace
+{
+
+// Screen row of the file list's first line, found by its ".." entry.
+int OpeningListRow(const wordstartui::cScreen& screen)
+{
+    for (int row = 0; row < screen.GetRows(); ++row)
+    {
+        if ((CellAt(screen, row, 1).textUtf8 == ".") && (CellAt(screen, row, 2).textUtf8 == "."))
+        {
+            return row;
+        }
+    }
+    return -1;
+}
+
+}
+
+
+namespace
+{
+
+// A list entry cell drawn plain: list colours, no underline, no bold.
+void CheckPlainEntry(const wordstartui::cScreen& screen, int row, int col)
+{
+    CheckCellColours(screen, row, col, kWs7Black, kWs7Grey);
+    CHECK((CellAt(screen, row, col).style.attrs & wordstartui::CELL_ATTR_UNDERLINE) == 0);
+    CHECK((CellAt(screen, row, col).style.attrs & wordstartui::CELL_ATTR_BOLD) == 0);
+}
+
+// A list entry cell drawn as the highlight bar: grey on black, no bold.
+void CheckBarEntry(const wordstartui::cScreen& screen, int row, int col)
+{
+    CheckCellColours(screen, row, col, kWs7Grey, kWs7Black);
+    CHECK((CellAt(screen, row, col).style.attrs & wordstartui::CELL_ATTR_UNDERLINE) == 0);
+    CHECK((CellAt(screen, row, col).style.attrs & wordstartui::CELL_ATTR_BOLD) == 0);
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - the file list shows no selection until it is active")
+{
+    for (int level : {0, 3, 4})
+    {
+        CAPTURE(level);
+        sOpeningListDir dir;
+
+        {
+            // Fresh start: no entry marked; Enter does nothing.
+            cWSWordTsar app;
+            EnterWs7Opening(app, level);
+            app.TestSetOpeningDirectory(dir.path.string());
+            wordstartui::cScreen screen;
+            screen.Resize(25, 80);
+            app.TestDrawOpening(screen);
+            const int listRow = OpeningListRow(screen);
+            REQUIRE(listRow > 0);
+            CheckPlainEntry(screen, listRow, 1);
+
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER));
+            CHECK(app.TestInOpening() == true);
+            CHECK(app.TestOpeningSelectedName() == "../");
+            CHECK(std::filesystem::equivalent(app.TestOpeningDirectory(), dir.path) == true);
+            app.TestDrawOpening(screen);
+            CheckPlainEntry(screen, listRow, 1);
+
+            // The first Down shows the bar on ".." without moving; the next
+            // moves it to f3.txt; Enter opens f3.txt.
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+            CHECK(app.TestOpeningSelectedName() == "../");
+            app.TestDrawOpening(screen);
+            CheckBarEntry(screen, listRow, 1);
+
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+            REQUIRE(app.TestOpeningSelectedName() == "f3.txt");
+            app.TestDrawOpening(screen);
+            CHECK(CellAt(screen, listRow + 1, 1).textUtf8 == "f");
+            CheckBarEntry(screen, listRow + 1, 1);
+            CheckPlainEntry(screen, listRow, 1);
+
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER));
+            CHECK(app.TestInEditor() == true);
+            CHECK(std::filesystem::path(app.TestFilename()).filename() == "f3.txt");
+        }
+
+        for (wordstartui::eSpecialKey key : {wordstartui::SPECIAL_KEY_ARROW_UP,
+                                             wordstartui::SPECIAL_KEY_ARROW_LEFT,
+                                             wordstartui::SPECIAL_KEY_ARROW_RIGHT,
+                                             wordstartui::SPECIAL_KEY_PAGE_UP,
+                                             wordstartui::SPECIAL_KEY_PAGE_DOWN,
+                                             wordstartui::SPECIAL_KEY_HOME,
+                                             wordstartui::SPECIAL_KEY_END})
+        {
+            // Every movement key activates the list without moving.
+            CAPTURE(static_cast<int>(key));
+            cWSWordTsar app;
+            EnterWs7Opening(app, level);
+            app.TestSetOpeningDirectory(dir.path.string());
+            wordstartui::cScreen screen;
+            screen.Resize(25, 80);
+            app.TestDrawOpening(screen);
+            const int listRow = OpeningListRow(screen);
+            app.TestHandleEvent(OpeningSpecial(key));
+            CHECK(app.TestOpeningSelectedName() == "../");
+            app.TestDrawOpening(screen);
+            CheckBarEntry(screen, listRow, 1);
+        }
+
+        {
+            // D gives the list letter focus and shows the bar; Escape takes
+            // focus back and clears it. Tab twice leaves it inactive.
+            cWSWordTsar app;
+            EnterWs7Opening(app, level);
+            app.TestSetOpeningDirectory(dir.path.string());
+            wordstartui::cScreen screen;
+            screen.Resize(25, 80);
+            app.TestDrawOpening(screen);
+            const int listRow = OpeningListRow(screen);
+
+            app.TestHandleEvent(OpeningText("d"));
+            REQUIRE(app.TestOpeningBrowserFocus() == true);
+            app.TestDrawOpening(screen);
+            CheckBarEntry(screen, listRow, 1);
+
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ESCAPE));
+            REQUIRE(app.TestOpeningBrowserFocus() == false);
+            app.TestDrawOpening(screen);
+            CheckPlainEntry(screen, listRow, 1);
+
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_TAB));
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_TAB));
+            REQUIRE(app.TestOpeningBrowserFocus() == false);
+            app.TestDrawOpening(screen);
+            CheckPlainEntry(screen, listRow, 1);
         }
     }
 }
@@ -2689,6 +2834,7 @@ TEST_CASE("TUI Opening screen - Tab drops a pending print, TOC or index request"
             REQUIRE(app.TestOpeningWantTOC() == false);
             REQUIRE(app.TestOpeningWantIndex() == false);
             app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
             CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
             CHECK(app.TestInEditor() == true);
             CHECK(std::filesystem::path(app.TestFilename()).filename() == "f3.txt");
@@ -2974,6 +3120,7 @@ TEST_CASE("TUI - a status message does not follow a file opened from the Opening
 
     app.TestHandleEvent(OpeningText("n"));
     REQUIRE(StatusMessage(app) == kNotAvailable);
+    app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
     app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
     app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER));
     REQUIRE(app.TestInEditor() == true);

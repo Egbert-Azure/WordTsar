@@ -605,20 +605,21 @@ void cFileBrowser::Draw(cScreen& screen, const cTheme& theme, bool focused)
 ///
 /// @param  cScreen& screen [in,out] target screen
 /// @param  const cTheme& theme [in] color theme
-/// @param  bool focused [in] true if the browser has focus
+/// @param  bool focused [in] true to draw the selected entry as the bar
 ///
 /// @return nothing
 ///
 /// @brief
 /// Draw the WordStar layout: per 20-cell column the name at cell column 1, a
 /// '/' or the size ending at cell column 17, and a vertical bar at cell
-/// column 19 between columns.
+/// column 19 between columns. Without focus no entry is marked.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cFileBrowser::DrawWordStar(cScreen& screen, const cTheme& theme, bool focused)
 {
     sStyle normal = theme.GetStyle(wordstartui::THEME_ROLE_LIST);
     sStyle selected = theme.GetStyle(wordstartui::THEME_ROLE_LIST_SELECTED);
+    selected.attrs = wordstartui::CELL_ATTR_NONE;
 
     screen.FillRect(mBounds, " ", normal);
 
@@ -650,16 +651,9 @@ void cFileBrowser::DrawWordStar(cScreen& screen, const cTheme& theme, bool focus
             const sEntry& entry = mEntries[static_cast<size_t>(index)];
 
             sStyle style = normal;
-            if (index == mSelected)
+            if ((index == mSelected) && (focused == true))
             {
-                if (focused == true)
-                {
-                    style = selected;
-                }
-                else
-                {
-                    style.attrs = style.attrs | wordstartui::CELL_ATTR_UNDERLINE;
-                }
+                style = selected;
             }
 
             std::string name = entry.name;

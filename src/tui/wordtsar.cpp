@@ -171,6 +171,7 @@ cWSWordTsar::cWSWordTsar(void)
     mBrowser.SetWordStarLayout(true);
     mHaveFileArg = false;
     mOpeningBrowserFocus = false;
+    mOpeningListActive = false;
     mOpeningWantPrint = false;
     mOpeningWantTOC = false;
     mOpeningWantIndex = false;
@@ -540,6 +541,7 @@ void cWSWordTsar::CheckCommandSignals(void)
         mEditor->ClearReturnToOpening();
         mFilename.clear();
         mOpeningBrowserFocus = false;
+        mOpeningListActive = false;
         mBrowser.SetDirectory(mBrowser.GetCurrentDirectory());
         SetMode(APP_OPENING);
     }
@@ -2083,7 +2085,7 @@ void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow, 
     }
     browserRect.cols = mCols;
     mBrowser.SetBounds(browserRect);
-    mBrowser.Draw(screen, GetTheme(), mOpeningBrowserFocus);
+    mBrowser.Draw(screen, GetTheme(), (mOpeningBrowserFocus == true) || (mOpeningListActive == true));
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -3055,6 +3057,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         mOpeningWantPrint = false;
         mOpeningWantTOC = false;
         mOpeningWantIndex = false;
+        mOpeningListActive = false;
         if (mOpeningBrowserFocus == true)
         {
             mOpeningBrowserFocus = false;
@@ -3086,15 +3089,39 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         if (escape == true)
         {
             mOpeningBrowserFocus = false;
+            mOpeningListActive = false;
             mOpeningWantPrint = false;
             mOpeningWantTOC = false;
             mOpeningWantIndex = false;
             return true;
         }
 
+        // An inactive list shows no selection: a movement key activates it
+        // without moving, other keys do nothing.
+        if ((mOpeningBrowserFocus == false) && (mOpeningListActive == false))
+        {
+            switch (event.special)
+            {
+                case wordstartui::SPECIAL_KEY_ARROW_UP:
+                case wordstartui::SPECIAL_KEY_ARROW_DOWN:
+                case wordstartui::SPECIAL_KEY_ARROW_LEFT:
+                case wordstartui::SPECIAL_KEY_ARROW_RIGHT:
+                case wordstartui::SPECIAL_KEY_PAGE_UP:
+                case wordstartui::SPECIAL_KEY_PAGE_DOWN:
+                case wordstartui::SPECIAL_KEY_HOME:
+                case wordstartui::SPECIAL_KEY_END:
+                    mOpeningListActive = true;
+                    break;
+                default:
+                    break;
+            }
+            return true;
+        }
+
         wsui::cFileBrowser::eAction action = mBrowser.HandleEvent(event);
         if (action == wsui::cFileBrowser::ACTION_FILE)
         {
+            mOpeningListActive = false;
             mFilename = mBrowser.GetSelectedFile();
             mEditor->SetStatusMessage("", false, 0);
             mEditor->LoadFile(mFilename);
@@ -3121,6 +3148,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         if ((action == wsui::cFileBrowser::ACTION_EXIT_TOP) && (mOpeningBrowserFocus == true))
         {
             mOpeningBrowserFocus = false;
+            mOpeningListActive = false;
             mOpeningWantPrint = false;
             mOpeningWantTOC = false;
             mOpeningWantIndex = false;

@@ -243,6 +243,7 @@ private:
     bool mHaveFileArg;         // a file was given on the command line
     wsui::cFileBrowser mBrowser;  // file picker on the opening screen
     bool mOpeningBrowserFocus;    // true when the browser has focus (not the menu)
+    bool mOpeningListActive;      // true when arrows have activated the list without focus
     bool mOpeningWantPrint;       // true when the browser was opened via "print a file"
     bool mOpeningWantTOC;         // true when the browser was opened via "table of contents"
     bool mOpeningWantIndex;       // true when the browser was opened via "index a document"
