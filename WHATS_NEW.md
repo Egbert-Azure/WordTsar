@@ -2,15 +2,41 @@
 
 Release history for WordTsar, in reverse chronological order.
 
-## 0.14.3 (2026-10-31)
+## 0.14.3 (2026-11-01)
 
 **Fixes**
 
 - Fixed: a WordStar paragraph that starts with a soft tab and then a period now loads as text instead of being read as a dot command (#35).
 - Fixed: extended characters written as ESC, a byte below 0x20 and FS now load as the matching graphic character under CP437, CP737 and CP850 (#43).
 - Fixed: files that are binaries, plain text or UTF-8 are no longer opened as WordStar documents.
+- Fixed: the file type check now also accepts a WordStar 4 word with an accented letter before a tab, ESC, 0x1A or a style toggle.
+- Fixed: a WordStar 5 or later header that is larger than the file is no longer accepted as WordStar.
 - Fixed: a crash when pasting RTF from the clipboard before a file is opened (#52).
 - Fixed: the document no longer flickers behind the file dialog in the GUI, and the TUI file dialog fills the screen (#39, #38).
+- Fixed: footnotes, endnotes, annotations and comments now load and save back unchanged (#47).
+- Fixed: a file opened as text is saved as text in the GUI and the TUI (#51).
+- Fixed: the save format follows the last save with a WordStar or text extension. Saving as RTF or DOCX leaves it as it was (#51).
+- Fixed: plain-text saves no longer contain internal marker bytes. Tabs stay tabs (#51).
+- Fixed: a tab in a text file now loads as a tab (#51).
+- Fixed: a text file keeps its line endings when it is saved. New text files, Write Block to File and clipboard copy use LF (#51).
+- Fixed: a text save that fails to write is now reported (#51).
+- Fixed: Opening-screen entries without an action are drawn like the other entries (#24).
+
+**Changes**
+
+- Changed: help level 4 is the default for new configurations. Existing configurations keep their level (#24).
+- Changed: at help level 4 the TUI Opening screen shows the menu bar File, Utilities, Additional and Help over a four-column file list, instead of the command panel. F10, Alt+letter and the plain letters F, U, A and H open the menus (#24).
+- Changed: the Help menu has Help (F1) and Change Help Level. F1 F1 no longer changes the level at level 4 (#24).
+- Changed: Recent Files, System Preferences and About WordTsar are in the File, Utilities and Help menus of the Opening screen (#24).
+- Changed: help levels 0 to 3 keep the classic Opening Menu, now in the WordStar 7 layout with its box and title row. G (recent files), V (preferences) and W (about WordTsar) are added (#24).
+- Changed: the Opening file list shows sizes in k, M and G, a "/" after folder names, and shortened names that keep the extension (#24).
+- Changed: the Opening file list starts in the folder ws was started from, unless Default Directory is set (#24).
+- Changed: the Opening screen colours follow the active colour preset (#24).
+- Changed: menu hotkey letters and highlighted entries use colour only, with no bold (#55).
+
+**Additions**
+
+- Added: the colour setting "Selected hotkey" in System Preferences, for the hotkey letter of a highlighted menu entry (#55).
 
 ## 0.14.2 (2026-10-30)
 
