@@ -80,31 +80,6 @@ void EmergencySignalHandler(int /*sig*/)
 // Splash frames before auto-advancing (~50ms per loop tick).
 constexpr int SPLASH_TICKS = 12;
 
-enum class eOpeningAction
-{
-    OPEN_DOCUMENT,
-    SPEED_WRITE,
-    OPEN_NONDOCUMENT,
-    PRINT_FILE,
-    FAX,
-    PRINT_FROM_KEYBOARD,
-    INDEX_DOCUMENT,
-    TABLE_OF_CONTENTS,
-    EXIT,
-    CHANGE_DIRECTORY,
-    PROTECT_UNPROTECT,
-    RENAME_FILE,
-    COPY_FILE,
-    DELETE_FILE,
-    TURN_DIRECTORY_OFF,
-    MACROS,
-    RUN_COMMAND,
-    ABOUT,
-    DISPLAY_STATUS,
-    RECENT_FILES,
-    PREFERENCES,
-};
-
 struct sOpeningItem
 {
     char key;           // typed hotkey; 0 = cursor + Enter only, no direct keypress
@@ -2939,6 +2914,23 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         return true;
     }
 
+    RunOpeningAction(action);
+
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  eOpeningAction action [in] Opening screen action to run
+///
+/// @return nothing
+///
+/// @brief
+/// Run one Opening screen action.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::RunOpeningAction(eOpeningAction action)
+{
     switch (action)
     {
         case eOpeningAction::EXIT:
@@ -2998,8 +2990,6 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
             // NotImplemented, since none of these can currently be selected.
             break;
     }
-
-    return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////

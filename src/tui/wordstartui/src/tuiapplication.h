@@ -43,6 +43,9 @@ public:
     int Run(void);
     void Quit(void);
     cTheme& GetTheme(void);
+#ifdef WORDTSAR_TUI_TEST_HOOKS
+    bool TestQuitRequested(void) const { return mQuit; }
+#endif
 
 protected:
     virtual void Draw(cScreen& screen, const cTheme& theme) = 0;

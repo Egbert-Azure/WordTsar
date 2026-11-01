@@ -37,6 +37,32 @@ class cWSEditorView;
 class cConfig;
 class cWordStarInput;
 
+// Actions of the Opening screen, run from its menu panel.
+enum class eOpeningAction
+{
+    OPEN_DOCUMENT,
+    SPEED_WRITE,
+    OPEN_NONDOCUMENT,
+    PRINT_FILE,
+    FAX,
+    PRINT_FROM_KEYBOARD,
+    INDEX_DOCUMENT,
+    TABLE_OF_CONTENTS,
+    EXIT,
+    CHANGE_DIRECTORY,
+    PROTECT_UNPROTECT,
+    RENAME_FILE,
+    COPY_FILE,
+    DELETE_FILE,
+    TURN_DIRECTORY_OFF,
+    MACROS,
+    RUN_COMMAND,
+    ABOUT,
+    DISPLAY_STATUS,
+    RECENT_FILES,
+    PREFERENCES,
+};
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @class cWSWordTsar
@@ -68,6 +94,17 @@ public:
     std::string TestTitleText(void) const { return TitleText(); }
     // Load a file the way the command line and the Opening screen do.
     void TestOpenFromOpening(const std::string& path);
+    // Opening screen state, driven through HandleEvent.
+    void TestEnterOpening(void) { mMode = APP_OPENING; }
+    bool TestHandleEvent(const wordstartui::sInputEvent& event) { return HandleEvent(event); }
+    bool TestInOpening(void) const { return mMode == APP_OPENING; }
+    bool TestInEditor(void) const { return mMode == APP_EDITOR; }
+    bool TestOpeningBrowserFocus(void) const { return mOpeningBrowserFocus; }
+    bool TestOpeningWantPrint(void) const { return mOpeningWantPrint; }
+    bool TestOpeningWantTOC(void) const { return mOpeningWantTOC; }
+    bool TestOpeningWantIndex(void) const { return mOpeningWantIndex; }
+    int TestOpeningSelection(void) const { return mOpeningSel; }
+    const std::string& TestFilename(void) const { return mFilename; }
 #endif
 
     // ---- iWSDialogHost ----
@@ -117,6 +154,7 @@ private:
     void DrawSplash(wordstartui::cScreen& screen);
     void DrawOpeningMenu(wordstartui::cScreen& screen);
     bool HandleOpeningKey(const wordstartui::sInputEvent& event);
+    void RunOpeningAction(eOpeningAction action);
     void ShowOpeningStatus(void);
     void ShowOpeningHelp(void);
     // Real legal notices (copyright, no-warranty, redistribution rights, how
