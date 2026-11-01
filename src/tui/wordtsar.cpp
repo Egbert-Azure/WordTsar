@@ -1916,7 +1916,7 @@ void cWSWordTsar::DrawOpeningBars(cScreen& screen)
     screen.FillRect(full, " ", base);
 
     DrawOpeningTitle(screen);
-    DrawOpeningFiles(screen, 7, 8);
+    DrawOpeningFiles(screen, 7, 8, "\xe2\x96\x80");   // U+2580 UPPER HALF BLOCK
 
     sRect menuRect;
     menuRect.row = 1;
@@ -1966,17 +1966,18 @@ void cWSWordTsar::DrawOpeningTitle(cScreen& screen)
 /// @param  cScreen& screen [in,out] target screen
 /// @param  int headerRow [in] row of the Filenames/Path line
 /// @param  int listRow [in] first row of the file list
+/// @param  const char* upperRule [in] glyph that fills the row above the header
 ///
 /// @return nothing
 ///
 /// @brief
-/// Draw an upper half-block bar above the Filenames/Path line, the line
+/// Draw a row of upperRule above the Filenames/Path line, the line
 /// itself ("Filenames:" at column 1, the path and free space from column 21,
 /// the scroll arrows at columns 71 to 77), the file list below it, and a
 /// lower half-block bar on the last row.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow)
+void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow, const char* upperRule)
 {
     sStyle base;
     base.fg = wordstartui::MakeDefaultColor();
@@ -1992,7 +1993,7 @@ void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow)
         line.cols = mCols;
         screen.FillRect(line, glyph, base);
     };
-    bar(headerRow - 1, "\xe2\x96\x80");   // U+2580 UPPER HALF BLOCK
+    bar(headerRow - 1, upperRule);
     bar(mRows - 1, "\xe2\x96\x84");       // U+2584 LOWER HALF BLOCK
 
     screen.PutText(headerRow, 1, "Filenames:", base);
@@ -2170,10 +2171,8 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
         }
     }
 
-    // The file list's upper bar sits at row 13, or directly below the
-    // panel when the own entries row reaches row 13.
-    int barRow = std::max(13, ownRow + 1);
-    DrawOpeningFiles(screen, barRow + 1, barRow + 2);
+    // Below the box: a single line, the header, then the file list.
+    DrawOpeningFiles(screen, boxBottom + 2, boxBottom + 3, "\xe2\x94\x80");   // U+2500
 }
 
 /////////////////////////////////////////////////////////////////////////////

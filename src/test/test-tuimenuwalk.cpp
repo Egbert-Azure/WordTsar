@@ -1428,22 +1428,11 @@ TEST_CASE("TUI Opening screen - help level 3 header and bars")
     screen.Resize(25, 80);
     app.TestDrawOpening(screen);
 
-    // The upper bar sits at row 13, or directly below a taller panel.
-    int panelBottom = 0;
-    for (int row = 0; row < 24; ++row)
-    {
-        if (MenuRowText(screen, row).find("preferences") != std::string::npos)
-        {
-            panelBottom = row;
-        }
-    }
-    REQUIRE(panelBottom > 0);
-    const int barRow = std::max(13, panelBottom + 1);
-
-    CHECK(RowIsFilledWith(screen, barRow, kUpperHalf) == true);
-    CheckOpeningHeader(screen, barRow + 1, "/");
-    CHECK(CellRun(screen, barRow + 2, 1, 2) == "..");
-    CHECK(CellRun(screen, barRow + 2, 19, 1) == kBar);
+    // Row 13 is a single line, row 14 the header, rows 15 to 23 the list.
+    CHECK(RowIsFilledWith(screen, 13, "\xe2\x94\x80") == true);   // U+2500
+    CheckOpeningHeader(screen, 14, "/");
+    CHECK(CellRun(screen, 15, 1, 2) == "..");
+    CHECK(CellRun(screen, 15, 19, 1) == kBar);
     CHECK(RowIsFilledWith(screen, 24, kLowerHalf) == true);
 }
 
