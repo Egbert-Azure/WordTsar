@@ -148,6 +148,7 @@ cWSWordTsar::cWSWordTsar(void)
     mMode = APP_SPLASH;
     mSplashFrames = 0;
     mOpeningSel = 0;
+    mBrowser.SetWordStarLayout(true);
     mHaveFileArg = false;
     mOpeningBrowserFocus = false;
     mOpeningWantPrint = false;

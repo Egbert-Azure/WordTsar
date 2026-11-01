@@ -25,6 +25,7 @@
 #include "src/tui/wordstartui/src/theme.h"
 #include "src/tui/wordstartui/src/tuidefs.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,10 @@ namespace wsui
 /// the available width. Arrow keys move within the grid, a letter jumps to the
 /// next matching entry, Enter (or a mouse click) opens a directory or selects a
 /// file. Used both by the standalone open/save dialog and the start screen.
+///
+/// The WordStar layout (SetWordStarLayout) uses columns of 20 cells filled
+/// across each row first: name at cell column 1, a '/' or the size ending at
+/// cell column 17, and a vertical bar at cell column 19 between columns.
 ///
 /////////////////////////////////////////////////////////////////////////////
 class cFileBrowser
@@ -61,6 +66,7 @@ public:
     cFileBrowser(void);
 
     void SetDirectory(const std::string& path);
+    void SetWordStarLayout(bool on);
     void SetBounds(const wordstartui::sRect& bounds);
     void Draw(wordstartui::cScreen& screen, const wordstartui::cTheme& theme, bool focused);
     eAction HandleEvent(const wordstartui::sInputEvent& event);
@@ -69,12 +75,16 @@ public:
     std::string GetCurrentDirectory(void) const;
     std::string GetSelectedName(void) const;
 
+    static std::string FormatSize(std::uintmax_t bytes);
+    static std::string ShortenName(const std::string& name, int width);
+
 private:
     struct sEntry
     {
         std::string name;
         std::string path;
         bool isDirectory;
+        std::uintmax_t size;
     };
 
     void Rebuild(void);
@@ -82,6 +92,9 @@ private:
     int ColumnCount(void) const;
     int NumRows(void) const;
     int VisibleRows(void) const;
+    int GridRow(int index) const;
+    int IndexAt(int gridRow, int gridCol) const;
+    void DrawWordStar(wordstartui::cScreen& screen, const wordstartui::cTheme& theme, bool focused);
     void EnsureVisible(void);
     eAction Activate(void);
 
@@ -94,6 +107,7 @@ private:
     std::vector<sEntry> mEntries;
     int mSelected;
     int mScrollRow;                 // first visible grid row
+    bool mWordStar;                 // WordStar layout: 20-cell columns, row-major
     wordstartui::sRect mBounds;
     std::string mSelectedFile;
 };

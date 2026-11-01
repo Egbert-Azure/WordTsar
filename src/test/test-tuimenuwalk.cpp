@@ -27,9 +27,14 @@
 #include "src/tui/wordstartui/src/dialog.h"
 #include "src/tui/dialogs/dialoghost.h"
 #include "src/input/wordtsarinput.h"
+#include "src/tui/dialogs/filebrowser.h"
 
 #include <cctype>
+#include <chrono>
+#include <cstdio>
 #include <deque>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 
@@ -1002,4 +1007,331 @@ TEST_CASE("TUI edit screen - Help menu has Help and Change Help Level")
         CHECK(host.mModals == 1);
         CHECK(editor->mHelpLevel == 4);
     }
+}
+
+
+namespace
+{
+
+// A scratch directory removed again when the test ends.
+struct sBrowserDir
+{
+    std::filesystem::path path;
+
+    explicit sBrowserDir(const std::string& tag)
+    {
+        const long long stamp = static_cast<long long>(
+            std::chrono::steady_clock::now().time_since_epoch().count());
+        path = std::filesystem::temp_directory_path() /
+               ("wt-browser-" + tag + "-" + std::to_string(stamp));
+        std::filesystem::remove_all(path);
+        std::filesystem::create_directories(path);
+    }
+
+    ~sBrowserDir(void)
+    {
+        std::error_code ec;
+        std::filesystem::remove_all(path, ec);
+    }
+
+    void Folder(const std::string& name) const
+    {
+        std::filesystem::create_directories(path / name);
+    }
+
+    void File(const std::string& name, size_t bytes) const
+    {
+        std::ofstream out(path / name, std::ios::binary);
+        out << std::string(bytes, 'x');
+    }
+};
+
+// Cells [col, col + count) of a row, joined.
+std::string CellRun(const wordstartui::cScreen& screen, int row, int col, int count)
+{
+    std::string text;
+    for (int index = 0; index < count; ++index)
+    {
+        const wordstartui::sCell* cell = screen.GetCell(row, col + index);
+        text += (cell != nullptr) ? cell->textUtf8 : std::string("?");
+    }
+    return text;
+}
+
+wordstartui::sRect BrowserRect(int row, int rows)
+{
+    wordstartui::sRect rect{};
+    rect.row = row;
+    rect.col = 0;
+    rect.rows = rows;
+    rect.cols = 80;
+    return rect;
+}
+
+wordstartui::sInputEvent BrowserClick(int row, int col)
+{
+    wordstartui::sInputEvent event{};
+    event.type = wordstartui::INPUT_TYPE_MOUSE;
+    event.mouseAction = wordstartui::MOUSE_ACTION_PRESS;
+    event.mouseButton = wordstartui::MOUSE_BUTTON_LEFT;
+    event.mouseRow = row;
+    event.mouseCol = col;
+    return event;
+}
+
+const char* const kBar = "\xe2\x94\x82";   // U+2502
+
+}
+
+
+TEST_CASE("TUI file browser - size text")
+{
+    CHECK(wsui::cFileBrowser::FormatSize(6) == ".0k");
+    CHECK(wsui::cFileBrowser::FormatSize(57) == ".1k");
+    CHECK(wsui::cFileBrowser::FormatSize(307) == ".3k");
+    CHECK(wsui::cFileBrowser::FormatSize(838) == ".8k");
+    CHECK(wsui::cFileBrowser::FormatSize(1024) == "1.0k");
+    CHECK(wsui::cFileBrowser::FormatSize(1664) == "1.7k");
+    CHECK(wsui::cFileBrowser::FormatSize(4872) == "4.9k");
+    CHECK(wsui::cFileBrowser::FormatSize(9949) == "9.9k");
+    CHECK(wsui::cFileBrowser::FormatSize(9950) == "10k");
+    CHECK(wsui::cFileBrowser::FormatSize(13696) == "14k");
+    CHECK(wsui::cFileBrowser::FormatSize(41856) == "42k");
+    CHECK(wsui::cFileBrowser::FormatSize(327403) == "327k");
+    CHECK(wsui::cFileBrowser::FormatSize(999499) == "999k");
+    CHECK(wsui::cFileBrowser::FormatSize(999500) == "1.0M");
+    CHECK(wsui::cFileBrowser::FormatSize(1234567) == "1.2M");
+    CHECK(wsui::cFileBrowser::FormatSize(999949999) == "999.9M");
+    CHECK(wsui::cFileBrowser::FormatSize(999950000) == "1.0G");
+    CHECK(wsui::cFileBrowser::FormatSize(1100000000ULL) == "1.1G");
+}
+
+
+TEST_CASE("TUI file browser - a long name keeps its extension")
+{
+    CHECK(wsui::cFileBrowser::ShortenName("short.txt", 12) == "short.txt");
+    CHECK(wsui::cFileBrowser::ShortenName("ABCDEFGHIJKLMNOPQRSTUVWXYZ.txt", 12) == "ABCDEFG\xe2\x80\xa6.txt");
+    CHECK(wsui::cFileBrowser::ShortenName("abcdefghijklmnopqrstuvwxyz0123", 15) == "abcdefghijklmn\xe2\x80\xa6");
+    CHECK(wsui::cFileBrowser::ShortenName("name.averylongextension", 12) == "name.averyl\xe2\x80\xa6");
+}
+
+
+TEST_CASE("TUI file browser - WordStar layout fills each row across four columns")
+{
+    sBrowserDir dir("layout");
+    dir.Folder("alpha");
+    dir.Folder("beta");
+    dir.File("big.dat", 327403);
+    dir.File("small.txt", 307);
+    dir.File("tiny.bat", 6);
+    dir.File("zeta.ws", 1664);
+
+    wsui::cFileBrowser browser;
+    browser.SetWordStarLayout(true);
+    browser.SetDirectory(dir.path.string());
+    browser.SetBounds(BrowserRect(8, 16));
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    wordstartui::cTheme theme;
+    browser.Draw(screen, theme, false);
+
+    // Row 0: "..", alpha, beta, big.dat.
+    CHECK(CellRun(screen, 8, 0, 1) == " ");
+    CHECK(CellRun(screen, 8, 1, 3) == ".. ");
+    CHECK(CellRun(screen, 8, 17, 1) == "/");
+    CHECK(CellRun(screen, 8, 18, 1) == " ");
+    CHECK(CellRun(screen, 8, 19, 1) == kBar);
+    CHECK(CellRun(screen, 8, 21, 6) == "alpha ");
+    CHECK(CellRun(screen, 8, 37, 1) == "/");
+    CHECK(CellRun(screen, 8, 39, 1) == kBar);
+    CHECK(CellRun(screen, 8, 41, 5) == "beta ");
+    CHECK(CellRun(screen, 8, 57, 1) == "/");
+    CHECK(CellRun(screen, 8, 59, 1) == kBar);
+    CHECK(CellRun(screen, 8, 61, 7) == "big.dat");
+    CHECK(CellRun(screen, 8, 73, 5) == " 327k");
+    CHECK(CellRun(screen, 8, 78, 2) == "  ");
+
+    // Row 1: the remaining files, sizes ending at column 17 + 20k.
+    CHECK(CellRun(screen, 9, 1, 9) == "small.txt");
+    CHECK(CellRun(screen, 9, 14, 4) == " .3k");
+    CHECK(CellRun(screen, 9, 19, 1) == kBar);
+    CHECK(CellRun(screen, 9, 21, 8) == "tiny.bat");
+    CHECK(CellRun(screen, 9, 34, 4) == " .0k");
+    CHECK(CellRun(screen, 9, 41, 7) == "zeta.ws");
+    CHECK(CellRun(screen, 9, 54, 4) == "1.7k");
+
+    SUBCASE("long names are cut before the extension")
+    {
+        sBrowserDir longDir("long");
+        longDir.Folder("abcdefghijklmnopqrstuvwxyz0123");
+        longDir.File("ABCDEFGHIJKLMNOPQRSTUVWXYZ.txt", 1664);
+        browser.SetDirectory(longDir.path.string());
+        browser.Draw(screen, theme, false);
+
+        CHECK(CellRun(screen, 8, 21, 16) == "abcdefghijklmn\xe2\x80\xa6 ");
+        CHECK(CellRun(screen, 8, 37, 1) == "/");
+        CHECK(CellRun(screen, 8, 41, 13) == "ABCDEFG\xe2\x80\xa6.txt ");
+        CHECK(CellRun(screen, 8, 54, 4) == "1.7k");
+    }
+}
+
+
+TEST_CASE("TUI file browser - the Open and Save layout is unchanged")
+{
+    // "..", two folders and ten files: 13 entries, 6 columns of 12, 3 rows.
+    sBrowserDir dir("classic");
+    dir.Folder("alpha");
+    dir.Folder("beta");
+    for (int index = 0; index < 10; ++index)
+    {
+        char name[16];
+        std::snprintf(name, sizeof(name), "f%02d.txt", index);
+        dir.File(name, 100);
+    }
+
+    wsui::cFileBrowser browser;
+    browser.SetDirectory(dir.path.string());
+    browser.SetBounds(BrowserRect(8, 3));
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    wordstartui::cTheme theme;
+    browser.Draw(screen, theme, false);
+
+    // Column-major: entries fill down each column first, names at column 0.
+    CHECK(CellRun(screen, 8, 0, 3) == "../");
+    CHECK(CellRun(screen, 9, 0, 6) == "alpha/");
+    CHECK(CellRun(screen, 10, 0, 5) == "beta/");
+    CHECK(CellRun(screen, 8, 12, 7) == "f00.txt");
+    CHECK(CellRun(screen, 9, 12, 7) == "f01.txt");
+    CHECK(CellRun(screen, 8, 24, 7) == "f03.txt");
+    CHECK(CellRun(screen, 8, 19, 1) != kBar);
+
+    browser.HandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+    CHECK(browser.GetSelectedName() == "alpha/");
+    browser.HandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT));
+    CHECK(browser.GetSelectedName() == "f01.txt");
+}
+
+
+TEST_CASE("TUI file browser - WordStar layout navigation")
+{
+    // "..", d1-d3 and f00-f25: 30 entries in 8 rows of 4; 3 rows visible.
+    sBrowserDir dir("nav");
+    dir.Folder("d1");
+    dir.Folder("d2");
+    dir.Folder("d3");
+    for (int index = 0; index < 26; ++index)
+    {
+        char name[16];
+        std::snprintf(name, sizeof(name), "f%02d.txt", index);
+        dir.File(name, 100);
+    }
+
+    wsui::cFileBrowser browser;
+    browser.SetWordStarLayout(true);
+    browser.SetDirectory(dir.path.string());
+    browser.SetBounds(BrowserRect(10, 3));
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    wordstartui::cTheme theme;
+
+    auto key = [&](wordstartui::eSpecialKey special)
+    {
+        return browser.HandleEvent(OpeningSpecial(special));
+    };
+
+    REQUIRE(browser.GetSelectedName() == "../");
+
+    SUBCASE("arrow keys move across and down the rows")
+    {
+        key(wordstartui::SPECIAL_KEY_ARROW_RIGHT);
+        CHECK(browser.GetSelectedName() == "d1/");
+        key(wordstartui::SPECIAL_KEY_ARROW_DOWN);
+        CHECK(browser.GetSelectedName() == "f01.txt");
+        key(wordstartui::SPECIAL_KEY_ARROW_LEFT);
+        CHECK(browser.GetSelectedName() == "f00.txt");
+        key(wordstartui::SPECIAL_KEY_ARROW_UP);
+        CHECK(browser.GetSelectedName() == "../");
+        CHECK(key(wordstartui::SPECIAL_KEY_ARROW_UP) == wsui::cFileBrowser::ACTION_EXIT_TOP);
+        key(wordstartui::SPECIAL_KEY_ARROW_LEFT);
+        CHECK(browser.GetSelectedName() == "../");
+    }
+
+    SUBCASE("Page Down and Page Up move a screen of rows and scroll")
+    {
+        key(wordstartui::SPECIAL_KEY_PAGE_DOWN);
+        CHECK(browser.GetSelectedName() == "f08.txt");
+        browser.Draw(screen, theme, true);
+        CHECK(CellRun(screen, 12, 1, 7) == "f08.txt");
+        CHECK(CellRun(screen, 10, 1, 7) == "f00.txt");
+
+        key(wordstartui::SPECIAL_KEY_PAGE_DOWN);
+        CHECK(browser.GetSelectedName() == "f20.txt");
+        key(wordstartui::SPECIAL_KEY_PAGE_DOWN);
+        CHECK(browser.GetSelectedName() == "f24.txt");
+        key(wordstartui::SPECIAL_KEY_PAGE_UP);
+        CHECK(browser.GetSelectedName() == "f12.txt");
+        key(wordstartui::SPECIAL_KEY_PAGE_UP);
+        CHECK(browser.GetSelectedName() == "f00.txt");
+        key(wordstartui::SPECIAL_KEY_PAGE_UP);
+        CHECK(browser.GetSelectedName() == "../");
+    }
+
+    SUBCASE("Home and End go to the first and last entry and scroll")
+    {
+        key(wordstartui::SPECIAL_KEY_END);
+        CHECK(browser.GetSelectedName() == "f25.txt");
+        browser.Draw(screen, theme, true);
+        CHECK(CellRun(screen, 12, 21, 7) == "f25.txt");
+        CHECK(CellRun(screen, 12, 1, 7) == "f24.txt");
+
+        key(wordstartui::SPECIAL_KEY_HOME);
+        CHECK(browser.GetSelectedName() == "../");
+        browser.Draw(screen, theme, true);
+        CHECK(CellRun(screen, 10, 1, 2) == "..");
+    }
+
+    SUBCASE("a click picks the entry under the mouse")
+    {
+        browser.Draw(screen, theme, true);
+        CHECK(browser.HandleEvent(BrowserClick(11, 45)) == wsui::cFileBrowser::ACTION_FILE);
+        CHECK(std::filesystem::path(browser.GetSelectedFile()).filename() == "f02.txt");
+    }
+
+    SUBCASE("a click after scrolling picks the scrolled entry")
+    {
+        key(wordstartui::SPECIAL_KEY_END);
+        browser.Draw(screen, theme, true);
+        CHECK(browser.HandleEvent(BrowserClick(10, 1)) == wsui::cFileBrowser::ACTION_FILE);
+        CHECK(std::filesystem::path(browser.GetSelectedFile()).filename() == "f16.txt");
+    }
+
+    SUBCASE("a typed letter jumps to the next name")
+    {
+        browser.HandleEvent(OpeningText("f"));
+        CHECK(browser.GetSelectedName() == "f00.txt");
+        browser.HandleEvent(OpeningText("d"));
+        CHECK(browser.GetSelectedName() == "d1/");
+    }
+}
+
+
+TEST_CASE("TUI Opening screen - the file list uses the WordStar layout")
+{
+    cWSWordTsar app;
+    app.TestGetEditor()->mHelpLevel = 4;
+    app.TestEnterOpening();
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    CHECK(CellRun(screen, 8, 0, 4) == " .. ");
+    CHECK(CellRun(screen, 8, 17, 1) == "/");
+    CHECK(CellRun(screen, 8, 19, 1) == kBar);
+    CHECK(CellRun(screen, 8, 39, 1) == kBar);
+    CHECK(CellRun(screen, 8, 59, 1) == kBar);
 }

@@ -54,6 +54,7 @@ cFileBrowser::cFileBrowser(void)
 {
     mSelected = 0;
     mScrollRow = 0;
+    mWordStar = false;
     mBounds.row = 0;
     mBounds.col = 0;
     mBounds.rows = 1;
@@ -117,6 +118,107 @@ void cFileBrowser::SetBounds(const sRect& bounds)
     EnsureVisible();
 }
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  bool on [in] true for the WordStar layout
+///
+/// @return nothing
+///
+/// @brief
+/// Switch between the adaptive column-major grid and the WordStar layout of
+/// 20-cell columns filled across each row first.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cFileBrowser::SetWordStarLayout(bool on)
+{
+    mWordStar = on;
+    mScrollRow = 0;
+    EnsureVisible();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  std::uintmax_t bytes [in] file size
+///
+/// @return the size as shown in the WordStar layout
+///
+/// @brief
+/// Rounded, in units of 1000: ".3k" below 1k, "1.7k" below 10k, "327k" below
+/// 1000k, then "1.2M" below 1000M, then "1.1G".
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cFileBrowser::FormatSize(std::uintmax_t bytes)
+{
+    auto tenths = [](std::uintmax_t value) -> std::string
+    {
+        return std::to_string(value / 10) + "." + std::to_string(value % 10);
+    };
+
+    const std::uintmax_t tenthsK = (bytes + 50) / 100;
+    if (tenthsK < 10)
+    {
+        return "." + std::to_string(tenthsK) + "k";
+    }
+    if (tenthsK < 100)
+    {
+        return tenths(tenthsK) + "k";
+    }
+
+    const std::uintmax_t kilo = (bytes + 500) / 1000;
+    if (kilo < 1000)
+    {
+        return std::to_string(kilo) + "k";
+    }
+
+    const std::uintmax_t tenthsM = (bytes + 50000) / 100000;
+    if (tenthsM < 10000)
+    {
+        return tenths(tenthsM) + "M";
+    }
+
+    return tenths((bytes + 50000000) / 100000000) + "G";
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const std::string& name [in] file or folder name
+/// @param  int width [in] available columns
+///
+/// @return the name, cut to the width
+///
+/// @brief
+/// Shorten a name that does not fit: the extension stays and the part before
+/// it is cut, the cut marked with an ellipsis. A name whose extension leaves
+/// no room is cut at the end.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cFileBrowser::ShortenName(const std::string& name, int width)
+{
+    const std::string ellipsis = "\xe2\x80\xa6";   // U+2026
+
+    if (wordstartui::cUtf8Helper::TextWidth(name) <= width)
+    {
+        return name;
+    }
+    if (width < 2)
+    {
+        return wordstartui::cUtf8Helper::FitWidth(name, width);
+    }
+
+    const size_t dot = name.rfind('.');
+    if ((dot != std::string::npos) && (dot > 0))
+    {
+        const std::string extension = name.substr(dot);
+        const int baseWidth = width - 1 - wordstartui::cUtf8Helper::TextWidth(extension);
+        if (baseWidth >= 1)
+        {
+            return wordstartui::cUtf8Helper::FitWidth(name.substr(0, dot), baseWidth) + ellipsis + extension;
+        }
+    }
+
+    return wordstartui::cUtf8Helper::FitWidth(name, width - 1) + ellipsis;
+}
+
 std::string cFileBrowser::GetSelectedFile(void) const
 {
     return mSelectedFile;
@@ -158,6 +260,7 @@ void cFileBrowser::Rebuild(void)
         up.path = mDirectory;
     }
     up.isDirectory = true;
+    up.size = 0;
     mEntries.push_back(up);
 
     std::vector<sEntry> dirs;
@@ -193,6 +296,7 @@ void cFileBrowser::Rebuild(void)
 
         sEntry entry;
         entry.path = it->path().string();
+        entry.size = 0;
 
         if (it->is_directory(entryEc) == true)
         {
@@ -204,6 +308,11 @@ void cFileBrowser::Rebuild(void)
         {
             entry.name = it->path().filename().string();
             entry.isDirectory = false;
+            std::uintmax_t size = it->file_size(entryEc);
+            if (!entryEc)
+            {
+                entry.size = size;
+            }
             files.push_back(entry);
         }
     }
@@ -241,6 +350,11 @@ void cFileBrowser::Rebuild(void)
 /////////////////////////////////////////////////////////////////////////////
 int cFileBrowser::ColumnWidth(void) const
 {
+    if (mWordStar == true)
+    {
+        return 20;
+    }
+
     int longest = 4;
     for (const sEntry& entry : mEntries)
     {
@@ -279,10 +393,10 @@ int cFileBrowser::ColumnCount(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return the number of grid rows (entries fill columns top-down)
+/// @return the number of grid rows
 ///
 /// @brief
-/// Row count for the column-major grid: ceil(entries / columns).
+/// Row count of the grid: ceil(entries / columns).
 ///
 /////////////////////////////////////////////////////////////////////////////
 int cFileBrowser::NumRows(void) const
@@ -309,6 +423,45 @@ int cFileBrowser::VisibleRows(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  int index [in] entry index
+///
+/// @return the grid row of the entry
+///
+/// @brief
+/// Row-major in the WordStar layout, column-major otherwise.
+///
+/////////////////////////////////////////////////////////////////////////////
+int cFileBrowser::GridRow(int index) const
+{
+    if (mWordStar == true)
+    {
+        return index / ColumnCount();
+    }
+    return index % NumRows();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  int gridRow [in] grid row
+/// @param  int gridCol [in] grid column
+///
+/// @return the entry index at that grid position (may be past the end)
+///
+/// @brief
+/// Row-major in the WordStar layout, column-major otherwise.
+///
+/////////////////////////////////////////////////////////////////////////////
+int cFileBrowser::IndexAt(int gridRow, int gridCol) const
+{
+    if (mWordStar == true)
+    {
+        return (gridRow * ColumnCount()) + gridCol;
+    }
+    return (gridCol * NumRows()) + gridRow;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
@@ -317,10 +470,7 @@ int cFileBrowser::VisibleRows(void) const
 /////////////////////////////////////////////////////////////////////////////
 void cFileBrowser::EnsureVisible(void)
 {
-    // Column-major grid: an entry's on-screen row is its index modulo the row
-    // count (entries fill down each column first).
-    int numRows = NumRows();
-    int gridRow = mSelected % numRows;
+    int gridRow = GridRow(mSelected);
     int visible = VisibleRows();
 
     if (gridRow < mScrollRow)
@@ -352,6 +502,12 @@ void cFileBrowser::EnsureVisible(void)
 /////////////////////////////////////////////////////////////////////////////
 void cFileBrowser::Draw(cScreen& screen, const cTheme& theme, bool focused)
 {
+    if (mWordStar == true)
+    {
+        DrawWordStar(screen, theme, focused);
+        return;
+    }
+
     sStyle normal = theme.GetStyle(wordstartui::THEME_ROLE_LIST);
     sStyle selected = theme.GetStyle(wordstartui::THEME_ROLE_LIST_SELECTED);
 
@@ -406,6 +562,91 @@ void cFileBrowser::Draw(cScreen& screen, const cTheme& theme, bool focused)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  cScreen& screen [in,out] target screen
+/// @param  const cTheme& theme [in] color theme
+/// @param  bool focused [in] true if the browser has focus
+///
+/// @return nothing
+///
+/// @brief
+/// Draw the WordStar layout: per 20-cell column the name at cell column 1, a
+/// '/' or the size ending at cell column 17, and a vertical bar at cell
+/// column 19 between columns.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cFileBrowser::DrawWordStar(cScreen& screen, const cTheme& theme, bool focused)
+{
+    sStyle normal = theme.GetStyle(wordstartui::THEME_ROLE_LIST);
+    sStyle selected = theme.GetStyle(wordstartui::THEME_ROLE_LIST_SELECTED);
+
+    screen.FillRect(mBounds, " ", normal);
+
+    const int width = ColumnWidth();
+    const int columns = ColumnCount();
+    const int visible = VisibleRows();
+    const int count = static_cast<int>(mEntries.size());
+
+    for (int line = 0; line < visible; ++line)
+    {
+        const int screenRow = mBounds.row + line;
+        const int gridRow = mScrollRow + line;
+
+        for (int gridCol = 0; gridCol < columns; ++gridCol)
+        {
+            const int screenCol = mBounds.col + (gridCol * width);
+
+            if (gridCol < (columns - 1))
+            {
+                screen.PutCell(screenRow, screenCol + 19, "\xe2\x94\x82", normal);   // U+2502
+            }
+
+            const int index = IndexAt(gridRow, gridCol);
+            if (index >= count)
+            {
+                continue;
+            }
+
+            const sEntry& entry = mEntries[static_cast<size_t>(index)];
+
+            sStyle style = normal;
+            if (index == mSelected)
+            {
+                if (focused == true)
+                {
+                    style = selected;
+                }
+                else
+                {
+                    style.attrs = style.attrs | wordstartui::CELL_ATTR_UNDERLINE;
+                }
+            }
+
+            std::string name = entry.name;
+            std::string suffix = FormatSize(entry.size);
+            if (entry.isDirectory == true)
+            {
+                if ((name.empty() == false) && (name.back() == '/'))
+                {
+                    name.pop_back();
+                }
+                suffix = "/";
+            }
+            const int suffixWidth = wordstartui::cUtf8Helper::TextWidth(suffix);
+
+            sRect cell;
+            cell.row = screenRow;
+            cell.col = screenCol;
+            cell.rows = 1;
+            cell.cols = 19;
+            screen.FillRect(cell, " ", style);
+            screen.PutText(screenRow, screenCol + 1, ShortenName(name, 16 - suffixWidth), style);
+            screen.PutText(screenRow, screenCol + 18 - suffixWidth, suffix, style);
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return the action resulting from opening the selected entry
 ///
 /// @brief
@@ -449,6 +690,82 @@ cFileBrowser::eAction cFileBrowser::HandleEvent(const sInputEvent& event)
     if (count == 0)
     {
         return ACTION_NONE;
+    }
+
+    if ((event.type == wordstartui::INPUT_TYPE_SPECIAL) && (mWordStar == true))
+    {
+        // Row-major grid: Right/Left move one entry, Down/Up a whole row.
+        const int column = mSelected % columns;
+        const int page = VisibleRows() * columns;
+
+        if (event.special == wordstartui::SPECIAL_KEY_ARROW_DOWN)
+        {
+            if ((mSelected + columns) < count)
+            {
+                mSelected += columns;
+            }
+            EnsureVisible();
+            return ACTION_NONE;
+        }
+        else if (event.special == wordstartui::SPECIAL_KEY_ARROW_UP)
+        {
+            if (mSelected < columns)
+            {
+                return ACTION_EXIT_TOP;
+            }
+            mSelected -= columns;
+            EnsureVisible();
+            return ACTION_NONE;
+        }
+        else if (event.special == wordstartui::SPECIAL_KEY_ARROW_RIGHT)
+        {
+            if (mSelected < (count - 1))
+            {
+                mSelected++;
+            }
+            EnsureVisible();
+            return ACTION_NONE;
+        }
+        else if (event.special == wordstartui::SPECIAL_KEY_ARROW_LEFT)
+        {
+            if (mSelected > 0)
+            {
+                mSelected--;
+            }
+            EnsureVisible();
+            return ACTION_NONE;
+        }
+        else if (event.special == wordstartui::SPECIAL_KEY_PAGE_DOWN)
+        {
+            // Same column, a screen of rows down, or its last row.
+            int target = mSelected + page;
+            if (target >= count)
+            {
+                target = (((count - 1) / columns) * columns) + column;
+                if (target >= count)
+                {
+                    target -= columns;
+                }
+                if (target < mSelected)
+                {
+                    target = mSelected;
+                }
+            }
+            mSelected = target;
+            EnsureVisible();
+            return ACTION_NONE;
+        }
+        else if (event.special == wordstartui::SPECIAL_KEY_PAGE_UP)
+        {
+            // Same column, a screen of rows up, or the first row.
+            mSelected -= page;
+            if (mSelected < 0)
+            {
+                mSelected = column;
+            }
+            EnsureVisible();
+            return ACTION_NONE;
+        }
     }
 
     if (event.type == wordstartui::INPUT_TYPE_SPECIAL)
@@ -544,7 +861,7 @@ cFileBrowser::eAction cFileBrowser::HandleEvent(const sInputEvent& event)
             int gridCol = localCol / width;
             if (gridCol < columns)
             {
-                int index = (gridCol * numRows) + gridRow;
+                int index = IndexAt(gridRow, gridCol);
                 if ((index >= 0) && (index < count))
                 {
                     mSelected = index;
