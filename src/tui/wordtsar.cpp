@@ -2067,23 +2067,18 @@ void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow, 
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
 {
-    // The opening screen uses the default terminal colors.
-    sStyle base;
-    base.fg = wordstartui::MakeDefaultColor();
-    base.bg = wordstartui::MakeDefaultColor();
-    base.attrs = wordstartui::CELL_ATTR_NONE;
+    // Panel in the menu bar colours, letters in the accelerator colour, the
+    // selected entry in the menu highlight colours.
+    sStyle base = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU);
 
-    sStyle sel = base;
-    sel.attrs = wordstartui::CELL_ATTR_INVERSE;
+    sStyle sel = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU_ACTIVE);
+    sel.attrs = wordstartui::CELL_ATTR_NONE;
 
-    // Gold, not blue -- pure blue reads poorly against a dark terminal
-    // background (this screen paints no background of its own, so it
-    // inherits whatever the user's terminal theme is). Reuses the same
-    // accent as the splash screen's logo, just above, for consistency
-    // between the two "welcome" screens.
+    sStyle selKey = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU_ACTIVE_ACCEL);
+    selKey.attrs = wordstartui::CELL_ATTR_NONE;
+
     sStyle keyStyle = base;
-    keyStyle.fg = wordstartui::MakeRgb(204, 170, 0);
-    keyStyle.attrs = wordstartui::CELL_ATTR_BOLD;
+    keyStyle.fg = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU_ACCEL).fg;
 
     sStyle disabled = base;
     disabled.attrs = wordstartui::CELL_ATTR_DIM;
@@ -2119,7 +2114,7 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
     screen.PutText(boxBottom, right, "\xe2\x94\x98", base);    // U+2518
 
     std::string header = " O P E N I N G   M E N U ";
-    screen.PutText(boxTop, (mCols - static_cast<int>(header.size())) / 2, header, base);
+    screen.PutText(boxTop, (mCols - static_cast<int>(header.size())) / 2, header, keyStyle);
 
     // Two columns: letters at columns 6 and 43, labels two columns further.
     // Item order in kOpeningItems is left-column-first (kOpeningLeftCount
@@ -2146,6 +2141,10 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
                 padded.push_back(' ');
             }
             screen.PutText(row, col - 2, padded, sel);
+            if (item.key != 0)
+            {
+                screen.PutText(row, col, std::string(1, item.key), selKey);
+            }
         }
         else
         {

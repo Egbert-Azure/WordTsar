@@ -1924,3 +1924,71 @@ TEST_CASE("TUI Opening screen - help level 4 open menu title")
     CheckCellColours(screen, 4, 9, kWs7LightBlue, kWs7Grey);
     CheckCellColours(screen, 4, 10, kWs7Black, kWs7Grey);
 }
+
+
+TEST_CASE("TUI Opening screen - help level 3 uses the palette colours")
+{
+    cWSWordTsar app;
+    EnterWs7Opening(app, 3);
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    // Row 0: title bar colours.
+    CheckCellColours(screen, 0, 37, kWs7Grey, kWs7Black);
+
+    // The box: black lines on grey, the menu name in the accelerator colour.
+    CHECK(CellAt(screen, 1, 0).textUtf8 == "\xe2\x94\x8c");
+    CheckCellColours(screen, 1, 0, kWs7Black, kWs7Grey);
+    CHECK(CellAt(screen, 1, 28).textUtf8 == "O");
+    CheckCellColours(screen, 1, 28, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 5, 79, kWs7Black, kWs7Grey);
+    CheckCellColours(screen, 5, 30, kWs7Black, kWs7Grey);
+
+    // Letters in the accelerator colour, labels black on grey.
+    CHECK(CellAt(screen, 3, 6).textUtf8 == "S");
+    CheckCellColours(screen, 3, 6, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 3, 8, kWs7Black, kWs7Grey);
+    CHECK(CellAt(screen, 2, 43).textUtf8 == "L");
+    CheckCellColours(screen, 2, 43, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 2, 45, kWs7Black, kWs7Grey);
+    CHECK(CellAt(screen, 11, 5).textUtf8 == "F");
+    CheckCellColours(screen, 11, 5, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 11, 6, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 11, 8, kWs7Black, kWs7Grey);
+
+    // An entry without an Opening action keeps the panel colours.
+    CHECK(CellAt(screen, 4, 6).textUtf8 == "N");
+    CheckCellColours(screen, 4, 6, kWs7LightBlue, kWs7Grey);
+    CHECK(CellAt(screen, 4, 8).style.bg == kWs7Grey);
+
+    // The selected entry: menu highlight colours, its letter in the
+    // highlighted hotkey colours.
+    REQUIRE(app.TestOpeningSelection() == 0);
+    CHECK(CellAt(screen, 2, 6).textUtf8 == "D");
+    CheckCellColours(screen, 2, 6, kWs7Grey, kWs7Blue);
+    CheckCellColours(screen, 2, 4, kWs7Grey, kWs7Black);
+    CheckCellColours(screen, 2, 8, kWs7Grey, kWs7Black);
+
+    // WordTsar's own entries in the bottom border.
+    std::string bottom = MenuRowText(screen, 12);
+    size_t recent = bottom.find(" G recent files ");
+    REQUIRE(recent != std::string::npos);
+    int letterCol = 0;
+    {
+        // Column of "G" counted in cells.
+        int col = 0;
+        for (; col < 80; ++col)
+        {
+            if ((CellAt(screen, 12, col).textUtf8 == "G") && (CellAt(screen, 12, col + 2).textUtf8 == "r"))
+            {
+                break;
+            }
+        }
+        letterCol = col;
+    }
+    REQUIRE(letterCol < 80);
+    CheckCellColours(screen, 12, letterCol, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 12, letterCol + 2, kWs7Black, kWs7Grey);
+}
