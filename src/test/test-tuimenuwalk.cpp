@@ -1992,3 +1992,55 @@ TEST_CASE("TUI Opening screen - help level 3 uses the palette colours")
     CheckCellColours(screen, 12, letterCol, kWs7LightBlue, kWs7Grey);
     CheckCellColours(screen, 12, letterCol + 2, kWs7Black, kWs7Grey);
 }
+
+
+namespace
+{
+
+// True when no cell in rows first to last carries the bold attribute.
+bool NoBoldInRows(const wordstartui::cScreen& screen, int first, int last)
+{
+    bool clean = true;
+    for (int row = first; row <= last; ++row)
+    {
+        for (int col = 0; col < 80; ++col)
+        {
+            const wordstartui::sCell& cell = CellAt(screen, row, col);
+            if ((cell.style.attrs & wordstartui::CELL_ATTR_BOLD) != 0U)
+            {
+                INFO("bold cell ", row, ",", col, " \"", cell.textUtf8, "\"");
+                CHECK(false);
+                clean = false;
+            }
+        }
+    }
+    return clean;
+}
+
+}
+
+
+TEST_CASE("TUI menu bar - menu titles, highlighted entries and hotkeys carry no bold")
+{
+    cWSWordTsar app;
+    app.TestBuildMenus();
+    const wordstartui::cMenuBar& menu = app.TestGetMenu();
+
+    for (const wordstartui::sMenuItem& item : menu.GetItems())
+    {
+        if (item.entries.empty() == true)
+        {
+            continue;
+        }
+        INFO("edit-screen menu: ", item.title);
+        wordstartui::cScreen screen = DrawOpenMenu(menu, item.hotKey);
+        CHECK(NoBoldInRows(screen, 1, 24) == true);
+    }
+
+    for (const wordstartui::sMenuItem& item : app.TestGetOpeningMenu().GetItems())
+    {
+        INFO("Opening menu: ", item.title);
+        wordstartui::cScreen screen = DrawOpenMenu(app.TestGetOpeningMenu(), item.hotKey);
+        CHECK(NoBoldInRows(screen, 1, 24) == true);
+    }
+}

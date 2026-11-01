@@ -880,7 +880,6 @@ void cMenuBar::Draw(cScreen& screen, const cTheme& theme)
             {
                 sStyle hotStyle = rowStyle;
                 hotStyle.fg = accel.fg;
-                hotStyle.attrs = hotStyle.attrs | CELL_ATTR_BOLD;
                 if (index == highlight)
                 {
                     hotStyle = activeAccel;

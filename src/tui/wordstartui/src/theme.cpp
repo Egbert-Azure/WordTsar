@@ -283,9 +283,9 @@ void cTheme::LoadPalette(const sThemePalette& p)
     mStyles[THEME_ROLE_EDITOR_STATUS] = StyleFrom(p.statusFg, p.statusBg, CELL_ATTR_BOLD);
     mStyles[THEME_ROLE_EDITOR_BLOCK] = StyleFrom(p.blockFg, p.blockBg, CELL_ATTR_INVERSE);
     mStyles[THEME_ROLE_MENU] = StyleFrom(p.menuFg, p.menuBg, CELL_ATTR_NONE);
-    mStyles[THEME_ROLE_MENU_ACTIVE] = StyleFrom(p.menuActiveFg, p.menuActiveBg, CELL_ATTR_BOLD);
-    mStyles[THEME_ROLE_MENU_ACCEL] = StyleFrom(p.menuAccelFg, p.menuAccelBg, CELL_ATTR_BOLD);
-    mStyles[THEME_ROLE_MENU_ACTIVE_ACCEL] = StyleFrom(p.menuActiveAccelFg, p.menuActiveAccelBg, CELL_ATTR_BOLD);
+    mStyles[THEME_ROLE_MENU_ACTIVE] = StyleFrom(p.menuActiveFg, p.menuActiveBg, CELL_ATTR_NONE);
+    mStyles[THEME_ROLE_MENU_ACCEL] = StyleFrom(p.menuAccelFg, p.menuAccelBg, CELL_ATTR_NONE);
+    mStyles[THEME_ROLE_MENU_ACTIVE_ACCEL] = StyleFrom(p.menuActiveAccelFg, p.menuActiveAccelBg, CELL_ATTR_NONE);
     mStyles[THEME_ROLE_DIALOG] = StyleFrom(p.menuFg, p.menuBg, CELL_ATTR_NONE);
     mStyles[THEME_ROLE_DIALOG_TITLE] = StyleFrom(p.titleFg, p.titleBg, CELL_ATTR_BOLD);
     mStyles[THEME_ROLE_DIALOG_FOCUS] = StyleFrom(p.menuActiveFg, p.menuActiveBg, CELL_ATTR_BOLD);
