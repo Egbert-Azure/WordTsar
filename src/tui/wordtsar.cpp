@@ -1353,6 +1353,18 @@ void cWSWordTsar::BuildMenus(void)
 
     // ------------------------------- Help -------------------------------
     int help = mMenu.AddMenu("Help", 'H');
+    mMenu.AddSubItem(help, "&Help  F1", [this](void)
+    {
+        // Same as pressing F1 in the editor.
+        IInputHandler* input = mEditor->GetInput();
+        if (input != nullptr)
+        {
+            input->HandleSpecialKey(SPECIAL_F1);
+        }
+        CheckCommandSignals();
+    });
+    mMenu.AddSubItem(help, "&Change Help Level...", [this](void) { mEditor->PromptHelpLevel(); });
+    mMenu.AddSeparator(help);
     mMenu.AddSubItem(help, "&About WordTsar", [this](void) { ShowAboutWordTsar(); });
 }
 
@@ -1414,8 +1426,8 @@ void cWSWordTsar::BuildOpeningMenus(void)
     mOpeningMenu.AddSubItem(additional, "&Star Exchange  AS", none, false);
 
     int help = mOpeningMenu.AddMenu("Help", 'H');
-    mOpeningMenu.AddSubItem(help, "&Help  F1", none, false);
-    mOpeningMenu.AddSubItem(help, "&Change Help Level...", none, false);
+    mOpeningMenu.AddSubItem(help, "&Help  F1", [this](void) { ShowOpeningHelp(); });
+    mOpeningMenu.AddSubItem(help, "&Change Help Level...", [this](void) { mEditor->PromptHelpLevel(); });
     mOpeningMenu.AddSeparator(help);
     mOpeningMenu.AddSubItem(help, "&About WordTsar", run(eOpeningAction::ABOUT));
 }

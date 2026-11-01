@@ -2549,7 +2549,27 @@ void cWSEditorCtrl::GotoPage(void)
 /// @return nothing
 ///
 /// @brief
-/// Prompt for and apply a new WordStar 7 help level (F1 F1). Per the real
+/// F1 F1: prompt for a new help level, except at level 4, where the level
+/// is changed through Help > Change Help Level.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::ChangeHelpLevel(void)
+{
+    if (mHelpLevel == 4)
+    {
+        return;
+    }
+
+    PromptHelpLevel();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Prompt for and apply a new WordStar 7 help level. Per the real
 /// manual's "Change Help Level" reference:
 ///   4 - Pull-down menu bar shown; all prompts displayed. Looks the same
 ///       as 0/1 here since the TUI's menu bar is always shown regardless
@@ -2561,7 +2581,7 @@ void cWSEditorCtrl::GotoPage(void)
 ///       status line at level 0).
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cWSEditorCtrl::ChangeHelpLevel(void)
+void cWSEditorCtrl::PromptHelpLevel(void)
 {
     if (!mHost)
     {

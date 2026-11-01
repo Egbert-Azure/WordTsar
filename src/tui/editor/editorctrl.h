@@ -91,6 +91,8 @@ public:
     void GotoPage(void) override;
     void DeleteToChar(void) override;
     void ChangeHelpLevel(void) override;
+    // Prompt for and apply a help level 0-4 (Help > Change Help Level).
+    void PromptHelpLevel(void);
 
     // ---- Pure virtual: formatting and layout dialogs ----
     void SelectFont(void) override;

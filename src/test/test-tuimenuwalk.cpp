@@ -24,8 +24,12 @@
 #include "src/tui/wordtsar.h"
 #include "src/tui/editor/editorctrl.h"
 #include "src/tui/wordstartui/src/menubar.h"
+#include "src/tui/wordstartui/src/dialog.h"
+#include "src/tui/dialogs/dialoghost.h"
+#include "src/input/wordtsarinput.h"
 
 #include <cctype>
+#include <deque>
 #include <string>
 
 
@@ -810,5 +814,192 @@ TEST_CASE("TUI Opening screen - Opening menu entries run the panel actions")
         CHECK(app.TestOpeningBrowserFocus() == false);
         CHECK(app.TestInOpening() == true);
         CHECK(app.TestQuitRequested() == false);
+    }
+}
+
+
+namespace
+{
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief Dialog host that feeds queued events to modal dialogs, cancels
+///        when the queue is empty, and counts the dialogs it runs.
+///
+/////////////////////////////////////////////////////////////////////////////
+class cCountingHost : public iWSDialogHost
+{
+public:
+    void QueueText(const std::string& text)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_TEXT;
+        event.textUtf8 = text;
+        mEvents.push_back(event);
+    }
+
+    void QueueEnter(void)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_SPECIAL;
+        event.special = wordstartui::SPECIAL_KEY_ENTER;
+        mEvents.push_back(event);
+    }
+
+    void HostRunModal(wordstartui::cDialog& dialog) override
+    {
+        mModals = mModals + 1;
+        dialog.FocusFirst();
+        while (dialog.GetResult() == wordstartui::DIALOG_RESULT_NONE)
+        {
+            if (mEvents.empty() == true)
+            {
+                dialog.SetResult(wordstartui::DIALOG_RESULT_CANCEL);
+                break;
+            }
+            dialog.HandleEvent(mEvents.front());
+            mEvents.pop_front();
+        }
+    }
+
+    void HostRunModalRaw(
+        const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
+        const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
+    {
+        (void)draw;
+        (void)handle;
+        mModals = mModals + 1;
+    }
+
+    const wordstartui::cTheme& HostTheme(void) override
+    {
+        return mTheme;
+    }
+
+    wordstartui::sTerminalSize HostScreenSize(void) override
+    {
+        wordstartui::sTerminalSize size;
+        size.rows = 25;
+        size.cols = 80;
+        return size;
+    }
+
+    wordstartui::sTerminalCapabilities HostCapabilities(void) override
+    {
+        wordstartui::sTerminalCapabilities caps{};
+        return caps;
+    }
+
+    void HostShowLoadProgress(const std::string& message, int percent) override
+    {
+        (void)message;
+        (void)percent;
+    }
+
+    void HostHideLoadProgress(void) override
+    {
+    }
+
+    int mModals = 0;
+
+private:
+    std::deque<wordstartui::sInputEvent> mEvents;
+    wordstartui::cTheme mTheme;
+};
+
+}
+
+
+TEST_CASE("TUI help level - F1 F1 prompts for a level below 4 only")
+{
+    cWSWordTsar app;
+    cWSEditorCtrl* editor = app.TestGetEditor();
+    cCountingHost host;
+    editor->SetDialogHost(&host);
+    cWordStarInput input(editor);
+
+    SUBCASE("level 4")
+    {
+        editor->mHelpLevel = 4;
+        input.HandleSpecialKey(SPECIAL_F1);
+        input.HandleSpecialKey(SPECIAL_F1);
+        CHECK(host.mModals == 0);
+        CHECK(editor->mHelpLevel == 4);
+    }
+
+    SUBCASE("level 3")
+    {
+        editor->mHelpLevel = 3;
+        input.HandleSpecialKey(SPECIAL_F1);
+        input.HandleSpecialKey(SPECIAL_F1);
+        CHECK(host.mModals == 1);
+        CHECK(editor->mHelpLevel == 3);
+    }
+}
+
+
+TEST_CASE("TUI Opening screen - Help menu entries")
+{
+    cWSWordTsar app;
+    cWSEditorCtrl* editor = app.TestGetEditor();
+    cCountingHost host;
+    editor->SetDialogHost(&host);
+    editor->mHelpLevel = 4;
+    app.TestEnterOpening();
+
+    const std::vector<wordstartui::sMenuItem>& items = app.TestGetOpeningMenu().GetItems();
+    REQUIRE(items.size() == 4);
+    REQUIRE(items[3].entries.size() == 4);
+    CHECK(items[3].entries[0].enabled == true);
+    CHECK(static_cast<bool>(items[3].entries[0].callback) == true);
+    CHECK(items[3].entries[1].enabled == true);
+
+    SUBCASE("Change Help Level sets the level")
+    {
+        host.QueueText("3");
+        host.QueueEnter();
+        app.TestHandleEvent(OpeningText("h"));
+        app.TestHandleEvent(OpeningText("c"));
+        CHECK(host.mModals == 1);
+        CHECK(editor->mHelpLevel == 3);
+        CHECK(app.TestGetOpeningMenu().IsOpen() == false);
+        CHECK(app.TestInOpening() == true);
+    }
+}
+
+
+TEST_CASE("TUI edit screen - Help menu has Help and Change Help Level")
+{
+    cWSWordTsar app;
+    app.TestBuildMenus();
+    const std::vector<wordstartui::sMenuItem>& items = app.TestGetMenu().GetItems();
+    REQUIRE(items.empty() == false);
+    const wordstartui::sMenuItem& help = items.back();
+    REQUIRE(help.title == "Help");
+    REQUIRE(help.entries.size() == 4);
+    CHECK(help.entries[0].title == "Help");
+    CHECK(help.entries[0].shortcut == "F1");
+    CHECK(help.entries[0].enabled == true);
+    CHECK(help.entries[1].title == "Change Help Level...");
+    CHECK(help.entries[1].enabled == true);
+    CHECK(help.entries[2].isSeparator == true);
+    CHECK(help.entries[3].title == "About WordTsar");
+
+    SUBCASE("Change Help Level sets the level")
+    {
+        cWSEditorCtrl* editor = app.TestGetEditor();
+        cCountingHost host;
+        editor->SetDialogHost(&host);
+        editor->mHelpLevel = 3;
+        app.TestEnterOpening();
+        app.TestHandleEvent(OpeningText("s"));
+        REQUIRE(app.TestInEditor() == true);
+
+        host.QueueText("4");
+        host.QueueEnter();
+        app.TestHandleEvent(OpeningAltText("h"));
+        app.TestHandleEvent(OpeningText("c"));
+        CHECK(host.mModals == 1);
+        CHECK(editor->mHelpLevel == 4);
     }
 }
