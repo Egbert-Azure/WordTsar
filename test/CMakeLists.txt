@@ -101,6 +101,7 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     ../src/test/test-tocindexgenerator.cpp
     ../src/test/test-tuifontutils.cpp
     ../src/test/test-config.cpp
+    ../src/test/test-abouttext.cpp
     ../src/test/test-wordstarinput.cpp
     ../src/test/test-isolation.cpp
 
