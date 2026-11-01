@@ -15563,3 +15563,61 @@ TEST_CASE("GUI editor - clipboard copy writes plain text with LF line endings")
     editor.ClipboardCopy();
     CHECK(QApplication::clipboard()->text().toStdString() == expected);
 }
+
+
+TEST_CASE("GUI editor - an export format leaves the save format unchanged")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-exportfmt-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    SUBCASE("a text file saved as .rtf, then with an unknown extension")
+    {
+        auto path = dir / "notes.def";
+        WriteFileBytes(path, "key=value\r\n");
+        REQUIRE(editor.LoadFile(path.string()));
+
+        REQUIRE(editor.SaveFile((dir / "x.rtf").string()));
+        REQUIRE(editor.SaveFile((dir / "y.def").string()));
+
+        std::string expected = "key=value\r\n";
+        CHECK(ReadFileBytes(dir / "y.def").substr(0, expected.size()) == expected);
+    }
+
+    SUBCASE("a text file saved as .docx, then with an unknown extension")
+    {
+        auto path = dir / "notes.def";
+        WriteFileBytes(path, "key=value\r\n");
+        REQUIRE(editor.LoadFile(path.string()));
+
+        REQUIRE(editor.SaveFile((dir / "x.docx").string()));
+        REQUIRE(editor.SaveFile((dir / "y.def").string()));
+
+        std::string expected = "key=value\r\n";
+        CHECK(ReadFileBytes(dir / "y.def").substr(0, expected.size()) == expected);
+    }
+
+    SUBCASE("a WordStar file saved as .rtf, then with an unknown extension")
+    {
+        doc->Insert("Hello\r");
+        REQUIRE(editor.SaveFile((dir / "doc.ws").string()));
+        REQUIRE(editor.LoadFile((dir / "doc.ws").string()));
+
+        REQUIRE(editor.SaveFile((dir / "x.rtf").string()));
+        REQUIRE(editor.SaveFile((dir / "y.def").string()));
+
+        std::string bytes = ReadFileBytes(dir / "y.def");
+        REQUIRE(bytes.empty() == false);
+        CHECK(static_cast<unsigned char>(bytes[0]) == 0x1D);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}

@@ -1313,6 +1313,7 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
 
     cFile* fileWriter = nullptr;
     bool savesAsText = false;
+    bool isExport = false;
 
     if (ext == ".ws" || ext == ".ws7" || ext == ".ws4")
     {
@@ -1321,6 +1322,7 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
     else if (ext == ".rtf")
     {
         fileWriter = new cRTFFile(this);
+        isExport = true;
     }
     else if (ext == ".txt" || mDocument->IsTextFile())
     {
@@ -1341,8 +1343,12 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
 
     if (success)
     {
-        // The format written is the format of the next save to an unknown extension
-        mDocument->SetTextFile(savesAsText);
+        // The format written is the format of the next save to an unknown
+        // extension; an export format leaves it unchanged
+        if (isExport == false)
+        {
+            mDocument->SetTextFile(savesAsText);
+        }
 
         mFileName = filepath.filename().string();
         mFileDir = filepath.parent_path().string();
