@@ -1448,6 +1448,32 @@ TEST_CASE("TUI Opening screen - help level 3 header and bars")
 }
 
 
+namespace
+{
+
+wordstartui::cScreen DrawLevel3Opening(cWSWordTsar& app)
+{
+    app.TestGetEditor()->mHelpLevel = 3;
+    app.TestEnterOpening();
+    app.TestSetOpeningDirectory("/");
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+    return screen;
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - help level 3 C label reads protect/unprotect a file")
+{
+    cWSWordTsar app;
+    wordstartui::cScreen screen = DrawLevel3Opening(app);
+    CHECK(ScreenHasText(screen, "C protect/unprotect a file") == true);
+}
+
+
 
 namespace
 {

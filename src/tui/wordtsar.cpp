@@ -113,7 +113,7 @@ const sOpeningItem kOpeningItems[] =
     // Right column -- 10 rows, matches real WS7 exactly, plus two
     // WordTsar-only rows appended at the end (no letter -- see above).
     { 'L', "change drive/directory", true,  eOpeningAction::CHANGE_DIRECTORY },
-    { 'C', "protect/unprotect",      false, eOpeningAction::PROTECT_UNPROTECT },
+    { 'C', "protect/unprotect a file", false, eOpeningAction::PROTECT_UNPROTECT },
     { 'E', "rename a file",          false, eOpeningAction::RENAME_FILE },
     { 'O', "copy a file",            false, eOpeningAction::COPY_FILE },
     { 'Y', "delete a file",          false, eOpeningAction::DELETE_FILE },
