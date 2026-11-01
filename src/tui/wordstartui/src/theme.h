@@ -38,6 +38,7 @@ struct sThemePalette
     sColor menuFg, menuBg;              // menu bar
     sColor menuActiveFg, menuActiveBg;  // menu highlight (focus/selection accent)
     sColor menuAccelFg, menuAccelBg;    // menu accelerator (alert accent)
+    sColor menuActiveAccelFg, menuActiveAccelBg;   // accelerator on a highlighted entry
     sColor titleFg, titleBg;            // title bar
     sColor statusFg, statusBg;          // status bar
     sColor helpFg, helpBg;              // help panel

@@ -817,6 +817,8 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
     palette.menuActiveBg = rgb(config.mTuiMenuHighlightBackground);
     palette.menuAccelFg = rgb(config.mTuiMenuAcceleratorForeground);
     palette.menuAccelBg = rgb(config.mTuiMenuBarBackground);
+    palette.menuActiveAccelFg = rgb(config.mTuiMenuHighlightAcceleratorForeground);
+    palette.menuActiveAccelBg = rgb(config.mTuiMenuHighlightAcceleratorBackground);
     palette.titleFg = rgb(config.mTuiTitleBarForeground);
     palette.titleBg = rgb(config.mTuiTitleBarBackground);
     palette.statusFg = rgb(config.mTuiStatusBarForeground);

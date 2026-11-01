@@ -740,6 +740,7 @@ void cMenuBar::Draw(cScreen& screen, const cTheme& theme)
     sStyle style = theme.GetStyle(THEME_ROLE_MENU);
     sStyle active = theme.GetStyle(THEME_ROLE_MENU_ACTIVE);
     sStyle accel = theme.GetStyle(THEME_ROLE_MENU_ACCEL);
+    sStyle activeAccel = theme.GetStyle(THEME_ROLE_MENU_ACTIVE_ACCEL);
 
     screen.FillRect(mBounds, " ", style);
 
@@ -840,6 +841,10 @@ void cMenuBar::Draw(cScreen& screen, const cTheme& theme)
                 sStyle hotStyle = rowStyle;
                 hotStyle.fg = accel.fg;
                 hotStyle.attrs = hotStyle.attrs | CELL_ATTR_BOLD;
+                if (index == highlight)
+                {
+                    hotStyle = activeAccel;
+                }
                 std::string letter = entry.title.substr(static_cast<size_t>(entry.hotKeyPos), 1);
                 screen.PutCell(entryRow, box.col + 2 + entry.hotKeyPos, letter, hotStyle);
             }

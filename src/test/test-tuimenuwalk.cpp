@@ -28,6 +28,7 @@
 #include "src/tui/dialogs/dialoghost.h"
 #include "src/input/wordtsarinput.h"
 #include "src/tui/dialogs/filebrowser.h"
+#include "src/core/utils/config.h"
 
 #include <algorithm>
 #include <cctype>
@@ -1731,4 +1732,96 @@ TEST_CASE("TUI menu bar - edit-screen pull-downs keep the shortcut at the border
             CHECK(CellRun(screen, 3 + static_cast<int>(index), right - width, width) == entry.shortcut);
         }
     }
+}
+
+
+namespace
+{
+
+wordstartui::cScreen DrawOpenMenuWithTheme(wordstartui::cMenuBar menu, char letter, const wordstartui::cTheme& theme)
+{
+    wordstartui::sRect bounds{};
+    bounds.row = 1;
+    bounds.col = 0;
+    bounds.rows = 1;
+    bounds.cols = 80;
+    menu.SetBounds(bounds);
+    menu.HandleEvent(MenuAlt(letter));
+    REQUIRE(menu.IsOpen() == true);
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    menu.Draw(screen, theme);
+    return screen;
+}
+
+const wordstartui::sCell& CellAt(const wordstartui::cScreen& screen, int row, int col)
+{
+    const wordstartui::sCell* cell = screen.GetCell(row, col);
+    REQUIRE(cell != nullptr);
+    return *cell;
+}
+
+}
+
+
+TEST_CASE("TUI menu bar - the highlighted entry's hotkey uses the highlighted hotkey colours")
+{
+    wordstartui::sThemePalette palette = wordstartui::cTheme::GetDefaultPalette();
+    palette.menuFg = wordstartui::MakeRgb(0, 0, 0);
+    palette.menuBg = wordstartui::MakeRgb(170, 170, 170);
+    palette.menuAccelFg = wordstartui::MakeRgb(85, 85, 255);
+    palette.menuAccelBg = wordstartui::MakeRgb(170, 170, 170);
+    palette.menuActiveFg = wordstartui::MakeRgb(170, 170, 170);
+    palette.menuActiveBg = wordstartui::MakeRgb(0, 0, 0);
+    palette.menuActiveAccelFg = wordstartui::MakeRgb(11, 12, 13);
+    palette.menuActiveAccelBg = wordstartui::MakeRgb(14, 15, 16);
+    wordstartui::cTheme theme;
+    theme.LoadPalette(palette);
+
+    wordstartui::cMenuBar menu;
+    int file = menu.AddMenu("File", 'f');
+    menu.AddSubItem(file, "&Alpha", [](void) {});
+    menu.AddSubItem(file, "&Beta", [](void) {});
+
+    wordstartui::cScreen screen = DrawOpenMenuWithTheme(menu, 'f', theme);
+
+    // Highlighted entry on row 3: its letter in the new pair, the rest in the
+    // menu highlight colours.
+    const wordstartui::sCell& hot = CellAt(screen, 3, 3);
+    CHECK(hot.textUtf8 == "A");
+    CHECK(hot.style.fg == wordstartui::MakeRgb(11, 12, 13));
+    CHECK(hot.style.bg == wordstartui::MakeRgb(14, 15, 16));
+    const wordstartui::sCell& rest = CellAt(screen, 3, 4);
+    CHECK(rest.style.fg == wordstartui::MakeRgb(170, 170, 170));
+    CHECK(rest.style.bg == wordstartui::MakeRgb(0, 0, 0));
+
+    // Other entry on row 4: its letter in the accelerator colour on the menu.
+    const wordstartui::sCell& other = CellAt(screen, 4, 3);
+    CHECK(other.textUtf8 == "B");
+    CHECK(other.style.fg == wordstartui::MakeRgb(85, 85, 255));
+    CHECK(other.style.bg == wordstartui::MakeRgb(170, 170, 170));
+}
+
+
+TEST_CASE("TUI Opening screen - WordStar 7 colours for the highlighted hotkey in a pull-down")
+{
+    cWSWordTsar app;
+    cConfig config;
+    config.ApplyTUIPalette(cConfig::GetTUIPalettes().back());
+    app.TestApplyConfig(config);
+    app.TestGetEditor()->mHelpLevel = 4;
+    app.TestEnterOpening();
+    REQUIRE(app.TestHandleEvent(OpeningText("f")) == true);
+    REQUIRE(app.TestGetOpeningMenu().IsOpen() == true);
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    // "New" is highlighted; its hotkey letter "w" sits at column 4.
+    const wordstartui::sCell& hot = CellAt(screen, 3, 4);
+    CHECK(hot.textUtf8 == "w");
+    CHECK(hot.style.fg == wordstartui::MakeRgb(170, 170, 170));
+    CHECK(hot.style.bg == wordstartui::MakeRgb(0, 0, 170));
 }

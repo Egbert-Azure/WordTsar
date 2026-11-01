@@ -92,6 +92,7 @@ public:
     void TestBuildMenus(void) { BuildMenus(); }
     const wordstartui::cMenuBar& TestGetMenu(void) const { return mMenu; }
     cWSEditorCtrl* TestGetEditor(void) { return mEditor; }
+    void TestApplyConfig(cConfig& config) { ApplyConfig(config, true); }
     std::string TestTitleText(void) const { return TitleText(); }
     // Load a file the way the command line and the Opening screen do.
     void TestOpenFromOpening(const std::string& path);

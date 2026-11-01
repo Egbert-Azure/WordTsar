@@ -240,6 +240,8 @@ sThemePalette cTheme::GetDefaultPalette(void)
     palette.menuActiveBg = MakePaletteColor(COLOR_BLUE);
     palette.menuAccelFg = MakePaletteColor(COLOR_RED);
     palette.menuAccelBg = MakePaletteColor(COLOR_LIGHT_GRAY);
+    palette.menuActiveAccelFg = MakePaletteColor(COLOR_YELLOW);
+    palette.menuActiveAccelBg = MakePaletteColor(COLOR_BLUE);
     palette.titleFg = MakePaletteColor(COLOR_WHITE);
     palette.titleBg = MakePaletteColor(COLOR_BLUE);
     palette.statusFg = MakePaletteColor(COLOR_WHITE);
@@ -283,6 +285,7 @@ void cTheme::LoadPalette(const sThemePalette& p)
     mStyles[THEME_ROLE_MENU] = StyleFrom(p.menuFg, p.menuBg, CELL_ATTR_NONE);
     mStyles[THEME_ROLE_MENU_ACTIVE] = StyleFrom(p.menuActiveFg, p.menuActiveBg, CELL_ATTR_BOLD);
     mStyles[THEME_ROLE_MENU_ACCEL] = StyleFrom(p.menuAccelFg, p.menuAccelBg, CELL_ATTR_BOLD);
+    mStyles[THEME_ROLE_MENU_ACTIVE_ACCEL] = StyleFrom(p.menuActiveAccelFg, p.menuActiveAccelBg, CELL_ATTR_BOLD);
     mStyles[THEME_ROLE_DIALOG] = StyleFrom(p.menuFg, p.menuBg, CELL_ATTR_NONE);
     mStyles[THEME_ROLE_DIALOG_TITLE] = StyleFrom(p.titleFg, p.titleBg, CELL_ATTR_BOLD);
     mStyles[THEME_ROLE_DIALOG_FOCUS] = StyleFrom(p.menuActiveFg, p.menuActiveBg, CELL_ATTR_BOLD);
