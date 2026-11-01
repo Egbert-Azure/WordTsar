@@ -28,6 +28,7 @@
 #include "src/tui/dialogs/dialoghost.h"
 #include "src/tui/dialogs/filebrowser.h"
 #include "src/core/include/config.h"
+#include "src/core/utils/abouttext.h"
 
 #include <chrono>
 #include <string>
@@ -122,6 +123,18 @@ public:
         mCols = screen.GetCols();
         DrawOpeningMenu(screen);
     }
+    // Startup screen with fixed system values instead of the running system's.
+    void TestSetSystemInfo(const abouttext::sSystemInfo& info)
+    {
+        mStartupSystem = info;
+        mStartupSystemKnown = true;
+    }
+    void TestDrawStartup(wordstartui::cScreen& screen)
+    {
+        mRows = screen.GetRows();
+        mCols = screen.GetCols();
+        DrawStartupScreen(screen);
+    }
 #endif
 
     // ---- iWSDialogHost ----
@@ -170,7 +183,7 @@ private:
     // Present the character-style selector and apply the chosen style.
     void SelectStyle(void);
 
-    void DrawSplash(wordstartui::cScreen& screen);
+    void DrawStartupScreen(wordstartui::cScreen& screen);
     void DrawOpeningMenu(wordstartui::cScreen& screen);
     void DrawOpeningBars(wordstartui::cScreen& screen);
     void DrawOpeningPanel(wordstartui::cScreen& screen);
@@ -244,6 +257,8 @@ private:
     eAppMode mMode;            // splash / opening menu / editor
     int mSplashFrames;         // frames the splash has been shown
     bool mHaveFileArg;         // a file was given on the command line
+    abouttext::sSystemInfo mStartupSystem;   // system values shown on the startup screen
+    bool mStartupSystemKnown;                // mStartupSystem has been filled
     wsui::cFileBrowser mBrowser;  // file picker on the opening screen
     bool mOpeningBrowserFocus;    // true when the browser has focus (not the menu)
     bool mOpeningListActive;      // true when arrows have activated the list without focus

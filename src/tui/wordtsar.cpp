@@ -84,6 +84,45 @@ constexpr int SPLASH_TICKS = 12;
 // Status message for a menu entry or letter WordTsar does not implement.
 const char* const kNotAvailableMessage = "Not available in WordTsar";
 
+// Text wrapped at spaces into lines of at most width columns; a word wider
+// than width is cut.
+std::vector<std::string> WrapToWidth(const std::string& text, int width)
+{
+    std::vector<std::string> lines;
+    if (width < 1)
+    {
+        return lines;
+    }
+
+    std::string line;
+    size_t start = 0;
+    while (start <= text.size())
+    {
+        size_t end = text.find(' ', start);
+        if (end == std::string::npos)
+        {
+            end = text.size();
+        }
+        std::string word = wordstartui::cUtf8Helper::FitWidth(text.substr(start, end - start), width);
+        std::string joined = line.empty() ? word : (line + " " + word);
+        if ((line.empty() == false) && (wordstartui::cUtf8Helper::TextWidth(joined) > width))
+        {
+            lines.push_back(line);
+            line = word;
+        }
+        else
+        {
+            line = joined;
+        }
+        start = end + 1;
+    }
+    if (line.empty() == false)
+    {
+        lines.push_back(line);
+    }
+    return lines;
+}
+
 struct sOpeningItem
 {
     char key;           // typed hotkey
@@ -170,6 +209,7 @@ cWSWordTsar::cWSWordTsar(void)
     mSplashFrames = 0;
     mBrowser.SetWordStarLayout(true);
     mHaveFileArg = false;
+    mStartupSystemKnown = false;
     mOpeningBrowserFocus = false;
     mOpeningListActive = false;
     mOpeningWantPrint = false;
@@ -1813,7 +1853,7 @@ void cWSWordTsar::Draw(cScreen& screen, const cTheme& theme)
 {
     if (mMode == APP_SPLASH)
     {
-        DrawSplash(screen);
+        DrawStartupScreen(screen);
 
         mSplashFrames++;
         if (mSplashFrames >= SPLASH_TICKS)
@@ -1846,52 +1886,135 @@ void cWSWordTsar::Draw(cScreen& screen, const cTheme& theme)
 /// @return nothing
 ///
 /// @brief
-/// Draw the startup splash banner.
+/// Draw the startup screen. Row 0 is a bar of upper half blocks with the
+/// name centred. Below it, each separated by a blank row: the product block;
+/// a separator, 70 % of the width, followed by the system block, which
+/// starts three columns inside the separator; a separator, a blank row and
+/// the technology block; the legal block. Lines are centred and wrapped to
+/// leave one blank column on each side. A block that does not fit in full
+/// is left out together with every block after it. Bars are in the title
+/// bar foreground, everything else in the editor colours.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cWSWordTsar::DrawSplash(cScreen& screen)
+void cWSWordTsar::DrawStartupScreen(cScreen& screen)
 {
-    sStyle back;
-    back.fg = wordstartui::MakeRgb(204, 170, 0);
-    back.bg = wordstartui::MakeRgb(0, 0, 0);
-    back.attrs = wordstartui::CELL_ATTR_NONE;
+    sStyle body = GetTheme().GetStyle(wordstartui::THEME_ROLE_EDITOR);
+    body.attrs = wordstartui::CELL_ATTR_NONE;
+
+    sStyle bar = body;
+    bar.fg = mTitleFg;
 
     sRect full;
     full.row = 0;
     full.col = 0;
     full.rows = mRows;
     full.cols = mCols;
-    screen.FillRect(full, " ", back);
+    screen.FillRect(full, " ", body);
 
-    sStyle bold = back;
-    bold.attrs = wordstartui::CELL_ATTR_BOLD;
-
-    // Echoes the GUI splash's own cover-page layout (letter-spaced wordmark,
-    // thin rule, "FOR MACOS" subtitle) rather than the old boxed "MM" logo --
-    // a terminal has no way to show that cover's actual gear photo (no
-    // inline-image protocol in a plain terminal), but the same spaced-caps
-    // title treatment already used for the Opening Menu banner gets close.
-    std::string wordmark = "W O R D T S A R";
-    std::string subtitle = "F O R   M A C O S";
-
-    std::string rule;
-    for (size_t i = 0; i < wordmark.size(); ++i)
+    if ((mRows < 1) || (mCols < 1))
     {
-        rule += "\xe2\x94\x80"; // U+2500 BOX DRAWINGS LIGHT HORIZONTAL
+        return;
     }
 
-    int titleRow = (mRows / 2) - 3;
-    if (titleRow < 0)
+    auto barRow = [&](int row, int col, int cols)
     {
-        titleRow = 0;
+        sRect line;
+        line.row = row;
+        line.col = col;
+        line.rows = 1;
+        line.cols = cols;
+        screen.FillRect(line, "\xe2\x96\x80", bar);   // U+2580 UPPER HALF BLOCK
+    };
+
+    barRow(0, 0, mCols);
+    const std::string name = " WordTsar ";
+    int nameCol = std::max(0, (mCols - wordstartui::cUtf8Helper::TextWidth(name)) / 2);
+    screen.PutText(0, nameCol, name, body);
+
+    const int textWidth = std::max(1, mCols - 2);
+    const int sepWidth = (mCols * 7) / 10;
+    const int sepCol = (mCols - sepWidth) / 2;
+
+    // One screen row of a block: a text line, a blank row or a separator.
+    struct sRow
+    {
+        enum eKind { TEXT, BLANK, SEPARATOR } kind;
+        std::string text;
+        int col;
+    };
+
+    auto centred = [&](const std::vector<std::string>& lines, std::vector<sRow>& out)
+    {
+        for (const std::string& line : lines)
+        {
+            for (const std::string& piece : WrapToWidth(line, textWidth))
+            {
+                int col = std::max(0, (mCols - wordstartui::cUtf8Helper::TextWidth(piece)) / 2);
+                out.push_back({ sRow::TEXT, piece, col });
+            }
+        }
+    };
+
+    if (mStartupSystemKnown == false)
+    {
+        mStartupSystem = abouttext::QuerySystemInfo();
+        mStartupSystemKnown = true;
     }
 
-    screen.PutText(titleRow, (mCols - static_cast<int>(wordmark.size())) / 2, wordmark, bold);
-    screen.PutText(titleRow + 1, (mCols - static_cast<int>(wordmark.size())) / 2, rule, back);
-    screen.PutText(titleRow + 3, (mCols - static_cast<int>(subtitle.size())) / 2, subtitle, back);
+    std::vector<std::vector<sRow>> blocks(4);
 
-    std::string version = std::string(FULLVERSION_STRING);
-    screen.PutText(titleRow + 5, (mCols - static_cast<int>(version.size())) / 2, version, back);
+    blocks[0].push_back({ sRow::BLANK, "", 0 });
+    centred(abouttext::ProductLines(), blocks[0]);
+
+    blocks[1].push_back({ sRow::BLANK, "", 0 });
+    blocks[1].push_back({ sRow::SEPARATOR, "", 0 });
+    {
+        std::vector<sRow> system;
+        centred(abouttext::SystemLines(mStartupSystem, mCols, mRows), system);
+        int widest = 0;
+        for (const sRow& row : system)
+        {
+            widest = std::max(widest, wordstartui::cUtf8Helper::TextWidth(row.text));
+        }
+        const int leftCol = sepCol + 3;
+        for (sRow& row : system)
+        {
+            if (leftCol + widest <= mCols - 1)
+            {
+                row.col = leftCol;
+            }
+            blocks[1].push_back(row);
+        }
+    }
+
+    blocks[2].push_back({ sRow::BLANK, "", 0 });
+    blocks[2].push_back({ sRow::SEPARATOR, "", 0 });
+    blocks[2].push_back({ sRow::BLANK, "", 0 });
+    centred(abouttext::TechnologyLines(), blocks[2]);
+
+    blocks[3].push_back({ sRow::BLANK, "", 0 });
+    centred(abouttext::LegalLines(), blocks[3]);
+
+    int row = 1;
+    for (const std::vector<sRow>& block : blocks)
+    {
+        if (row + static_cast<int>(block.size()) > mRows)
+        {
+            break;
+        }
+        for (const sRow& line : block)
+        {
+            if (line.kind == sRow::TEXT)
+            {
+                screen.PutText(row, line.col, line.text, body);
+            }
+            else if ((line.kind == sRow::SEPARATOR) && (sepWidth > 0))
+            {
+                barRow(row, sepCol, sepWidth);
+            }
+            ++row;
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////
