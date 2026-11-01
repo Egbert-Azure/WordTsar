@@ -23,6 +23,7 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <string>
 
 
@@ -489,3 +490,42 @@ TEST_CASE("GetDefaultFontDescriptor uses the saved default font")
     REQUIRE(loaded.GetDefaultFontDescriptor().has_value() == true);
     CHECK(*loaded.GetDefaultFontDescriptor() == "Georgia|14.0|0|0|0|0|0");
 }
+
+
+TEST_SUITE("cConfig - Help level")
+{
+
+TEST_CASE("TUI help level defaults to 4 and GUI help level to 3")
+{
+    TempConfigDir tmpDir;
+
+    cConfig defaults;
+    CHECK(defaults.mTuiShowHelp == 4);
+    CHECK(defaults.mGuiShowHelp == 3);
+
+    std::filesystem::create_directories(cConfig::GetConfigDir());
+    {
+        std::ofstream empty(cConfig::GetConfigFilePath(), std::ios::trunc);
+    }
+    cConfig loaded;
+    loaded.Load();
+    CHECK(loaded.mTuiShowHelp == 4);
+    CHECK(loaded.mGuiShowHelp == 3);
+}
+
+
+TEST_CASE("A stored TUI help level 3 stays 3 on load")
+{
+    TempConfigDir tmpDir;
+
+    std::filesystem::create_directories(cConfig::GetConfigDir());
+    {
+        std::ofstream file(cConfig::GetConfigFilePath(), std::ios::trunc);
+        file << "[tui.display]\nshowHelp = 3\n";
+    }
+    cConfig loaded;
+    loaded.Load();
+    CHECK(loaded.mTuiShowHelp == 3);
+}
+
+}  // TEST_SUITE

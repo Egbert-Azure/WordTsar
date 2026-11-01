@@ -182,7 +182,7 @@ cConfig::cConfig(void)
 
     // [tui.display] defaults
     mTuiShowTitleBar = true;
-    mTuiShowHelp = 3;                   // see the matching mGuiShowHelp comment above
+    mTuiShowHelp = 4;                   // WordStar 7 default: pull-down menu bar, no classic panel
     mTuiShowRuler = true;
     mTuiShowScrollBar = true;
     mTuiShowStatusBar = true;
