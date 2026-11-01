@@ -165,6 +165,7 @@ private:
     void DrawOpeningPanel(wordstartui::cScreen& screen);
     void DrawOpeningFiles(wordstartui::cScreen& screen, int headerRow, int listRow);
     bool HandleOpeningKey(const wordstartui::sInputEvent& event);
+    bool HandleOpeningMenuKey(const wordstartui::sInputEvent& event);
     void RunOpeningAction(eOpeningAction action);
     void ShowOpeningStatus(void);
     void ShowOpeningHelp(void);

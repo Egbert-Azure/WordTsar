@@ -2891,6 +2891,11 @@ bool cWSWordTsar::HandleEvent(const sInputEvent& event)
 /////////////////////////////////////////////////////////////////////////////
 bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
 {
+    if ((mEditor->mHelpLevel == 4) && (HandleOpeningMenuKey(event) == true))
+    {
+        return true;
+    }
+
     // Tab toggles focus between the menu and the file picker.
     if ((event.type == wordstartui::INPUT_TYPE_SPECIAL) &&
         (event.special == wordstartui::SPECIAL_KEY_TAB))
@@ -3053,6 +3058,60 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
     RunOpeningAction(action);
 
     return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const sInputEvent& event [in] input event
+///
+/// @return true if the Opening menu bar consumed the event
+///
+/// @brief
+/// Route an Opening screen event to the help level 4 menu bar. An open menu
+/// takes every key. F10, Alt+letter and mouse clicks go to the bar. Plain F,
+/// U, A and H open their menus while the file list does not have focus;
+/// other letters are left to the Opening screen actions.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSWordTsar::HandleOpeningMenuKey(const sInputEvent& event)
+{
+    if (mOpeningMenu.IsOpen() == true)
+    {
+        mOpeningMenu.HandleEvent(event);
+        return true;
+    }
+
+    if ((event.type == wordstartui::INPUT_TYPE_MOUSE) ||
+        (event.type == wordstartui::INPUT_TYPE_FUNCTION))
+    {
+        return mOpeningMenu.HandleEvent(event);
+    }
+
+    if ((event.type != wordstartui::INPUT_TYPE_TEXT) || (event.textUtf8.empty() == true))
+    {
+        return false;
+    }
+
+    if (event.alt == true)
+    {
+        return mOpeningMenu.HandleEvent(event);
+    }
+
+    if (mOpeningBrowserFocus == true)
+    {
+        return false;
+    }
+
+    char typed = static_cast<char>(std::tolower(static_cast<unsigned char>(event.textUtf8[0])));
+    if ((typed != 'f') && (typed != 'u') && (typed != 'a') && (typed != 'h'))
+    {
+        return false;
+    }
+
+    sInputEvent altEvent = event;
+    altEvent.textUtf8 = std::string(1, typed);
+    altEvent.alt = true;
+    return mOpeningMenu.HandleEvent(altEvent);
 }
 
 /////////////////////////////////////////////////////////////////////////////

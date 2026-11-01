@@ -481,3 +481,128 @@ TEST_CASE("TUI Opening screen - each Opening menu opens")
         CHECK(menu.IsOpen() == true);
     }
 }
+
+
+namespace
+{
+
+wordstartui::sInputEvent OpeningAltText(const std::string& text)
+{
+    wordstartui::sInputEvent event = OpeningText(text);
+    event.alt = true;
+    return event;
+}
+
+wordstartui::sInputEvent OpeningFunction(int key)
+{
+    wordstartui::sInputEvent event{};
+    event.type = wordstartui::INPUT_TYPE_FUNCTION;
+    event.functionKey = key;
+    return event;
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - help level 4 keys open the Opening menus")
+{
+    cWSWordTsar app;
+    app.TestGetEditor()->mHelpLevel = 4;
+    app.TestEnterOpening();
+    const wordstartui::cMenuBar& menu = app.TestGetOpeningMenu();
+    REQUIRE(menu.IsOpen() == false);
+
+    SUBCASE("F10 opens File and Escape closes it")
+    {
+        CHECK(app.TestHandleEvent(OpeningFunction(10)) == true);
+        CHECK(menu.GetOpenMenu() == 0);
+        CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
+        CHECK(menu.IsOpen() == false);
+        CHECK(app.TestQuitRequested() == false);
+        CHECK(app.TestInOpening() == true);
+    }
+
+    SUBCASE("plain F, U, A, H open their menus")
+    {
+        const char* letters[] = {"f", "u", "a", "h"};
+        for (int index = 0; index < 4; ++index)
+        {
+            INFO("letter: ", letters[index]);
+            CHECK(app.TestHandleEvent(OpeningText(letters[index])) == true);
+            CHECK(menu.GetOpenMenu() == index);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ESCAPE));
+            CHECK(menu.IsOpen() == false);
+        }
+        CHECK(app.TestQuitRequested() == false);
+    }
+
+    SUBCASE("upper-case letters open their menus")
+    {
+        CHECK(app.TestHandleEvent(OpeningText("U")) == true);
+        CHECK(menu.GetOpenMenu() == 1);
+    }
+
+    SUBCASE("Alt+F, U, A, H open their menus")
+    {
+        const char* letters[] = {"f", "u", "a", "h"};
+        for (int index = 0; index < 4; ++index)
+        {
+            INFO("Alt+", letters[index]);
+            CHECK(app.TestHandleEvent(OpeningAltText(letters[index])) == true);
+            CHECK(menu.GetOpenMenu() == index);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ESCAPE));
+        }
+    }
+
+    SUBCASE("Left and Right move between menus")
+    {
+        app.TestHandleEvent(OpeningText("f"));
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT));
+        CHECK(menu.GetOpenMenu() == 1);
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT));
+        CHECK(menu.GetOpenMenu() == 2);
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_LEFT));
+        CHECK(menu.GetOpenMenu() == 1);
+        CHECK(app.TestOpeningSelection() == 0);
+    }
+
+    SUBCASE("other classic letters still run their actions")
+    {
+        CHECK(app.TestHandleEvent(OpeningText("d")) == true);
+        CHECK(menu.IsOpen() == false);
+        CHECK(app.TestOpeningBrowserFocus() == true);
+    }
+
+    SUBCASE("plain letters go to the file list when it has focus")
+    {
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_TAB));
+        REQUIRE(app.TestOpeningBrowserFocus() == true);
+        app.TestHandleEvent(OpeningText("f"));
+        CHECK(menu.IsOpen() == false);
+        CHECK(app.TestHandleEvent(OpeningFunction(10)) == true);
+        CHECK(menu.GetOpenMenu() == 0);
+    }
+}
+
+
+TEST_CASE("TUI Opening screen - help level 3 keys do not open the Opening menus")
+{
+    cWSWordTsar app;
+    app.TestGetEditor()->mHelpLevel = 3;
+    app.TestEnterOpening();
+    const wordstartui::cMenuBar& menu = app.TestGetOpeningMenu();
+
+    for (const char* letter : {"f", "u", "h"})
+    {
+        INFO("letter: ", letter);
+        app.TestHandleEvent(OpeningText(letter));
+        CHECK(menu.IsOpen() == false);
+        app.TestHandleEvent(OpeningAltText(letter));
+        CHECK(menu.IsOpen() == false);
+    }
+    app.TestHandleEvent(OpeningFunction(10));
+    CHECK(menu.IsOpen() == false);
+    CHECK(app.TestInOpening() == true);
+    CHECK(app.TestQuitRequested() == false);
+    CHECK(app.TestOpeningBrowserFocus() == false);
+}

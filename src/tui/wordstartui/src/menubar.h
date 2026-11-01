@@ -91,6 +91,8 @@ public:
     void Draw(cScreen& screen, const cTheme& theme);
     bool HandleEvent(const sInputEvent& event);
     bool IsOpen(void) const;
+    // Index of the open top-level menu, or -1 when none is open.
+    int GetOpenMenu(void) const;
     void Close(void);
 
     const std::vector<sMenuItem>& GetItems(void) const;
