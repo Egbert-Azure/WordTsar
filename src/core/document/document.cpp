@@ -509,6 +509,7 @@ void cDocument::Clear(void)
 
     ClearMarkers() ;
     mSavedBlockHidden = false ;
+    mTextFile = false ;
 
     mCPParagraph = 1024 ;           // random number just so it's no 0 to start (see GetParagraphCodepoints())
 
@@ -1757,6 +1758,35 @@ void cDocument::InsertEndnote(sNote &note)
     NotifyChanged(currentparagraphnumber) ;
 }
 
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  textFile   [IN] - true if the document was loaded as plain text
+///
+/// @return nothing
+///
+/// @brief
+/// Mark the document as a plain-text file. A save to an extension with no
+/// known format writes plain text when set, WordStar 7 otherwise. Clear()
+/// resets it.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::SetTextFile(bool textFile)
+{
+    mTextFile = textFile ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return bool - true if the document was loaded as plain text
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDocument::IsTextFile(void)
+{
+    return mTextFile ;
+}
 
 
 /////////////////////////////////////////////////////////////////////////////

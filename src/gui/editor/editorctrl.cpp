@@ -6887,6 +6887,7 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
     // Detect file type using each handler's CheckType()
     // WordStar CheckType includes content-based detection for unknown extensions
     cFile* fileReader = nullptr;
+    bool loadedAsText = false;
 
     cWordstarFile wsCheck(this);
     cRTFFile rtfCheck(this);
@@ -6908,6 +6909,7 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
     {
         // No known format detected: load as plain text
         fileReader = new cTextFile(this);
+        loadedAsText = true;
     }
 
     // Clear the current document before loading new content -- otherwise the
@@ -6976,6 +6978,7 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
             mDocument->UnsetBlock();
             mDocument->SetPosition(0);  // Move to start of document
             mDocument->ClearUndoHistory();
+            mDocument->SetTextFile(loadedAsText);
             MarkDocumentSaved();
         }
 
@@ -7117,7 +7120,8 @@ bool cEditorCtrl::InsertFileAtCursor(const std::string& filename)
 ///
 /// @brief
 /// Save the document. Detects file type from extension.
-/// Supports WordStar 7, RTF, Text formats for saving.
+/// Supports WordStar 7, RTF, Text formats for saving. An extension with no
+/// known format saves a document loaded as text as text, others as WordStar 7.
 ///
 /// [REFACTORED from editorctrl.cpp::SaveFile()]
 ///
@@ -7150,6 +7154,10 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
     else if (qfilename.endsWith(".docx", Qt::CaseInsensitive))
     {
         fileWriter = new cDOCXFile(this);
+    }
+    else if (mDocument->IsTextFile())
+    {
+        fileWriter = new cTextFile(this);
     }
     else
     {

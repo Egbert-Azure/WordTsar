@@ -30,6 +30,7 @@
 #include "src/input/wordtsarinput.h"
 
 #include <filesystem>
+#include <fstream>
 #include <string>
 
 #include <unistd.h>
@@ -156,6 +157,95 @@ TEST_CASE("cWSEditorCtrl - ^KD saves, clears and returns to the Opening screen")
         CHECK(input.OnControlKChar('d') == false);
         CHECK(editor.ReturnToOpeningRequested() == false);
         CHECK(editor.GetDocument()->GetTextSize() == emptySize + 9);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+namespace
+{
+
+std::string ReadFileBytes(const std::filesystem::path& path)
+{
+    std::ifstream f(path, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+}
+
+void WriteFileBytes(const std::filesystem::path& path, const std::string& bytes)
+{
+    std::ofstream f(path, std::ios::binary);
+    f << bytes;
+}
+
+}
+
+
+TEST_CASE("cWSEditorCtrl - a file opened as text saves as text, a WordStar file as WordStar")
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-tui-nondoc-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    SUBCASE("a text file with an unknown extension")
+    {
+        auto path = dir / "setup.def";
+        WriteFileBytes(path, "key=value\r\nother=1\r\n");
+        REQUIRE(editor.LoadFile(path.string()));
+
+        doc->SetPosition(0);
+        doc->Insert("# ");
+        REQUIRE(editor.SaveFile(path.string()));
+
+        std::string expected = "# key=value\r\nother=1\r\n";
+        CHECK(ReadFileBytes(path).substr(0, expected.size()) == expected);
+    }
+
+    SUBCASE("a WordStar file with an unknown extension")
+    {
+        doc->Insert("Hello\r");
+        REQUIRE(editor.SaveFile((dir / "doc.ws").string()));
+        std::filesystem::copy_file(dir / "doc.ws", dir / "doc.def");
+
+        REQUIRE(editor.LoadFile((dir / "doc.def").string()));
+        doc->SetPosition(0);
+        doc->Insert("X");
+        REQUIRE(editor.SaveFile((dir / "doc.def").string()));
+
+        std::string bytes = ReadFileBytes(dir / "doc.def");
+        REQUIRE(bytes.empty() == false);
+        CHECK(static_cast<unsigned char>(bytes[0]) == 0x1D);
+    }
+
+    SUBCASE("a new document saved with an unknown extension")
+    {
+        doc->Insert("Hello\r");
+        REQUIRE(editor.SaveFile((dir / "new.def").string()));
+
+        std::string bytes = ReadFileBytes(dir / "new.def");
+        REQUIRE(bytes.empty() == false);
+        CHECK(static_cast<unsigned char>(bytes[0]) == 0x1D);
+    }
+
+    SUBCASE("a new document after a text file was abandoned")
+    {
+        auto path = dir / "setup.def";
+        WriteFileBytes(path, "key=value\r\n");
+        REQUIRE(editor.LoadFile(path.string()));
+        editor.AbandonFile();
+
+        doc->Insert("Hello\r");
+        REQUIRE(editor.SaveFile((dir / "new.def").string()));
+
+        std::string bytes = ReadFileBytes(dir / "new.def");
+        REQUIRE(bytes.empty() == false);
+        CHECK(static_cast<unsigned char>(bytes[0]) == 0x1D);
     }
 
     std::error_code ec;

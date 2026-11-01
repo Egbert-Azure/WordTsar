@@ -301,6 +301,8 @@ public:
     bool GetLoading(void) ;
     void SetSuppressNotify(bool suppress) ;
     bool GetSuppressNotify(void) ;
+    void SetTextFile(bool textFile) ;
+    bool IsTextFile(void) ;
 
     // --- Position ---
     POSITION_T GetTextSize(void) ;
@@ -502,6 +504,7 @@ private:
     bool mIsLoading ;                                   ///< true if loading file, else false
     bool mSuppressNotify ;                              ///< true to suppress listener notifications without affecting undo
     bool mSuppressUndo ;                                ///< true to suppress undo recording without implying file-load semantics
+    bool mTextFile ;                                    ///< true if the document was loaded by the plain-text reader
 
     // --- Paragraph Lookup Cache ---
     POSITION_T mLastParagraphFromPosition ;

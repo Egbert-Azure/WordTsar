@@ -1039,6 +1039,7 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
 
     // Detect file type using each handler's CheckType()
     cFile* fileReader = nullptr;
+    bool loadedAsText = false;
 
     cWordstarFile wsCheck(this);
     cRTFFile rtfCheck(this);
@@ -1059,6 +1060,7 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
     else
     {
         fileReader = new cTextFile(this);
+        loadedAsText = true;
     }
 
     // Clear the current document before loading new content -- otherwise the
@@ -1115,6 +1117,7 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
             mDocument->UnsetBlock();
             mDocument->SetPosition(0);
             mDocument->ClearUndoHistory();
+            mDocument->SetTextFile(loadedAsText);
             MarkDocumentSaved();
         }
 
@@ -1263,7 +1266,9 @@ void cWSEditorCtrl::FileIOProgress(int percent)
 ///
 /// @brief
 /// Save the document. Detects the format from the extension and delegates to
-/// the appropriate handler. Also writes a WordStar backup (except DOCX).
+/// the appropriate handler. An extension with no known format saves a
+/// document loaded as text as text, others as WordStar 7. Also writes a
+/// WordStar backup (except DOCX).
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::SaveFile(const std::string& filename)
@@ -1309,7 +1314,7 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
     {
         fileWriter = new cRTFFile(this);
     }
-    else if (ext == ".txt")
+    else if (ext == ".txt" || mDocument->IsTextFile())
     {
         fileWriter = new cTextFile(this);
     }
