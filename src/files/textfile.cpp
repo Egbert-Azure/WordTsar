@@ -1086,7 +1086,8 @@ bool cTextFile::LoadFile(std::string filename)
 /// @param  filename [in] file to save
 /// @param  length [in] document length in graphemes
 ///
-/// @return true if file saved successfully
+/// @return true if file saved successfully, false if it could not be opened
+///         or a write or flush failed
 ///
 /// @brief
 /// Save document as UTF-8 plain text with the document's line ending.
@@ -1104,8 +1105,9 @@ bool cTextFile::SaveFile(std::string filename, POSITION_T length)
 
     file << mDocument->GetPlainText(0, length, mDocument->GetLineEnding());
 
+    // close() flushes; a failed write or flush sets failbit or badbit
     file.close();
-    return true;
+    return file.good();
 }
 
 /////////////////////////////////////////////////////////////////////////////
