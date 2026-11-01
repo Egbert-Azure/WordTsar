@@ -25,6 +25,7 @@
 #include "src/tui/dialogs/dialoghost.h"
 #include "src/tui/dialogs/dialogs.h"
 #include "src/tui/wordstartui/src/dialog.h"
+#include "src/tui/wordstartui/src/terminaldriverposix.h"
 #include "src/core/utils/abouttext.h"
 #include "src/core/utils/config.h"
 #include "src/core/include/version.h"
@@ -815,4 +816,110 @@ TEST_CASE("TUI About box - Help > About WordTsar shows the scrolling box")
     CheckAboutFrame(modal);
     sBox box = FindBox(modal);
     CHECK(Trimmed(InsideText(modal, box, box.top + 2)) == abouttext::Tagline());
+}
+
+
+namespace
+{
+
+// Events the POSIX driver reads from the given bytes on standard input.
+std::vector<wordstartui::sInputEvent> DriverEvents(const std::string& bytes)
+{
+    int fds[2];
+    REQUIRE(pipe(fds) == 0);
+    REQUIRE(write(fds[1], bytes.data(), bytes.size()) == static_cast<ssize_t>(bytes.size()));
+    close(fds[1]);
+
+    int savedStdin = dup(STDIN_FILENO);
+    REQUIRE(savedStdin >= 0);
+    REQUIRE(dup2(fds[0], STDIN_FILENO) == STDIN_FILENO);
+    close(fds[0]);
+
+    std::vector<wordstartui::sInputEvent> events;
+    {
+        wordstartui::cTerminalDriverPosix driver;
+        for (size_t attempt = 0; attempt < bytes.size() + 2; ++attempt)
+        {
+            wordstartui::sInputEvent event{};
+            if (driver.ReadEvent(event, 10) == true)
+            {
+                events.push_back(event);
+            }
+        }
+    }
+
+    dup2(savedStdin, STDIN_FILENO);
+    close(savedStdin);
+    return events;
+}
+
+bool IsEscapeEvent(const wordstartui::sInputEvent& event)
+{
+    return (event.type == wordstartui::INPUT_TYPE_SPECIAL) && (event.special == wordstartui::SPECIAL_KEY_ESCAPE);
+}
+
+}
+
+
+TEST_CASE("TUI terminal driver - an unknown CSI sequence is not an Escape key")
+{
+    for (const char* sequence : {"\x1b[99~", "\x1b[1;2A", "\x1b[1;5C", "\x1b[Z", "\x1b[200~"})
+    {
+        INFO("sequence: ESC", std::string(sequence + 1));
+        for (const wordstartui::sInputEvent& event : DriverEvents(sequence))
+        {
+            CHECK(IsEscapeEvent(event) == false);
+            CHECK(event.type == wordstartui::INPUT_TYPE_NONE);
+        }
+    }
+}
+
+
+TEST_CASE("TUI terminal driver - known sequences and a lone Escape still decode")
+{
+    std::vector<wordstartui::sInputEvent> events = DriverEvents("\x1b[A" "\x1b[99~" "\x1b[5~" "\x1bOP" "x");
+    REQUIRE(events.size() == 4);
+    CHECK(events[0].type == wordstartui::INPUT_TYPE_SPECIAL);
+    CHECK(events[0].special == wordstartui::SPECIAL_KEY_ARROW_UP);
+    CHECK(events[1].type == wordstartui::INPUT_TYPE_SPECIAL);
+    CHECK(events[1].special == wordstartui::SPECIAL_KEY_PAGE_UP);
+    CHECK(events[2].type == wordstartui::INPUT_TYPE_FUNCTION);
+    CHECK(events[2].functionKey == 1);
+    CHECK(events[3].type == wordstartui::INPUT_TYPE_TEXT);
+    CHECK(events[3].textUtf8 == "x");
+
+    std::vector<wordstartui::sInputEvent> escape = DriverEvents("\x1b");
+    REQUIRE(escape.size() == 1);
+    CHECK(IsEscapeEvent(escape[0]) == true);
+}
+
+
+TEST_CASE("TUI startup screen - an unknown CSI sequence does not exit ws")
+{
+    cWSWordTsar app;
+    wordstartui::cScreen screen;
+    StartShowing(app, screen);
+
+    SUBCASE("during the startup screen")
+    {
+        for (const wordstartui::sInputEvent& event : DriverEvents("\x1b[99~" "\x1b[1;2A"))
+        {
+            app.TestHandleEvent(event);
+        }
+        CHECK(app.TestQuitRequested() == false);
+        CHECK(app.TestInStartup() == true);
+    }
+
+    SUBCASE("on the Opening screen")
+    {
+        app.TestSetStartupDuration(std::chrono::milliseconds(0));
+        app.TestTickStartup();
+        REQUIRE(app.TestInOpening() == true);
+        for (const wordstartui::sInputEvent& event : DriverEvents("\x1b[99~" "\x1b[1;2A"))
+        {
+            app.TestHandleEvent(event);
+        }
+        CHECK(app.TestQuitRequested() == false);
+        CHECK(app.TestInOpening() == true);
+    }
 }

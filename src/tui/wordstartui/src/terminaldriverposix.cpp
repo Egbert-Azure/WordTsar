@@ -792,7 +792,8 @@ bool cTerminalDriverPosix::DecodeEscape(sInputEvent& event, const std::vector<ui
 /// @param  sInputEvent& event [out] decoded event
 /// @param  const std::string& sequence [in] CSI sequence
 ///
-/// @return true when the CSI sequence was decoded
+/// @return true when the CSI sequence was decoded, false for a sequence
+///         that is not known
 ///
 /// @brief
 /// Decode common xterm/Linux-console CSI key sequences.
@@ -899,7 +900,10 @@ bool cTerminalDriverPosix::DecodeCsi(sInputEvent& event, const std::string& sequ
     }
     else
     {
-        event.special = SPECIAL_KEY_ESCAPE;
+        // Unknown sequence: no event.
+        event.type = INPUT_TYPE_NONE;
+        event.special = SPECIAL_KEY_NONE;
+        return false;
     }
 
     return true;
