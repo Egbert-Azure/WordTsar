@@ -40,6 +40,8 @@
 #include <fstream>
 #include <string>
 
+#include <unistd.h>
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -142,7 +144,6 @@ TEST_CASE("TUI Opening screen - letter keys run their actions")
         CHECK(app.TestOpeningWantTOC() == false);
         CHECK(app.TestOpeningWantIndex() == false);
         CHECK(app.TestInOpening() == true);
-        CHECK(app.TestOpeningSelection() == 0);
     }
 
     SUBCASE("L opens the file list")
@@ -150,7 +151,6 @@ TEST_CASE("TUI Opening screen - letter keys run their actions")
         CHECK(app.TestHandleEvent(OpeningText("L")) == true);
         CHECK(app.TestOpeningBrowserFocus() == true);
         CHECK(app.TestOpeningWantPrint() == false);
-        CHECK(app.TestOpeningSelection() == 9);
     }
 
     SUBCASE("P opens the file list to print")
@@ -207,53 +207,7 @@ TEST_CASE("TUI Opening screen - letter keys run their actions")
             CHECK(app.TestOpeningBrowserFocus() == false);
             CHECK(app.TestInOpening() == true);
             CHECK(app.TestQuitRequested() == false);
-            CHECK(app.TestOpeningSelection() == 0);
         }
-    }
-}
-
-
-TEST_CASE("TUI Opening screen - Enter runs the selected item")
-{
-    cWSWordTsar app;
-    app.TestEnterOpening();
-
-    SUBCASE("Enter on the first item opens the file list")
-    {
-        CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
-        CHECK(app.TestOpeningBrowserFocus() == true);
-    }
-
-    SUBCASE("Enter on a greyed-out item does nothing")
-    {
-        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
-        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
-        REQUIRE(app.TestOpeningSelection() == 2);
-        CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
-        CHECK(app.TestOpeningBrowserFocus() == false);
-        CHECK(app.TestInOpening() == true);
-        CHECK(app.TestQuitRequested() == false);
-    }
-
-    SUBCASE("Enter on print a file opens the file list to print")
-    {
-        for (int step = 0; step < 3; ++step)
-        {
-            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
-        }
-        REQUIRE(app.TestOpeningSelection() == 3);
-        CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
-        CHECK(app.TestOpeningBrowserFocus() == true);
-        CHECK(app.TestOpeningWantPrint() == true);
-    }
-
-    SUBCASE("Enter on change drive/directory opens the file list")
-    {
-        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT));
-        REQUIRE(app.TestOpeningSelection() == 9);
-        CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
-        CHECK(app.TestOpeningBrowserFocus() == true);
-        CHECK(app.TestOpeningWantPrint() == false);
     }
 }
 
@@ -575,7 +529,6 @@ TEST_CASE("TUI Opening screen - help level 4 keys open the Opening menus")
         CHECK(menu.GetOpenMenu() == 2);
         app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_LEFT));
         CHECK(menu.GetOpenMenu() == 1);
-        CHECK(app.TestOpeningSelection() == 0);
     }
 
     SUBCASE("other classic letters still run their actions")
@@ -1482,18 +1435,6 @@ TEST_CASE("TUI Opening screen - help level 3 own entries sit on row 12 with lett
     CHECK(app.TestOpeningKeyAction('V', action) == true);
     CHECK(action == eOpeningAction::PREFERENCES);
 
-    SUBCASE("the right column ends with display status")
-    {
-        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT));
-        for (int step = 0; step < 9; ++step)
-        {
-            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
-        }
-        REQUIRE(app.TestOpeningSelection() == 18);
-        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
-        CHECK(app.TestOpeningBrowserFocus() == true);
-    }
-
     SUBCASE("help level 4 leaves G and V unbound")
     {
         app.TestGetEditor()->mHelpLevel = 4;
@@ -1521,7 +1462,6 @@ TEST_CASE("TUI Opening screen - help level 3 A is additional and W is about Word
     CHECK(app.TestHandleEvent(OpeningText("a")) == true);
     CHECK(app.TestInOpening() == true);
     CHECK(app.TestOpeningBrowserFocus() == false);
-    CHECK(app.TestOpeningSelection() == 0);
     CHECK(app.TestQuitRequested() == false);
 
     SUBCASE("help level 4 leaves W unbound")
@@ -1969,8 +1909,7 @@ TEST_CASE("TUI Opening screen - help level 3 uses the palette colours")
     CheckCellColours(screen, 4, 6, kWs7LightBlue, kWs7Grey);
     CHECK(CellAt(screen, 4, 8).style.bg == kWs7Grey);
 
-    // No selection bar: the entry under the panel cursor looks like the others.
-    REQUIRE(app.TestOpeningSelection() == 0);
+    // No selection bar: the first entry looks like the others.
     CHECK(CellAt(screen, 2, 6).textUtf8 == "D");
     CheckCellColours(screen, 2, 6, kWs7LightBlue, kWs7Grey);
     CheckCellColours(screen, 2, 4, kWs7Black, kWs7Grey);
@@ -2186,7 +2125,6 @@ TEST_CASE("TUI Opening screen - help level 3 panel shows no selection bar")
     EnterWs7Opening(app, 3);
     REQUIRE(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN)) == true);
     REQUIRE(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT)) == true);
-    REQUIRE(app.TestOpeningSelection() == 10);
     REQUIRE(app.TestOpeningBrowserFocus() == false);
 
     wordstartui::cScreen screen;
@@ -2353,5 +2291,114 @@ TEST_CASE("TUI Opening screen - the file list starts in the current directory un
         CHECK(fs::equivalent(fs::path(app.TestGetEditor()->mFileDir), chosen) == true);
         std::error_code ec;
         fs::remove(chosen, ec);
+    }
+}
+
+
+namespace
+{
+
+// A unique folder with f0.txt to f7.txt; the file list shows "..", f0, f1, f2
+// on its first row and f3 to f6 on the second.
+struct sOpeningListDir
+{
+    std::filesystem::path path;
+
+    sOpeningListDir(void)
+    {
+        std::string pattern = (std::filesystem::temp_directory_path() / "wt-opening-list-XXXXXX").string();
+        REQUIRE(mkdtemp(pattern.data()) != nullptr);
+        path = pattern;
+        for (int index = 0; index < 8; ++index)
+        {
+            std::ofstream out(path / ("f" + std::to_string(index) + ".txt"), std::ios::binary);
+            out << "text " << index << "\n";
+        }
+    }
+
+    ~sOpeningListDir(void)
+    {
+        std::error_code ec;
+        std::filesystem::remove_all(path, ec);
+    }
+};
+
+void PrepareOpeningList(cWSWordTsar& app, int level, const sOpeningListDir& dir)
+{
+    app.TestGetEditor()->mHelpLevel = level;
+    app.TestSetOpeningDirectory(dir.path.string());
+    app.TestEnterOpening();
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - arrows and Enter work the file list")
+{
+    for (int level : {3, 4})
+    {
+        CAPTURE(level);
+        sOpeningListDir dir;
+
+        {
+            // Arrows move the list selection; Up past the first row stays.
+            cWSWordTsar app;
+            PrepareOpeningList(app, level, dir);
+            REQUIRE(app.TestOpeningSelectedName() == "../");
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT));
+            CHECK(app.TestOpeningSelectedName() == "f0.txt");
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+            CHECK(app.TestOpeningSelectedName() == "f4.txt");
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_LEFT));
+            CHECK(app.TestOpeningSelectedName() == "f3.txt");
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_UP));
+            CHECK(app.TestOpeningSelectedName() == "../");
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_UP));
+            CHECK(app.TestOpeningSelectedName() == "../");
+            CHECK(app.TestOpeningBrowserFocus() == false);
+            CHECK(app.TestInOpening() == true);
+            CHECK(app.TestQuitRequested() == false);
+        }
+
+        {
+            // Down then Enter opens the highlighted file, not a panel action.
+            cWSWordTsar app;
+            PrepareOpeningList(app, level, dir);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+            CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
+            CHECK(app.TestQuitRequested() == false);
+            CHECK(app.TestInEditor() == true);
+            CHECK(std::filesystem::path(app.TestFilename()).filename() == "f3.txt");
+        }
+
+        {
+            // Enter on the first entry stays on the Opening screen.
+            cWSWordTsar app;
+            PrepareOpeningList(app, level, dir);
+            CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
+            CHECK(app.TestInOpening() == true);
+            CHECK(app.TestQuitRequested() == false);
+            CHECK(app.TestFilename().empty() == true);
+        }
+
+        {
+            // Tab gives the letters to the list; Escape takes them back, a
+            // second Escape exits.
+            cWSWordTsar app;
+            PrepareOpeningList(app, level, dir);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_TAB));
+            REQUIRE(app.TestOpeningBrowserFocus() == true);
+            app.TestHandleEvent(OpeningText("f"));
+            CHECK(app.TestOpeningSelectedName() == "f0.txt");
+            CHECK(app.TestGetOpeningMenu().IsOpen() == false);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ESCAPE));
+            CHECK(app.TestOpeningBrowserFocus() == false);
+            CHECK(app.TestQuitRequested() == false);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ESCAPE));
+            CHECK(app.TestQuitRequested() == true);
+        }
     }
 }

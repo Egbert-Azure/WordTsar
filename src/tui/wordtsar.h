@@ -105,7 +105,6 @@ public:
     bool TestOpeningWantPrint(void) const { return mOpeningWantPrint; }
     bool TestOpeningWantTOC(void) const { return mOpeningWantTOC; }
     bool TestOpeningWantIndex(void) const { return mOpeningWantIndex; }
-    int TestOpeningSelection(void) const { return mOpeningSel; }
     bool TestOpeningKeyAction(char typed, eOpeningAction& action) const
     {
         int index = 0;
@@ -115,6 +114,7 @@ public:
     const wordstartui::cMenuBar& TestGetOpeningMenu(void) const { return mOpeningMenu; }
     void TestSetOpeningDirectory(const std::string& path) { mBrowser.SetDirectory(path); }
     std::string TestOpeningDirectory(void) const { return mBrowser.GetCurrentDirectory(); }
+    std::string TestOpeningSelectedName(void) const { return mBrowser.GetSelectedName(); }
     void TestDrawOpening(wordstartui::cScreen& screen)
     {
         mRows = screen.GetRows();
@@ -238,7 +238,6 @@ private:
 
     eAppMode mMode;            // splash / opening menu / editor
     int mSplashFrames;         // frames the splash has been shown
-    int mOpeningSel;           // selected opening-menu item index
     bool mHaveFileArg;         // a file was given on the command line
     wsui::cFileBrowser mBrowser;  // file picker on the opening screen
     bool mOpeningBrowserFocus;    // true when the browser has focus (not the menu)

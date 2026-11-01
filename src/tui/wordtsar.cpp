@@ -83,7 +83,7 @@ constexpr int SPLASH_TICKS = 12;
 
 struct sOpeningItem
 {
-    char key;           // typed hotkey; 0 = cursor + Enter only, no direct keypress
+    char key;           // typed hotkey
     const char* label;
     bool enabled;
     eOpeningAction action;
@@ -149,7 +149,6 @@ cWSWordTsar::cWSWordTsar(void)
     mCols = 80;
     mMode = APP_SPLASH;
     mSplashFrames = 0;
-    mOpeningSel = 0;
     mBrowser.SetWordStarLayout(true);
     mHaveFileArg = false;
     mOpeningBrowserFocus = false;
@@ -3003,8 +3002,8 @@ bool cWSWordTsar::HandleEvent(const sInputEvent& event)
 /// @return true if handled
 ///
 /// @brief
-/// Drive the opening menu: arrows move the selection, a letter or Enter picks
-/// an item.
+/// Drive the Opening screen: arrows move the file list selection, Enter opens
+/// the selected file, a letter runs its Opening action.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
@@ -3037,11 +3036,16 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         return true;
     }
 
-    // ----- File picker focused -----
-    if (mOpeningBrowserFocus == true)
+    const bool escape = (event.type == wordstartui::INPUT_TYPE_SPECIAL) &&
+                        (event.special == wordstartui::SPECIAL_KEY_ESCAPE);
+
+    // The file list takes every key while it has focus, and the special keys
+    // (arrows, paging, Enter) otherwise. Letters without focus run the
+    // Opening screen actions.
+    if ((mOpeningBrowserFocus == true) ||
+        ((event.type == wordstartui::INPUT_TYPE_SPECIAL) && (escape == false)))
     {
-        if ((event.type == wordstartui::INPUT_TYPE_SPECIAL) &&
-            (event.special == wordstartui::SPECIAL_KEY_ESCAPE))
+        if (escape == true)
         {
             mOpeningBrowserFocus = false;
             mOpeningWantPrint = false;
@@ -3074,7 +3078,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
             mMode = APP_EDITOR;
             return true;
         }
-        if (action == wsui::cFileBrowser::ACTION_EXIT_TOP)
+        if ((action == wsui::cFileBrowser::ACTION_EXIT_TOP) && (mOpeningBrowserFocus == true))
         {
             mOpeningBrowserFocus = false;
             mOpeningWantPrint = false;
@@ -3084,84 +3088,19 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         return true;
     }
 
-    // ----- Menu focused -----
+    // ----- Letters and Escape -----
     eOpeningAction action{};
     bool haveAction = false;
-    const int rightCount = kOpeningRightCount;
 
-    if (event.type == wordstartui::INPUT_TYPE_SPECIAL)
+    if (escape == true)
     {
-        // Two-column grid navigation: Down/Up move within a column (cursor
-        // may land on disabled items), Down past the bottom enters the file
-        // browser, and Left/Right switch columns, clamping to the target
-        // column's (shorter or longer) row count.
-        bool onLeft = (mOpeningSel < kOpeningLeftCount);
-        int col = onLeft ? 0 : 1;
-        int row = onLeft ? mOpeningSel : (mOpeningSel - kOpeningLeftCount);
-        int rowsInCol = onLeft ? kOpeningLeftCount : rightCount;
-
-        if (event.special == wordstartui::SPECIAL_KEY_ARROW_DOWN)
-        {
-            if (row < (rowsInCol - 1))
-            {
-                mOpeningSel = onLeft ? (row + 1) : (kOpeningLeftCount + row + 1);
-            }
-            else
-            {
-                mOpeningBrowserFocus = true;
-            }
-            return true;
-        }
-        else if (event.special == wordstartui::SPECIAL_KEY_ARROW_UP)
-        {
-            if (row > 0)
-            {
-                mOpeningSel = onLeft ? (row - 1) : (kOpeningLeftCount + row - 1);
-            }
-            return true;
-        }
-        else if (event.special == wordstartui::SPECIAL_KEY_ARROW_RIGHT)
-        {
-            if (col == 0)
-            {
-                mOpeningSel = kOpeningLeftCount + std::min(row, rightCount - 1);
-            }
-            return true;
-        }
-        else if (event.special == wordstartui::SPECIAL_KEY_ARROW_LEFT)
-        {
-            if (col == 1)
-            {
-                mOpeningSel = std::min(row, kOpeningLeftCount - 1);
-            }
-            return true;
-        }
-        else if (event.special == wordstartui::SPECIAL_KEY_ENTER)
-        {
-            if (kOpeningItems[mOpeningSel].enabled == true)
-            {
-                action = kOpeningItems[mOpeningSel].action;
-                haveAction = true;
-            }
-        }
-        else if (event.special == wordstartui::SPECIAL_KEY_ESCAPE)
-        {
-            action = eOpeningAction::EXIT;
-            haveAction = true;
-        }
+        action = eOpeningAction::EXIT;
+        haveAction = true;
     }
     else if ((event.type == wordstartui::INPUT_TYPE_TEXT) && (event.textUtf8.empty() == false))
     {
         int index = 0;
-        if (OpeningKeyAction(event.textUtf8[0], action, index) == true)
-        {
-            // The cursor moves over the two columns only.
-            if (index < kOpeningOwnFirst)
-            {
-                mOpeningSel = index;
-            }
-            haveAction = true;
-        }
+        haveAction = OpeningKeyAction(event.textUtf8[0], action, index);
     }
 
     if (haveAction == false)
