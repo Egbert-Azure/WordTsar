@@ -35,7 +35,8 @@ namespace wordstartui
 // case) and hotKeyPos is its index in title, for highlighting. An entry is one
 // of: a leaf action (callback), a separator (isSeparator), or a submenu (submenu
 // non-empty) that opens a cascading flyout. Disabled entries are drawn like
-// enabled ones; choosing one runs its callback, if any, and leaves the menu open.
+// enabled ones; choosing one with a callback closes the menu and runs it, one
+// without a callback leaves the menu open.
 struct sMenuEntry
 {
     std::string title;

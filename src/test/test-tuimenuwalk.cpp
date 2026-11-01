@@ -752,26 +752,27 @@ TEST_CASE("TUI Opening screen - Opening menu entries run the panel actions")
         CHECK(app.TestOpeningWantTOC() == true);
     }
 
-    SUBCASE("greyed File entries do nothing")
+    SUBCASE("greyed File entries close the menu and do nothing else")
     {
-        app.TestHandleEvent(OpeningText("f"));
         for (const char* letter : {"n", "k", "f", "o", "t", "e", "c", "h", "r"})
         {
-            INFO("letter: ", letter);
+            INFO("letter: ", std::string(letter));
+            app.TestHandleEvent(OpeningText("f"));
+            REQUIRE(menu.GetOpenMenu() == 0);
             CHECK(app.TestHandleEvent(OpeningText(letter)) == true);
-            CHECK(menu.GetOpenMenu() == 0);
+            CHECK(menu.IsOpen() == false);
         }
         CHECK(app.TestOpeningBrowserFocus() == false);
         CHECK(app.TestInOpening() == true);
         CHECK(app.TestQuitRequested() == false);
     }
 
-    SUBCASE("Enter on a greyed Additional entry does nothing")
+    SUBCASE("Enter on a greyed Additional entry closes the menu")
     {
         app.TestHandleEvent(OpeningText("a"));
         REQUIRE(menu.GetOpenMenu() == 2);
         CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
-        CHECK(menu.GetOpenMenu() == 2);
+        CHECK(menu.IsOpen() == false);
         CHECK(app.TestOpeningBrowserFocus() == false);
         CHECK(app.TestInOpening() == true);
         CHECK(app.TestQuitRequested() == false);
@@ -2527,7 +2528,7 @@ TEST_CASE("TUI Opening screen - entries WordTsar does not implement say so")
             REQUIRE(app.TestGetOpeningMenu().GetOpenMenu() == entry.menuIndex);
             CHECK(app.TestHandleEvent(OpeningText(entry.letter)) == true);
             CHECK(StatusMessage(app) == kNotAvailable);
-            CHECK(app.TestGetOpeningMenu().GetOpenMenu() == entry.menuIndex);
+            CHECK(app.TestGetOpeningMenu().IsOpen() == false);
             CHECK(app.TestOpeningBrowserFocus() == false);
             CHECK(app.TestInOpening() == true);
             CHECK(app.TestQuitRequested() == false);
@@ -2543,7 +2544,7 @@ TEST_CASE("TUI Opening screen - entries WordTsar does not implement say so")
         app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
         CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
         CHECK(StatusMessage(app) == kNotAvailable);
-        CHECK(app.TestGetOpeningMenu().GetOpenMenu() == 0);
+        CHECK(app.TestGetOpeningMenu().IsOpen() == false);
         CHECK(app.TestOpeningBrowserFocus() == false);
         CHECK(app.TestInOpening() == true);
     }
@@ -2561,7 +2562,7 @@ TEST_CASE("TUI Opening screen - entries WordTsar does not implement say so")
         const int col = static_cast<int>(MenuRowText(screen, row).find("Run DOS Command"));
         CHECK(app.TestHandleEvent(LeftClick(row, col + 2)) == true);
         CHECK(StatusMessage(app) == kNotAvailable);
-        CHECK(app.TestGetOpeningMenu().GetOpenMenu() == 0);
+        CHECK(app.TestGetOpeningMenu().IsOpen() == false);
         CHECK(app.TestInOpening() == true);
         CHECK(app.TestQuitRequested() == false);
     }
@@ -2622,10 +2623,9 @@ TEST_CASE("TUI edit screen - a menu entry WordTsar does not implement says so")
     {
         app.TestHandleEvent(OpeningAltText("u"));
         REQUIRE(menu.IsOpen() == true);
-        const int open = menu.GetOpenMenu();
         CHECK(app.TestHandleEvent(OpeningText("t")) == true);
         CHECK(StatusMessage(app) == kNotAvailable);
-        CHECK(menu.GetOpenMenu() == open);
+        CHECK(menu.IsOpen() == false);
         CHECK(app.TestInEditor() == true);
     }
 
@@ -2637,6 +2637,28 @@ TEST_CASE("TUI edit screen - a menu entry WordTsar does not implement says so")
         app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
         CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
         CHECK(StatusMessage(app) == kNotAvailable);
-        CHECK(menu.IsOpen() == true);
+        CHECK(menu.IsOpen() == false);
+    }
+}
+
+
+TEST_CASE("TUI Opening screen - an entry WordTsar does not implement closes the menu at 24 rows")
+{
+    sOpeningListDir dir;
+
+    for (const char* letter : {"r", "f", "o"})
+    {
+        INFO("File then ", std::string(letter));
+        cWSWordTsar app;
+        PrepareOpeningList(app, 4, dir);
+        app.TestHandleEvent(OpeningText("f"));
+        REQUIRE(app.TestGetOpeningMenu().GetOpenMenu() == 0);
+        CHECK(app.TestHandleEvent(OpeningText(letter)) == true);
+        CHECK(app.TestGetOpeningMenu().IsOpen() == false);
+        wordstartui::cScreen screen;
+        screen.Resize(24, 80);
+        app.TestDrawOpening(screen);
+        CHECK(MenuRowText(screen, 23).find(kNotAvailable) != std::string::npos);
+        CHECK(app.TestInOpening() == true);
     }
 }

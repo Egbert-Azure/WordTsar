@@ -335,7 +335,7 @@ int cMenuBar::AddMenu(const std::string& title, char hotKey)
 /// @param  int menuIndex [in] menu returned by AddMenu
 /// @param  const std::string& title [in] sub-item title
 /// @param  std::function<void(void)> callback [in] activation callback
-/// @param  bool enabled [in] false: choosing the item runs callback and leaves the menu open
+/// @param  bool enabled [in] false: a callback closes the menu and runs; no callback leaves it open
 ///
 /// @return nothing
 ///
@@ -419,7 +419,7 @@ int cMenuBar::AddSubMenu(int menuIndex, const std::string& title)
 /// @param  int subHandle [in] handle returned by AddSubMenu
 /// @param  const std::string& title [in] sub-item title
 /// @param  std::function<void(void)> callback [in] activation callback
-/// @param  bool enabled [in] false: choosing the item runs callback and leaves the menu open
+/// @param  bool enabled [in] false: a callback closes the menu and runs; no callback leaves it open
 ///
 /// @return nothing
 ///
@@ -1396,8 +1396,8 @@ void cMenuBar::Ascend(void)
 ///
 /// @brief
 /// Act on the deepest highlighted entry: descend into a submenu, or fire a leaf
-/// entry's callback and close the menu. A disabled leaf fires its callback, if
-/// it has one, and the menu stays open. Separators do nothing.
+/// entry's callback and close the menu. A disabled leaf without a callback
+/// does nothing and the menu stays open. Separators do nothing.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMenuBar::ActivateHighlighted(void)
@@ -1432,12 +1432,8 @@ void cMenuBar::ActivateHighlighted(void)
         return;
     }
 
-    if (entry.enabled == false)
+    if ((entry.enabled == false) && (!entry.callback))
     {
-        if (entry.callback)
-        {
-            entry.callback();
-        }
         return;
     }
 
