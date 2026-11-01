@@ -2,6 +2,16 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.14.3 (2026-10-31)
+
+**Fixes**
+
+- Fixed: a WordStar paragraph that starts with a soft tab and then a period now loads as text instead of being read as a dot command (#35).
+- Fixed: extended characters written as ESC, a byte below 0x20 and FS now load as the matching graphic character under CP437, CP737 and CP850 (#43).
+- Fixed: files that are binaries, plain text or UTF-8 are no longer opened as WordStar documents.
+- Fixed: a crash when pasting RTF from the clipboard before a file is opened (#52).
+- Fixed: the document no longer flickers behind the file dialog in the GUI, and the TUI file dialog fills the screen (#39, #38).
+
 ## 0.14.2 (2026-10-30)
 
 WordTsar is no longer Beta.
