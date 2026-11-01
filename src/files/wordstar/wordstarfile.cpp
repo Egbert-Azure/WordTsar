@@ -437,7 +437,7 @@ bool cWordstarFile::CheckType(std::string filename)
 /// extensions.
 ///
 /// Accepts a file that starts with a WordStar 5+ header sequence (0x1D,
-/// size, type 0x00). Rejects known non-WordStar formats by their magic
+/// size, type 0x00) whose size + 3 bytes fit in the file. Rejects known non-WordStar formats by their magic
 /// bytes. Otherwise scans up to 256 KiB, up to the first 0x1A outside a
 /// sequence or an ESC x FS triple. A sequence is valid when its 16-bit
 /// length L is at least 4, the bytes at +L and +L+1 repeat the length and
@@ -481,12 +481,13 @@ static bool IsWordStarContent(const std::string& filename)
     }
 
     // --- WordStar 5+ detection ---
-    // Check for valid sequence header: 0x1D, size[2], type=0x00
+    // Check for valid sequence header: 0x1D, size[2], type=0x00.
+    // The header occupies size + 3 bytes and must fit in the file.
     if (buf[0] == 0x1D && buf[3] == 0x00)
     {
         uint16_t size = static_cast<uint16_t>(buf[1]) |
                         (static_cast<uint16_t>(buf[2]) << 8) ;
-        if (size >= 4)
+        if (size >= 4 && static_cast<size_t>(size) + 3 <= bytesRead)
         {
             return true ;
         }

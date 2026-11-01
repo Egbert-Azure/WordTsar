@@ -2266,6 +2266,41 @@ TEST_CASE("cWordstarFile::CheckType - a 0x1D that starts no complete sequence is
 }
 
 
+TEST_CASE("cWordstarFile::CheckType - a WordStar 5+ header is accepted only if it fits in the file")
+{
+    // 1D, size (2), type 00, then size - 1 more bytes: size + 3 bytes in all
+    auto header = [](uint16_t size, size_t fileSize)
+    {
+        std::string bytes("\x1D", 1);
+        bytes += static_cast<char>(size & 0xFF);
+        bytes += static_cast<char>(size >> 8);
+        bytes += '\0';
+        bytes.resize(fileSize, 'x');
+        return bytes;
+    };
+
+    SUBCASE("a header that ends at the last byte of the file")
+    {
+        CHECK(CheckTypeOf(header(10, 13)));
+    }
+
+    SUBCASE("a header one byte larger than the file")
+    {
+        CHECK(CheckTypeOf(header(10, 12)) == false);
+    }
+
+    SUBCASE("a header far larger than the file")
+    {
+        CHECK(CheckTypeOf(header(0xFFFF, 20)) == false);
+    }
+
+    SUBCASE("a WordStar 7 file")
+    {
+        CHECK(CheckTypeOf(WordStar7File("Hello\r\n")));
+    }
+}
+
+
 TEST_CASE("cWordstarFile::CheckType - a file of exactly 256 KiB is scanned to its last byte")
 {
     const size_t fileSize = 256 * 1024;
