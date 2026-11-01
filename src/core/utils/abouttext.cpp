@@ -27,8 +27,22 @@
 #include "abouttext.h"
 #include "src/core/include/version.h"
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+
+#ifndef _WIN32
+#include <cerrno>
+#include <csignal>
+#include <fcntl.h>
+#include <poll.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+extern char** environ;
+#endif
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
@@ -352,25 +366,203 @@ std::string QueryChip(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return name of the default printer from `lpstat -d`, empty when none
-///         is set or lpstat cannot run
+/// @return absolute path of lpstat
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string LpstatPath(void)
+{
+    return "/usr/bin/lpstat";
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  path [in] absolute path of the program
+/// @param  args [in] arguments after the program name
+/// @param  timeoutMs [in] how long the program may run
+///
+/// @return standard output of the program, empty when it cannot start or
+///         has not finished after timeoutMs
+///
+/// @brief
+/// The program runs in its own process group with LC_ALL=C, standard
+/// input and error on /dev/null and no other open descriptors. Output is
+/// read through a pipe with poll() until end of file and the program is
+/// reaped with waitpid(); past the deadline the process group is killed
+/// with SIGKILL and the program reaped.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string RunCommand(const std::string& path, const std::vector<std::string>& args, int timeoutMs)
+{
+#ifdef _WIN32
+    (void)path;
+    (void)args;
+    (void)timeoutMs;
+    return std::string();
+#else
+    using tClock = std::chrono::steady_clock;
+    const tClock::time_point deadline = tClock::now() + std::chrono::milliseconds(timeoutMs);
+
+    auto remainingMs = [&deadline](void) -> int
+    {
+        long long left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - tClock::now()).count();
+        return (left > 0) ? static_cast<int>(left) : 0;
+    };
+
+    int fds[2];
+    if (pipe(fds) != 0)
+    {
+        return std::string();
+    }
+
+    std::vector<std::string> argStore;
+    argStore.push_back(path);
+    argStore.insert(argStore.end(), args.begin(), args.end());
+    std::vector<char*> argv;
+    for (std::string& arg : argStore)
+    {
+        argv.push_back(arg.data());
+    }
+    argv.push_back(nullptr);
+
+    std::vector<std::string> envStore;
+    for (char** entry = environ; (entry != nullptr) && (*entry != nullptr); ++entry)
+    {
+        if (std::strncmp(*entry, "LC_ALL=", 7) != 0)
+        {
+            envStore.push_back(*entry);
+        }
+    }
+    envStore.push_back("LC_ALL=C");
+    std::vector<char*> envp;
+    for (std::string& entry : envStore)
+    {
+        envp.push_back(entry.data());
+    }
+    envp.push_back(nullptr);
+
+    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+    posix_spawn_file_actions_adddup2(&actions, fds[1], STDOUT_FILENO);
+    posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
+
+    posix_spawnattr_t attr;
+    posix_spawnattr_init(&attr);
+    short flags = POSIX_SPAWN_SETPGROUP;
+#ifdef POSIX_SPAWN_CLOEXEC_DEFAULT
+    flags = static_cast<short>(flags | POSIX_SPAWN_CLOEXEC_DEFAULT);
+#else
+    posix_spawn_file_actions_addclose(&actions, fds[0]);
+#endif
+    posix_spawnattr_setflags(&attr, flags);
+    posix_spawnattr_setpgroup(&attr, 0);
+
+    pid_t pid = 0;
+    int spawned = posix_spawn(&pid, path.c_str(), &actions, &attr, argv.data(), envp.data());
+    posix_spawn_file_actions_destroy(&actions);
+    posix_spawnattr_destroy(&attr);
+    close(fds[1]);
+
+    if (spawned != 0)
+    {
+        close(fds[0]);
+        return std::string();
+    }
+
+    std::string output;
+    bool finished = false;
+    bool atEnd = false;
+
+    while ((atEnd == false) && (remainingMs() > 0))
+    {
+        pollfd descriptor;
+        descriptor.fd = fds[0];
+        descriptor.events = POLLIN;
+        descriptor.revents = 0;
+        int ready = poll(&descriptor, 1, remainingMs());
+        if (ready < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            break;
+        }
+        if (ready == 0)
+        {
+            break;
+        }
+        char buffer[256];
+        ssize_t count = read(fds[0], buffer, sizeof(buffer));
+        if (count > 0)
+        {
+            output.append(buffer, static_cast<size_t>(count));
+        }
+        else if ((count == 0) || (errno != EINTR))
+        {
+            atEnd = true;
+        }
+    }
+    close(fds[0]);
+
+    int status = 0;
+    while (atEnd == true)
+    {
+        pid_t reaped = waitpid(pid, &status, WNOHANG);
+        if (reaped == pid)
+        {
+            finished = true;
+            break;
+        }
+        if ((reaped < 0) && (errno != EINTR))
+        {
+            break;
+        }
+        if (remainingMs() == 0)
+        {
+            break;
+        }
+        poll(nullptr, 0, 10);
+    }
+
+    if (finished == false)
+    {
+        kill(-pid, SIGKILL);
+        kill(pid, SIGKILL);
+        while ((waitpid(pid, &status, 0) < 0) && (errno == EINTR))
+        {
+        }
+        return std::string();
+    }
+
+    return output;
+#endif
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return name of the default printer from /usr/bin/lpstat -d, empty
+///         when none is set, lpstat fails or it runs longer than
+///         kLpstatTimeoutMs
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string QueryDefaultPrinter(void)
 {
-    FILE* pipe = popen("LC_ALL=C lpstat -d 2>/dev/null", "r");
-    if (pipe == nullptr)
-    {
-        return std::string();
-    }
-    std::string output;
-    char buffer[256];
-    while (std::fgets(buffer, sizeof(buffer), pipe) != nullptr)
-    {
-        output += buffer;
-    }
-    pclose(pipe);
-    return ParseLpstatDefault(output);
+    return QueryDefaultPrinter(LpstatPath(), kLpstatTimeoutMs);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  lpstatPath [in] path of the lpstat program
+/// @param  timeoutMs [in] how long lpstat may run
+///
+/// @return name of the default printer from `lpstatPath -d`, empty when
+///         none is set, lpstat fails or it runs longer than timeoutMs
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string QueryDefaultPrinter(const std::string& lpstatPath, int timeoutMs)
+{
+    return ParseLpstatDefault(RunCommand(lpstatPath, {"-d"}, timeoutMs));
 }
 
 /////////////////////////////////////////////////////////////////////////////

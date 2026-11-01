@@ -85,9 +85,24 @@ std::string ParseLpstatDefault(const std::string& output);
 // TERM_PROGRAM value, empty when unset.
 std::string TerminalName(const char* termProgram);
 
+// Absolute path of lpstat, "/usr/bin/lpstat".
+std::string LpstatPath(void);
+
+// Milliseconds QueryDefaultPrinter waits for lpstat.
+const int kLpstatTimeoutMs = 1000;
+
+// Standard output of the program at path run with args, LC_ALL=C, and
+// standard input and error on /dev/null. Empty when the program cannot
+// start or has not finished after timeoutMs; it is then killed with its
+// process group and reaped.
+std::string RunCommand(const std::string& path, const std::vector<std::string>& args, int timeoutMs);
+
 std::string QueryMacOSVersion(void);
 std::string QueryChip(void);
+// Default printer from `lpstatPath -d`, empty when none is set, lpstat
+// fails or it does not finish within timeoutMs.
 std::string QueryDefaultPrinter(void);
+std::string QueryDefaultPrinter(const std::string& lpstatPath, int timeoutMs);
 sSystemInfo QuerySystemInfo(void);
 
 }

@@ -22,8 +22,16 @@
 #include "src/core/utils/abouttext.h"
 #include "src/core/include/version.h"
 
+#include <cerrno>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
+
+#include <signal.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 
 namespace
@@ -231,4 +239,142 @@ TEST_CASE("About text - system queries return without crashing")
     CHECK(printer.find('\n') == std::string::npos);
     abouttext::sSystemInfo info = abouttext::QuerySystemInfo();
     CHECK(info.printer == printer);
+}
+
+
+namespace
+{
+
+// A unique temporary folder for scratch scripts, removed with its contents.
+class cScriptDir
+{
+public:
+    cScriptDir(void)
+    {
+        std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-lpstat-XXXXXX").string();
+        REQUIRE(mkdtemp(pattern.data()) != nullptr);
+        mPath = pattern;
+    }
+
+    ~cScriptDir(void)
+    {
+        std::error_code ec;
+        std::filesystem::remove_all(mPath, ec);
+    }
+
+    // An executable shell script with the given body.
+    std::string Script(const std::string& name, const std::string& body)
+    {
+        std::filesystem::path file = mPath / name;
+        {
+            std::ofstream out(file, std::ios::binary);
+            out << "#!/bin/sh\n" << body;
+        }
+        REQUIRE(chmod(file.c_str(), 0700) == 0);
+        return file.string();
+    }
+
+    std::string File(const std::string& name) const
+    {
+        return (mPath / name).string();
+    }
+
+private:
+    std::filesystem::path mPath;
+};
+
+int ReadPid(const std::string& path)
+{
+    std::ifstream in(path);
+    int pid = 0;
+    in >> pid;
+    return pid;
+}
+
+// True when no process with the pid exists, a zombie included; waits up
+// to 1 s for a process that is being torn down.
+bool ProcessGone(int pid)
+{
+    for (int attempt = 0; attempt < 100; ++attempt)
+    {
+        if ((kill(pid, 0) != 0) && (errno == ESRCH))
+        {
+            return true;
+        }
+        usleep(10 * 1000);
+    }
+    return false;
+}
+
+}
+
+
+TEST_CASE("About text - lpstat runs from its absolute path with a 1-second timeout")
+{
+    CHECK(abouttext::LpstatPath() == "/usr/bin/lpstat");
+    CHECK(abouttext::kLpstatTimeoutMs == 1000);
+}
+
+
+TEST_CASE("About text - default printer from an injected lpstat")
+{
+    cScriptDir dir;
+
+    SUBCASE("lpstat -d is run with LC_ALL=C and its output parsed")
+    {
+        std::string lpstat = dir.Script("lpstat",
+            "if [ \"$1\" = \"-d\" ] && [ \"$LC_ALL\" = \"C\" ]; then\n"
+            "  echo \"system default destination: Fake_Printer\"\n"
+            "fi\n");
+        CHECK(abouttext::QueryDefaultPrinter(lpstat, 1000) == "Fake_Printer");
+    }
+
+    SUBCASE("no default destination")
+    {
+        std::string lpstat = dir.Script("lpstat", "echo \"no system default destination\"\n");
+        CHECK(abouttext::QueryDefaultPrinter(lpstat, 1000) == "");
+    }
+
+    SUBCASE("a missing program")
+    {
+        CHECK(abouttext::QueryDefaultPrinter(dir.File("missing"), 1000) == "");
+    }
+
+    SUBCASE("output on standard error is not read")
+    {
+        std::string lpstat = dir.Script("lpstat", "echo \"system default destination: Stderr_Printer\" >&2\n");
+        CHECK(abouttext::QueryDefaultPrinter(lpstat, 1000) == "");
+    }
+}
+
+
+TEST_CASE("About text - an lpstat that hangs is killed after the timeout and means no printer")
+{
+    cScriptDir dir;
+    std::string shellPid = dir.File("shell.pid");
+    std::string sleepPid = dir.File("sleep.pid");
+    std::string lpstat = dir.Script("lpstat",
+        "echo $$ > '" + shellPid + "'\n"
+        "echo \"system default destination: Too_Late\"\n"
+        "sleep 5 &\n"
+        "echo $! > '" + sleepPid + "'\n"
+        "wait\n");
+
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    std::string printer = abouttext::QueryDefaultPrinter(lpstat, 1000);
+    std::chrono::milliseconds elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+
+    CHECK(printer == "");
+    CHECK(elapsed.count() >= 900);
+    CHECK(elapsed.count() < 1500);
+    CHECK(abouttext::PrinterLine(printer) == "Printing to PDF");
+
+    int shell = ReadPid(shellPid);
+    int sleeper = ReadPid(sleepPid);
+    REQUIRE(shell > 0);
+    REQUIRE(sleeper > 0);
+    // The shell was reaped, not left a zombie, and its child was killed.
+    CHECK((kill(shell, 0) != 0) == true);
+    CHECK(ProcessGone(sleeper) == true);
 }
