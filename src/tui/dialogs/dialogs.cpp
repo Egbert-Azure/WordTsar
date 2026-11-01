@@ -2289,13 +2289,14 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         {"Menu Bar",       &config.mTuiMenuBarForeground,              &config.mTuiMenuBarBackground},
     };
 
-    // Right column of sub-tab 1: the five "screen 2" chrome colors.
+    // Right column of sub-tab 1: the six "screen 2" chrome colors.
     std::vector<sColorPair> screen2Colors = {
         {"Menu Accelerator", &config.mTuiMenuAcceleratorForeground, &config.mTuiMenuAcceleratorBackground},
         {"Menu Highlight",   &config.mTuiMenuHighlightForeground,   &config.mTuiMenuHighlightBackground},
         {"Ruler",            &config.mTuiRulerForeground,           &config.mTuiRulerBackground},
         {"Flag Column",      &config.mTuiFlagColumnForeground,      &config.mTuiFlagColumnBackground},
         {"Scrollbar",        &config.mTuiScrollbarForeground,       &config.mTuiScrollbarBackground},
+        {"Highlight Accel.", &config.mTuiMenuHighlightAcceleratorForeground, &config.mTuiMenuHighlightAcceleratorBackground},
     };
 
     int colorSubTab = 0;
@@ -2458,6 +2459,8 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         *screen2Colors[3].bg = pal.flagColumnBackground;
         *screen2Colors[4].fg = pal.scrollbarForeground;
         *screen2Colors[4].bg = pal.scrollbarBackground;
+        *screen2Colors[5].fg = pal.menuHighlightAcceleratorForeground;
+        *screen2Colors[5].bg = pal.menuHighlightAcceleratorBackground;
     };
 
     // Read the current color pairs into a new sTUIPalette for saving.
@@ -2522,6 +2525,8 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         pal.flagColumnBackground = *screen2Colors[3].bg;
         pal.scrollbarForeground = *screen2Colors[4].fg;
         pal.scrollbarBackground = *screen2Colors[4].bg;
+        pal.menuHighlightAcceleratorForeground = *screen2Colors[5].fg;
+        pal.menuHighlightAcceleratorBackground = *screen2Colors[5].bg;
 
         return pal;
     };
@@ -2562,7 +2567,8 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
             && rgbEqual(*screen2Colors[1].fg, pal.menuHighlightForeground) && rgbEqual(*screen2Colors[1].bg, pal.menuHighlightBackground)
             && rgbEqual(*screen2Colors[2].fg, pal.rulerForeground) && rgbEqual(*screen2Colors[2].bg, pal.rulerBackground)
             && rgbEqual(*screen2Colors[3].fg, pal.flagColumnForeground) && rgbEqual(*screen2Colors[3].bg, pal.flagColumnBackground)
-            && rgbEqual(*screen2Colors[4].fg, pal.scrollbarForeground) && rgbEqual(*screen2Colors[4].bg, pal.scrollbarBackground);
+            && rgbEqual(*screen2Colors[4].fg, pal.scrollbarForeground) && rgbEqual(*screen2Colors[4].bg, pal.scrollbarBackground)
+            && rgbEqual(*screen2Colors[5].fg, pal.menuHighlightAcceleratorForeground) && rgbEqual(*screen2Colors[5].bg, pal.menuHighlightAcceleratorBackground);
 
         if (match == true)
         {

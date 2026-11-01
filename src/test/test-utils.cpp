@@ -205,6 +205,8 @@ TEST_CASE("UT-2g: cConfig GetTUIPalettes provides a WordStar 7 preset last")
     CHECK(SameRGB(ws7.menuAcceleratorBackground,    {170, 170, 170}));
     CHECK(SameRGB(ws7.menuHighlightForeground,      {170, 170, 170}));
     CHECK(SameRGB(ws7.menuHighlightBackground,      {0, 0, 0}));
+    CHECK(SameRGB(ws7.menuHighlightAcceleratorForeground, {170, 170, 170}));
+    CHECK(SameRGB(ws7.menuHighlightAcceleratorBackground, {0, 0, 170}));
     CHECK(SameRGB(ws7.helpPanelForeground,          {0, 0, 0}));
     CHECK(SameRGB(ws7.helpPanelBackground,          {170, 170, 170}));
     CHECK(SameRGB(ws7.helpPanelKeystrokeForeground, {85, 85, 255}));
@@ -227,6 +229,8 @@ TEST_CASE("UT-2g: cConfig GetTUIPalettes provides a WordStar 7 preset last")
     CHECK(SameRGB(wt.menuAcceleratorBackground,    {170, 170, 170}));
     CHECK(SameRGB(wt.menuHighlightForeground,      {170, 170, 170}));
     CHECK(SameRGB(wt.menuHighlightBackground,      {0, 0, 170}));
+    CHECK(SameRGB(wt.menuHighlightAcceleratorForeground, {255, 255, 85}));
+    CHECK(SameRGB(wt.menuHighlightAcceleratorBackground, {0, 0, 170}));
 
     // Default-constructed config TUI colors are unchanged
     cConfig config;
@@ -274,12 +278,51 @@ TEST_CASE("UT-2g: cConfig GetTUIPalettes provides a WordStar 7 preset last")
     CHECK(SameRGB(config.mTuiMenuAcceleratorBackground,    {170, 170, 170}));
     CHECK(SameRGB(config.mTuiMenuHighlightForeground,      {170, 170, 170}));
     CHECK(SameRGB(config.mTuiMenuHighlightBackground,      {0, 0, 170}));
+    CHECK(SameRGB(config.mTuiMenuHighlightAcceleratorForeground, {255, 255, 85}));
+    CHECK(SameRGB(config.mTuiMenuHighlightAcceleratorBackground, {0, 0, 170}));
     CHECK(SameRGB(config.mTuiRulerForeground,              {170, 170, 170}));
     CHECK(SameRGB(config.mTuiRulerBackground,              {0, 0, 0}));
     CHECK(SameRGB(config.mTuiFlagColumnForeground,         {170, 170, 170}));
     CHECK(SameRGB(config.mTuiFlagColumnBackground,         {0, 0, 0}));
     CHECK(SameRGB(config.mTuiScrollbarForeground,          {0, 0, 170}));
     CHECK(SameRGB(config.mTuiScrollbarBackground,          {85, 85, 128}));
+}
+
+TEST_CASE("UT-2h: every TUI preset sets a readable highlighted hotkey pair")
+{
+    std::vector<sTUIPalette> palettes = cConfig::GetTUIPalettes();
+    REQUIRE(palettes.size() == 6);
+
+    struct sExpected
+    {
+        const char* name;
+        sRGB fg;
+        sRGB bg;
+    };
+    const sExpected expected[] = {
+        {"WordTsar",      {255, 255, 85},  {0, 0, 170}},
+        {"Standard CGA",  {170, 170, 170}, {0, 0, 170}},
+        {"Monochrome",    {0, 0, 0},       {170, 170, 170}},
+        {"Alternate CGA", {255, 255, 255}, {170, 0, 170}},
+        {"Sawyer",        {0, 0, 0},       {0, 170, 0}},
+        {"WordStar 7",    {170, 170, 170}, {0, 0, 170}},
+    };
+
+    for (size_t index = 0; index < palettes.size(); ++index)
+    {
+        const sTUIPalette& p = palettes[index];
+        INFO(p.name);
+        CHECK(p.name == expected[index].name);
+        CHECK(SameRGB(p.menuHighlightAcceleratorForeground, expected[index].fg));
+        CHECK(SameRGB(p.menuHighlightAcceleratorBackground, expected[index].bg));
+
+        // The letter differs from its own background and stands out from the
+        // rest of the highlighted entry.
+        CHECK_FALSE(SameRGB(p.menuHighlightAcceleratorForeground, p.menuHighlightAcceleratorBackground));
+        bool sameAsEntry = SameRGB(p.menuHighlightAcceleratorForeground, p.menuHighlightForeground) &&
+                           SameRGB(p.menuHighlightAcceleratorBackground, p.menuHighlightBackground);
+        CHECK_FALSE(sameAsEntry);
+    }
 }
 
 TEST_CASE("UT-2e: cConfig ApplyGUIPalette")
@@ -360,4 +403,6 @@ TEST_CASE("UT-2f: cConfig ApplyTUIPalette")
     // Check screen colors
     CHECK(config.mTuiTitleBarForeground.r == palettes[1].titleBarForeground.r);
     CHECK(config.mTuiScrollbarBackground.r == palettes[1].scrollbarBackground.r);
+    CHECK(SameRGB(config.mTuiMenuHighlightAcceleratorForeground, palettes[1].menuHighlightAcceleratorForeground));
+    CHECK(SameRGB(config.mTuiMenuHighlightAcceleratorBackground, palettes[1].menuHighlightAcceleratorBackground));
 }

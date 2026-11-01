@@ -263,6 +263,8 @@ TEST_CASE("TUI palette round-trip: save and load")
     original.menuAcceleratorBackground    = {70, 71, 72};
     original.menuHighlightForeground      = {73, 74, 75};
     original.menuHighlightBackground      = {76, 77, 78};
+    original.menuHighlightAcceleratorForeground = {97, 98, 99};
+    original.menuHighlightAcceleratorBackground = {100, 101, 102};
     original.rulerForeground              = {79, 80, 81};
     original.rulerBackground              = {82, 83, 84};
     original.flagColumnForeground         = {85, 86, 87};
@@ -291,6 +293,42 @@ TEST_CASE("TUI palette round-trip: save and load")
     CheckRGB(loaded.scrollbarBackground,          original.scrollbarBackground,          "scrollbarBackground");
     CheckRGB(loaded.menuHighlightForeground,      original.menuHighlightForeground,      "menuHighlightForeground");
     CheckRGB(loaded.flagColumnBackground,         original.flagColumnBackground,         "flagColumnBackground");
+    CheckRGB(loaded.menuHighlightAcceleratorForeground, original.menuHighlightAcceleratorForeground, "menuHighlightAcceleratorForeground");
+    CheckRGB(loaded.menuHighlightAcceleratorBackground, original.menuHighlightAcceleratorBackground, "menuHighlightAcceleratorBackground");
+}
+
+
+TEST_CASE("TUI palette without the highlighted hotkey keys uses the menu highlight colours")
+{
+    TempConfigDir tmpDir;
+
+    {
+        std::ofstream file(cConfig::GetTUIPaletteFilePath());
+        file << "[Older]\n";
+        file << "menuHighlightForeground = 1,2,3\n";
+        file << "menuHighlightBackground = 4,5,6\n";
+    }
+
+    auto palettes = cConfig::LoadCustomTUIPalettes();
+    REQUIRE(palettes.size() == 1);
+    CheckRGB(palettes[0].menuHighlightAcceleratorForeground, {1, 2, 3}, "menuHighlightAcceleratorForeground");
+    CheckRGB(palettes[0].menuHighlightAcceleratorBackground, {4, 5, 6}, "menuHighlightAcceleratorBackground");
+}
+
+
+TEST_CASE("TUI highlighted hotkey colours round-trip through the config file")
+{
+    TempConfigDir tmpDir;
+
+    cConfig saved;
+    saved.mTuiMenuHighlightAcceleratorForeground = {11, 12, 13};
+    saved.mTuiMenuHighlightAcceleratorBackground = {14, 15, 16};
+    REQUIRE(saved.Save() == true);
+
+    cConfig loaded;
+    loaded.Load();
+    CheckRGB(loaded.mTuiMenuHighlightAcceleratorForeground, {11, 12, 13}, "mTuiMenuHighlightAcceleratorForeground");
+    CheckRGB(loaded.mTuiMenuHighlightAcceleratorBackground, {14, 15, 16}, "mTuiMenuHighlightAcceleratorBackground");
 }
 
 

@@ -85,8 +85,8 @@ struct sGUIPalette
 /// @struct sTUIPalette
 ///
 /// @brief
-/// Named preset color palette for the TUI. Contains all 50 sRGB values
-/// (25 fg+bg pairs) that populate the [tui.colors], [tui.styleColors],
+/// Named preset color palette for the TUI. Contains all 52 sRGB values
+/// (26 fg+bg pairs) that populate the [tui.colors], [tui.styleColors],
 /// and [tui.screen] config sections. Used as a starting point; users can
 /// customize individual colors after applying a palette.
 ///
@@ -114,7 +114,7 @@ struct sTUIPalette
     sRGB superscriptForeground, superscriptBackground;
     sRGB subscriptForeground, subscriptBackground;
 
-    // [tui.screen] -- 10 screen color pairs (20 sRGB)
+    // [tui.screen] -- 11 screen color pairs (22 sRGB)
     sRGB titleBarForeground, titleBarBackground;
     sRGB statusBarForeground, statusBarBackground;
     sRGB helpPanelForeground, helpPanelBackground;
@@ -122,6 +122,7 @@ struct sTUIPalette
     sRGB menuBarForeground, menuBarBackground;
     sRGB menuAcceleratorForeground, menuAcceleratorBackground;
     sRGB menuHighlightForeground, menuHighlightBackground;
+    sRGB menuHighlightAcceleratorForeground, menuHighlightAcceleratorBackground;
     sRGB rulerForeground, rulerBackground;
     sRGB flagColumnForeground, flagColumnBackground;
     sRGB scrollbarForeground, scrollbarBackground;
@@ -308,7 +309,7 @@ public:
     sRGB mTuiSubscriptForeground;
     sRGB mTuiSubscriptBackground;
 
-    // --- [tui.screen] settings (10 screen color pairs = 20 sRGB values) ---
+    // --- [tui.screen] settings (11 screen color pairs = 22 sRGB values) ---
     sRGB mTuiTitleBarForeground;
     sRGB mTuiTitleBarBackground;
     sRGB mTuiStatusBarForeground;
@@ -323,6 +324,8 @@ public:
     sRGB mTuiMenuAcceleratorBackground;
     sRGB mTuiMenuHighlightForeground;
     sRGB mTuiMenuHighlightBackground;
+    sRGB mTuiMenuHighlightAcceleratorForeground;
+    sRGB mTuiMenuHighlightAcceleratorBackground;
     sRGB mTuiRulerForeground;
     sRGB mTuiRulerBackground;
     sRGB mTuiFlagColumnForeground;

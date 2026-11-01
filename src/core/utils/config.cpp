@@ -241,6 +241,8 @@ cConfig::cConfig(void)
     mTuiMenuAcceleratorBackground = {170, 170, 170};
     mTuiMenuHighlightForeground = {170, 170, 170};
     mTuiMenuHighlightBackground = {0, 0, 170};
+    mTuiMenuHighlightAcceleratorForeground = {255, 255, 85};
+    mTuiMenuHighlightAcceleratorBackground = {0, 0, 170};
     mTuiRulerForeground = {170, 170, 170};
     mTuiRulerBackground = {0, 0, 0};
     mTuiFlagColumnForeground = {170, 170, 170};
@@ -839,6 +841,8 @@ bool cConfig::Load(void)
     mTuiMenuAcceleratorBackground = ReadRGB(&ini, "tui.screen", "menuAcceleratorBackground", mTuiMenuAcceleratorBackground);
     mTuiMenuHighlightForeground = ReadRGB(&ini, "tui.screen", "menuHighlightForeground", mTuiMenuHighlightForeground);
     mTuiMenuHighlightBackground = ReadRGB(&ini, "tui.screen", "menuHighlightBackground", mTuiMenuHighlightBackground);
+    mTuiMenuHighlightAcceleratorForeground = ReadRGB(&ini, "tui.screen", "menuHighlightAcceleratorForeground", mTuiMenuHighlightAcceleratorForeground);
+    mTuiMenuHighlightAcceleratorBackground = ReadRGB(&ini, "tui.screen", "menuHighlightAcceleratorBackground", mTuiMenuHighlightAcceleratorBackground);
     mTuiRulerForeground = ReadRGB(&ini, "tui.screen", "rulerForeground", mTuiRulerForeground);
     mTuiRulerBackground = ReadRGB(&ini, "tui.screen", "rulerBackground", mTuiRulerBackground);
     mTuiFlagColumnForeground = ReadRGB(&ini, "tui.screen", "flagColumnForeground", mTuiFlagColumnForeground);
@@ -1024,6 +1028,8 @@ bool cConfig::Save(void)
     WriteRGB(&ini, "tui.screen", "menuAcceleratorBackground", mTuiMenuAcceleratorBackground);
     WriteRGB(&ini, "tui.screen", "menuHighlightForeground", mTuiMenuHighlightForeground);
     WriteRGB(&ini, "tui.screen", "menuHighlightBackground", mTuiMenuHighlightBackground);
+    WriteRGB(&ini, "tui.screen", "menuHighlightAcceleratorForeground", mTuiMenuHighlightAcceleratorForeground);
+    WriteRGB(&ini, "tui.screen", "menuHighlightAcceleratorBackground", mTuiMenuHighlightAcceleratorBackground);
     WriteRGB(&ini, "tui.screen", "rulerForeground", mTuiRulerForeground);
     WriteRGB(&ini, "tui.screen", "rulerBackground", mTuiRulerBackground);
     WriteRGB(&ini, "tui.screen", "flagColumnForeground", mTuiFlagColumnForeground);
@@ -1359,6 +1365,8 @@ std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
     wordtsar.menuAcceleratorBackground       = {170, 170, 170};
     wordtsar.menuHighlightForeground         = {170, 170, 170};
     wordtsar.menuHighlightBackground         = {0, 0, 170};
+    wordtsar.menuHighlightAcceleratorForeground = {255, 255, 85};
+    wordtsar.menuHighlightAcceleratorBackground = {0, 0, 170};
     wordtsar.rulerForeground                 = {170, 170, 170};
     wordtsar.rulerBackground                 = {0, 0, 0};
     wordtsar.flagColumnForeground            = {170, 170, 170};
@@ -1438,6 +1446,8 @@ std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
     stdCGA.menuAcceleratorBackground       = cgaWhite;
     stdCGA.menuHighlightForeground         = cgaBrightWhite; // Title highlight
     stdCGA.menuHighlightBackground         = cgaBlack;
+    stdCGA.menuHighlightAcceleratorForeground = cgaWhite;
+    stdCGA.menuHighlightAcceleratorBackground = cgaBlue;
     stdCGA.rulerForeground                 = cgaWhite;
     stdCGA.rulerBackground                 = cgaBlack;
     stdCGA.flagColumnForeground            = cgaWhite;
@@ -1502,6 +1512,8 @@ std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
     mono.menuAcceleratorBackground       = cgaBlack;
     mono.menuHighlightForeground         = cgaBrightWhite; // Title highlight
     mono.menuHighlightBackground         = cgaBlack;
+    mono.menuHighlightAcceleratorForeground = cgaBlack;
+    mono.menuHighlightAcceleratorBackground = cgaWhite;
     mono.rulerForeground                 = cgaWhite;
     mono.rulerBackground                 = cgaBlack;
     mono.flagColumnForeground            = cgaWhite;
@@ -1565,6 +1577,8 @@ std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
     altCGA.menuAcceleratorBackground       = cgaWhite;
     altCGA.menuHighlightForeground         = cgaBrightWhite; // Title highlight
     altCGA.menuHighlightBackground         = cgaBlack;
+    altCGA.menuHighlightAcceleratorForeground = cgaBrightWhite;
+    altCGA.menuHighlightAcceleratorBackground = cgaMagenta;
     altCGA.rulerForeground                 = cgaWhite;
     altCGA.rulerBackground                 = cgaBlack;
     altCGA.flagColumnForeground            = cgaWhite;
@@ -1632,6 +1646,8 @@ std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
     sfwriter.menuAcceleratorBackground       = cgaBlack;
     sfwriter.menuHighlightForeground         = cgaWhite;   // Title highlight
     sfwriter.menuHighlightBackground         = cgaBlack;
+    sfwriter.menuHighlightAcceleratorForeground = cgaBlack;
+    sfwriter.menuHighlightAcceleratorBackground = cgaGreen;
     sfwriter.rulerForeground                 = cgaDarkGray;
     sfwriter.rulerBackground                 = cgaBlack;
     sfwriter.flagColumnForeground            = cgaDarkGray;
@@ -1660,6 +1676,8 @@ std::vector<sTUIPalette> cConfig::GetTUIPalettes(void)
     ws7.menuAcceleratorBackground       = cgaWhite;
     ws7.menuHighlightForeground         = cgaWhite;
     ws7.menuHighlightBackground         = cgaBlack;
+    ws7.menuHighlightAcceleratorForeground = cgaWhite;
+    ws7.menuHighlightAcceleratorBackground = cgaBlue;
     palettes.push_back(ws7);
 
     return palettes;
@@ -1845,7 +1863,7 @@ std::vector<sTUIPalette> cConfig::LoadCustomTUIPalettes(void)
         pal.subscriptForeground           = readRGB(name, "subscriptForeground", black);
         pal.subscriptBackground           = readRGB(name, "subscriptBackground", white);
 
-        // [tui.screen] -- 10 screen color pairs (20 sRGB)
+        // [tui.screen] -- 11 screen color pairs (22 sRGB)
         pal.titleBarForeground            = readRGB(name, "titleBarForeground", black);
         pal.titleBarBackground            = readRGB(name, "titleBarBackground", white);
         pal.statusBarForeground           = readRGB(name, "statusBarForeground", black);
@@ -1860,6 +1878,8 @@ std::vector<sTUIPalette> cConfig::LoadCustomTUIPalettes(void)
         pal.menuAcceleratorBackground     = readRGB(name, "menuAcceleratorBackground", white);
         pal.menuHighlightForeground       = readRGB(name, "menuHighlightForeground", black);
         pal.menuHighlightBackground       = readRGB(name, "menuHighlightBackground", white);
+        pal.menuHighlightAcceleratorForeground = readRGB(name, "menuHighlightAcceleratorForeground", pal.menuHighlightForeground);
+        pal.menuHighlightAcceleratorBackground = readRGB(name, "menuHighlightAcceleratorBackground", pal.menuHighlightBackground);
         pal.rulerForeground               = readRGB(name, "rulerForeground", black);
         pal.rulerBackground               = readRGB(name, "rulerBackground", white);
         pal.flagColumnForeground          = readRGB(name, "flagColumnForeground", black);
@@ -1998,7 +2018,7 @@ bool cConfig::SaveCustomTUIPalette(const sTUIPalette& palette)
     writeRGB("subscriptForeground",           palette.subscriptForeground);
     writeRGB("subscriptBackground",           palette.subscriptBackground);
 
-    // [tui.screen] -- 10 screen color pairs (20 sRGB)
+    // [tui.screen] -- 11 screen color pairs (22 sRGB)
     writeRGB("titleBarForeground",            palette.titleBarForeground);
     writeRGB("titleBarBackground",            palette.titleBarBackground);
     writeRGB("statusBarForeground",           palette.statusBarForeground);
@@ -2013,6 +2033,8 @@ bool cConfig::SaveCustomTUIPalette(const sTUIPalette& palette)
     writeRGB("menuAcceleratorBackground",     palette.menuAcceleratorBackground);
     writeRGB("menuHighlightForeground",       palette.menuHighlightForeground);
     writeRGB("menuHighlightBackground",       palette.menuHighlightBackground);
+    writeRGB("menuHighlightAcceleratorForeground", palette.menuHighlightAcceleratorForeground);
+    writeRGB("menuHighlightAcceleratorBackground", palette.menuHighlightAcceleratorBackground);
     writeRGB("rulerForeground",               palette.rulerForeground);
     writeRGB("rulerBackground",               palette.rulerBackground);
     writeRGB("flagColumnForeground",          palette.flagColumnForeground);
@@ -2131,6 +2153,8 @@ void cConfig::ApplyTUIPalette(const sTUIPalette& palette)
     mTuiMenuAcceleratorBackground = palette.menuAcceleratorBackground;
     mTuiMenuHighlightForeground = palette.menuHighlightForeground;
     mTuiMenuHighlightBackground = palette.menuHighlightBackground;
+    mTuiMenuHighlightAcceleratorForeground = palette.menuHighlightAcceleratorForeground;
+    mTuiMenuHighlightAcceleratorBackground = palette.menuHighlightAcceleratorBackground;
     mTuiRulerForeground = palette.rulerForeground;
     mTuiRulerBackground = palette.rulerBackground;
     mTuiFlagColumnForeground = palette.flagColumnForeground;
