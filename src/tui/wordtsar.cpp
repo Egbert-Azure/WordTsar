@@ -130,6 +130,22 @@ constexpr int kOpeningRightCount = 10;
 constexpr int kOpeningOwnFirst = kOpeningLeftCount + kOpeningRightCount;
 constexpr int kOpeningCount = 22;
 
+// True if a typed letter belongs to a disabled Opening item.
+bool IsUnavailableOpeningKey(char typed)
+{
+    const int upper = std::toupper(static_cast<unsigned char>(typed));
+    for (int item = 0; item < kOpeningOwnFirst; ++item)
+    {
+        const sOpeningItem& entry = kOpeningItems[item];
+        if ((entry.enabled == false) &&
+            (std::toupper(static_cast<unsigned char>(entry.key)) == upper))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1083,7 +1099,7 @@ void cWSWordTsar::BuildMenus(void)
     {
         return modern ? mod : ws;
     };
-    auto none = [](void) {};
+    auto unavailable = [this](void) { ShowNotAvailable(); };
 
     // ------------------------------- File -------------------------------
     int file = mMenu.AddMenu("File", 'F');
@@ -1142,16 +1158,16 @@ void cWSWordTsar::BuildMenus(void)
 
     int editGotoOther = mMenu.AddSubMenu(edit, "Go to &Other");
     mMenu.AddSubMenuItem(editGotoOther, std::string("Font Tag") + SC("^Q=", "Alt+Q, ="), [this](void) { InjectChord(CTRL_Q, '='); });
-    mMenu.AddSubMenuItem(editGotoOther, std::string("Style Tag") + SC("^Q<", ""), none, false);
-    mMenu.AddSubMenuItem(editGotoOther, std::string("Note...") + SC("^ONG", ""), none, false);
+    mMenu.AddSubMenuItem(editGotoOther, std::string("Style Tag") + SC("^Q<", ""), unavailable, false);
+    mMenu.AddSubMenuItem(editGotoOther, std::string("Note...") + SC("^ONG", ""), unavailable, false);
     mMenu.AddSubMenuItem(editGotoOther, std::string("Previous Position") + SC("^QP", "Alt+Q, P"), [this](void) { InjectChord(CTRL_Q, 'p'); });
     mMenu.AddSubMenuItem(editGotoOther, std::string("Last Find/Replace") + SC("^QV", "Alt+Q, V"), [this](void) { InjectChord(CTRL_Q, 'v'); });
     mMenu.AddSubMenuItem(editGotoOther, std::string("Beginning of Block") + SC("^QB", "Alt+Q, B"), [this](void) { InjectChord(CTRL_Q, 'b'); });
     mMenu.AddSubMenuItem(editGotoOther, std::string("End of Block") + SC("^QK", "Alt+Q, K"), [this](void) { InjectChord(CTRL_Q, 'k'); });
     mMenu.AddSubMenuItem(editGotoOther, std::string("Document Beginning") + SC("^QR", "Ctrl+Home"), [this](void) { InjectChord(CTRL_Q, 'r'); });
     mMenu.AddSubMenuItem(editGotoOther, std::string("Document End") + SC("^QC", "Ctrl+End"), [this](void) { InjectChord(CTRL_Q, 'c'); });
-    mMenu.AddSubMenuItem(editGotoOther, std::string("Scroll Up") + SC("^QW", ""), none, false);
-    mMenu.AddSubMenuItem(editGotoOther, std::string("Scroll Down") + SC("^QZ", ""), none, false);
+    mMenu.AddSubMenuItem(editGotoOther, std::string("Scroll Up") + SC("^QW", ""), unavailable, false);
+    mMenu.AddSubMenuItem(editGotoOther, std::string("Scroll Down") + SC("^QZ", ""), unavailable, false);
 
     int editSetMarker = mMenu.AddSubMenu(edit, "&Set Marker");
     for (char digit = '1'; digit <= '9'; ++digit)
@@ -1161,16 +1177,16 @@ void cWSWordTsar::BuildMenus(void)
     }
     mMenu.AddSubMenuItem(editSetMarker, std::string("Marker 0") + SC("^K0", "Alt+K, 0"), [this](void) { InjectChord(CTRL_K, '0'); });
 
-    mMenu.AddSubItem(edit, std::string("Edit &Note") + SC("^OND", ""), none, false);
+    mMenu.AddSubItem(edit, std::string("Edit &Note") + SC("^OND", ""), unavailable, false);
 
     int editNoteOpt = mMenu.AddSubMenu(edit, "Note Optio&ns");
-    mMenu.AddSubMenuItem(editNoteOpt, std::string("Convert Note...") + SC("^ONV", ""), none, false);
-    mMenu.AddSubMenuItem(editNoteOpt, std::string("Endnote Location") + SC(".pe", ""), none, false);
+    mMenu.AddSubMenuItem(editNoteOpt, std::string("Convert Note...") + SC("^ONV", ""), unavailable, false);
+    mMenu.AddSubMenuItem(editNoteOpt, std::string("Endnote Location") + SC(".pe", ""), unavailable, false);
 
     int editSettings = mMenu.AddSubMenu(edit, "Editing Se&ttings");
-    mMenu.AddSubMenuItem(editSettings, std::string("Column Block Mode") + SC("^KN", ""), none, false);
-    mMenu.AddSubMenuItem(editSettings, std::string("Column Replace") + SC("^KI", ""), none, false);
-    mMenu.AddSubMenuItem(editSettings, std::string("Auto Align") + SC("^OA", ""), none, false);
+    mMenu.AddSubMenuItem(editSettings, std::string("Column Block Mode") + SC("^KN", ""), unavailable, false);
+    mMenu.AddSubMenuItem(editSettings, std::string("Column Replace") + SC("^KI", ""), unavailable, false);
+    mMenu.AddSubMenuItem(editSettings, std::string("Auto Align") + SC("^OA", ""), unavailable, false);
 
     // ------------------------------- View -------------------------------
     int view = mMenu.AddMenu("View", 'V');
@@ -1191,9 +1207,9 @@ void cWSWordTsar::BuildMenus(void)
 
     int insertOther = mMenu.AddSubMenu(insert, "&Other Value");
     mMenu.AddSubMenuItem(insertOther, std::string("Current Time") + SC("^M!", ""), [this](void) { InjectChord(CTRL_M, '!'); });
-    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Result") + SC("^M=", ""), none, false);
-    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Expr.") + SC("^M#", ""), none, false);
-    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Dollar") + SC("^M$", ""), none, false);
+    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Result") + SC("^M=", ""), unavailable, false);
+    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Expr.") + SC("^M#", ""), unavailable, false);
+    mMenu.AddSubMenuItem(insertOther, std::string("Last Math Dollar") + SC("^M$", ""), unavailable, false);
     mMenu.AddSubMenuItem(insertOther, std::string("Current Filename") + SC("^M*", ""), [this](void) { InjectChord(CTRL_M, '*'); });
     mMenu.AddSubMenuItem(insertOther, std::string("Current Directory") + SC("^M.", ""), [this](void) { InjectChord(CTRL_M, '.'); });
     mMenu.AddSubMenuItem(insertOther, std::string("Current Path") + SC("^M\\", ""), [this](void) { InjectChord(CTRL_M, '\\'); });
@@ -1208,25 +1224,25 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(insertVar, "Path", [this](void) { mEditor->InsertText("&\\&"); });
     mMenu.AddSubMenuItem(insertVar, "Word Count", [this](void) { mEditor->InsertText("&?&"); });
 
-    mMenu.AddSubItem(insert, std::string("&Extended Char...") + SC("^PO", ""), none, false);
+    mMenu.AddSubItem(insert, std::string("&Extended Char...") + SC("^PO", ""), unavailable, false);
     mMenu.AddSeparator(insert);
     mMenu.AddSubItem(insert, std::string("&File...") + SC("^KR", ""), [this](void) { InjectChord(CTRL_K, 'r'); });
-    mMenu.AddSubItem(insert, std::string("File at Print Time") + SC(".fi", ""), none, false);
-    mMenu.AddSubItem(insert, std::string("&Graphic...") + SC("^P*", ""), none, false);
+    mMenu.AddSubItem(insert, std::string("File at Print Time") + SC(".fi", ""), unavailable, false);
+    mMenu.AddSubItem(insert, std::string("&Graphic...") + SC("^P*", ""), unavailable, false);
 
     int insertNote = mMenu.AddSubMenu(insert, "&Note");
-    mMenu.AddSubMenuItem(insertNote, std::string("Comment...") + SC("^ONC", ""), none, false);
-    mMenu.AddSubMenuItem(insertNote, std::string("Footnote...") + SC("^ONF", ""), none, false);
-    mMenu.AddSubMenuItem(insertNote, std::string("Endnote...") + SC("^ONE", ""), none, false);
-    mMenu.AddSubMenuItem(insertNote, std::string("Annotation") + SC("^ONA", ""), none, false);
+    mMenu.AddSubMenuItem(insertNote, std::string("Comment...") + SC("^ONC", ""), unavailable, false);
+    mMenu.AddSubMenuItem(insertNote, std::string("Footnote...") + SC("^ONF", ""), unavailable, false);
+    mMenu.AddSubMenuItem(insertNote, std::string("Endnote...") + SC("^ONE", ""), unavailable, false);
+    mMenu.AddSubMenuItem(insertNote, std::string("Annotation") + SC("^ONA", ""), unavailable, false);
 
     mMenu.AddSeparator(insert);
     int insertIndex = mMenu.AddSubMenu(insert, "&Index/TOC Entry");
     mMenu.AddSubMenuItem(insertIndex, std::string("TOC Entry...") + SC(".tc", ""), [this](void) { InsertTOCEntry(); });
     mMenu.AddSubMenuItem(insertIndex, std::string("Index Entry...") + SC("^ONI", ""), [this](void) { InsertIndexEntry(); });
-    mMenu.AddSubMenuItem(insertIndex, std::string("Dot Leader to Tab") + SC("^P.", ""), none, false);
+    mMenu.AddSubMenuItem(insertIndex, std::string("Dot Leader to Tab") + SC("^P.", ""), unavailable, false);
 
-    mMenu.AddSubItem(insert, std::string("Outline Number...") + SC("^OZ", ""), none, false);
+    mMenu.AddSubItem(insert, std::string("Outline Number...") + SC("^OZ", ""), unavailable, false);
 
     // ------------------------------- Style ------------------------------
     int style = mMenu.AddMenu("Style", 'S');
@@ -1239,19 +1255,19 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(styleOther, std::string("Strikeout") + SC("^PX", "Alt+P, X"), [this](void) { InjectChord(CTRL_P, 'x'); });
     mMenu.AddSubMenuItem(styleOther, std::string("Subscript") + SC("^PV", "Alt+P, V"), [this](void) { InjectChord(CTRL_P, 'v'); });
     mMenu.AddSubMenuItem(styleOther, std::string("Superscript") + SC("^PT", "Alt+P, T"), [this](void) { InjectChord(CTRL_P, 't'); });
-    mMenu.AddSubMenuItem(styleOther, std::string("Doublestrike") + SC("^PD", ""), none, false);
+    mMenu.AddSubMenuItem(styleOther, std::string("Doublestrike") + SC("^PD", ""), unavailable, false);
     mMenu.AddSubMenuItem(styleOther, std::string("Color...") + SC("^P-", "Alt+P, -"), [this](void) { InjectChord(CTRL_P, '-'); });
 
     mMenu.AddSeparator(style);
-    mMenu.AddSubItem(style, std::string("Select Para Style") + SC("^OFS", ""), none, false);
-    mMenu.AddSubItem(style, std::string("Previous Style") + SC("^OFP", ""), none, false);
-    mMenu.AddSubItem(style, std::string("Define Para Style") + SC("^OFD", ""), none, false);
+    mMenu.AddSubItem(style, std::string("Select Para Style") + SC("^OFS", ""), unavailable, false);
+    mMenu.AddSubItem(style, std::string("Previous Style") + SC("^OFP", ""), unavailable, false);
+    mMenu.AddSubItem(style, std::string("Define Para Style") + SC("^OFD", ""), unavailable, false);
 
     int styleManage = mMenu.AddSubMenu(style, "&Manage Paragraph Styles");
-    mMenu.AddSubMenuItem(styleManage, std::string("Copy to Library") + SC("^OFO", ""), none, false);
-    mMenu.AddSubMenuItem(styleManage, std::string("Delete Library") + SC("^OFY", ""), none, false);
-    mMenu.AddSubMenuItem(styleManage, std::string("Rename Library") + SC("^OFR", ""), none, false);
-    mMenu.AddSubMenuItem(styleManage, std::string("Rename Document") + SC("^OFE", ""), none, false);
+    mMenu.AddSubMenuItem(styleManage, std::string("Copy to Library") + SC("^OFO", ""), unavailable, false);
+    mMenu.AddSubMenuItem(styleManage, std::string("Delete Library") + SC("^OFY", ""), unavailable, false);
+    mMenu.AddSubMenuItem(styleManage, std::string("Rename Library") + SC("^OFR", ""), unavailable, false);
+    mMenu.AddSubMenuItem(styleManage, std::string("Rename Document") + SC("^OFE", ""), unavailable, false);
 
     int styleCase = mMenu.AddSubMenu(style, "Convert &Case");
     mMenu.AddSubMenuItem(styleCase, std::string("Uppercase") + SC("^K\"", "Alt+K, \""), [this](void) { InjectChord(CTRL_K, '"'); });
@@ -1270,8 +1286,8 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(layout, std::string("Right Align Para") + SC("^O>", "Ctrl+R"), [this](void) { InjectChord(CTRL_O, '>'); });
     mMenu.AddSubItem(layout, std::string("&Justify Paragraph") + SC("^O+", "Ctrl+J"), [this](void) { InjectChord(CTRL_O, '+'); });
     mMenu.AddSeparator(layout);
-    mMenu.AddSubItem(layout, std::string("Ruler Line...") + SC("^OL", ""), none, false);
-    mMenu.AddSubItem(layout, std::string("Columns...") + SC("^OU", ""), none, false);
+    mMenu.AddSubItem(layout, std::string("Ruler Line...") + SC("^OL", ""), unavailable, false);
+    mMenu.AddSubItem(layout, std::string("Columns...") + SC("^OU", ""), unavailable, false);
     mMenu.AddSubItem(layout, std::string("Pa&ge...") + SC("^OY", "Alt+O, Y"), [this](void) { InjectChord(CTRL_O, 'Y'); });
 
     int layoutHF = mMenu.AddSubMenu(layout, "&Headers/Footers");
@@ -1286,22 +1302,22 @@ void cWSWordTsar::BuildMenus(void)
         mEditor->GetDocument()->Insert(".fo\n");
     });
 
-    mMenu.AddSubItem(layout, std::string("Page Numbering...") + SC("^O#", ""), none, false);
-    mMenu.AddSubItem(layout, std::string("Line Numbering...") + SC(".l#", ""), none, false);
-    mMenu.AddSubItem(layout, std::string("Alignment/Spacing") + SC("^OS", ""), none, false);
+    mMenu.AddSubItem(layout, std::string("Page Numbering...") + SC("^O#", ""), unavailable, false);
+    mMenu.AddSubItem(layout, std::string("Line Numbering...") + SC(".l#", ""), unavailable, false);
+    mMenu.AddSubItem(layout, std::string("Alignment/Spacing") + SC("^OS", ""), unavailable, false);
 
     int layoutSpecial = mMenu.AddSubMenu(layout, "Special &Effects");
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Overprint Char") + SC("^PH", ""), none, false);
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Overprint Line") + SC("^P Enter", ""), none, false);
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Option Hyphen") + SC("^OE", ""), none, false);
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Vertically Center") + SC("^OV", ""), none, false);
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Word Together") + SC("^PO", ""), none, false);
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Overprint Char") + SC("^PH", ""), unavailable, false);
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Overprint Line") + SC("^P Enter", ""), unavailable, false);
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Option Hyphen") + SC("^OE", ""), unavailable, false);
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Vertically Center") + SC("^OV", ""), unavailable, false);
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Word Together") + SC("^PO", ""), unavailable, false);
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Page") + SC(".cp", ""), [this](void) {
         mEditor->MoveCursorStartLine();
         mEditor->GetDocument()->MaybeInsertHardReturn();
         mEditor->GetDocument()->Insert(".cp\n");
     });
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Column") + SC(".cc", ""), none, false);
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Column") + SC(".cc", ""), unavailable, false);
 
     // ----------------------------- Utilities ----------------------------
     int util = mMenu.AddMenu("Utilities", 'U');
@@ -1310,50 +1326,50 @@ void cWSWordTsar::BuildMenus(void)
     int utilSpell = mMenu.AddSubMenu(util, "Spell Check Ot&her");
     mMenu.AddSubMenuItem(utilSpell, std::string("Rest of Document") + SC("^QL", ""), [this](void) { mEditor->SpellCheckDocument(); });
     mMenu.AddSubMenuItem(utilSpell, std::string("Word") + SC("^QN", ""), [this](void) { mEditor->SpellCheckWord(); });
-    mMenu.AddSubMenuItem(utilSpell, std::string("Type Word...") + SC("^QO", ""), none, false);
+    mMenu.AddSubMenuItem(utilSpell, std::string("Type Word...") + SC("^QO", ""), unavailable, false);
 
-    mMenu.AddSubItem(util, std::string("&Thesaurus") + SC("^QJ", ""), none, false);
+    mMenu.AddSubItem(util, std::string("&Thesaurus") + SC("^QJ", ""), unavailable, false);
     mMenu.AddSeparator(util);
-    mMenu.AddSubItem(util, std::string("&Inset") + SC("^P&", ""), none, false);
-    mMenu.AddSubItem(util, std::string("&Calculator") + SC("^QM", ""), none, false);
-    mMenu.AddSubItem(util, std::string("Block &Math") + SC("^KM", ""), none, false);
+    mMenu.AddSubItem(util, std::string("&Inset") + SC("^P&", ""), unavailable, false);
+    mMenu.AddSubItem(util, std::string("&Calculator") + SC("^QM", ""), unavailable, false);
+    mMenu.AddSubItem(util, std::string("Block &Math") + SC("^KM", ""), unavailable, false);
 
     int utilSort = mMenu.AddSubMenu(util, "Sort &Block");
-    mMenu.AddSubMenuItem(utilSort, std::string("Ascending") + SC("^KZA", ""), none, false);
-    mMenu.AddSubMenuItem(utilSort, std::string("Descending") + SC("^KZD", ""), none, false);
+    mMenu.AddSubMenuItem(utilSort, std::string("Ascending") + SC("^KZA", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilSort, std::string("Descending") + SC("^KZD", ""), unavailable, false);
 
     mMenu.AddSubItem(util, std::string("&Word Count") + SC("^K?", "Alt+K, ?"), [this](void) { InjectChord(CTRL_K, '?'); });
     mMenu.AddSeparator(util);
 
     int utilMacros = mMenu.AddSubMenu(util, "Macr&os");
-    mMenu.AddSubMenuItem(utilMacros, std::string("Play...") + SC("^MP", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Record...") + SC("^MR", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Edit/Create...") + SC("^MD", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Single Step...") + SC("^MS", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Copy...") + SC("^MO", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Delete...") + SC("^MY", ""), none, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Rename...") + SC("^ME", ""), none, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Play...") + SC("^MP", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Record...") + SC("^MR", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Edit/Create...") + SC("^MD", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Single Step...") + SC("^MS", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Copy...") + SC("^MO", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Delete...") + SC("^MY", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Rename...") + SC("^ME", ""), unavailable, false);
 
     int utilMerge = mMenu.AddSubMenu(util, "Merge &Print Commands");
-    mMenu.AddSubMenuItem(utilMerge, std::string("Data File...") + SC(".df", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Name Variables") + SC(".rv", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Set Variable") + SC(".sv", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Set Var to Math") + SC(".ma", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Ask for Variable") + SC(".av", ""), none, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Data File...") + SC(".df", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Name Variables") + SC(".rv", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Set Variable") + SC(".sv", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Set Var to Math") + SC(".ma", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Ask for Variable") + SC(".av", ""), unavailable, false);
     mMenu.AddSubMenuSeparator(utilMerge);
-    mMenu.AddSubMenuItem(utilMerge, std::string("If...") + SC(".if", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Else") + SC(".el", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("End If") + SC(".ei", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Go to Top") + SC(".go t", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Go to Bottom") + SC(".go b", ""), none, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("If...") + SC(".if", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Else") + SC(".el", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("End If") + SC(".ei", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Go to Top") + SC(".go t", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Go to Bottom") + SC(".go b", ""), unavailable, false);
     mMenu.AddSubMenuSeparator(utilMerge);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Clear Screen...") + SC(".cs", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Display Message") + SC(".dm", ""), none, false);
-    mMenu.AddSubMenuItem(utilMerge, std::string("Print n Times...") + SC(".rp", ""), none, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Clear Screen...") + SC(".cs", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Display Message") + SC(".dm", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMerge, std::string("Print n Times...") + SC(".rp", ""), unavailable, false);
 
     int utilReformat = mMenu.AddSubMenu(util, "&Reformat");
     mMenu.AddSubMenuItem(utilReformat, std::string("Rest of Document") + SC("^QU", "Alt+Q, U"), [this](void) { InjectChord(CTRL_Q, 'u'); });
-    mMenu.AddSubMenuItem(utilReformat, std::string("Rest of Notes") + SC("^ONU", ""), none, false);
+    mMenu.AddSubMenuItem(utilReformat, std::string("Rest of Notes") + SC("^ONU", ""), unavailable, false);
 
     mMenu.AddSeparator(util);
     mMenu.AddSubItem(util, std::string("System Preferences"), [this](void) { OpenSystemPreferences(); });
@@ -1393,8 +1409,8 @@ void cWSWordTsar::BuildOpeningMenus(void)
     mOpeningMenu.SetWideOpenTitle(true);
 
     // Entries show the classic Opening Menu letter right-aligned. Entries
-    // without an Opening screen action are disabled.
-    auto none = [](void) {};
+    // without an Opening screen action are disabled and report that.
+    auto unavailable = [this](void) { ShowNotAvailable(); };
     auto run = [this](eOpeningAction action)
     {
         return [this, action](void) { RunOpeningAction(action); };
@@ -1403,21 +1419,21 @@ void cWSWordTsar::BuildOpeningMenus(void)
     int file = mOpeningMenu.AddMenu("File", 'F');
     mOpeningMenu.AddSubItem(file, "Ne&w  S", run(eOpeningAction::SPEED_WRITE));
     mOpeningMenu.AddSubItem(file, "Open &Document...  D", run(eOpeningAction::OPEN_DOCUMENT));
-    mOpeningMenu.AddSubItem(file, "Open &Nondocument...  N", none, false);
+    mOpeningMenu.AddSubItem(file, "Open &Nondocument...  N", unavailable, false);
     mOpeningMenu.AddSubItem(file, "Recent F&iles...", run(eOpeningAction::RECENT_FILES));
     mOpeningMenu.AddSeparator(file);
     mOpeningMenu.AddSubItem(file, "&Print...  P", run(eOpeningAction::PRINT_FILE));
-    mOpeningMenu.AddSubItem(file, "Print from &Keyboard...  K", none, false);
-    mOpeningMenu.AddSubItem(file, "&Fax...  \\", none, false);
+    mOpeningMenu.AddSubItem(file, "Print from &Keyboard...  K", unavailable, false);
+    mOpeningMenu.AddSubItem(file, "&Fax...  \\", unavailable, false);
     mOpeningMenu.AddSeparator(file);
-    mOpeningMenu.AddSubItem(file, "C&opy...  O", none, false);
-    mOpeningMenu.AddSubItem(file, "Dele&te...  Y", none, false);
-    mOpeningMenu.AddSubItem(file, "R&ename...  E", none, false);
-    mOpeningMenu.AddSubItem(file, "Prote&ct/Unprotect...  C", none, false);
+    mOpeningMenu.AddSubItem(file, "C&opy...  O", unavailable, false);
+    mOpeningMenu.AddSubItem(file, "Dele&te...  Y", unavailable, false);
+    mOpeningMenu.AddSubItem(file, "R&ename...  E", unavailable, false);
+    mOpeningMenu.AddSubItem(file, "Prote&ct/Unprotect...  C", unavailable, false);
     mOpeningMenu.AddSeparator(file);
     mOpeningMenu.AddSubItem(file, "Change Dri&ve/Directory...  L", run(eOpeningAction::CHANGE_DIRECTORY));
-    mOpeningMenu.AddSubItem(file, "C&hange Filename Display...", none, false);
-    mOpeningMenu.AddSubItem(file, "&Run DOS Command...  R", none, false);
+    mOpeningMenu.AddSubItem(file, "C&hange Filename Display...", unavailable, false);
+    mOpeningMenu.AddSubItem(file, "&Run DOS Command...  R", unavailable, false);
     mOpeningMenu.AddSubItem(file, "Stat&us  ?", run(eOpeningAction::DISPLAY_STATUS));
     mOpeningMenu.AddSeparator(file);
     mOpeningMenu.AddSubItem(file, "E&xit WordTsar  X", run(eOpeningAction::EXIT));
@@ -1425,15 +1441,15 @@ void cWSWordTsar::BuildOpeningMenus(void)
     int util = mOpeningMenu.AddMenu("Utilities", 'U');
     mOpeningMenu.AddSubItem(util, "&Index...  I", run(eOpeningAction::INDEX_DOCUMENT));
     mOpeningMenu.AddSubItem(util, "&TOC...  T", run(eOpeningAction::TABLE_OF_CONTENTS));
-    mOpeningMenu.AddSubItem(util, "&Macros  \xe2\x96\xba", none, false);   // U+25BA
+    mOpeningMenu.AddSubItem(util, "&Macros  \xe2\x96\xba", unavailable, false);   // U+25BA
     mOpeningMenu.AddSeparator(util);
     mOpeningMenu.AddSubItem(util, "System &Preferences...", run(eOpeningAction::PREFERENCES));
     mOpeningMenu.SetMenuBoxLayout(util, 20, 17);
 
     int additional = mOpeningMenu.AddMenu("Additional", 'A');
-    mOpeningMenu.AddSubItem(additional, "&MailList  AM", none, false);
-    mOpeningMenu.AddSubItem(additional, "&TelMerge  AT", none, false);
-    mOpeningMenu.AddSubItem(additional, "&Star Exchange  AS", none, false);
+    mOpeningMenu.AddSubItem(additional, "&MailList  AM", unavailable, false);
+    mOpeningMenu.AddSubItem(additional, "&TelMerge  AT", unavailable, false);
+    mOpeningMenu.AddSubItem(additional, "&Star Exchange  AS", unavailable, false);
 
     int help = mOpeningMenu.AddMenu("Help", 'H');
     mOpeningMenu.AddSubItem(help, "&Help  F1", [this](void) { ShowOpeningHelp(); });
@@ -2003,7 +2019,8 @@ sStyle cWSWordTsar::OpeningBarStyle(void) const
 /// Draw a row of upperRule above the Filenames/Path line, the line
 /// itself ("Filenames:" at column 1, the path and free space from column 21,
 /// the scroll arrows at columns 71 to 77), the file list below it, and a
-/// lower half-block bar on the last row. Text is in the menu bar colours.
+/// lower half-block bar on the last row, which also shows a transient status
+/// message. Text is in the menu bar colours.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow, const char* upperRule,
@@ -2023,6 +2040,14 @@ void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow, 
     bar(headerRow, " ", base);
     bar(headerRow - 1, upperRule, upperStyle);
     bar(mRows - 1, "\xe2\x96\x84", OpeningBarStyle());   // U+2584 LOWER HALF BLOCK
+
+    // A transient status message covers the start of the last row.
+    std::string message = mEditor->GetStatusMessage();
+    mEditor->TickStatusMessage();
+    if (message.empty() == false)
+    {
+        screen.PutText(mRows - 1, 1, " " + message + " ", base);
+    }
 
     screen.PutText(headerRow, 1, "Filenames:", base);
 
@@ -3107,6 +3132,10 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
     {
         int index = 0;
         haveAction = OpeningKeyAction(event.textUtf8[0], action, index);
+        if ((haveAction == false) && (IsUnavailableOpeningKey(event.textUtf8[0]) == true))
+        {
+            ShowNotAvailable();
+        }
     }
 
     if (haveAction == false)
@@ -3276,6 +3305,19 @@ void cWSWordTsar::RunOpeningAction(eOpeningAction action)
             // NotImplemented, since none of these can currently be selected.
             break;
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Report on the status line that the chosen entry is not available.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::ShowNotAvailable(void)
+{
+    mEditor->SetStatusMessage("Not available in WordTsar");
 }
 
 /////////////////////////////////////////////////////////////////////////////

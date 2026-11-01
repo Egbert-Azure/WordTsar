@@ -2460,3 +2460,183 @@ TEST_CASE("TUI Opening screen - Alt letters never run the letter actions")
         }
     }
 }
+
+
+namespace
+{
+
+const char* const kNotAvailable = "Not available in WordTsar";
+
+std::string StatusMessage(cWSWordTsar& app)
+{
+    return app.TestGetEditor()->GetStatusMessage();
+}
+
+// Screen row showing the given text, or -1.
+int RowWithText(const wordstartui::cScreen& screen, const std::string& text)
+{
+    for (int row = 0; row < screen.GetRows(); ++row)
+    {
+        if (MenuRowText(screen, row).find(text) != std::string::npos)
+        {
+            return row;
+        }
+    }
+    return -1;
+}
+
+wordstartui::sInputEvent LeftClick(int row, int col)
+{
+    wordstartui::sInputEvent event{};
+    event.type = wordstartui::INPUT_TYPE_MOUSE;
+    event.mouseAction = wordstartui::MOUSE_ACTION_PRESS;
+    event.mouseButton = wordstartui::MOUSE_BUTTON_LEFT;
+    event.mouseRow = row;
+    event.mouseCol = col;
+    return event;
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - entries WordTsar does not implement say so")
+{
+    sOpeningListDir dir;
+
+    SUBCASE("hotkeys in the Opening pull-downs")
+    {
+        struct sCase
+        {
+            const char* menu;
+            const char* letter;
+            int menuIndex;
+        };
+        const sCase cases[] =
+        {
+            {"f", "n", 0}, {"f", "k", 0}, {"f", "f", 0}, {"f", "o", 0}, {"f", "t", 0},
+            {"f", "e", 0}, {"f", "c", 0}, {"f", "h", 0}, {"f", "r", 0},
+            {"u", "m", 1},
+            {"a", "m", 2}, {"a", "t", 2}, {"a", "s", 2},
+        };
+        for (const sCase& entry : cases)
+        {
+            INFO(entry.menu, " then ", entry.letter);
+            cWSWordTsar app;
+            PrepareOpeningList(app, 4, dir);
+            app.TestHandleEvent(OpeningText(entry.menu));
+            REQUIRE(app.TestGetOpeningMenu().GetOpenMenu() == entry.menuIndex);
+            CHECK(app.TestHandleEvent(OpeningText(entry.letter)) == true);
+            CHECK(StatusMessage(app) == kNotAvailable);
+            CHECK(app.TestGetOpeningMenu().GetOpenMenu() == entry.menuIndex);
+            CHECK(app.TestOpeningBrowserFocus() == false);
+            CHECK(app.TestInOpening() == true);
+            CHECK(app.TestQuitRequested() == false);
+        }
+    }
+
+    SUBCASE("Enter in the Opening pull-downs")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 4, dir);
+        app.TestHandleEvent(OpeningText("f"));
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+        CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
+        CHECK(StatusMessage(app) == kNotAvailable);
+        CHECK(app.TestGetOpeningMenu().GetOpenMenu() == 0);
+        CHECK(app.TestOpeningBrowserFocus() == false);
+        CHECK(app.TestInOpening() == true);
+    }
+
+    SUBCASE("a click in the Opening pull-downs")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 4, dir);
+        app.TestHandleEvent(OpeningText("f"));
+        wordstartui::cScreen screen;
+        screen.Resize(25, 80);
+        app.TestDrawOpening(screen);
+        const int row = RowWithText(screen, "Run DOS Command");
+        REQUIRE(row > 1);
+        const int col = static_cast<int>(MenuRowText(screen, row).find("Run DOS Command"));
+        CHECK(app.TestHandleEvent(LeftClick(row, col + 2)) == true);
+        CHECK(StatusMessage(app) == kNotAvailable);
+        CHECK(app.TestGetOpeningMenu().GetOpenMenu() == 0);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestQuitRequested() == false);
+    }
+
+    SUBCASE("help level 3 panel letters")
+    {
+        for (const char* letter : {"n", "\\", "k", "c", "e", "o", "y", "f", "m", "r", "a"})
+        {
+            INFO("letter: ", letter);
+            cWSWordTsar app;
+            PrepareOpeningList(app, 3, dir);
+            CHECK(app.TestHandleEvent(OpeningText(letter)) == true);
+            CHECK(StatusMessage(app) == kNotAvailable);
+            CHECK(app.TestOpeningBrowserFocus() == false);
+            CHECK(app.TestInOpening() == true);
+            CHECK(app.TestQuitRequested() == false);
+        }
+    }
+
+    SUBCASE("implemented letters and entries show nothing")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 3, dir);
+        app.TestHandleEvent(OpeningText("d"));
+        CHECK(StatusMessage(app).empty() == true);
+        app.TestHandleEvent(OpeningText("q"));
+        CHECK(StatusMessage(app).empty() == true);
+    }
+
+    SUBCASE("the message shows on the last row of the Opening screen")
+    {
+        for (int level : {3, 4})
+        {
+            CAPTURE(level);
+            cWSWordTsar app;
+            PrepareOpeningList(app, level, dir);
+            app.TestHandleEvent(OpeningText("n"));
+            wordstartui::cScreen screen;
+            screen.Resize(25, 80);
+            app.TestDrawOpening(screen);
+            CHECK(MenuRowText(screen, 24).find(kNotAvailable) != std::string::npos);
+            CHECK(RowWithText(screen, kNotAvailable) == 24);
+        }
+    }
+}
+
+
+TEST_CASE("TUI edit screen - a menu entry WordTsar does not implement says so")
+{
+    cWSWordTsar app;
+    app.TestBuildMenus();
+    app.TestEnterOpening();
+    app.TestHandleEvent(OpeningText("s"));
+    REQUIRE(app.TestInEditor() == true);
+    const wordstartui::cMenuBar& menu = app.TestGetMenu();
+
+    SUBCASE("by its hotkey")
+    {
+        app.TestHandleEvent(OpeningAltText("u"));
+        REQUIRE(menu.IsOpen() == true);
+        const int open = menu.GetOpenMenu();
+        CHECK(app.TestHandleEvent(OpeningText("t")) == true);
+        CHECK(StatusMessage(app) == kNotAvailable);
+        CHECK(menu.GetOpenMenu() == open);
+        CHECK(app.TestInEditor() == true);
+    }
+
+    SUBCASE("by Enter")
+    {
+        app.TestHandleEvent(OpeningAltText("u"));
+        REQUIRE(menu.IsOpen() == true);
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+        CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
+        CHECK(StatusMessage(app) == kNotAvailable);
+        CHECK(menu.IsOpen() == true);
+    }
+}

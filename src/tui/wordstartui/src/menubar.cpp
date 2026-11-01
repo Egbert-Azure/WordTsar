@@ -335,7 +335,7 @@ int cMenuBar::AddMenu(const std::string& title, char hotKey)
 /// @param  int menuIndex [in] menu returned by AddMenu
 /// @param  const std::string& title [in] sub-item title
 /// @param  std::function<void(void)> callback [in] activation callback
-/// @param  bool enabled [in] false to make the item non-activatable
+/// @param  bool enabled [in] false: choosing the item runs callback and leaves the menu open
 ///
 /// @return nothing
 ///
@@ -419,7 +419,7 @@ int cMenuBar::AddSubMenu(int menuIndex, const std::string& title)
 /// @param  int subHandle [in] handle returned by AddSubMenu
 /// @param  const std::string& title [in] sub-item title
 /// @param  std::function<void(void)> callback [in] activation callback
-/// @param  bool enabled [in] false to make the item non-activatable
+/// @param  bool enabled [in] false: choosing the item runs callback and leaves the menu open
 ///
 /// @return nothing
 ///
@@ -1108,8 +1108,8 @@ bool cMenuBar::HandleEvent(const sInputEvent& event)
         }
 
         // A plain letter activates the entry with that accelerator at the
-        // current depth. Other letters are consumed so they do not leak to the
-        // editor while the menu is open.
+        // current depth, an enabled entry before a disabled one. Other letters
+        // are consumed so they do not leak to the editor while the menu is open.
         if ((event.type == INPUT_TYPE_TEXT) && (event.alt == false) && (event.textUtf8.empty() == false))
         {
             char pressed = static_cast<char>(std::tolower(static_cast<unsigned char>(event.textUtf8[0])));
@@ -1117,14 +1117,17 @@ bool cMenuBar::HandleEvent(const sInputEvent& event)
 
             if (entries != nullptr)
             {
-                for (int index = 0; index < static_cast<int>(entries->size()); ++index)
+                for (bool enabled : {true, false})
                 {
-                    const sMenuEntry& entry = (*entries)[static_cast<size_t>(index)];
-                    if ((entry.isSeparator == false) && (entry.enabled == true) && (entry.hotKey == pressed))
+                    for (int index = 0; index < static_cast<int>(entries->size()); ++index)
                     {
-                        mPath.back() = index;
-                        ActivateHighlighted();
-                        return true;
+                        const sMenuEntry& entry = (*entries)[static_cast<size_t>(index)];
+                        if ((entry.isSeparator == false) && (entry.enabled == enabled) && (entry.hotKey == pressed))
+                        {
+                            mPath.back() = index;
+                            ActivateHighlighted();
+                            return true;
+                        }
                     }
                 }
             }
@@ -1393,8 +1396,8 @@ void cMenuBar::Ascend(void)
 ///
 /// @brief
 /// Act on the deepest highlighted entry: descend into a submenu, or fire a leaf
-/// entry's callback and close the menu. Separators and disabled entries do
-/// nothing.
+/// entry's callback and close the menu. A disabled leaf fires its callback, if
+/// it has one, and the menu stays open. Separators do nothing.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMenuBar::ActivateHighlighted(void)
@@ -1431,6 +1434,10 @@ void cMenuBar::ActivateHighlighted(void)
 
     if (entry.enabled == false)
     {
+        if (entry.callback)
+        {
+            entry.callback();
+        }
         return;
     }
 

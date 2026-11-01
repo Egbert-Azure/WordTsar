@@ -180,6 +180,7 @@ private:
     bool HandleOpeningMenuKey(const wordstartui::sInputEvent& event);
     bool OpeningKeyAction(char typed, eOpeningAction& action, int& index) const;
     void RunOpeningAction(eOpeningAction action);
+    void ShowNotAvailable(void);
     void ShowOpeningStatus(void);
     void ShowOpeningHelp(void);
     // Real legal notices (copyright, no-warranty, redistribution rights, how
