@@ -1904,6 +1904,50 @@ TEST_CASE("cWordstarFile - ESC x FS with x at 0x80 or above follows the editor c
 }
 
 
+TEST_CASE("cWordstarFile - German letters as ESC x FS load and save under CP437 and CP850")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+
+    // a 0x84, o 0x94, u 0x81, A 0x8E, O 0x99, U 0x9A, sz 0xE1 in both code pages
+    const std::string ae = ExtChar(0x84);
+    const std::string oe = ExtChar(0x94);
+    const std::string ue = ExtChar(0x81);
+    const std::string AE = ExtChar(0x8E);
+    const std::string OE = ExtChar(0x99);
+    const std::string UE = ExtChar(0x9A);
+    const std::string sz = ExtChar(0xE1);
+
+    std::string input = WordStar7File(
+        "Gr" + ue + sz + "e aus M" + ue + "nchen, sch" + oe + "ne H" + ae + "user" + "\x0D\x0A"
+        + AE + "rger " + OE + "l " + UE + "bel Stra" + sz + "\x0D\x0A"
+        + "Fl" + ue + "sse und B" + ae + "r " + "M" + oe + "\x0D\x0A");
+
+    std::string expected =
+        "Gr\xC3\xBC\xC3\x9F" "e aus M\xC3\xBC" "nchen, sch\xC3\xB6" "ne H\xC3\xA4" "user\x0D|"
+        "\xC3\x84" "rger \xC3\x96" "l \xC3\x9C" "bel Stra\xC3\x9F\x0D|"
+        "Fl\xC3\xBC" "sse und B\xC3\xA4" "r M\xC3\xB6\x0D|";
+
+    const eCodePage pages[] = { CP437, CP850 };
+    for (eCodePage page : pages)
+    {
+        CAPTURE(static_cast<int>(page));
+        editor.SetCodePage(page);
+        std::string saved = EditorRoundTrip(editor, input);
+
+        std::string loaded;
+        for (PARAGRAPH_T para = 0; para < doc->GetNumberofParagraphs(); para++)
+        {
+            loaded += doc->GetParagraphText(para) + "|";
+        }
+        CHECK(Hex(loaded, 0, expected.size()) == Hex(expected, 0, expected.size()));
+        CHECK(saved.size() == input.size());
+        CHECK(Hex(saved, 128, input.size()) == Hex(input, 128, input.size()));
+    }
+}
+
+
 TEST_CASE("cWordstarFile - ESC FS FS loads as one right angle glyph")
 {
     ensureQApplication();
