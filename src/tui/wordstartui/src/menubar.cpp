@@ -20,6 +20,7 @@
 
 #include "menubar.h"
 
+#include <algorithm>
 #include <cctype>
 
 namespace wordstartui
@@ -54,6 +55,8 @@ cMenuBar::cMenuBar(void)
     mBounds.cols = 0;
     mOpenMenu = -1;
     mScreenRows = 0;
+    mMenuGap = 2;
+    mLastRightAligned = false;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -69,6 +72,37 @@ cMenuBar::cMenuBar(void)
 void cMenuBar::SetBounds(const sRect& bounds)
 {
     mBounds = bounds;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  int gap [in] blank columns between top-level titles
+///
+/// @return nothing
+///
+/// @brief
+/// Set the spacing of the top-level titles.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMenuBar::SetMenuGap(int gap)
+{
+    mMenuGap = std::max(gap, 0);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  bool rightAligned [in] true to place the last title at the right
+///
+/// @return nothing
+///
+/// @brief
+/// Place the last top-level title two columns before the right edge of the
+/// bar instead of after the previous title.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMenuBar::SetLastMenuRightAligned(bool rightAligned)
+{
+    mLastRightAligned = rightAligned;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -392,7 +426,17 @@ int cMenuBar::MenuColumn(int menuIndex) const
 
     for (int index = 0; index < menuIndex; ++index)
     {
-        col += MenuTextWidth(index) + 2;
+        col += MenuTextWidth(index) + mMenuGap;
+    }
+
+    int lastIndex = static_cast<int>(mItems.size()) - 1;
+    if ((mLastRightAligned == true) && (menuIndex > 0) && (menuIndex == lastIndex))
+    {
+        int rightCol = mBounds.col + mBounds.cols - MenuTextWidth(menuIndex) - 2;
+        if (rightCol > col)
+        {
+            col = rightCol;
+        }
     }
 
     return col;

@@ -69,6 +69,11 @@ public:
     cMenuBar(void);
 
     void SetBounds(const sRect& bounds);
+    // Blank columns between two top-level titles (default 2).
+    void SetMenuGap(int gap);
+    // Draw the last top-level title with two blank columns before the right
+    // edge of the bar, when it fits there (default off).
+    void SetLastMenuRightAligned(bool rightAligned);
     void Clear(void);
     void AddItem(const std::string& title, char hotKey, std::function<void(void)> callback);
     int AddMenu(const std::string& title, char hotKey);
@@ -123,6 +128,8 @@ private:
     int mOpenMenu;
     std::vector<int> mPath;   // highlight index per open depth (level 0 = top pull-down)
     int mScreenRows;          // last known screen height (for flyout clamping)
+    int mMenuGap;             // blank columns between top-level titles
+    bool mLastRightAligned;   // last top-level title sits at the right edge
 };
 
 }

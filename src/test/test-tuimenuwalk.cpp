@@ -24,6 +24,7 @@
 #include "src/tui/wordtsar.h"
 #include "src/tui/wordstartui/src/menubar.h"
 
+#include <cctype>
 #include <string>
 
 
@@ -265,4 +266,119 @@ TEST_CASE("TUI Opening screen - Escape and D clear pending file-list requests")
     CHECK(app.TestOpeningWantPrint() == false);
     CHECK(app.TestOpeningWantTOC() == false);
     CHECK(app.TestOpeningWantIndex() == false);
+}
+
+
+namespace
+{
+
+// Text of one screen row from column 0, one character per cell.
+std::string MenuRowText(const wordstartui::cScreen& screen, int row)
+{
+    std::string text;
+    for (int col = 0; col < screen.GetCols(); ++col)
+    {
+        const wordstartui::sCell* cell = screen.GetCell(row, col);
+        text += (cell != nullptr) ? cell->textUtf8 : std::string("?");
+    }
+    return text;
+}
+
+wordstartui::cMenuBar OpeningStyleMenu(void)
+{
+    wordstartui::cMenuBar menu;
+    for (const char* title : {"File", "Utilities", "Additional", "Help"})
+    {
+        int index = menu.AddMenu(title, static_cast<char>(std::tolower(title[0])));
+        menu.AddSubItem(index, "&Entry", [](void) {});
+    }
+    wordstartui::sRect bounds{};
+    bounds.row = 0;
+    bounds.col = 0;
+    bounds.rows = 1;
+    bounds.cols = 80;
+    menu.SetBounds(bounds);
+    return menu;
+}
+
+}
+
+
+TEST_CASE("TUI menu bar - default layout puts two columns between menus")
+{
+    wordstartui::cScreen screen;
+    screen.Resize(24, 80);
+    wordstartui::cTheme theme;
+
+    wordstartui::cMenuBar menu = OpeningStyleMenu();
+    menu.Draw(screen, theme);
+
+    CHECK(MenuRowText(screen, 0) ==
+          " File  Utilities  Additional  Help                                              ");
+}
+
+
+TEST_CASE("TUI menu bar - gap 3 and a right-aligned last menu")
+{
+    wordstartui::cScreen screen;
+    screen.Resize(24, 80);
+    wordstartui::cTheme theme;
+
+    wordstartui::cMenuBar menu = OpeningStyleMenu();
+    menu.SetMenuGap(3);
+    menu.SetLastMenuRightAligned(true);
+    menu.Draw(screen, theme);
+
+    std::string row = MenuRowText(screen, 0);
+    CHECK(row.find("File") == 1);
+    CHECK(row.find("Utilities") == 8);
+    CHECK(row.find("Additional") == 20);
+    CHECK(row.find("Help") == 74);
+    CHECK(row.substr(78) == "  ");
+
+    SUBCASE("a click on the right-aligned title opens its menu")
+    {
+        wordstartui::sInputEvent click{};
+        click.type = wordstartui::INPUT_TYPE_MOUSE;
+        click.mouseAction = wordstartui::MOUSE_ACTION_PRESS;
+        click.mouseButton = wordstartui::MOUSE_BUTTON_LEFT;
+        click.mouseRow = 0;
+        click.mouseCol = 75;
+        CHECK(menu.HandleEvent(click) == true);
+        CHECK(menu.IsOpen() == true);
+    }
+
+    SUBCASE("a click where Help sits by default opens nothing")
+    {
+        wordstartui::sInputEvent click{};
+        click.type = wordstartui::INPUT_TYPE_MOUSE;
+        click.mouseAction = wordstartui::MOUSE_ACTION_PRESS;
+        click.mouseButton = wordstartui::MOUSE_BUTTON_LEFT;
+        click.mouseRow = 0;
+        click.mouseCol = 32;
+        menu.HandleEvent(click);
+        CHECK(menu.IsOpen() == false);
+    }
+}
+
+
+TEST_CASE("TUI menu bar - the edit-screen menu keeps the default layout")
+{
+    cWSWordTsar app;
+    app.TestBuildMenus();
+    wordstartui::cMenuBar menu = app.TestGetMenu();
+    wordstartui::sRect bounds{};
+    bounds.row = 0;
+    bounds.col = 0;
+    bounds.rows = 1;
+    bounds.cols = 80;
+    menu.SetBounds(bounds);
+
+    wordstartui::cScreen screen;
+    screen.Resize(24, 80);
+    wordstartui::cTheme theme;
+    menu.Draw(screen, theme);
+
+    CHECK(MenuRowText(screen, 0) ==
+          " File  Edit  View  Insert  Style  Layout  Utilities  Help                       ");
 }
