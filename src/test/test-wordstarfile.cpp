@@ -2155,6 +2155,83 @@ TEST_CASE("cWordstarFile::CheckType - a high-bit letter before a tab, ESC, 0x1A 
 }
 
 
+TEST_CASE("cWordstarFile::CheckType - a 0x1D that starts no complete sequence is rejected")
+{
+    const std::string text = "This line wraps\x8D\x0A" "here.\r\n";
+    const std::string seq = SequenceBytes(SEQ_COMMENT, "a note");
+
+    REQUIRE(CheckTypeOf(text + seq + text));
+
+    SUBCASE("a sequence cut by the end of the file")
+    {
+        CHECK(CheckTypeOf(text + seq.substr(0, seq.size() - 3)) == false);
+    }
+
+    SUBCASE("a sequence of length 3")
+    {
+        CHECK(CheckTypeOf(text + std::string("\x1D\x03\x00\x03\x00\x1D", 6) + text) == false);
+    }
+
+    SUBCASE("a sequence whose length is larger than the file")
+    {
+        std::string longSeq = seq;
+        longSeq[1] = '\x00';
+        longSeq[2] = '\x10';
+        CHECK(CheckTypeOf(text + longSeq + text) == false);
+    }
+}
+
+
+TEST_CASE("cWordstarFile::CheckType - a file of exactly 256 KiB is scanned to its last byte")
+{
+    const size_t fileSize = 256 * 1024;
+    std::string text;
+    while (text.size() < fileSize)
+    {
+        text += "plain text line\r\n";
+    }
+    text.resize(fileSize - 2);
+
+    SUBCASE("a soft return in the last two bytes")
+    {
+        std::string bytes = text + "\x8D\x0A";
+        REQUIRE(bytes.size() == fileSize);
+        CHECK(CheckTypeOf(bytes));
+    }
+
+    SUBCASE("a NUL in the last byte")
+    {
+        std::string bytes = "wraps\x8D\x0A" + text.substr(7) + std::string("\r\x00", 2);
+        REQUIRE(bytes.size() == fileSize);
+        CHECK(CheckTypeOf(bytes) == false);
+    }
+}
+
+
+TEST_CASE("cWordstarFile::CheckType - UTF-8 with a 4-byte character is rejected, a surrogate is not UTF-8")
+{
+    // a control byte and a dot command line, accepted without UTF-8
+    const std::string head = ".he Header\r\nSome \x02" "bold\x02 text ";
+
+    SUBCASE("a 4-byte character")
+    {
+        // U+20000
+        CHECK(CheckTypeOf(head + "\xF0\xA0\x80\x80" " here.\r\n") == false);
+    }
+
+    SUBCASE("a 4-byte character cut short")
+    {
+        CHECK(CheckTypeOf(head + "\xF0\xA0\x80" " here.\r\n"));
+    }
+
+    SUBCASE("a surrogate")
+    {
+        // U+D800 encoded as three bytes
+        CHECK(CheckTypeOf(head + "\xED\xA0\x80" " here.\r\n"));
+    }
+}
+
+
 namespace
 {
 
