@@ -78,6 +78,9 @@ public:
     // between the label and shortcut columns and one before the right
     // border (default off).
     void SetLetterColumnLayout(bool on);
+    // The open title's highlight covers one column on each side, and its
+    // hotkey letter takes the highlighted hotkey colours (default off).
+    void SetWideOpenTitle(bool on);
     void Clear(void);
     void AddItem(const std::string& title, char hotKey, std::function<void(void)> callback);
     int AddMenu(const std::string& title, char hotKey);
@@ -137,6 +140,7 @@ private:
     int mMenuGap;             // blank columns between top-level titles
     bool mLastRightAligned;   // last top-level title sits at the right edge
     bool mLetterColumn;       // WordStar pull-down layout (SetLetterColumnLayout)
+    bool mWideOpenTitle;      // open title highlight one column wider each side
 };
 
 }

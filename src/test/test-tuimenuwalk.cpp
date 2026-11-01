@@ -1825,3 +1825,102 @@ TEST_CASE("TUI Opening screen - WordStar 7 colours for the highlighted hotkey in
     CHECK(hot.style.fg == wordstartui::MakeRgb(170, 170, 170));
     CHECK(hot.style.bg == wordstartui::MakeRgb(0, 0, 170));
 }
+
+
+namespace
+{
+
+const wordstartui::sColor kWs7Black = wordstartui::MakeRgb(0, 0, 0);
+const wordstartui::sColor kWs7Blue = wordstartui::MakeRgb(0, 0, 170);
+const wordstartui::sColor kWs7Grey = wordstartui::MakeRgb(170, 170, 170);
+const wordstartui::sColor kWs7LightBlue = wordstartui::MakeRgb(85, 85, 255);
+
+// An app in the WordStar 7 colour preset on the Opening screen.
+void EnterWs7Opening(cWSWordTsar& app, int helpLevel)
+{
+    cConfig config;
+    config.ApplyTUIPalette(cConfig::GetTUIPalettes().back());
+    REQUIRE(config.mTuiMenuHighlightAcceleratorBackground.b == 170);
+    app.TestApplyConfig(config);
+    app.TestGetEditor()->mHelpLevel = helpLevel;
+    app.TestEnterOpening();
+}
+
+void CheckCellColours(const wordstartui::cScreen& screen, int row, int col,
+                      const wordstartui::sColor& fg, const wordstartui::sColor& bg)
+{
+    const wordstartui::sCell& cell = CellAt(screen, row, col);
+    INFO("cell ", row, ",", col, " \"", cell.textUtf8, "\"");
+    CHECK(cell.style.fg == fg);
+    CHECK(cell.style.bg == bg);
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - help level 4 uses the palette colours")
+{
+    cWSWordTsar app;
+    EnterWs7Opening(app, 4);
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    // Row 0: title bar colours.
+    CheckCellColours(screen, 0, 0, kWs7Grey, kWs7Black);
+    CheckCellColours(screen, 0, 37, kWs7Grey, kWs7Black);
+
+    // Row 1: menu bar, hotkey letters in the accelerator colour.
+    CheckCellColours(screen, 1, 1, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 1, 2, kWs7Black, kWs7Grey);
+    CheckCellColours(screen, 1, 40, kWs7Black, kWs7Grey);
+
+    // Rows 2 to 5: the editor background as an empty strip.
+    for (int row = 2; row <= 5; ++row)
+    {
+        CHECK(CellAt(screen, row, 0).style.bg == kWs7Blue);
+        CHECK(CellAt(screen, row, 79).style.bg == kWs7Blue);
+    }
+
+    // Rows 6 and 24: half-block bars in the title bar background on the panel.
+    CHECK(CellAt(screen, 6, 10).textUtf8 == "\xe2\x96\x80");
+    CheckCellColours(screen, 6, 10, kWs7Black, kWs7Grey);
+    CHECK(CellAt(screen, 24, 10).textUtf8 == "\xe2\x96\x84");
+    CheckCellColours(screen, 24, 10, kWs7Black, kWs7Grey);
+
+    // Row 7 and the file list: black on grey.
+    CheckCellColours(screen, 7, 1, kWs7Black, kWs7Grey);
+    CheckCellColours(screen, 7, 18, kWs7Black, kWs7Grey);
+    CheckCellColours(screen, 7, 71, kWs7Black, kWs7Grey);
+    CheckCellColours(screen, 8, 1, kWs7Black, kWs7Grey);
+    CheckCellColours(screen, 23, 79, kWs7Black, kWs7Grey);
+}
+
+
+TEST_CASE("TUI Opening screen - help level 4 open menu title")
+{
+    cWSWordTsar app;
+    EnterWs7Opening(app, 4);
+    REQUIRE(app.TestHandleEvent(OpeningText("u")) == true);
+    REQUIRE(app.TestGetOpeningMenu().IsOpen() == true);
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    // Utilities sits at columns 8 to 16; the highlight covers 7 to 17.
+    CheckCellColours(screen, 1, 6, kWs7Black, kWs7Grey);
+    CheckCellColours(screen, 1, 7, kWs7Grey, kWs7Black);
+    CHECK(CellAt(screen, 1, 8).textUtf8 == "U");
+    CheckCellColours(screen, 1, 8, kWs7Grey, kWs7Blue);
+    CheckCellColours(screen, 1, 9, kWs7Grey, kWs7Black);
+    CheckCellColours(screen, 1, 17, kWs7Grey, kWs7Black);
+    CheckCellColours(screen, 1, 18, kWs7Black, kWs7Grey);
+
+    // The pull-down: black on grey with light blue hotkeys below the
+    // highlighted first entry.
+    CHECK(CellAt(screen, 4, 9).textUtf8 == "T");
+    CheckCellColours(screen, 4, 9, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 4, 10, kWs7Black, kWs7Grey);
+}

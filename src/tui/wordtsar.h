@@ -172,7 +172,9 @@ private:
     void DrawOpeningBars(wordstartui::cScreen& screen);
     void DrawOpeningPanel(wordstartui::cScreen& screen);
     void DrawOpeningTitle(wordstartui::cScreen& screen);
-    void DrawOpeningFiles(wordstartui::cScreen& screen, int headerRow, int listRow, const char* upperRule);
+    void DrawOpeningFiles(wordstartui::cScreen& screen, int headerRow, int listRow, const char* upperRule,
+                          const wordstartui::sStyle& upperStyle);
+    wordstartui::sStyle OpeningBarStyle(void) const;
     bool HandleOpeningKey(const wordstartui::sInputEvent& event);
     bool HandleOpeningMenuKey(const wordstartui::sInputEvent& event);
     bool OpeningKeyAction(char typed, eOpeningAction& action, int& index) const;

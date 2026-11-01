@@ -1388,6 +1388,7 @@ void cWSWordTsar::BuildOpeningMenus(void)
     mOpeningMenu.SetMenuGap(3);
     mOpeningMenu.SetLastMenuRightAligned(true);
     mOpeningMenu.SetLetterColumnLayout(true);
+    mOpeningMenu.SetWideOpenTitle(true);
 
     // Entries show the classic Opening Menu letter right-aligned. Entries
     // without an Opening screen action are greyed out.
@@ -1899,26 +1900,29 @@ void cWSWordTsar::DrawOpeningMenu(cScreen& screen)
 ///
 /// @brief
 /// Draw the help level 4 Opening screen: row 0 is the title bar, row 1 the
-/// Opening menu bar, rows 2 to 5 empty, then the file list from row 6. The
-/// menu bar is drawn last so its pull-downs overlay the file list.
+/// Opening menu bar, rows 2 to 5 an empty strip in the editor colours, then
+/// the file list from row 6. The menu bar is drawn last so its pull-downs
+/// overlay the file list.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::DrawOpeningBars(cScreen& screen)
 {
-    sStyle base;
-    base.fg = wordstartui::MakeDefaultColor();
-    base.bg = wordstartui::MakeDefaultColor();
-    base.attrs = wordstartui::CELL_ATTR_NONE;
-
     sRect full;
     full.row = 0;
     full.col = 0;
     full.rows = mRows;
     full.cols = mCols;
-    screen.FillRect(full, " ", base);
+    screen.FillRect(full, " ", GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU));
+
+    sRect strip;
+    strip.row = 2;
+    strip.col = 0;
+    strip.rows = 4;
+    strip.cols = mCols;
+    screen.FillRect(strip, " ", GetTheme().GetStyle(wordstartui::THEME_ROLE_EDITOR));
 
     DrawOpeningTitle(screen);
-    DrawOpeningFiles(screen, 7, 8, "\xe2\x96\x80");   // U+2580 UPPER HALF BLOCK
+    DrawOpeningFiles(screen, 7, 8, "\xe2\x96\x80", OpeningBarStyle());   // U+2580 UPPER HALF BLOCK
 
     sRect menuRect;
     menuRect.row = 1;
@@ -1943,8 +1947,8 @@ void cWSWordTsar::DrawOpeningBars(cScreen& screen)
 void cWSWordTsar::DrawOpeningTitle(cScreen& screen)
 {
     sStyle base;
-    base.fg = wordstartui::MakeDefaultColor();
-    base.bg = wordstartui::MakeDefaultColor();
+    base.fg = mTitleFg;
+    base.bg = mTitleBg;
     base.attrs = wordstartui::CELL_ATTR_NONE;
 
     sRect line;
@@ -1965,10 +1969,29 @@ void cWSWordTsar::DrawOpeningTitle(cScreen& screen)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return style of the Opening screen's half-block bars
+///
+/// @brief
+/// The title bar colours swapped: the half block in the title bar
+/// background, the rest of the cell in the title bar foreground.
+///
+/////////////////////////////////////////////////////////////////////////////
+sStyle cWSWordTsar::OpeningBarStyle(void) const
+{
+    sStyle style;
+    style.fg = mTitleBg;
+    style.bg = mTitleFg;
+    style.attrs = wordstartui::CELL_ATTR_NONE;
+    return style;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  cScreen& screen [in,out] target screen
 /// @param  int headerRow [in] row of the Filenames/Path line
 /// @param  int listRow [in] first row of the file list
 /// @param  const char* upperRule [in] glyph that fills the row above the header
+/// @param  const sStyle& upperStyle [in] colours of the upperRule row
 ///
 /// @return nothing
 ///
@@ -1976,27 +1999,26 @@ void cWSWordTsar::DrawOpeningTitle(cScreen& screen)
 /// Draw a row of upperRule above the Filenames/Path line, the line
 /// itself ("Filenames:" at column 1, the path and free space from column 21,
 /// the scroll arrows at columns 71 to 77), the file list below it, and a
-/// lower half-block bar on the last row.
+/// lower half-block bar on the last row. Text is in the menu bar colours.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow, const char* upperRule)
+void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow, const char* upperRule,
+                                   const sStyle& upperStyle)
 {
-    sStyle base;
-    base.fg = wordstartui::MakeDefaultColor();
-    base.bg = wordstartui::MakeDefaultColor();
-    base.attrs = wordstartui::CELL_ATTR_NONE;
+    sStyle base = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU);
 
-    auto bar = [&](int r, const char* glyph)
+    auto bar = [&](int r, const char* glyph, const sStyle& style)
     {
         sRect line;
         line.row = r;
         line.col = 0;
         line.rows = 1;
         line.cols = mCols;
-        screen.FillRect(line, glyph, base);
+        screen.FillRect(line, glyph, style);
     };
-    bar(headerRow - 1, upperRule);
-    bar(mRows - 1, "\xe2\x96\x84");       // U+2584 LOWER HALF BLOCK
+    bar(headerRow, " ", base);
+    bar(headerRow - 1, upperRule, upperStyle);
+    bar(mRows - 1, "\xe2\x96\x84", OpeningBarStyle());   // U+2584 LOWER HALF BLOCK
 
     screen.PutText(headerRow, 1, "Filenames:", base);
 
@@ -2174,7 +2196,8 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
     }
 
     // Below the box: a single line, the header, then the file list.
-    DrawOpeningFiles(screen, boxBottom + 2, boxBottom + 3, "\xe2\x94\x80");   // U+2500
+    DrawOpeningFiles(screen, boxBottom + 2, boxBottom + 3, "\xe2\x94\x80",
+                     GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU));   // U+2500
 }
 
 /////////////////////////////////////////////////////////////////////////////

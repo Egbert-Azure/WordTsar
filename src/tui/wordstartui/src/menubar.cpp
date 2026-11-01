@@ -59,6 +59,7 @@ cMenuBar::cMenuBar(void)
     mMenuGap = 2;
     mLastRightAligned = false;
     mLetterColumn = false;
+    mWideOpenTitle = false;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -122,6 +123,23 @@ void cMenuBar::SetLastMenuRightAligned(bool rightAligned)
 void cMenuBar::SetLetterColumnLayout(bool on)
 {
     mLetterColumn = on;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  bool on [in] true for the wide open-title highlight
+///
+/// @return nothing
+///
+/// @brief
+/// Draw the open title's highlight from one column before the title to one
+/// column after it, with the title's hotkey letter in the highlighted
+/// hotkey colours.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMenuBar::SetWideOpenTitle(bool on)
+{
+    mWideOpenTitle = on;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -763,6 +781,28 @@ void cMenuBar::Draw(cScreen& screen, const cTheme& theme)
         }
 
         screen.PutText(mBounds.row, col, item.title, labelStyle);
+
+        if ((menuIndex == mOpenMenu) && (mWideOpenTitle == true))
+        {
+            if (col > mBounds.col)
+            {
+                screen.PutCell(mBounds.row, col - 1, " ", active);
+            }
+            if ((col + width) < (mBounds.col + mBounds.cols))
+            {
+                screen.PutCell(mBounds.row, col + width, " ", active);
+            }
+            for (size_t index = 0; index < item.title.size(); ++index)
+            {
+                char current = static_cast<char>(std::tolower(static_cast<unsigned char>(item.title[index])));
+
+                if (current == item.hotKey)
+                {
+                    screen.PutText(mBounds.row, col + static_cast<int>(index), item.title.substr(index, 1), activeAccel);
+                    break;
+                }
+            }
+        }
 
         if (menuIndex != mOpenMenu)
         {
