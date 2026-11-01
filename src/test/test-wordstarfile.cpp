@@ -673,6 +673,26 @@ TEST_CASE("cWordstarFile - an annotation sequence loads as a marker and saves ba
 }
 
 
+TEST_CASE("cWordstarFile - a comment sequence loads as a marker and saves back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    std::string body = std::string("\x01\x00\x00\x00\x00", 5) + "comment text";
+    std::string input = WordStar7File("Hi" + SequenceBytes(SEQ_COMMENT, body) + "!\x0D\x0A");
+    std::string saved = RoundTrip(editor, input);
+
+    cDocument* doc = editor.GetDocument();
+    CHECK(doc->GetCharNoAdvance(2)[0] == static_cast<char>(MARKER_CHAR));
+    CHECK(doc->GetControlChar(2) == STYLE_FOOTNOTE);
+    sNote note{};
+    CHECK(doc->GetNote(2, note));
+    CHECK(note.kind == NOTE_KIND_COMMENT);
+    CHECK(saved == input);
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief

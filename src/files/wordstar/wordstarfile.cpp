@@ -58,7 +58,6 @@
  *
  * @section limitations Current Limitations
  * - Some sequence types (graphics, paragraph styles) are not implemented
- * - ParseComment() is a stub (comments are read but not processed)
  *
  * @author Gerald Brandt
  * @copyright GNU Affero General Public License v3.0
@@ -1278,6 +1277,10 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
                                 {
                                     intro.type = eSequence::SEQ_ANNOTATION ;
                                 }
+                                else if(note.kind == NOTE_KIND_COMMENT)
+                                {
+                                    intro.type = eSequence::SEQ_COMMENT ;
+                                }
                                 else
                                 {
                                     intro.type = eSequence::SEQ_FOOTNOTE ;
@@ -1835,8 +1838,7 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
  * - SEQ_FONT: Font information
  * - SEQ_NEWFONT: New font definitions
  * - SEQ_TAB: Tab settings
- * - SEQ_FOOTNOTE/SEQ_ENDNOTE: Footnote and endnote content
- * - SEQ_ANNOTATION/SEQ_COMMENT: Comment and annotation content
+ * - SEQ_FOOTNOTE/SEQ_ENDNOTE/SEQ_ANNOTATION/SEQ_COMMENT: note content
  * 
  * Unimplemented sequence types (SEQ_ENDOFPAGE, SEQ_PAGEOFFSET, SEQ_PARAGRAPHNUMBER,
  * SEQ_INDEXENTRY, SEQ_PRINTERCONTROL, SEQ_GRAPHICS, SEQ_PARAGRAPHSTYLE, SEQ_ALTFONT)
@@ -1897,17 +1899,6 @@ void cWordstarFile::HandleSequence(void)
         case eSequence::SEQ_FOOTNOTE :
         case eSequence::SEQ_ENDNOTE :
         case eSequence::SEQ_ANNOTATION :
-            {
-                std::string str ;
-                if(ReadBytes(bodySize, str) == false)
-                {
-                    return ;
-                }
-
-                ParseNote(str, type) ;
-            }
-            break ;
-
         case eSequence::SEQ_COMMENT :
             {
                 std::string str ;
@@ -1916,7 +1907,7 @@ void cWordstarFile::HandleSequence(void)
                     return ;
                 }
 
-                ParseComment(str, type) ;
+                ParseNote(str, type) ;
             }
             break ;
 
@@ -2363,21 +2354,21 @@ void cWordstarFile::ParseTab(void)
 /**
  * @brief Parses a WordStar note sequence and extracts note information
  * 
- * This function processes a WordStar file sequence containing note data (footnote, endnote
- * or annotation)
+ * This function processes a WordStar file sequence containing note data (footnote, endnote,
+ * annotation or comment)
  * and extracts the relevant information including note formatting, text content, and metadata.
  * The function handles both simple notes and embedded footnotes with sub-sequences.
  * 
  * @param sequence The raw byte sequence from the WordStar file containing note data
- * @param type The type of note sequence being parsed (footnote, endnote or annotation)
+ * @param type The type of note sequence being parsed (footnote, endnote, annotation or comment)
  * 
  * @details The function performs the following operations:
  * - Extracts main sequence information using a union to interpret bytes as note structure
  * - Checks for embedded footnotes (tag == 1) and processes sub-sequence data if present
  * - Extracts the note text content from the remaining sequence
  * - Creates a note object with the parsed symbol format and text
- * - Inserts the note into the document as a footnote (footnotes and annotations,
- *   told apart by sNote::kind) or as an endnote
+ * - Inserts the note into the document as a footnote (footnotes, annotations and
+ *   comments, told apart by sNote::kind) or as an endnote
  * 
  * @note A note shorter than its 4-byte header, an embedded footnote shorter than its
  *       13 bytes of sub-sequence data, or a sub-sequence with no closing STYLE_SEQUENCE
@@ -2471,18 +2462,16 @@ void cWordstarFile::ParseNote(std::string sequence, eSequence type)
         note.kind = NOTE_KIND_ANNOTATION ;
         mDocument->InsertFootnote(note) ;
     }
+    else if(type == eSequence::SEQ_COMMENT)
+    {
+        note.kind = NOTE_KIND_COMMENT ;
+        mDocument->InsertFootnote(note) ;
+    }
     else if(type == eSequence::SEQ_ENDNOTE)
     {
         note.kind = NOTE_KIND_ENDNOTE ;
         mDocument->InsertEndnote(note) ;
     }
-}
-
-
-void cWordstarFile::ParseComment(std::string sequence, eSequence type)
-{
-    UNUSED_ARGUMENT(sequence) ;
-    UNUSED_ARGUMENT(type) ;
 }
 
 

@@ -52,8 +52,8 @@ enum eSequence
     SEQ_FONT,                   // font selection by index (done)
     SEQ_FOOTNOTE,               // footnote marker and text (done)
     SEQ_ENDNOTE,                // endnote marker and text (done)
-    SEQ_ANNOTATION,             // annotation marker and text (partial)
-    SEQ_COMMENT,                // embedded comment block (partial)
+    SEQ_ANNOTATION,             // annotation marker and text (done)
+    SEQ_COMMENT,                // embedded comment block (done)
     SEQ_RESERVED1,              // reserved by WordStar
     SEQ_RESERVED2,              // reserved by WordStar
     SEQ_TAB,                    // tab stop definition (partial)
@@ -134,7 +134,6 @@ private :
     void ParseTab(void) ;
 
     void ParseNote(std::string sequence, eSequence type) ;
-    void ParseComment(std::string sequence, eSequence type) ;
 
     void InsertFootnote(void) ;
 
