@@ -24,8 +24,8 @@
 //Standard Version Type
 static const long MAJOR  = 0;
 static const long MINOR  = 14;
-static const long BUILD  = 2;
+static const long BUILD  = 3;
 
-static const char FULLVERSION_STRING [] = "0.14.2";
+static const char FULLVERSION_STRING [] = "0.14.3";
 
 #endif //VERSION_H
