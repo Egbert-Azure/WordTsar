@@ -505,3 +505,25 @@ TEST_CASE("TUI startup screen - a file name on the command line opens after the 
     CHECK(app.TestInEditor() == true);
     CHECK(app.TestGetEditor()->mFileName == "letter.txt");
 }
+
+
+TEST_CASE("TUI About box - shared text with the tagline first and the open-source components")
+{
+    cWSWordTsar app;
+    std::string message = app.TestAboutMessage();
+    CHECK(message == abouttext::AboutText());
+    CHECK(message.rfind("A WordStar 7 clone for the 21st century.\n", 0) == 0);
+    CHECK(message.find("Wordstar") == std::string::npos);
+    CHECK(message.find(abouttext::TrademarkText()) != std::string::npos);
+    for (const char* component : {"pugixml", "SimpleIni", "cpp-unicodelib", "PicoMath", "zip", "miniz", "chillout"})
+    {
+        INFO("component: ", component);
+        CHECK(message.find(component) != std::string::npos);
+    }
+
+    app.TestCountModals();
+    app.TestEnterOpening();
+    app.TestGetEditor()->mHelpLevel = 3;
+    CHECK(app.TestHandleEvent(Text("w")) == true);
+    CHECK(app.TestModalCount() == 1);
+}

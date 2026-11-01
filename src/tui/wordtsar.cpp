@@ -3727,27 +3727,17 @@ void cWSWordTsar::ShowOpeningStatus(void)
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::ShowAboutWordTsar(void)
 {
-    std::string text = std::string("WordTsar ") + FULLVERSION_STRING + "\n\n";
+    wsdialogs::MessageBox(this, "About WordTsar", AboutMessage());
+}
 
-    text += "Wordstar for the 21st century. This is a macOS-focused fork of "
-            "Gerald Brandt's WordTsar -- the Wordstar-clone editing engine, "
-            "document formats, and original design are his work; this fork "
-            "adds macOS-specific packaging and features on top. Not endorsed "
-            "by or affiliated with the upstream WordTsar project.\n\n";
-
-    text += "Copyright (C) 2018 Gerald Brandt\n";
-    text += "Portions Copyright (C) 2026 Egbert H. Schroeer\n\n";
-
-    text += "This program comes with ABSOLUTELY NO WARRANTY.\n";
-    text += "This is free software, and you are welcome to redistribute it "
-            "under the terms of the GNU Affero General Public License v3.0. "
-            "See LICENSE.md in the source distribution, or "
-            "https://www.gnu.org/licenses/agpl-3.0.html for the full licence "
-            "text.\n\n";
-
-    text += "https://github.com/Egbert-Azure/WordTsar";
-
-    wsdialogs::MessageBox(this, "About WordTsar", text);
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the message of the About WordTsar box
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cWSWordTsar::AboutMessage(void) const
+{
+    return abouttext::AboutText();
 }
 
 /////////////////////////////////////////////////////////////////////////////

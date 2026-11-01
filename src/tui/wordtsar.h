@@ -150,6 +150,7 @@ public:
     // Modal dialogs are counted and cancelled instead of run.
     void TestCountModals(void) { mTestCountModals = true; }
     int TestModalCount(void) const { return mTestModalCount; }
+    std::string TestAboutMessage(void) const { return AboutMessage(); }
 #endif
 
     // ---- iWSDialogHost ----
@@ -222,6 +223,7 @@ private:
     // to view the licence) -- distinct from About()'s memory/status screen,
     // which stays reachable on its own via ^O? and the Opening Menu's "?".
     void ShowAboutWordTsar(void);
+    std::string AboutMessage(void) const;
     void GenerateTOCFromFile(void);
     void GenerateIndexFromFile(void);
     void InsertTOCEntry(void);
