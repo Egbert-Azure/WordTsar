@@ -2070,15 +2070,11 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
     screen.PutText(0, (mCols - static_cast<int>(header.size())) / 2, header, base);
     separator(1);
 
-    // Two-column menu: left column at column 2, right column near mid.
+    // Two columns: letters at columns 6 and 43, labels two columns further.
     // Item order in kOpeningItems is left-column-first (kOpeningLeftCount
     // rows), then right column -- rows are just the index within that run.
-    int leftCol = 2;
-    int rightCol = mCols / 2;
-    if (rightCol > 40)
-    {
-        rightCol = 40;
-    }
+    const int leftCol = 6;
+    const int rightCol = 43;
     for (int index = 0; index < kOpeningOwnFirst; ++index)
     {
         const sOpeningItem& item = kOpeningItems[index];
@@ -2120,8 +2116,8 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
     // function-key event, not a typed character -- see HandleOpeningKey).
     {
         int row = 2 + kOpeningLeftCount;
-        screen.PutText(row, leftCol, "F1 help", base);
-        screen.PutText(row, leftCol, std::string("F1"), keyStyle);
+        screen.PutText(row, leftCol - 1, "F1 help", base);
+        screen.PutText(row, leftCol - 1, std::string("F1"), keyStyle);
     }
 
     // WordTsar's own entries on one row below the columns, centred, each as

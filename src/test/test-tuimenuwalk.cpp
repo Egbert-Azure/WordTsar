@@ -1541,6 +1541,21 @@ TEST_CASE("TUI Opening screen - help level 3 A is additional and W is about Word
 }
 
 
+TEST_CASE("TUI Opening screen - help level 3 columns follow the WordStar layout")
+{
+    cWSWordTsar app;
+    wordstartui::cScreen screen = DrawLevel3Opening(app);
+
+    // Letters at columns 6 and 43, labels at 8 and 45, F1 at 5 and 6.
+    CHECK(CellRun(screen, 2, 4, 19) == "  D open a document");
+    CHECK(CellRun(screen, 10, 4, 17) == "  X exit WordTsar");
+    CHECK(CellRun(screen, 11, 4, 8) == " F1 help");
+    CHECK(CellRun(screen, 2, 41, 26) == "  L change drive/directory");
+    CHECK(CellRun(screen, 10, 41, 14) == "  A additional");
+    CHECK(CellRun(screen, 11, 41, 18) == "  ? display status");
+}
+
+
 
 namespace
 {
