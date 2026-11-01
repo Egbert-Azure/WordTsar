@@ -447,7 +447,9 @@ bool cWordstarFile::CheckType(std::string filename)
 /// Rejects when:
 ///   - a 0x1D does not start a valid sequence
 ///   - a 0x00 is outside a sequence
-///   - a byte 0xA1-0xFF is not followed by 0x20, 0x0D, 0x0A, 0x8D or 0xA0
+///   - a byte 0xA1-0xFF is not followed by 0x20, 0x0D, 0x0A, 0x8D, 0xA0,
+///     0x09, 0x1A, 0x1B or a style toggle (0x02, 0x13, 0x14, 0x16, 0x18,
+///     0x19)
 ///   - the high bytes form valid UTF-8 with at least one multi-byte character
 ///   - 0x1A padding to a multiple of 128 is followed by 14 00 11 (WordStar
 ///     7 macro)
@@ -678,7 +680,11 @@ static bool IsWordStarContent(const std::string& filename)
         if (c >= 0xA1)
         {
             unsigned char next = (i + 1 < bytesRead) ? buf[i + 1] : 0x20 ;
-            if (next != 0x20 && next != 0x0D && next != 0x0A && next != 0x8D && next != 0xA0)
+            bool wordEnd = next == 0x20 || next == 0x0D || next == 0x0A || next == 0x8D || next == 0xA0 ||
+                           next == 0x09 || next == 0x1A || next == 0x1B ||
+                           next == STYLE_BOLD || next == STYLE_UNDERLINE || next == STYLE_SUPERSCRIPT ||
+                           next == STYLE_SUBSCRIPT || next == STYLE_STRIKETHROUGH || next == STYLE_ITALICS ;
+            if (wordEnd == false)
             {
                 return false ;
             }

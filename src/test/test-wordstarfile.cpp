@@ -2123,6 +2123,38 @@ TEST_CASE("cWordstarFile::CheckType - content with WordStar structure is accepte
 }
 
 
+TEST_CASE("cWordstarFile::CheckType - a high-bit letter before a tab, ESC, 0x1A or style toggle ends a word")
+{
+    // 0xE5 = 'e' | 0x80, 0xE4 = 'd' | 0x80
+    SUBCASE("a tab")
+    {
+        CHECK(CheckTypeOf("Nam\xE5\tvalue that wraps\x8D\x0A" "here.\r\n"));
+    }
+
+    SUBCASE("ESC x FS")
+    {
+        CHECK(CheckTypeOf("Pric\xE5\x1B\x9C\x1C" "10 that wraps\x8D\x0A" "here.\r\n"));
+    }
+
+    SUBCASE("0x1A")
+    {
+        CHECK(CheckTypeOf(PadEof("A line that wraps\x8D\x0A" "and ends her\xE5")));
+    }
+
+    SUBCASE("a style toggle")
+    {
+        // bold, underline, superscript, subscript, strikethrough, italics
+        const char toggles[] = { 0x02, 0x13, 0x14, 0x16, 0x18, 0x19 };
+        for (char toggle : toggles)
+        {
+            CAPTURE(static_cast<int>(toggle));
+            std::string bytes = std::string("Some ") + toggle + "wor\xE4" + toggle + " that wraps\x8D\x0A" "here.\r\n";
+            CHECK(CheckTypeOf(bytes));
+        }
+    }
+}
+
+
 namespace
 {
 
