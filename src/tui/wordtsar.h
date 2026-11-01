@@ -170,6 +170,7 @@ private:
     void DrawOpeningMenu(wordstartui::cScreen& screen);
     void DrawOpeningBars(wordstartui::cScreen& screen);
     void DrawOpeningPanel(wordstartui::cScreen& screen);
+    void DrawOpeningTitle(wordstartui::cScreen& screen);
     void DrawOpeningFiles(wordstartui::cScreen& screen, int headerRow, int listRow);
     bool HandleOpeningKey(const wordstartui::sInputEvent& event);
     bool HandleOpeningMenuKey(const wordstartui::sInputEvent& event);

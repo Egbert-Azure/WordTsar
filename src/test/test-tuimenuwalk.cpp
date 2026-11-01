@@ -1556,6 +1556,40 @@ TEST_CASE("TUI Opening screen - help level 3 columns follow the WordStar layout"
 }
 
 
+TEST_CASE("TUI Opening screen - help level 3 title row and box")
+{
+    cWSWordTsar app;
+    wordstartui::cScreen screen = DrawLevel3Opening(app);
+    const std::string line = "\xe2\x94\x80";   // U+2500
+    const std::string side = "\xe2\x94\x82";   // U+2502
+
+    // Row 0: the name centred in a fill of upper half blocks.
+    CHECK(CellRun(screen, 0, 0, 1) == kUpperHalf);
+    CHECK(CellRun(screen, 0, 35, 10) == " WordTsar ");
+    CHECK(CellRun(screen, 0, 79, 1) == kUpperHalf);
+
+    // Row 1: top border with the menu name in it.
+    CHECK(CellRun(screen, 1, 0, 1) == "\xe2\x94\x8c");    // U+250C
+    CHECK(CellRun(screen, 1, 1, 1) == line);
+    CHECK(CellRun(screen, 1, 26, 27) == line + " O P E N I N G   M E N U " + line);
+    CHECK(CellRun(screen, 1, 79, 1) == "\xe2\x94\x90");   // U+2510
+
+    for (int row = 2; row <= 11; ++row)
+    {
+        INFO("row ", row);
+        CHECK(CellRun(screen, row, 0, 1) == side);
+        CHECK(CellRun(screen, row, 79, 1) == side);
+    }
+
+    // Row 12: bottom border carrying WordTsar's own entries.
+    CHECK(CellRun(screen, 12, 0, 2) == "\xe2\x94\x94" + line);   // U+2514
+    CHECK(CellRun(screen, 12, 78, 2) == line + "\xe2\x94\x98");  // U+2518
+    std::string bottom = MenuRowText(screen, 12);
+    CHECK(bottom.find(line + " G recent files " + line + line + " V preferences " +
+                      line + line + " W about WordTsar " + line) != std::string::npos);
+}
+
+
 
 namespace
 {

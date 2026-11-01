@@ -91,8 +91,8 @@ struct sOpeningItem
 
 // The WordStar 7 opening menu: the left column (kOpeningLeftCount rows), the
 // right column (kOpeningRightCount rows), then WordTsar's own entries, which
-// are drawn on one row below the columns and answer their letters at help
-// levels 0 to 3 only. F1 (help) is drawn below the left column and handled
+// are drawn in the bottom border of the menu box and answer their letters at
+// help levels 0 to 3 only. F1 (help) is drawn below the left column and handled
 // as a function key (see DrawOpeningPanel / HandleOpeningKey).
 const sOpeningItem kOpeningItems[] =
 {
@@ -1915,26 +1915,7 @@ void cWSWordTsar::DrawOpeningBars(cScreen& screen)
     full.cols = mCols;
     screen.FillRect(full, " ", base);
 
-    auto halfBlockBar = [&](int r)
-    {
-        sRect line;
-        line.row = r;
-        line.col = 0;
-        line.rows = 1;
-        line.cols = mCols;
-        screen.FillRect(line, "\xe2\x96\x80", base);   // U+2580 UPPER HALF BLOCK
-    };
-
-    // Row 0: the name centred in the bar, one blank column on each side.
-    halfBlockBar(0);
-    std::string name = "WordTsar";
-    int nameCol = (mCols - static_cast<int>(name.size())) / 2;
-    if (nameCol < 1)
-    {
-        nameCol = 1;
-    }
-    screen.PutText(0, nameCol - 1, " " + name + " ", base);
-
+    DrawOpeningTitle(screen);
     DrawOpeningFiles(screen, 7, 8);
 
     sRect menuRect;
@@ -1944,6 +1925,40 @@ void cWSWordTsar::DrawOpeningBars(cScreen& screen)
     menuRect.cols = mCols;
     mOpeningMenu.SetBounds(menuRect);
     mOpeningMenu.Draw(screen, GetTheme());
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  cScreen& screen [in,out] target screen
+///
+/// @return nothing
+///
+/// @brief
+/// Draw the Opening screen title on row 0: a fill of upper half blocks with
+/// the name centred, one blank column on each side.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::DrawOpeningTitle(cScreen& screen)
+{
+    sStyle base;
+    base.fg = wordstartui::MakeDefaultColor();
+    base.bg = wordstartui::MakeDefaultColor();
+    base.attrs = wordstartui::CELL_ATTR_NONE;
+
+    sRect line;
+    line.row = 0;
+    line.col = 0;
+    line.rows = 1;
+    line.cols = mCols;
+    screen.FillRect(line, "\xe2\x96\x80", base);   // U+2580 UPPER HALF BLOCK
+
+    std::string name = "WordTsar";
+    int nameCol = (mCols - static_cast<int>(name.size())) / 2;
+    if (nameCol < 1)
+    {
+        nameCol = 1;
+    }
+    screen.PutText(0, nameCol - 1, " " + name + " ", base);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2055,20 +2070,31 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
     full.cols = mCols;
     screen.FillRect(full, " ", base);
 
-    auto separator = [&](int r)
-    {
-        sRect line;
-        line.row = r;
-        line.col = 0;
-        line.rows = 1;
-        line.cols = mCols;
-        screen.FillRect(line, "\xe2\x94\x80", base);
-    };
+    DrawOpeningTitle(screen);
 
-    // Title (row 0) + separator.
-    std::string header = "O P E N I N G   M E N U";
-    screen.PutText(0, (mCols - static_cast<int>(header.size())) / 2, header, base);
-    separator(1);
+    // A single-line box from row 1 to the row below the columns, full width,
+    // with the menu name in its top border.
+    const int menuRows = std::max(kOpeningLeftCount + 1, kOpeningRightCount);
+    const int boxTop = 1;
+    const int boxBottom = 2 + menuRows;
+    const int right = mCols - 1;
+    for (int col = 1; col < right; ++col)
+    {
+        screen.PutText(boxTop, col, "\xe2\x94\x80", base);      // U+2500
+        screen.PutText(boxBottom, col, "\xe2\x94\x80", base);
+    }
+    for (int row = boxTop + 1; row < boxBottom; ++row)
+    {
+        screen.PutText(row, 0, "\xe2\x94\x82", base);          // U+2502
+        screen.PutText(row, right, "\xe2\x94\x82", base);
+    }
+    screen.PutText(boxTop, 0, "\xe2\x94\x8c", base);           // U+250C
+    screen.PutText(boxTop, right, "\xe2\x94\x90", base);       // U+2510
+    screen.PutText(boxBottom, 0, "\xe2\x94\x94", base);        // U+2514
+    screen.PutText(boxBottom, right, "\xe2\x94\x98", base);    // U+2518
+
+    std::string header = " O P E N I N G   M E N U ";
+    screen.PutText(boxTop, (mCols - static_cast<int>(header.size())) / 2, header, base);
 
     // Two columns: letters at columns 6 and 43, labels two columns further.
     // Item order in kOpeningItems is left-column-first (kOpeningLeftCount
@@ -2120,10 +2146,9 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
         screen.PutText(row, leftCol - 1, std::string("F1"), keyStyle);
     }
 
-    // WordTsar's own entries on one row below the columns, centred, each as
-    // " letter label " with two columns between entries.
-    const int menuRows = std::max(kOpeningLeftCount + 1, kOpeningRightCount);
-    const int ownRow = 2 + menuRows;
+    // WordTsar's own entries in the bottom border, centred, each as
+    // " letter label " with two border columns between entries.
+    const int ownRow = boxBottom;
     {
         const int gap = 2;
         int width = 0;
@@ -2139,7 +2164,7 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
         for (int index = kOpeningOwnFirst; index < kOpeningCount; ++index)
         {
             const sOpeningItem& item = kOpeningItems[index];
-            screen.PutText(ownRow, col + 1, std::string(1, item.key) + " " + item.label, base);
+            screen.PutText(ownRow, col, std::string(" ") + item.key + " " + item.label + " ", base);
             screen.PutText(ownRow, col + 1, std::string(1, item.key), keyStyle);
             col += 4 + static_cast<int>(std::strlen(item.label)) + gap;
         }
