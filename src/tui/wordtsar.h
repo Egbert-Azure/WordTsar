@@ -150,6 +150,8 @@ public:
     // Modal dialogs are counted and cancelled instead of run.
     void TestCountModals(void) { mTestCountModals = true; }
     int TestModalCount(void) const { return mTestModalCount; }
+    // The last counted cDialog, drawn at the screen size of the last TestDraw.
+    const wordstartui::cScreen& TestModalScreen(void) const { return mTestModalScreen; }
     std::string TestAboutMessage(void) const { return AboutMessage(); }
 #endif
 
@@ -285,6 +287,7 @@ private:
 #ifdef WORDTSAR_TUI_TEST_HOOKS
     bool mTestCountModals = false;
     int mTestModalCount = 0;
+    wordstartui::cScreen mTestModalScreen;
 #endif
     wsui::cFileBrowser mBrowser;  // file picker on the opening screen
     bool mOpeningBrowserFocus;    // true when the browser has focus (not the menu)

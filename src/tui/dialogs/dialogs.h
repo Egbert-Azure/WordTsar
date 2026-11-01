@@ -35,6 +35,11 @@ namespace wsdialogs
 // Show a one-button message box.
 void MessageBox(iWSDialogHost* host, const std::string& title, const std::string& message);
 
+// Message box with the text in a scrolling view and the OK button below it;
+// the box fits the screen. Up/Down/PageUp/PageDown/Home/End and the mouse
+// wheel scroll the text.
+void ScrollingMessageBox(iWSDialogHost* host, const std::string& title, const std::string& message);
+
 // Yes/No question; returns true for Yes.
 bool YesNo(iWSDialogHost* host, const std::string& title, const std::string& question);
 

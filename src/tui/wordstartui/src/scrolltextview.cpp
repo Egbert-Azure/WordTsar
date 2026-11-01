@@ -152,6 +152,16 @@ bool cScrollTextView::HandleEvent(const sInputEvent& event)
         Scroll(mBounds.rows);
         return true;
     }
+    else if (event.special == SPECIAL_KEY_HOME)
+    {
+        SetTopLine(0);
+        return true;
+    }
+    else if (event.special == SPECIAL_KEY_END)
+    {
+        SetTopLine(static_cast<int>(mLines.size()));
+        return true;
+    }
 
     return false;
 }

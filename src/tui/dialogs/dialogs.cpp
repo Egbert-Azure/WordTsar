@@ -479,6 +479,73 @@ void MessageBox(iWSDialogHost* host, const std::string& title, const std::string
 ///
 /// @param  iWSDialogHost* host [in] dialog host
 /// @param  const std::string& title [in] dialog title
+/// @param  const std::string& message [in] message text
+///
+/// @return nothing
+///
+/// @brief
+/// Display a one-button message box whose text scrolls in a view above
+/// the OK button. The box is at most two rows shorter than the screen and
+/// the text wraps at 60 columns or less to fit the screen width.
+///
+/////////////////////////////////////////////////////////////////////////////
+void ScrollingMessageBox(iWSDialogHost* host, const std::string& title, const std::string& message)
+{
+    sTerminalSize size = host->HostScreenSize();
+
+    int wrapWidth = std::min(60, size.cols - 8);
+
+    if (wrapWidth < 10)
+    {
+        wrapWidth = 10;
+    }
+
+    std::vector<std::string> lines = SplitLines(WrapText(message, wrapWidth));
+
+    int contentWidth = std::max(WidestLine(lines), static_cast<int>(title.size()));
+    int width = std::max(contentWidth + 6, 20);
+
+    // Border, blank, text, blank, button, border.
+    int height = static_cast<int>(lines.size()) + 5;
+    int maxHeight = std::max(size.rows - 2, 6);
+
+    if (height > maxHeight)
+    {
+        height = maxHeight;
+    }
+
+    sRect rect = CenteredRect(host, height, width);
+    cDialog dialog(rect, title);
+
+    sRect viewRect;
+    viewRect.row = rect.row + 2;
+    viewRect.col = rect.col + 2;
+    viewRect.rows = std::max(rect.rows - 5, 1);
+    viewRect.cols = std::max(rect.cols - 4, 1);
+
+    auto view = std::make_unique<cScrollTextView>(viewRect);
+    view->SetLines(lines);
+    dialog.AddWidget(std::move(view));
+
+    sRect buttonRect;
+    buttonRect.rows = 1;
+    buttonRect.cols = 8;
+    buttonRect.row = rect.row + rect.rows - 2;
+    buttonRect.col = rect.col + ((rect.cols - buttonRect.cols) / 2);
+
+    cDialog* dialogPtr = &dialog;
+    dialog.AddWidget(std::make_unique<cButton>(buttonRect, "OK", [dialogPtr]() {
+        dialogPtr->SetResult(DIALOG_RESULT_OK);
+    }));
+
+    dialog.FocusFirst();
+    host->HostRunModal(dialog);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  iWSDialogHost* host [in] dialog host
+/// @param  const std::string& title [in] dialog title
 /// @param  const std::string& question [in] question text
 ///
 /// @return true when Yes was pressed

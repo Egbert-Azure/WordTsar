@@ -22,6 +22,9 @@
 
 #include "src/tui/wordtsar.h"
 #include "src/tui/editor/editorctrl.h"
+#include "src/tui/dialogs/dialoghost.h"
+#include "src/tui/dialogs/dialogs.h"
+#include "src/tui/wordstartui/src/dialog.h"
 #include "src/core/utils/abouttext.h"
 #include "src/core/utils/config.h"
 #include "src/core/include/version.h"
@@ -29,7 +32,10 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <unistd.h>
@@ -526,4 +532,287 @@ TEST_CASE("TUI About box - shared text with the tagline first and the open-sourc
     app.TestGetEditor()->mHelpLevel = 3;
     CHECK(app.TestHandleEvent(Text("w")) == true);
     CHECK(app.TestModalCount() == 1);
+}
+
+
+namespace
+{
+
+// Dialog host that draws a modal dialog, feeds it a list of events and
+// keeps a copy of the screen after the first draw and after each event.
+class cScriptHost : public iWSDialogHost
+{
+public:
+    cScriptHost(int rows, int cols, const std::vector<wordstartui::sInputEvent>& events)
+        : mRows(rows), mCols(cols), mEvents(events)
+    {
+    }
+
+    void HostRunModal(wordstartui::cDialog& dialog) override
+    {
+        dialog.FocusFirst();
+        Snapshot([&](wordstartui::cScreen& screen) { dialog.Draw(screen, mTheme); });
+        for (const wordstartui::sInputEvent& event : mEvents)
+        {
+            if (dialog.GetResult() != wordstartui::DIALOG_RESULT_NONE)
+            {
+                break;
+            }
+            dialog.HandleEvent(event);
+            Snapshot([&](wordstartui::cScreen& screen) { dialog.Draw(screen, mTheme); });
+        }
+        mResult = dialog.GetResult();
+    }
+
+    void HostRunModalRaw(
+        const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
+        const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
+    {
+        (void)handle;
+        Snapshot([&](wordstartui::cScreen& screen) { draw(screen, mTheme); });
+    }
+
+    const wordstartui::cTheme& HostTheme(void) override { return mTheme; }
+
+    wordstartui::sTerminalSize HostScreenSize(void) override
+    {
+        wordstartui::sTerminalSize size{};
+        size.rows = mRows;
+        size.cols = mCols;
+        return size;
+    }
+
+    wordstartui::sTerminalCapabilities HostCapabilities(void) override
+    {
+        wordstartui::sTerminalCapabilities caps{};
+        return caps;
+    }
+
+    void HostShowLoadProgress(const std::string& message, int percent) override
+    {
+        (void)message;
+        (void)percent;
+    }
+
+    void HostHideLoadProgress(void) override {}
+
+    std::vector<wordstartui::cScreen> mFrames;
+    wordstartui::eDialogResult mResult = wordstartui::DIALOG_RESULT_NONE;
+
+private:
+    template <typename tDraw>
+    void Snapshot(tDraw draw)
+    {
+        wordstartui::cScreen screen;
+        screen.Resize(mRows, mCols);
+        draw(screen);
+        mFrames.push_back(screen);
+    }
+
+    int mRows;
+    int mCols;
+    std::vector<wordstartui::sInputEvent> mEvents;
+    wordstartui::cTheme mTheme;
+};
+
+// Box of a dialog on the screen: rows of the top-left and bottom-right corners.
+struct sBox
+{
+    int top = -1;
+    int left = -1;
+    int bottom = -1;
+    int right = -1;
+};
+
+sBox FindBox(const wordstartui::cScreen& screen)
+{
+    sBox box;
+    for (int row = 0; row < screen.GetRows(); ++row)
+    {
+        for (int col = 0; col < screen.GetCols(); ++col)
+        {
+            const std::string& cell = screen.GetCell(row, col)->textUtf8;
+            if ((cell == "┌") && (box.top < 0))
+            {
+                box.top = row;
+                box.left = col;
+            }
+            if (cell == "┘")
+            {
+                box.bottom = row;
+                box.right = col;
+            }
+        }
+    }
+    return box;
+}
+
+// Text between the side borders of a box row.
+std::string InsideText(const wordstartui::cScreen& screen, const sBox& box, int row)
+{
+    std::string text;
+    for (int col = box.left + 1; col < box.right; ++col)
+    {
+        text += screen.GetCell(row, col)->textUtf8;
+    }
+    return text;
+}
+
+// Text of a frame inside the box, one line per row.
+std::string FrameText(const wordstartui::cScreen& screen)
+{
+    sBox box = FindBox(screen);
+    std::string text;
+    for (int row = box.top + 1; row < box.bottom; ++row)
+    {
+        text += Trimmed(InsideText(screen, box, row)) + "\n";
+    }
+    return text;
+}
+
+// True when the frame shows the end of the About text, the last component
+// and its licence; the two may wrap onto separate lines.
+bool ShowsLastComponent(const wordstartui::cScreen& screen)
+{
+    abouttext::sComponent last = abouttext::Components().back();
+    std::string text = FrameText(screen);
+    return (text.find(last.name) != std::string::npos) &&
+           (text.find("(" + last.licence + ").\n") != std::string::npos);
+}
+
+// The OK button is the row above the bottom border, alone on its row, and
+// the whole box is on the screen.
+void CheckAboutFrame(const wordstartui::cScreen& screen)
+{
+    sBox box = FindBox(screen);
+    REQUIRE(box.top >= 0);
+    REQUIRE(box.bottom > box.top);
+    CHECK(box.left >= 0);
+    CHECK(box.right < screen.GetCols());
+    CHECK(box.bottom < screen.GetRows());
+    CHECK(screen.GetCell(box.bottom, box.left)->textUtf8 == "└");
+    CHECK(screen.GetCell(box.top, box.right)->textUtf8 == "┐");
+    CHECK(Trimmed(InsideText(screen, box, box.bottom - 1)) == "OK");
+    CHECK(Trimmed(InsideText(screen, box, box.bottom - 2)).empty());
+}
+
+std::vector<wordstartui::sInputEvent> Repeat(const wordstartui::sInputEvent& event, int count)
+{
+    return std::vector<wordstartui::sInputEvent>(static_cast<size_t>(count), event);
+}
+
+wordstartui::sInputEvent Wheel(int amount, int row, int col)
+{
+    wordstartui::sInputEvent event = Mouse(wordstartui::MOUSE_ACTION_WHEEL, row, col);
+    event.mouseButton = wordstartui::MOUSE_BUTTON_NONE;
+    event.mouseWheel = amount;
+    return event;
+}
+
+}
+
+
+TEST_CASE("TUI About box - the text scrolls and the OK button stays on screen")
+{
+    const std::string about = abouttext::AboutText();
+    const std::string tagline = abouttext::Tagline();
+
+    for (std::pair<int, int> size : {std::make_pair(25, 80), std::make_pair(20, 60), std::make_pair(40, 120)})
+    {
+        const int rows = size.first;
+        const int cols = size.second;
+        CAPTURE(rows);
+        CAPTURE(cols);
+
+        // End, then Home, then Down one line at a time, then Enter.
+        std::vector<wordstartui::sInputEvent> events;
+        events.push_back(Special(wordstartui::SPECIAL_KEY_END));
+        events.push_back(Special(wordstartui::SPECIAL_KEY_HOME));
+        std::vector<wordstartui::sInputEvent> downs = Repeat(Special(wordstartui::SPECIAL_KEY_ARROW_DOWN), 60);
+        events.insert(events.end(), downs.begin(), downs.end());
+        events.push_back(Special(wordstartui::SPECIAL_KEY_ENTER));
+
+        cScriptHost host(rows, cols, events);
+        wsdialogs::ScrollingMessageBox(&host, "About WordTsar", about);
+        REQUIRE(host.mFrames.size() == events.size() + 1);
+        CHECK(host.mResult == wordstartui::DIALOG_RESULT_OK);
+
+        std::string all;
+        for (const wordstartui::cScreen& frame : host.mFrames)
+        {
+            CheckAboutFrame(frame);
+            all += FrameText(frame);
+        }
+
+        // First text line of the box is the tagline.
+        sBox box = FindBox(host.mFrames[0]);
+        CHECK(Trimmed(InsideText(host.mFrames[0], box, box.top + 2)) == tagline);
+
+        // End shows the last component line, Home the tagline again.
+        CHECK(ShowsLastComponent(host.mFrames[1]) == true);
+        CHECK(FrameText(host.mFrames[2]).find(tagline) != std::string::npos);
+
+        bool fits = (rows == 40);
+        CHECK(ShowsLastComponent(host.mFrames[0]) == fits);
+
+        // Every word of the About text is shown in some frame.
+        std::istringstream words(about);
+        std::string word;
+        while (words >> word)
+        {
+            INFO("word: ", word);
+            CHECK(all.find(word) != std::string::npos);
+        }
+    }
+}
+
+
+TEST_CASE("TUI About box - Page Down, Page Up and the mouse wheel scroll the text")
+{
+    const std::string about = abouttext::AboutText();
+    const std::string tagline = abouttext::Tagline();
+
+    // Wheel position: the middle of an 80x25 screen is inside the text.
+    std::vector<wordstartui::sInputEvent> events = Repeat(Special(wordstartui::SPECIAL_KEY_PAGE_DOWN), 5);
+    std::vector<wordstartui::sInputEvent> ups = Repeat(Special(wordstartui::SPECIAL_KEY_PAGE_UP), 5);
+    events.insert(events.end(), ups.begin(), ups.end());
+    events.push_back(Wheel(3, 12, 40));
+    events.push_back(Wheel(-3, 12, 40));
+    events.push_back(Special(wordstartui::SPECIAL_KEY_ESCAPE));
+
+    cScriptHost host(25, 80, events);
+    wsdialogs::ScrollingMessageBox(&host, "About WordTsar", about);
+    REQUIRE(host.mFrames.size() == events.size() + 1);
+    CHECK(host.mResult == wordstartui::DIALOG_RESULT_CANCEL);
+
+    CHECK(ShowsLastComponent(host.mFrames[0]) == false);
+    CHECK(ShowsLastComponent(host.mFrames[5]) == true);
+    CHECK(FrameText(host.mFrames[5]).find(tagline) == std::string::npos);
+    CHECK(FrameText(host.mFrames[10]).find(tagline) != std::string::npos);
+    CHECK(FrameText(host.mFrames[11]).find(tagline) == std::string::npos);
+    CHECK(FrameText(host.mFrames[12]).find(tagline) != std::string::npos);
+    for (const wordstartui::cScreen& frame : host.mFrames)
+    {
+        CheckAboutFrame(frame);
+    }
+}
+
+
+TEST_CASE("TUI About box - Help > About WordTsar shows the scrolling box")
+{
+    cWSWordTsar app;
+    app.TestCountModals();
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestEnterOpening();
+    app.TestGetEditor()->mHelpLevel = 3;
+    app.TestDraw(screen);
+    CHECK(app.TestHandleEvent(Text("w")) == true);
+    REQUIRE(app.TestModalCount() == 1);
+
+    const wordstartui::cScreen& modal = app.TestModalScreen();
+    REQUIRE(modal.GetRows() == 25);
+    CheckAboutFrame(modal);
+    sBox box = FindBox(modal);
+    CHECK(Trimmed(InsideText(modal, box, box.top + 2)) == abouttext::Tagline());
 }

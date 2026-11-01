@@ -449,6 +449,8 @@ void cWSWordTsar::HostRunModal(wordstartui::cDialog& dialog)
     if (mTestCountModals == true)
     {
         mTestModalCount = mTestModalCount + 1;
+        mTestModalScreen.Resize(mRows, mCols);
+        dialog.Draw(mTestModalScreen, GetTheme());
         dialog.SetResult(wordstartui::DIALOG_RESULT_CANCEL);
         return;
     }
@@ -3727,7 +3729,7 @@ void cWSWordTsar::ShowOpeningStatus(void)
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::ShowAboutWordTsar(void)
 {
-    wsdialogs::MessageBox(this, "About WordTsar", AboutMessage());
+    wsdialogs::ScrollingMessageBox(this, "About WordTsar", AboutMessage());
 }
 
 /////////////////////////////////////////////////////////////////////////////
