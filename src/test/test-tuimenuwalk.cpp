@@ -2323,3 +2323,35 @@ TEST_CASE("TUI System Preferences - the highlighted hotkey colour pair is labell
     CHECK(host.Shows("Selected hotkey") == true);
     CHECK(host.Shows("Highlight Accel.") == false);
 }
+
+
+TEST_CASE("TUI Opening screen - the file list starts in the current directory unless a default is set")
+{
+    namespace fs = std::filesystem;
+    const fs::path here = fs::current_path();
+
+    SUBCASE("no Default Directory: the process's current directory")
+    {
+        cWSWordTsar app;
+        cConfig config;
+        config.mDefaultDirectory = "";
+        app.TestApplyConfig(config);
+        CHECK(fs::equivalent(fs::path(app.TestOpeningDirectory()), here) == true);
+        CHECK(fs::equivalent(fs::path(app.TestGetEditor()->mFileDir), here) == true);
+    }
+
+    SUBCASE("a Default Directory wins")
+    {
+        fs::path chosen = fs::temp_directory_path() / "wordtsar_default_directory_test";
+        fs::create_directories(chosen);
+        REQUIRE(fs::equivalent(chosen, here) == false);
+        cWSWordTsar app;
+        cConfig config;
+        config.mDefaultDirectory = chosen.string();
+        app.TestApplyConfig(config);
+        CHECK(fs::equivalent(fs::path(app.TestOpeningDirectory()), chosen) == true);
+        CHECK(fs::equivalent(fs::path(app.TestGetEditor()->mFileDir), chosen) == true);
+        std::error_code ec;
+        fs::remove(chosen, ec);
+    }
+}

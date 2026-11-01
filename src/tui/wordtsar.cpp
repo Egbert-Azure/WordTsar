@@ -722,14 +722,16 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
     mEditor->mAutoSaveIntervalSec = config.mAutoSaveInterval;
     mEditor->mDefaultFormat = config.mDefaultFormat;
     {
-        // Default to ~/Documents when the user hasn't set a custom default
-        // directory in Preferences -- without this fallback, the opening-menu
-        // file browser (seeded from the process cwd at construction) lands
-        // wherever the shell happened to be when ws was launched, not
-        // anywhere predictable.
+        // The Default Directory preference, or the directory ws was
+        // started from when it is empty.
+        std::error_code ec;
         std::string startDir = config.mDefaultDirectory.empty() == false
             ? config.mDefaultDirectory
-            : cEditorBase::DefaultFileDir();
+            : std::filesystem::current_path(ec).string();
+        if (startDir.empty() == true)
+        {
+            startDir = cEditorBase::DefaultFileDir();
+        }
         mEditor->mFileDir = startDir;
         mBrowser.SetDirectory(startDir);
     }

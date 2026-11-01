@@ -114,6 +114,7 @@ public:
     const std::string& TestFilename(void) const { return mFilename; }
     const wordstartui::cMenuBar& TestGetOpeningMenu(void) const { return mOpeningMenu; }
     void TestSetOpeningDirectory(const std::string& path) { mBrowser.SetDirectory(path); }
+    std::string TestOpeningDirectory(void) const { return mBrowser.GetCurrentDirectory(); }
     void TestDrawOpening(wordstartui::cScreen& screen)
     {
         mRows = screen.GetRows();
