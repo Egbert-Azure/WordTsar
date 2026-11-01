@@ -89,14 +89,11 @@ struct sOpeningItem
     eOpeningAction action;
 };
 
-// The WordStar 7 opening menu, two columns, letter-for-letter matching the
-// real Classic Opening Menu. The array is ordered left column first, then
-// right column -- see kOpeningLeftCount. The last two rows (no letter shown)
-// are WordTsar's own additions, reachable only by cursor + Enter so they
-// can't collide with a real WordStar 7 binding. F1 (help) is real WS7's own
-// 20th item; it's drawn and handled separately since it arrives as a
-// function-key event, not a typed character (see DrawOpeningMenu /
-// HandleOpeningKey).
+// The WordStar 7 opening menu: the left column (kOpeningLeftCount rows), the
+// right column (kOpeningRightCount rows), then WordTsar's own entries, which
+// are drawn on one row below the columns and answer their letters at help
+// levels 0 to 3 only. F1 (help) is drawn below the left column and handled
+// as a function key (see DrawOpeningPanel / HandleOpeningKey).
 const sOpeningItem kOpeningItems[] =
 {
     // Left column -- 9 rows, matches real WS7 exactly.
@@ -110,8 +107,7 @@ const sOpeningItem kOpeningItems[] =
     { 'T',  "table of contents",      true,  eOpeningAction::TABLE_OF_CONTENTS },
     { 'X',  "exit WordTsar",          true,  eOpeningAction::EXIT },
 
-    // Right column -- 10 rows, matches real WS7 exactly, plus two
-    // WordTsar-only rows appended at the end (no letter -- see above).
+    // Right column -- 10 rows, matches real WS7 exactly.
     { 'L', "change drive/directory", true,  eOpeningAction::CHANGE_DIRECTORY },
     { 'C', "protect/unprotect a file", false, eOpeningAction::PROTECT_UNPROTECT },
     { 'E', "rename a file",          false, eOpeningAction::RENAME_FILE },
@@ -122,11 +118,15 @@ const sOpeningItem kOpeningItems[] =
     { 'R', "run a DOS command",      false, eOpeningAction::RUN_COMMAND },
     { 'A', "about WordTsar",         true,  eOpeningAction::ABOUT },
     { '?', "display status",         true,  eOpeningAction::DISPLAY_STATUS },
-    {  0,  "recent files",           true,  eOpeningAction::RECENT_FILES },
-    {  0,  "preferences",            true,  eOpeningAction::PREFERENCES },
+
+    // WordTsar's own entries.
+    { 'G', "recent files",           true,  eOpeningAction::RECENT_FILES },
+    { 'V', "preferences",            true,  eOpeningAction::PREFERENCES },
 };
 
 constexpr int kOpeningLeftCount = 9;
+constexpr int kOpeningRightCount = 10;
+constexpr int kOpeningOwnFirst = kOpeningLeftCount + kOpeningRightCount;
 constexpr int kOpeningCount = 21;
 
 }
@@ -2078,9 +2078,7 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
     {
         rightCol = 40;
     }
-    int rightCount = kOpeningCount - kOpeningLeftCount;
-
-    for (int index = 0; index < kOpeningCount; ++index)
+    for (int index = 0; index < kOpeningOwnFirst; ++index)
     {
         const sOpeningItem& item = kOpeningItems[index];
         bool onLeft = (index < kOpeningLeftCount);
@@ -2125,10 +2123,34 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
         screen.PutText(row, leftCol, std::string("F1"), keyStyle);
     }
 
+    // WordTsar's own entries on one row below the columns, centred, each as
+    // " letter label " with two columns between entries.
+    const int menuRows = std::max(kOpeningLeftCount + 1, kOpeningRightCount);
+    const int ownRow = 2 + menuRows;
+    {
+        const int gap = 2;
+        int width = 0;
+        for (int index = kOpeningOwnFirst; index < kOpeningCount; ++index)
+        {
+            width += 4 + static_cast<int>(std::strlen(kOpeningItems[index].label));
+            if (index > kOpeningOwnFirst)
+            {
+                width += gap;
+            }
+        }
+        int col = (mCols - width) / 2;
+        for (int index = kOpeningOwnFirst; index < kOpeningCount; ++index)
+        {
+            const sOpeningItem& item = kOpeningItems[index];
+            screen.PutText(ownRow, col + 1, std::string(1, item.key) + " " + item.label, base);
+            screen.PutText(ownRow, col + 1, std::string(1, item.key), keyStyle);
+            col += 4 + static_cast<int>(std::strlen(item.label)) + gap;
+        }
+    }
+
     // The file list's upper bar sits at row 13, or directly below the
-    // panel when the taller column (including the F1 row) reaches row 13.
-    int menuRows = std::max(kOpeningLeftCount + 1, rightCount);
-    int barRow = std::max(13, 2 + menuRows);
+    // panel when the own entries row reaches row 13.
+    int barRow = std::max(13, ownRow + 1);
     DrawOpeningFiles(screen, barRow + 1, barRow + 2);
 }
 
@@ -3047,7 +3069,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
     // ----- Menu focused -----
     eOpeningAction action{};
     bool haveAction = false;
-    int rightCount = kOpeningCount - kOpeningLeftCount;
+    const int rightCount = kOpeningRightCount;
 
     if (event.type == wordstartui::INPUT_TYPE_SPECIAL)
     {
@@ -3112,19 +3134,15 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
     }
     else if ((event.type == wordstartui::INPUT_TYPE_TEXT) && (event.textUtf8.empty() == false))
     {
-        char typed = static_cast<char>(std::toupper(static_cast<unsigned char>(event.textUtf8[0])));
-
-        for (int index = 0; index < kOpeningCount; ++index)
+        int index = 0;
+        if (OpeningKeyAction(event.textUtf8[0], action, index) == true)
         {
-            const sOpeningItem& item = kOpeningItems[index];
-            if ((item.key != 0) && (item.enabled == true) &&
-                (std::toupper(static_cast<unsigned char>(item.key)) == typed))
+            // The cursor moves over the two columns only.
+            if (index < kOpeningOwnFirst)
             {
                 mOpeningSel = index;
-                action = item.action;
-                haveAction = true;
-                break;
             }
+            haveAction = true;
         }
     }
 
@@ -3136,6 +3154,38 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
     RunOpeningAction(action);
 
     return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  char typed [in] typed character, either case
+/// @param  eOpeningAction& action [out] action of the matching item
+/// @param  int& index [out] index of the matching item in kOpeningItems
+///
+/// @return true if an enabled Opening item has this letter
+///
+/// @brief
+/// Find the enabled Opening item for a typed letter. WordTsar's own entries
+/// answer at help levels 0 to 3 only.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSWordTsar::OpeningKeyAction(char typed, eOpeningAction& action, int& index) const
+{
+    char upper = static_cast<char>(std::toupper(static_cast<unsigned char>(typed)));
+
+    const int count = (mEditor->mHelpLevel == 4) ? kOpeningOwnFirst : kOpeningCount;
+    for (int item = 0; item < count; ++item)
+    {
+        const sOpeningItem& entry = kOpeningItems[item];
+        if ((entry.key != 0) && (entry.enabled == true) &&
+            (std::toupper(static_cast<unsigned char>(entry.key)) == upper))
+        {
+            action = entry.action;
+            index = item;
+            return true;
+        }
+    }
+    return false;
 }
 
 /////////////////////////////////////////////////////////////////////////////

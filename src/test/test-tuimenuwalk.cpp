@@ -1474,6 +1474,44 @@ TEST_CASE("TUI Opening screen - help level 3 C label reads protect/unprotect a f
 }
 
 
+TEST_CASE("TUI Opening screen - help level 3 own entries sit on row 12 with letters")
+{
+    cWSWordTsar app;
+    wordstartui::cScreen screen = DrawLevel3Opening(app);
+
+    std::string row12 = MenuRowText(screen, 12);
+    CHECK(row12.find("G recent files") != std::string::npos);
+    CHECK(row12.find("V preferences") != std::string::npos);
+    CHECK(ScreenHasText(screen, "  recent files") == false);
+    CHECK(ScreenHasText(screen, "  preferences") == false);
+
+    eOpeningAction action{};
+    CHECK(app.TestOpeningKeyAction('g', action) == true);
+    CHECK(action == eOpeningAction::RECENT_FILES);
+    CHECK(app.TestOpeningKeyAction('V', action) == true);
+    CHECK(action == eOpeningAction::PREFERENCES);
+
+    SUBCASE("the right column ends with display status")
+    {
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT));
+        for (int step = 0; step < 9; ++step)
+        {
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+        }
+        REQUIRE(app.TestOpeningSelection() == 18);
+        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+        CHECK(app.TestOpeningBrowserFocus() == true);
+    }
+
+    SUBCASE("help level 4 leaves G and V unbound")
+    {
+        app.TestGetEditor()->mHelpLevel = 4;
+        CHECK(app.TestOpeningKeyAction('g', action) == false);
+        CHECK(app.TestOpeningKeyAction('v', action) == false);
+    }
+}
+
+
 
 namespace
 {

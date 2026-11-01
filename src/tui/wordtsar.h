@@ -104,6 +104,11 @@ public:
     bool TestOpeningWantTOC(void) const { return mOpeningWantTOC; }
     bool TestOpeningWantIndex(void) const { return mOpeningWantIndex; }
     int TestOpeningSelection(void) const { return mOpeningSel; }
+    bool TestOpeningKeyAction(char typed, eOpeningAction& action) const
+    {
+        int index = 0;
+        return OpeningKeyAction(typed, action, index);
+    }
     const std::string& TestFilename(void) const { return mFilename; }
     const wordstartui::cMenuBar& TestGetOpeningMenu(void) const { return mOpeningMenu; }
     void TestSetOpeningDirectory(const std::string& path) { mBrowser.SetDirectory(path); }
@@ -167,6 +172,7 @@ private:
     void DrawOpeningFiles(wordstartui::cScreen& screen, int headerRow, int listRow);
     bool HandleOpeningKey(const wordstartui::sInputEvent& event);
     bool HandleOpeningMenuKey(const wordstartui::sInputEvent& event);
+    bool OpeningKeyAction(char typed, eOpeningAction& action, int& index) const;
     void RunOpeningAction(eOpeningAction action);
     void ShowOpeningStatus(void);
     void ShowOpeningHelp(void);
