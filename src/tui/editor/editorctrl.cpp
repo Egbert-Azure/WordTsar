@@ -61,6 +61,7 @@
 #include "src/core/include/version.h"
 #include "src/core/include/config.h"
 #include "src/core/utils/config.h"
+#include "src/core/utils/abouttext.h"
 
 // Spell checking
 #include "src/core/spellcheck/spellcheck.h"
@@ -2906,51 +2907,6 @@ void cWSEditorCtrl::PrintPreview(void)
 #ifndef _WIN32
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return CUPS default destination name, or empty if none is configured
-///
-/// @brief
-/// Runs `lpstat -d` and parses its output for a configured default
-/// destination. CUPS reports "no system default destination" when none
-/// has been set, which is common on a fresh macOS install even when
-/// printers are available.
-///
-/////////////////////////////////////////////////////////////////////////////
-static std::string GetCupsDefaultPrinter(void)
-{
-    FILE* pipe = popen("lpstat -d 2>/dev/null", "r");
-    if (!pipe)
-    {
-        return std::string();
-    }
-
-    std::string output;
-    char buf[256];
-    while (fgets(buf, sizeof(buf), pipe))
-    {
-        output += buf;
-    }
-    pclose(pipe);
-
-    const std::string marker = "system default destination:";
-    size_t pos = output.find(marker);
-    if (pos == std::string::npos)
-    {
-        return std::string();
-    }
-
-    std::string name = output.substr(pos + marker.size());
-    size_t start = name.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos)
-    {
-        return std::string();
-    }
-    size_t end = name.find_last_not_of(" \t\r\n");
-    return name.substr(start, end - start + 1);
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-///
 /// @return names of installed CUPS destinations (possibly empty)
 ///
 /// @brief
@@ -3029,7 +2985,7 @@ void cWSEditorCtrl::Print(void)
                              "\n\nOpen it in your PDF viewer to print.");
     }
 #else
-    std::string printerName = GetCupsDefaultPrinter();
+    std::string printerName = abouttext::QueryDefaultPrinter();
 
     if (printerName.empty())
     {
