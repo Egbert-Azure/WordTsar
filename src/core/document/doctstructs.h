@@ -387,13 +387,15 @@ struct sExtendedChars
 ///
 /// @brief
 /// Footnote or endnote content.
-/// Stores the note numbering symbol type and the note text.
+/// Stores the note numbering symbol type, the note text and the sequence
+/// body bytes as read from a WordStar file (empty when not loaded from one).
 ///
 /////////////////////////////////////////////////////////////////////////////
 struct sNote
 {
     eNoteSymbol symbol ;
     std::string text ;
+    std::string raw ;                           ///< sequence body bytes, written back unchanged on save
 };
 
 

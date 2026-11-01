@@ -610,6 +610,32 @@ TEST_CASE("cWordstarFile::LoadFile - footnote sequences")
 }
 
 
+TEST_CASE("cWordstarFile - a footnote sequence saves back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    SUBCASE("a simple note")
+    {
+        std::string body = std::string("\x02\x00\x00\x00\x00", 5) + "note text";
+        std::string input = WordStar7File("Hi" + SequenceBytes(SEQ_FOOTNOTE, body) + "!\x0D\x0A");
+        CHECK(RoundTrip(editor, input) == input);
+    }
+
+    SUBCASE("a note with an embedded footnote sub-sequence")
+    {
+        std::string body("\x01\x00\x01\x00", 4);                // tag = 1
+        body += std::string("\x00\x1D\x09\x00\x03", 5);         // bytes 4-8
+        body += std::string("\x00\x00\x01\x03", 4);             // sub-sequence data, bytes 9-12
+        body += std::string("\x00\x09\x00\x1D", 4);             // rest of the sub-sequence
+        body += "note\x0D\x0Atext";
+        std::string input = WordStar7File("Hi" + SequenceBytes(SEQ_FOOTNOTE, body) + "!\x0D\x0A");
+        CHECK(RoundTrip(editor, input) == input);
+    }
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief
@@ -847,7 +873,7 @@ bool SameWSFont(const sWSFont& a, const sWSFont& b)
 // Category of the first difference between paragraph para of a and of b,
 // or an empty string when they agree. Text graphemes are compared as UTF-8;
 // markers by control type and, for tabs, fonts, colours and variables, by
-// their attribute values. Differences in a dot-command paragraph are
+// their attribute values, for notes by their sequence body bytes. Differences in a dot-command paragraph are
 // "dot command", in a header or footer command "header-footer".
 std::string CompareParagraph(cDocument* a, cDocument* b, PARAGRAPH_T para)
 {
@@ -943,6 +969,17 @@ std::string CompareParagraph(cDocument* a, cDocument* b, PARAGRAPH_T para)
             if (a->GetVariable(posA) != b->GetVariable(posB))
             {
                 category = "formatting (variable)";
+            }
+        }
+        else if (controlA == STYLE_FOOTNOTE || controlA == STYLE_ENDNOTE)
+        {
+            sNote noteA{};
+            sNote noteB{};
+            bool gotA = a->GetNote(posA, noteA);
+            bool gotB = b->GetNote(posB, noteB);
+            if (gotA != gotB || noteA.raw != noteB.raw)
+            {
+                category = "note";
             }
         }
     }

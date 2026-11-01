@@ -2091,6 +2091,50 @@ bool cDocument::GetColor(POSITION_T position, sSeqRGBColor &color)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param position   [IN] the position to check for a note
+/// @param note       [OUT] the found note
+///
+/// @return bool - true if a footnote is at position
+///
+/// @brief
+/// Get the note stored for a note marker
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDocument::GetNote(POSITION_T position, sNote &note)
+{
+    if(position < 0 || position >= GetTextSize())
+    {
+        return false ;
+    }
+
+    PARAGRAPH_T currentparagraphnumber = GetParagraphFromPosition(position) ;
+    auto paraiter = mParagraphData.begin() + currentparagraphnumber ;
+    position -= paraiter->index ;
+
+    PairTable pcomp ;
+    pcomp.first = position ;
+    auto iter = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), pcomp, TableCompare) ;
+    if(iter == paraiter->pairs.end() || iter->first != position || iter->second != TYPE_FOOTNOTE)
+    {
+        return false ;
+    }
+
+    FootnotePair comp ;
+    comp.first = position ;
+    auto iter1 = lower_bound(paraiter->footnote.begin(), paraiter->footnote.end(), comp, FootnoteCompare) ;
+    if(iter1 == paraiter->footnote.end() || iter1->first != position)
+    {
+        return false ;
+    }
+
+    note = iter1->second ;
+    return true ;
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param position   [IN] the position to check font for
 /// @param intfont    [OUT] sInternalFonts data
 ///

@@ -1255,6 +1255,32 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
                         }
                         break;
 
+                    case STYLE_FOOTNOTE :
+                        {
+                            // a note loaded from a WordStar file is written back as its sequence;
+                            // any other marker of this code is written as the byte itself
+                            sNote note ;
+                            if(mDocument->GetNote(loop, note) == true && note.raw.empty() == false)
+                            {
+                                intro.size = static_cast<uint16_t>(note.raw.size() + 4) ;
+                                intro.type = eSequence::SEQ_FOOTNOTE ;
+
+                                close.size = intro.size ;
+
+                                fwrite(&intro, sizeof(sSeqIntro), 1, mFile) ;
+                                fwrite(note.raw.data(), 1, note.raw.size(), mFile) ;
+                                fwrite(&close, sizeof(sSeqClose), 1, mFile) ;
+
+                                stylecounter += note.raw.size() + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
+                            }
+                            else
+                            {
+                                fputc(ch1, mFile) ;
+                                stylecounter++ ;
+                            }
+                        }
+                        break ;
+
                     case STYLE_EOF :
                         loop = length ;  // get out of for loop
                         break ;
@@ -2414,6 +2440,7 @@ void cWordstarFile::ParseNote(std::string sequence, eSequence type)
     sNote note ;
     note.symbol = static_cast<eNoteSymbol>(subdata.note.format) ;
     note.text = text ;
+    note.raw = sequence ;
     if(type == eSequence::SEQ_FOOTNOTE)
     {
         mDocument->InsertFootnote(note) ;

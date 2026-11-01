@@ -319,6 +319,7 @@ public:
     bool GetColor(POSITION_T position, sSeqRGBColor &color) ;
     bool GetFont(POSITION_T position, sInternalFonts &intfont) ;
     eVariableType GetVariable(POSITION_T position) ;
+    bool GetNote(POSITION_T position, sNote &note) ;
     eModifiers GetControlChar(POSITION_T) ;
 
     // --- Text Retrieval ---
