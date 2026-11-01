@@ -74,6 +74,10 @@ public:
     // Draw the last top-level title with two blank columns before the right
     // edge of the bar, when it fits there (default off).
     void SetLastMenuRightAligned(bool rightAligned);
+    // Pull-downs open one column left of their title, with a blank column
+    // between the label and shortcut columns and one before the right
+    // border (default off).
+    void SetLetterColumnLayout(bool on);
     void Clear(void);
     void AddItem(const std::string& title, char hotKey, std::function<void(void)> callback);
     int AddMenu(const std::string& title, char hotKey);
@@ -132,6 +136,7 @@ private:
     int mScreenRows;          // last known screen height (for flyout clamping)
     int mMenuGap;             // blank columns between top-level titles
     bool mLastRightAligned;   // last top-level title sits at the right edge
+    bool mLetterColumn;       // WordStar pull-down layout (SetLetterColumnLayout)
 };
 
 }

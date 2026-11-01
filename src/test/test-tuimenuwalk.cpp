@@ -1446,3 +1446,158 @@ TEST_CASE("TUI Opening screen - help level 3 header and bars")
     CHECK(CellRun(screen, barRow + 2, 19, 1) == kBar);
     CHECK(RowIsFilledWith(screen, 24, kLowerHalf) == true);
 }
+
+
+
+namespace
+{
+
+wordstartui::sInputEvent MenuAlt(char letter)
+{
+    wordstartui::sInputEvent event{};
+    event.type = wordstartui::INPUT_TYPE_TEXT;
+    event.alt = true;
+    event.textUtf8 = std::string(1, letter);
+    return event;
+}
+
+// Draw a copy of the menu bar on row 1 of a 25x80 screen with one menu open.
+wordstartui::cScreen DrawOpenMenu(wordstartui::cMenuBar menu, char letter)
+{
+    wordstartui::sRect bounds{};
+    bounds.row = 1;
+    bounds.col = 0;
+    bounds.rows = 1;
+    bounds.cols = 80;
+    menu.SetBounds(bounds);
+    menu.HandleEvent(MenuAlt(letter));
+    REQUIRE(menu.IsOpen() == true);
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    wordstartui::cTheme theme;
+    menu.Draw(screen, theme);
+    return screen;
+}
+
+}
+
+
+TEST_CASE("TUI menu bar - a shortcut is placed by its display width")
+{
+    wordstartui::cMenuBar menu;
+    int util = menu.AddMenu("Utilities", 'u');
+    menu.AddSubItem(util, "&Index...  I", [](void) {});
+    menu.AddSubItem(util, "&Macros  \xe2\x96\xba", [](void) {});   // U+25BA
+
+    wordstartui::cScreen screen = DrawOpenMenu(menu, 'u');
+
+    // Box columns 1 to 15; both shortcuts end directly before the border.
+    CHECK(CellRun(screen, 2, 15, 1) == "\xe2\x94\x90");
+    CHECK(CellRun(screen, 3, 13, 3) == " I\xe2\x94\x82");
+    CHECK(CellRun(screen, 4, 13, 3) == " \xe2\x96\xba\xe2\x94\x82");
+}
+
+
+TEST_CASE("TUI Opening screen - pull-down boxes follow the WordStar layout")
+{
+    cWSWordTsar app;
+    const wordstartui::cMenuBar& opening = app.TestGetOpeningMenu();
+    const std::string corner = "\xe2\x94\x8c";   // U+250C
+    const std::string side = "\xe2\x94\x82";     // U+2502
+
+    SUBCASE("File")
+    {
+        wordstartui::cScreen screen = DrawOpenMenu(opening, 'f');
+        CHECK(CellRun(screen, 2, 0, 1) == corner);
+        CHECK(CellRun(screen, 2, 31, 1) == "\xe2\x94\x90");
+        CHECK(CellRun(screen, 3, 0, 5) == side + " New");
+        CHECK(CellRun(screen, 3, 28, 4) == " S " + side);
+        CHECK(CellRun(screen, 17, 28, 4) == " L " + side);
+        CHECK(CellRun(screen, 18, 2, 26) == "Change Filename Display...");
+        CHECK(CellRun(screen, 18, 28, 4) == "   " + side);
+        CHECK(CellRun(screen, 22, 28, 4) == " X " + side);
+    }
+
+    SUBCASE("Utilities")
+    {
+        wordstartui::cScreen screen = DrawOpenMenu(opening, 'u');
+        CHECK(CellRun(screen, 2, 7, 1) == corner);
+        CHECK(CellRun(screen, 2, 33, 1) == "\xe2\x94\x90");
+        CHECK(CellRun(screen, 3, 9, 8) == "Index...");
+        CHECK(CellRun(screen, 3, 30, 4) == " I " + side);
+        CHECK(CellRun(screen, 4, 30, 4) == " T " + side);
+        CHECK(CellRun(screen, 5, 30, 4) == " \xe2\x96\xba " + side);
+        CHECK(CellRun(screen, 7, 9, 21) == "System Preferences...");
+    }
+
+    SUBCASE("Additional")
+    {
+        wordstartui::cScreen screen = DrawOpenMenu(opening, 'a');
+        CHECK(CellRun(screen, 2, 19, 1) == corner);
+        CHECK(CellRun(screen, 2, 38, 1) == "\xe2\x94\x90");
+        CHECK(CellRun(screen, 3, 21, 8) == "MailList");
+        CHECK(CellRun(screen, 3, 34, 5) == " AM " + side);
+        CHECK(CellRun(screen, 5, 21, 13) == "Star Exchange");
+        CHECK(CellRun(screen, 5, 34, 5) == " AS " + side);
+    }
+
+    SUBCASE("Help")
+    {
+        wordstartui::cScreen screen = DrawOpenMenu(opening, 'h');
+        CHECK(CellRun(screen, 2, 53, 1) == corner);
+        CHECK(CellRun(screen, 2, 79, 1) == "\xe2\x94\x90");
+        CHECK(CellRun(screen, 3, 55, 4) == "Help");
+        CHECK(CellRun(screen, 3, 75, 5) == " F1 " + side);
+    }
+}
+
+
+TEST_CASE("TUI menu bar - edit-screen pull-downs keep the shortcut at the border")
+{
+    cWSWordTsar app;
+    app.TestBuildMenus();
+    const wordstartui::cMenuBar& menu = app.TestGetMenu();
+    const std::vector<wordstartui::sMenuItem>& items = menu.GetItems();
+
+    for (const wordstartui::sMenuItem& item : items)
+    {
+        if (item.entries.empty() == true)
+        {
+            continue;
+        }
+        INFO("menu: ", item.title);
+        wordstartui::cScreen screen = DrawOpenMenu(menu, item.hotKey);
+
+        // The box opens at the title's column unless it is pushed left by
+        // the right edge of the screen.
+        int left = -1;
+        int right = -1;
+        for (int col = 0; col < 80; ++col)
+        {
+            if (CellRun(screen, 2, col, 1) == "\xe2\x94\x8c")
+            {
+                left = col;
+            }
+            if (CellRun(screen, 2, col, 1) == "\xe2\x94\x90")
+            {
+                right = col;
+            }
+        }
+        REQUIRE(left >= 0);
+        REQUIRE(right > left);
+        const int titleCol = static_cast<int>(MenuRowText(screen, 1).find(item.title));
+        CHECK(((left == titleCol) || (right == 79)) == true);
+
+        for (size_t index = 0; index < item.entries.size(); ++index)
+        {
+            const wordstartui::sMenuEntry& entry = item.entries[index];
+            if (entry.shortcut.empty() == true)
+            {
+                continue;
+            }
+            const int width = static_cast<int>(entry.shortcut.size());
+            CHECK(CellRun(screen, 3 + static_cast<int>(index), right - width, width) == entry.shortcut);
+        }
+    }
+}

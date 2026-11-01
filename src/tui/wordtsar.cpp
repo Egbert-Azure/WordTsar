@@ -1384,6 +1384,7 @@ void cWSWordTsar::BuildOpeningMenus(void)
     mOpeningMenu.Clear();
     mOpeningMenu.SetMenuGap(3);
     mOpeningMenu.SetLastMenuRightAligned(true);
+    mOpeningMenu.SetLetterColumnLayout(true);
 
     // Entries show the classic Opening Menu letter right-aligned. Entries
     // without an Opening screen action are greyed out.

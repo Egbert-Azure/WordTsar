@@ -19,6 +19,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include "menubar.h"
+#include "utf8helper.h"
 
 #include <algorithm>
 #include <cctype>
@@ -57,6 +58,7 @@ cMenuBar::cMenuBar(void)
     mScreenRows = 0;
     mMenuGap = 2;
     mLastRightAligned = false;
+    mLetterColumn = false;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -103,6 +105,23 @@ void cMenuBar::SetMenuGap(int gap)
 void cMenuBar::SetLastMenuRightAligned(bool rightAligned)
 {
     mLastRightAligned = rightAligned;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  bool on [in] true for the WordStar pull-down layout
+///
+/// @return nothing
+///
+/// @brief
+/// Open each pull-down one column left of its title and size it as a label
+/// column and a shortcut column with a blank column between them; the
+/// shortcuts are right-aligned with one blank column before the border.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMenuBar::SetLetterColumnLayout(bool on)
+{
+    mLetterColumn = on;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -477,6 +496,33 @@ int cMenuBar::DropWidth(const std::vector<sMenuEntry>& entries) const
 {
     int width = 8;
 
+    if (mLetterColumn == true)
+    {
+        // Pad, label column, blank, shortcut column, pad.
+        int nameColumn = 0;
+        int shortColumn = 0;
+        for (const sMenuEntry& entry : entries)
+        {
+            if (entry.isSeparator == true)
+            {
+                continue;
+            }
+            nameColumn = std::max(nameColumn, cUtf8Helper::TextWidth(entry.title));
+            int shortLen = cUtf8Helper::TextWidth(entry.shortcut);
+            if ((shortLen == 0) && (entry.submenu.empty() == false))
+            {
+                shortLen = 1;
+            }
+            shortColumn = std::max(shortColumn, shortLen);
+        }
+        int inner = 1 + nameColumn + 1;
+        if (shortColumn > 0)
+        {
+            inner += shortColumn + 1;
+        }
+        return std::max(width, inner);
+    }
+
     for (const sMenuEntry& entry : entries)
     {
         if (entry.isSeparator == true)
@@ -484,8 +530,8 @@ int cMenuBar::DropWidth(const std::vector<sMenuEntry>& entries) const
             continue;
         }
 
-        int nameLen = static_cast<int>(entry.title.size());
-        int shortLen = static_cast<int>(entry.shortcut.size());
+        int nameLen = cUtf8Helper::TextWidth(entry.title);
+        int shortLen = cUtf8Helper::TextWidth(entry.shortcut);
         int candidate;
 
         if (shortLen > 0)
@@ -604,6 +650,10 @@ sRect cMenuBar::LevelRect(int level) const
     int innerWidth = DropWidth(*entries);
     int boxWidth = innerWidth + 2;
     int startCol = MenuColumn(mOpenMenu);
+    if (mLetterColumn == true)
+    {
+        startCol -= 1;
+    }
     if ((startCol + boxWidth) > screenRight)
     {
         startCol = screenRight - boxWidth;
@@ -796,7 +846,11 @@ void cMenuBar::Draw(cScreen& screen, const cTheme& theme)
 
             if (entry.shortcut.empty() == false)
             {
-                int scCol = box.col + box.cols - 1 - static_cast<int>(entry.shortcut.size());
+                int scCol = box.col + box.cols - 1 - cUtf8Helper::TextWidth(entry.shortcut);
+                if (mLetterColumn == true)
+                {
+                    scCol -= 1;
+                }
                 screen.PutText(entryRow, scCol, entry.shortcut, rowStyle);
             }
 
