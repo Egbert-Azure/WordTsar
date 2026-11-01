@@ -380,8 +380,12 @@ TEST_CASE("TUI startup screen - a key pressed during the startup screen reaches 
         CHECK(app.TestModalCount() == 1);
     }
 
-    SUBCASE("Escape exits as on the Opening screen")
+    SUBCASE("Escape only ends the startup screen; a second Escape exits")
     {
+        CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestQuitRequested() == false);
+        CHECK(app.TestOpeningBrowserFocus() == false);
         CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
         CHECK(app.TestQuitRequested() == true);
     }
@@ -816,6 +820,29 @@ TEST_CASE("TUI About box - Help > About WordTsar shows the scrolling box")
     CheckAboutFrame(modal);
     sBox box = FindBox(modal);
     CHECK(Trimmed(InsideText(modal, box, box.top + 2)) == abouttext::Tagline());
+}
+
+
+TEST_CASE("TUI startup screen - Escape with a file name ends the startup screen and opens the file")
+{
+    cStartupTempDir dir;
+    std::string file = dir.WriteText("letter.txt", "dear reader\n");
+
+    cWSWordTsar app;
+    PrepareWs7(app);
+    char name[] = "ws";
+    char* argv[] = { name, file.data(), nullptr };
+    app.TestStartSession(2, argv);
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDraw(screen);
+    REQUIRE(app.TestInStartup() == true);
+
+    CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
+    CHECK(app.TestQuitRequested() == false);
+    CHECK(app.TestInEditor() == true);
+    CHECK(app.TestGetEditor()->mFileName == "letter.txt");
+    CHECK(app.TestGetEditor()->GetDocument()->IsModified() == false);
 }
 
 

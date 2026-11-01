@@ -3164,8 +3164,8 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
 /////////////////////////////////////////////////////////////////////////////
 bool cWSWordTsar::HandleEvent(const sInputEvent& event)
 {
-    // A key ends the startup screen and goes on to the next screen. A mouse
-    // button press only ends it; other mouse events are ignored.
+    // A key ends the startup screen and goes on to the next screen. Escape
+    // and a mouse button press only end it; other mouse events are ignored.
     if (mMode == APP_STARTUP)
     {
         if (event.type == wordstartui::INPUT_TYPE_MOUSE)
@@ -3177,6 +3177,11 @@ bool cWSWordTsar::HandleEvent(const sInputEvent& event)
             return true;
         }
         EndStartupScreen();
+        if ((event.type == wordstartui::INPUT_TYPE_SPECIAL) &&
+            (event.special == wordstartui::SPECIAL_KEY_ESCAPE))
+        {
+            return true;
+        }
     }
 
     if (mMode == APP_OPENING)
