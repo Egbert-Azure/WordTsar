@@ -200,7 +200,7 @@ std::string TrademarkText(void)
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @return the third-party components built into WordTsar with the
-///         licence their bundled licence files name
+///         licences their bundled licence files and headers name
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::vector<sComponent> Components(void)
@@ -211,7 +211,7 @@ std::vector<sComponent> Components(void)
         { "cpp-unicodelib", "MIT" },
         { "PicoMath", "BSD 3-Clause" },
         { "zip", "MIT" },
-        { "miniz", "Unlicense" },
+        { "miniz", "Unlicense and MIT" },
         { "chillout", "MIT" },
     };
 }

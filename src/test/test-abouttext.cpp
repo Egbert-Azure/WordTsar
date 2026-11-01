@@ -156,12 +156,14 @@ TEST_CASE("About text - components and licences as the bundled licence files sta
     std::vector<abouttext::sComponent> components = abouttext::Components();
     REQUIRE(components.size() == 7);
     const char* names[] = {"pugixml", "SimpleIni", "cpp-unicodelib", "PicoMath", "zip", "miniz", "chillout"};
-    const char* licences[] = {"MIT", "MIT", "MIT", "BSD 3-Clause", "MIT", "Unlicense", "MIT"};
+    // miniz.h carries the Unlicense dedication and an MIT licence block.
+    const char* licences[] = {"MIT", "MIT", "MIT", "BSD 3-Clause", "MIT", "Unlicense and MIT", "MIT"};
     for (size_t index = 0; index < components.size(); ++index)
     {
         CHECK(components[index].name == names[index]);
         CHECK(components[index].licence == licences[index]);
     }
+    CHECK(abouttext::ComponentsText().find("miniz (Unlicense and MIT)") != std::string::npos);
 }
 
 
