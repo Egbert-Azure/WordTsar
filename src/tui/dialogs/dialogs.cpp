@@ -2646,6 +2646,7 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
     cCheckBox* showMenuPtr = nullptr;
     cCheckBox* alwaysDotPtr = nullptr;
     cCheckBox* alwaysFlagPtr = nullptr;
+    cCheckBox* showStartupPtr = nullptr;
     cDropdown* helpPtr = nullptr;
 
     {
@@ -2719,6 +2720,12 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         alwaysFlagPtr = alwaysFlag.get();
         displayFocus.push_back(alwaysFlagPtr);
         displayWidgets.push_back(std::move(alwaysFlag));
+
+        displayLabels.push_back({contentTop + 6, rightCol - 4, "Startup:", true});
+        auto showStartup = std::make_unique<cCheckBox>(MakeDisplayRect(rightCol, 7, checkWidth), "Show startup screen", BoolToTri(config.mTuiShowStartupScreen));
+        showStartupPtr = showStartup.get();
+        displayFocus.push_back(showStartupPtr);
+        displayWidgets.push_back(std::move(showStartup));
     }
 
     // ============================ User tab ============================
@@ -3788,6 +3795,7 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
     config.mTuiShowMenu = TriToBool(showMenuPtr);
     config.mTuiAlwaysDotCommands = TriToBool(alwaysDotPtr);
     config.mTuiAlwaysFlagColumn = TriToBool(alwaysFlagPtr);
+    config.mTuiShowStartupScreen = TriToBool(showStartupPtr);
     config.mTuiShowHelp = Clamp(helpPtr->GetSelectedIndex(), 0, 4);
 
     config.mShortName = shortNamePtr->GetText();

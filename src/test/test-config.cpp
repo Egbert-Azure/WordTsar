@@ -24,7 +24,10 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
+
+#include <unistd.h>
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -564,6 +567,58 @@ TEST_CASE("A stored TUI help level 3 stays 3 on load")
     cConfig loaded;
     loaded.Load();
     CHECK(loaded.mTuiShowHelp == 3);
+}
+
+}  // TEST_SUITE
+
+
+TEST_SUITE("cConfig - Startup screen")
+{
+
+TEST_CASE("showStartupScreen defaults to on and round-trips through the config file")
+{
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-test-startup-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path root = pattern;
+    const char* oldHome = std::getenv("HOME");
+    const char* oldXdg = std::getenv("XDG_CONFIG_HOME");
+    const std::string savedHome = (oldHome != nullptr) ? oldHome : "";
+    const std::string savedXdg = (oldXdg != nullptr) ? oldXdg : "";
+    setenv("HOME", root.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (root / ".config").c_str(), 1);
+    REQUIRE(cConfig::GetConfigFilePath().find(root.string()) == 0);
+
+    cConfig defaults;
+    CHECK(defaults.mTuiShowStartupScreen == true);
+
+    std::filesystem::create_directories(cConfig::GetConfigDir());
+    {
+        std::ofstream file(cConfig::GetConfigFilePath(), std::ios::trunc);
+        file << "[tui.display]\nshowStartupScreen = false\n";
+    }
+    cConfig loaded;
+    loaded.Load();
+    CHECK(loaded.mTuiShowStartupScreen == false);
+
+    loaded.mTuiShowStartupScreen = true;
+    loaded.Save();
+    cConfig reloaded;
+    reloaded.mTuiShowStartupScreen = false;
+    reloaded.Load();
+    CHECK(reloaded.mTuiShowStartupScreen == true);
+
+    reloaded.mTuiShowStartupScreen = false;
+    reloaded.Save();
+    {
+        std::ifstream file(cConfig::GetConfigFilePath());
+        std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        CHECK(text.find("showStartupScreen = false") != std::string::npos);
+    }
+
+    if (oldHome != nullptr) { setenv("HOME", savedHome.c_str(), 1); } else { unsetenv("HOME"); }
+    if (oldXdg != nullptr) { setenv("XDG_CONFIG_HOME", savedXdg.c_str(), 1); } else { unsetenv("XDG_CONFIG_HOME"); }
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
 }
 
 }  // TEST_SUITE

@@ -2264,6 +2264,91 @@ TEST_CASE("TUI System Preferences - the highlighted hotkey colour pair is labell
 }
 
 
+namespace
+{
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief Dialog host for System Preferences: clicks the Display tab and
+///        the entry with the given label, then presses Enter to accept.
+///
+/////////////////////////////////////////////////////////////////////////////
+class cClickLabelHost : public cKeysThenDrawHost
+{
+public:
+    explicit cClickLabelHost(const std::string& label) : mLabel(label) {}
+
+    void HostRunModalRaw(
+        const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
+        const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
+    {
+        wordstartui::cScreen screen;
+        screen.Resize(25, 80);
+        draw(screen, mOwnTheme);
+        ClickText(screen, "Display", handle);
+        draw(screen, mOwnTheme);
+        mFound = ClickText(screen, mLabel, handle);
+        wordstartui::sInputEvent enter{};
+        enter.type = wordstartui::INPUT_TYPE_SPECIAL;
+        enter.special = wordstartui::SPECIAL_KEY_ENTER;
+        handle(enter);
+    }
+
+    bool mFound = false;
+
+private:
+    // Left click on the first cell showing text; false when not shown.
+    static bool ClickText(const wordstartui::cScreen& screen, const std::string& text,
+                          const std::function<bool(const wordstartui::sInputEvent&)>& handle)
+    {
+        for (int row = 0; row < screen.GetRows(); ++row)
+        {
+            size_t at = MenuRowText(screen, row).find(text);
+            if (at == std::string::npos)
+            {
+                continue;
+            }
+            int col = 0;
+            std::string prefix;
+            while ((col < screen.GetCols()) && (prefix.size() < at))
+            {
+                prefix += screen.GetCell(row, col)->textUtf8;
+                ++col;
+            }
+            wordstartui::sInputEvent click{};
+            click.type = wordstartui::INPUT_TYPE_MOUSE;
+            click.mouseAction = wordstartui::MOUSE_ACTION_PRESS;
+            click.mouseButton = wordstartui::MOUSE_BUTTON_LEFT;
+            click.mouseRow = row;
+            click.mouseCol = col;
+            handle(click);
+            return true;
+        }
+        return false;
+    }
+
+    std::string mLabel;
+    wordstartui::cTheme mOwnTheme;
+};
+
+}
+
+
+TEST_CASE("TUI System Preferences - Show startup screen on the Display tab")
+{
+    for (bool start : {true, false})
+    {
+        CAPTURE(start);
+        cConfig config;
+        config.mTuiShowStartupScreen = start;
+        cClickLabelHost host("Show startup screen");
+        CHECK(wsdialogs::SystemPreferences(&host, config) == true);
+        CHECK(host.mFound == true);
+        CHECK(config.mTuiShowStartupScreen == !start);
+    }
+}
+
+
 TEST_CASE("TUI Opening screen - the file list starts in the current directory unless a default is set")
 {
     namespace fs = std::filesystem;

@@ -191,6 +191,7 @@ cConfig::cConfig(void)
     mTuiAlwaysDotCommands = true;
     mTuiAlwaysFlagColumn = true;
     mTuiCenterView = false;
+    mTuiShowStartupScreen = true;
 
     // [tui.colors] defaults (CGA blue bg, CGA gray text)
     mTuiBackground = {0, 0, 170};
@@ -791,6 +792,7 @@ bool cConfig::Load(void)
     mTuiAlwaysDotCommands = ini.GetBoolValue("tui.display", "alwaysDotCommands", mTuiAlwaysDotCommands);
     mTuiAlwaysFlagColumn = ini.GetBoolValue("tui.display", "alwaysFlagColumn", mTuiAlwaysFlagColumn);
     mTuiCenterView = ini.GetBoolValue("tui.display", "centerView", mTuiCenterView);
+    mTuiShowStartupScreen = ini.GetBoolValue("tui.display", "showStartupScreen", mTuiShowStartupScreen);
 
     // --- [tui.colors] ---
     mTuiBackground = ReadRGB(&ini, "tui.colors", "background", mTuiBackground);
@@ -978,6 +980,7 @@ bool cConfig::Save(void)
     ini.SetBoolValue("tui.display", "alwaysDotCommands", mTuiAlwaysDotCommands);
     ini.SetBoolValue("tui.display", "alwaysFlagColumn", mTuiAlwaysFlagColumn);
     ini.SetBoolValue("tui.display", "centerView", mTuiCenterView);
+    ini.SetBoolValue("tui.display", "showStartupScreen", mTuiShowStartupScreen);
 
     // --- [tui.colors] ---
     WriteRGB(&ini, "tui.colors", "background", mTuiBackground);
@@ -1190,6 +1193,7 @@ void cConfig::WriteCommentedTemplate(const std::string& path)
     file << "; TUI display options -- show/hide UI elements\n";
     file << "; showTitleBar is TUI-only (GUI uses the OS window title bar)\n";
     file << "; showHelp: 0 = off, 1 = context only, 2 = always show help panel\n";
+    file << "; showStartupScreen: show the startup screen when ws starts\n";
     file << "[tui.display]\n";
     file << "\n";
     file << "; TUI editor colors -- R, G, B values (0-255)\n";

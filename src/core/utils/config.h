@@ -274,6 +274,7 @@ public:
     bool mTuiAlwaysDotCommands;
     bool mTuiAlwaysFlagColumn;
     bool mTuiCenterView;
+    bool mTuiShowStartupScreen;
 
     // --- [tui.colors] settings (9 editor color pairs = 18 sRGB values) ---
     sRGB mTuiBackground;
