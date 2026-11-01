@@ -3044,10 +3044,14 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         return true;
     }
 
-    // Tab toggles focus between the menu and the file picker.
+    // Tab toggles focus between the menu and the file picker and drops a
+    // pending print, TOC or index request.
     if ((event.type == wordstartui::INPUT_TYPE_SPECIAL) &&
         (event.special == wordstartui::SPECIAL_KEY_TAB))
     {
+        mOpeningWantPrint = false;
+        mOpeningWantTOC = false;
+        mOpeningWantIndex = false;
         if (mOpeningBrowserFocus == true)
         {
             mOpeningBrowserFocus = false;

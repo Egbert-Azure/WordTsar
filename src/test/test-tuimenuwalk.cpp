@@ -2662,3 +2662,37 @@ TEST_CASE("TUI Opening screen - an entry WordTsar does not implement closes the 
         CHECK(app.TestInOpening() == true);
     }
 }
+
+
+TEST_CASE("TUI Opening screen - Tab drops a pending print, TOC or index request")
+{
+    sOpeningListDir dir;
+
+    for (int level : {3, 4})
+    {
+        CAPTURE(level);
+        for (const char* letter : {"p", "t", "i"})
+        {
+            INFO("letter: ", std::string(letter));
+            cWSWordTsar app;
+            PrepareOpeningList(app, level, dir);
+            if ((level == 4) && (std::string(letter) != "p"))
+            {
+                app.TestHandleEvent(OpeningText("u"));
+            }
+            app.TestHandleEvent(OpeningText(letter));
+            REQUIRE(app.TestOpeningBrowserFocus() == true);
+            REQUIRE((app.TestOpeningWantPrint() || app.TestOpeningWantTOC() || app.TestOpeningWantIndex()) == true);
+            CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_TAB)) == true);
+            CHECK(app.TestOpeningBrowserFocus() == false);
+            REQUIRE(app.TestOpeningWantPrint() == false);
+            REQUIRE(app.TestOpeningWantTOC() == false);
+            REQUIRE(app.TestOpeningWantIndex() == false);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+            CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
+            CHECK(app.TestInEditor() == true);
+            CHECK(std::filesystem::path(app.TestFilename()).filename() == "f3.txt");
+            CHECK(app.TestGetEditor()->GetStatusMessage().empty() == true);
+        }
+    }
+}
