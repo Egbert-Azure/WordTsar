@@ -81,6 +81,9 @@ void EmergencySignalHandler(int /*sig*/)
 // Splash frames before auto-advancing (~50ms per loop tick).
 constexpr int SPLASH_TICKS = 12;
 
+// Status message for a menu entry or letter WordTsar does not implement.
+const char* const kNotAvailableMessage = "Not available in WordTsar";
+
 struct sOpeningItem
 {
     char key;           // typed hotkey
@@ -3326,13 +3329,14 @@ void cWSWordTsar::RunOpeningAction(eOpeningAction action)
 /// @return nothing
 ///
 /// @brief
-/// Switch between the splash, Opening and edit screens. A status message
-/// does not carry over to a different screen.
+/// Switch between the splash, Opening and edit screens. The "Not available
+/// in WordTsar" message does not carry over to a different screen; other
+/// status messages stay until they time out.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::SetMode(eAppMode mode)
 {
-    if (mode != mMode)
+    if ((mode != mMode) && (mEditor->GetStatusMessage() == kNotAvailableMessage))
     {
         mEditor->SetStatusMessage("", false, 0);
     }
@@ -3349,7 +3353,7 @@ void cWSWordTsar::SetMode(eAppMode mode)
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::ShowNotAvailable(void)
 {
-    mEditor->SetStatusMessage("Not available in WordTsar");
+    mEditor->SetStatusMessage(kNotAvailableMessage);
 }
 
 /////////////////////////////////////////////////////////////////////////////

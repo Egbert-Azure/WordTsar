@@ -2798,6 +2798,69 @@ TEST_CASE("TUI - a status message does not cross between the Opening and edit sc
 }
 
 
+TEST_CASE("TUI - an error message stays when ^KD or ^KQ returns to the Opening screen")
+{
+    sOpeningListDir dir;
+    const std::string failed = "Backup save failed: x";
+
+    for (int level : {3, 4})
+    {
+        CAPTURE(level);
+        for (const char* letter : {"d", "q"})
+        {
+            INFO("^K", std::string(letter));
+            cWSWordTsar app;
+            PrepareOpeningList(app, level, dir);
+            app.TestHandleEvent(OpeningText("s"));
+            REQUIRE(app.TestInEditor() == true);
+            REQUIRE(app.TestGetEditor()->GetDocument()->IsModified() == false);
+
+            app.TestGetEditor()->SetStatusMessage(failed, false, 300);
+            wordstartui::sInputEvent controlK{};
+            controlK.type = wordstartui::INPUT_TYPE_CONTROL;
+            controlK.controlCode = 11;
+            app.TestHandleEvent(controlK);
+            app.TestHandleEvent(OpeningText(letter));
+            REQUIRE(app.TestInOpening() == true);
+            CHECK(StatusMessage(app) == failed);
+            wordstartui::cScreen screen;
+            screen.Resize(25, 80);
+            app.TestDrawOpening(screen);
+            CHECK(RowWithText(screen, failed) == 24);
+        }
+    }
+}
+
+
+TEST_CASE("TUI - the not-available message does not follow ^KD to the Opening screen")
+{
+    sOpeningListDir dir;
+    cWSWordTsar app;
+    app.TestBuildMenus();
+    PrepareOpeningList(app, 3, dir);
+    app.TestHandleEvent(OpeningText("s"));
+    REQUIRE(app.TestInEditor() == true);
+
+    app.TestHandleEvent(OpeningAltText("u"));
+    REQUIRE(app.TestGetMenu().IsOpen() == true);
+    app.TestHandleEvent(OpeningText("t"));
+    REQUIRE(StatusMessage(app) == kNotAvailable);
+    REQUIRE(app.TestGetEditor()->GetDocument()->IsModified() == false);
+
+    wordstartui::sInputEvent controlK{};
+    controlK.type = wordstartui::INPUT_TYPE_CONTROL;
+    controlK.controlCode = 11;
+    app.TestHandleEvent(controlK);
+    app.TestHandleEvent(OpeningText("d"));
+    REQUIRE(app.TestInOpening() == true);
+    CHECK(StatusMessage(app).empty() == true);
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+    CHECK(RowWithText(screen, kNotAvailable) == -1);
+}
+
+
 TEST_CASE("TUI - a status message does not follow a file opened from the Opening list")
 {
     sOpeningListDir dir;
