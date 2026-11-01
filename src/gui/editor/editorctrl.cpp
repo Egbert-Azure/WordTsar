@@ -167,6 +167,7 @@ cEditorCtrl::cEditorCtrl(QWidget* parent)
     : QWidget(parent)
     , cEditorBase()
     , mInput(nullptr)
+    , mProgress(nullptr)
     , mScrollbar(nullptr)
     , mInputMode(INPUT_WORDSTAR)
 {
@@ -207,6 +208,7 @@ cEditorCtrl::cEditorCtrl(cDocument* sharedDocument, QWidget* parent)
     : QWidget(parent)
     , cEditorBase()
     , mInput(nullptr)
+    , mProgress(nullptr)
     , mScrollbar(nullptr)
     , mInputMode(INPUT_WORDSTAR)
 {
@@ -6933,6 +6935,14 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
     QProgressDialog progress("Loading file...", "Cancel", 0, 100, this);
     progress.setWindowModality(Qt::ApplicationModal);
     mProgress = &progress;
+
+    // Clears mProgress on every exit, before progress is destroyed
+    struct sProgressReset
+    {
+        QProgressDialog*& pointer;
+        ~sProgressReset() { pointer = nullptr; }
+    } progressReset{mProgress};
+
     progress.show();
 
     // Load file using file handler
@@ -7068,6 +7078,14 @@ bool cEditorCtrl::InsertFileAtCursor(const std::string& filename)
     QProgressDialog progress("Inserting file...", "Cancel", 0, 100, this);
     progress.setWindowModality(Qt::ApplicationModal);
     mProgress = &progress;
+
+    // Clears mProgress on every exit, before progress is destroyed
+    struct sProgressReset
+    {
+        QProgressDialog*& pointer;
+        ~sProgressReset() { pointer = nullptr; }
+    } progressReset{mProgress};
+
     progress.show();
 
     bool success = fileReader->LoadFile(filename);

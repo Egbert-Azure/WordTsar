@@ -34,10 +34,15 @@
 #include <QTimer>
 #include <QMetaObject>
 #include <QPaintEvent>
+#include <QMimeData>
 
 #include <filesystem>
 #include <fstream>
 #include <chrono>
+#include <cstring>
+#include <memory>
+#include <random>
+#include <stdexcept>
 #include <unistd.h>
 
 /////////////////////////////////////////////////////////////////////////////
@@ -14976,4 +14981,145 @@ TEST_CASE("cEditorCtrl - a full-widget paint after a blink tick repaints the who
     CAPTURE(farCorner);
     CHECK(image.pixelColor(farCorner) != sentinel);
     CHECK(image.pixelColor(QPoint(editor.width() / 2, editor.height() / 2)) != sentinel);
+}
+
+
+namespace
+{
+
+// Destroys an editor built by NewEditorInFilledStorage()
+struct sFilledStorageDeleter
+{
+    void operator()(cEditorCtrl* editor) const
+    {
+        editor->~cEditorCtrl();
+        ::operator delete(static_cast<void*>(editor));
+    }
+};
+
+using FilledEditor = std::unique_ptr<cEditorCtrl, sFilledStorageDeleter>;
+
+// Builds a cEditorCtrl in storage filled with 0xA5, so a member the
+// constructor leaves unset holds a known non-null value
+template <typename... Args>
+FilledEditor NewEditorInFilledStorage(Args&&... args)
+{
+    void* storage = ::operator new(sizeof(cEditorCtrl));
+    std::memset(storage, 0xA5, sizeof(cEditorCtrl));
+    return FilledEditor(new (storage) cEditorCtrl(std::forward<Args>(args)...));
+}
+
+std::string DocumentText(cDocument* doc)
+{
+    std::string text;
+    for (PARAGRAPH_T para = 0; para < doc->GetNumberofParagraphs(); para++)
+    {
+        text += doc->GetParagraphText(para);
+    }
+    return text;
+}
+
+void SetClipboardRtf(const char* rtf)
+{
+    QMimeData* mime = new QMimeData;
+    mime->setData("text/rtf", QByteArray(rtf));
+    QApplication::clipboard()->setMimeData(mime);
+}
+
+// New empty directory under the system temp directory
+std::filesystem::path NewTempDir(void)
+{
+    std::random_device random;
+    std::filesystem::path dir;
+    do
+    {
+        dir = std::filesystem::temp_directory_path() / ("wordtsar_guieditor_" + std::to_string(random()) + std::to_string(random()));
+    }
+    while (std::filesystem::create_directory(dir) == false);
+    return dir;
+}
+
+void WriteBytes(const std::filesystem::path& path, const std::string& bytes)
+{
+    std::ofstream file(path, std::ios::binary);
+    file.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+}
+
+// Editor whose progress report throws, to leave LoadFile() by an exception
+class cThrowingProgressEditor : public cEditorCtrl
+{
+public:
+    void FileIOProgress(int /*percent*/) override
+    {
+        throw std::runtime_error("progress");
+    }
+};
+
+}
+
+
+TEST_CASE("cEditorCtrl::ClipboardPaste - RTF paste in an editor that never loaded a file")
+{
+    ensureQApplication();
+    FilledEditor editor = NewEditorInFilledStorage();
+
+    REQUIRE(editor->mProgress == nullptr);
+
+    SetClipboardRtf("{\\rtf1\\ansi hello}");
+    editor->ClipboardPaste();
+
+    CHECK(DocumentText(editor->GetDocument()).find("hello") != std::string::npos);
+}
+
+
+TEST_CASE("cEditorCtrl::ClipboardPaste - RTF paste in the reveal codes editor after a file was loaded")
+{
+    ensureQApplication();
+    std::filesystem::path dir = NewTempDir();
+    std::filesystem::path file = dir / "sample.txt";
+    WriteBytes(file, "first line\n");
+
+    cEditorCtrl mainEditor;
+    REQUIRE(mainEditor.LoadFile(file.string()));
+    CHECK(mainEditor.mProgress == nullptr);
+
+    // created like the reveal codes pane: a second editor on the shared document
+    FilledEditor codesEditor = NewEditorInFilledStorage(mainEditor.GetDocument(), nullptr);
+
+    REQUIRE(codesEditor->mProgress == nullptr);
+
+    SetClipboardRtf("{\\rtf1\\ansi hello}");
+    codesEditor->ClipboardPaste();
+
+    std::string text = DocumentText(mainEditor.GetDocument());
+    CHECK(text.find("hello") != std::string::npos);
+    CHECK(text.find("first line") != std::string::npos);
+
+    codesEditor.reset();
+    std::filesystem::remove_all(dir);
+}
+
+
+TEST_CASE("cEditorCtrl::LoadFile - mProgress is null after a load or insert that throws")
+{
+    ensureQApplication();
+    std::filesystem::path dir = NewTempDir();
+    std::filesystem::path file = dir / "sample.ws";
+    WriteBytes(file, "hello\r\n");
+
+    SUBCASE("LoadFile")
+    {
+        cThrowingProgressEditor editor;
+        CHECK_THROWS_AS(editor.LoadFile(file.string()), std::runtime_error);
+        CHECK(editor.mProgress == nullptr);
+    }
+
+    SUBCASE("InsertFileAtCursor")
+    {
+        cThrowingProgressEditor editor;
+        CHECK_THROWS_AS(editor.InsertFileAtCursor(file.string()), std::runtime_error);
+        CHECK(editor.mProgress == nullptr);
+    }
+
+    std::filesystem::remove_all(dir);
 }
