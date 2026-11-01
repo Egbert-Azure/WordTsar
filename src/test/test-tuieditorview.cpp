@@ -164,6 +164,39 @@ TEST_CASE("cWSEditorCtrl - ^KD saves, clears and returns to the Opening screen")
 }
 
 
+TEST_CASE("cWSEditorCtrl - a failed backup marks the status message as an error")
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-bakerr-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    {
+        cWSEditorCtrl editor;
+        editor.GetDocument()->Insert("some text");
+        REQUIRE(editor.GetDocument()->IsModified() == true);
+        editor.mBackupFileName = (dir / "missing" / "doc-bak.ws").string();
+
+        editor.AutoSaveBackup();
+        CHECK(editor.GetStatusMessage().rfind("Backup save failed: ", 0) == 0);
+        CHECK(editor.IsStatusError() == true);
+
+        editor.SetStatusMessage("Sent to x", false, 90);
+        CHECK(editor.IsStatusError() == false);
+
+        editor.SetStatusMessage("Backup save failed: x", false, 2, true);
+        editor.TickStatusMessage();
+        CHECK(editor.IsStatusError() == true);
+        editor.TickStatusMessage();
+        CHECK(editor.GetStatusMessage().empty() == true);
+        CHECK(editor.IsStatusError() == false);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
 namespace
 {
 

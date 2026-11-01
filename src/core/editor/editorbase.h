@@ -362,9 +362,10 @@ public:
 
     // Status Bar
     void GetStatus(sStatus& status);
-    void SetStatusMessage(const std::string& msg, bool busy = false, int durationFrames = 60);
+    void SetStatusMessage(const std::string& msg, bool busy = false, int durationFrames = 60, bool error = false);
     std::string GetStatusMessage(void) const;
     bool IsStatusBusy(void) const;
+    bool IsStatusError(void) const;
     void TickStatusMessage(void);
 
 protected:
@@ -591,6 +592,7 @@ protected:
     std::string mStatusMessage;             // Current status message text
     int mStatusMessageTimer;                // Countdown frames to clear message
     bool mStatusBusy;                       // True when busy indicator should be shown
+    bool mStatusError;                      // True when the status message reports an error
 };
 
 #endif // EDITORBASE_H

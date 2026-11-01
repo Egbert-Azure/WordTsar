@@ -3348,11 +3348,16 @@ void cWSWordTsar::SetMode(eAppMode mode)
 /// @return nothing
 ///
 /// @brief
-/// Report on the status line that the chosen entry is not available.
+/// Report on the status line that the chosen entry is not available. An
+/// error message that is still showing is kept.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::ShowNotAvailable(void)
 {
+    if (mEditor->IsStatusError() == true)
+    {
+        return;
+    }
     mEditor->SetStatusMessage(kNotAvailableMessage);
 }
 

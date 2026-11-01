@@ -1474,7 +1474,7 @@ bool cWSEditorCtrl::WriteBackup(void)
 
     if (success == false)
     {
-        SetStatusMessage("Backup save failed: " + mBackupFileName, false, 300);
+        SetStatusMessage("Backup save failed: " + mBackupFileName, false, 300, true);
     }
 
     return success;

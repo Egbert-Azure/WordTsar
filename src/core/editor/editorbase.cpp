@@ -206,6 +206,7 @@ cEditorBase::cEditorBase(void)
     , mStatusMessage("")
     , mStatusMessageTimer(0)
     , mStatusBusy(false)
+    , mStatusError(false)
 {
     // sDisplaySettings constructor already sets defaults:
     // - mode = DISPLAY_CONTINUOUS
@@ -5043,7 +5044,9 @@ void cEditorBase::GetStatus(sStatus& status)
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @param  msg [in] - Message text to display
+/// @param  busy [in] - Show the busy indicator
 /// @param  durationFrames [in] - Number of TickStatusMessage() calls before auto-clear (default 60)
+/// @param  error [in] - The message reports an error
 ///
 /// @return nothing
 ///
@@ -5052,11 +5055,12 @@ void cEditorBase::GetStatus(sStatus& status)
 /// The message auto-clears after durationFrames ticks.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorBase::SetStatusMessage(const std::string& msg, bool busy, int durationFrames)
+void cEditorBase::SetStatusMessage(const std::string& msg, bool busy, int durationFrames, bool error)
 {
     mStatusMessage = msg;
     mStatusBusy = busy;
     mStatusMessageTimer = durationFrames;
+    mStatusError = error;
 }
 
 
@@ -5092,6 +5096,21 @@ bool cEditorBase::IsStatusBusy(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return bool - true if the current status message reports an error
+///
+/// @brief
+/// Set by SetStatusMessage() with error=true, cleared by the next
+/// SetStatusMessage() or when the status message timer expires.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::IsStatusError(void) const
+{
+    return mStatusError;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
@@ -5108,6 +5127,7 @@ void cEditorBase::TickStatusMessage(void)
         {
             mStatusMessage.clear();
             mStatusBusy = false;
+            mStatusError = false;
         }
     }
 }

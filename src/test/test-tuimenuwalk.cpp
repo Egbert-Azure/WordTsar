@@ -2832,6 +2832,111 @@ TEST_CASE("TUI - an error message stays when ^KD or ^KQ returns to the Opening s
 }
 
 
+TEST_CASE("TUI - the not-available message does not replace an error message")
+{
+    sOpeningListDir dir;
+    const std::string failed = "Backup save failed: x";
+    wordstartui::sInputEvent controlK{};
+    controlK.type = wordstartui::INPUT_TYPE_CONTROL;
+    controlK.controlCode = 11;
+
+    SUBCASE("an Opening menu entry")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 4, dir);
+        app.TestGetEditor()->SetStatusMessage(failed, false, 300, true);
+        app.TestHandleEvent(OpeningText("f"));
+        REQUIRE(app.TestGetOpeningMenu().GetOpenMenu() == 0);
+        CHECK(app.TestHandleEvent(OpeningText("n")) == true);
+        CHECK(StatusMessage(app) == failed);
+        CHECK(app.TestGetOpeningMenu().IsOpen() == false);
+        CHECK(app.TestInOpening() == true);
+        wordstartui::cScreen screen;
+        screen.Resize(25, 80);
+        app.TestDrawOpening(screen);
+        CHECK(RowWithText(screen, failed) == 24);
+        CHECK(RowWithText(screen, kNotAvailable) == -1);
+    }
+
+    SUBCASE("a help level 3 panel letter")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 3, dir);
+        app.TestGetEditor()->SetStatusMessage(failed, false, 300, true);
+        CHECK(app.TestHandleEvent(OpeningText("n")) == true);
+        CHECK(StatusMessage(app) == failed);
+        CHECK(app.TestInOpening() == true);
+        wordstartui::cScreen screen;
+        screen.Resize(25, 80);
+        app.TestDrawOpening(screen);
+        CHECK(RowWithText(screen, failed) == 24);
+        CHECK(RowWithText(screen, kNotAvailable) == -1);
+    }
+
+    SUBCASE("an edit-screen menu entry, then ^KD or ^KQ")
+    {
+        for (const char* letter : {"d", "q"})
+        {
+            INFO("^K", std::string(letter));
+            cWSWordTsar app;
+            app.TestBuildMenus();
+            PrepareOpeningList(app, 3, dir);
+            app.TestHandleEvent(OpeningText("s"));
+            REQUIRE(app.TestInEditor() == true);
+            REQUIRE(app.TestGetEditor()->GetDocument()->IsModified() == false);
+
+            app.TestGetEditor()->SetStatusMessage(failed, false, 300, true);
+            app.TestHandleEvent(OpeningAltText("u"));
+            REQUIRE(app.TestGetMenu().IsOpen() == true);
+            CHECK(app.TestHandleEvent(OpeningText("t")) == true);
+            CHECK(StatusMessage(app) == failed);
+            CHECK(app.TestGetMenu().IsOpen() == false);
+            CHECK(app.TestInEditor() == true);
+
+            app.TestHandleEvent(controlK);
+            app.TestHandleEvent(OpeningText(letter));
+            REQUIRE(app.TestInOpening() == true);
+            CHECK(StatusMessage(app) == failed);
+            wordstartui::cScreen screen;
+            screen.Resize(25, 80);
+            app.TestDrawOpening(screen);
+            CHECK(RowWithText(screen, failed) == 24);
+        }
+    }
+
+    SUBCASE("a message that is not an error is replaced")
+    {
+        cWSWordTsar app;
+        app.TestBuildMenus();
+        PrepareOpeningList(app, 3, dir);
+        app.TestGetEditor()->SetStatusMessage("Sent to x", false, 90);
+        app.TestHandleEvent(OpeningText("n"));
+        CHECK(StatusMessage(app) == kNotAvailable);
+
+        app.TestHandleEvent(OpeningText("s"));
+        REQUIRE(app.TestInEditor() == true);
+        app.TestGetEditor()->SetStatusMessage("Sent to x", false, 90);
+        app.TestHandleEvent(OpeningAltText("u"));
+        REQUIRE(app.TestGetMenu().IsOpen() == true);
+        app.TestHandleEvent(OpeningText("t"));
+        CHECK(StatusMessage(app) == kNotAvailable);
+        CHECK(app.TestGetMenu().IsOpen() == false);
+    }
+
+    SUBCASE("an error set after the not-available message replaces it")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 3, dir);
+        app.TestHandleEvent(OpeningText("n"));
+        REQUIRE(StatusMessage(app) == kNotAvailable);
+        app.TestGetEditor()->SetStatusMessage(failed, false, 300, true);
+        CHECK(StatusMessage(app) == failed);
+        app.TestHandleEvent(OpeningText("n"));
+        CHECK(StatusMessage(app) == failed);
+    }
+}
+
+
 TEST_CASE("TUI - the not-available message does not follow ^KD to the Opening screen")
 {
     sOpeningListDir dir;
