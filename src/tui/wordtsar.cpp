@@ -1907,6 +1907,7 @@ void cWSWordTsar::DrawSplash(cScreen& screen)
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::DrawOpeningMenu(cScreen& screen)
 {
+    mOpeningPanelHits.clear();
     if (mEditor->mHelpLevel == 4)
     {
         DrawOpeningBars(screen);
@@ -2161,6 +2162,7 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
         {
             screen.PutText(row, col, std::string(1, item.key), keyStyle);
         }
+        mOpeningPanelHits.push_back({row, col, col + static_cast<int>(label.size()), index});
     }
 
     // F1 (help) -- real WS7's own 20th opening-menu item, drawn below the
@@ -2170,6 +2172,7 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
         int row = 2 + kOpeningLeftCount;
         screen.PutText(row, leftCol - 1, "F1 help", base);
         screen.PutText(row, leftCol - 1, std::string("F1"), keyStyle);
+        mOpeningPanelHits.push_back({row, leftCol - 1, leftCol + 6, -1});
     }
 
     // WordTsar's own entries in the bottom border, centred, each as
@@ -2192,6 +2195,7 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
             const sOpeningItem& item = kOpeningItems[index];
             screen.PutText(ownRow, col, std::string(" ") + item.key + " " + item.label + " ", base);
             screen.PutText(ownRow, col + 1, std::string(1, item.key), keyStyle);
+            mOpeningPanelHits.push_back({ownRow, col + 1, col + 3 + static_cast<int>(std::strlen(item.label)), index});
             col += 4 + static_cast<int>(std::strlen(item.label)) + gap;
         }
     }
@@ -3077,6 +3081,12 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         return true;
     }
 
+    if (event.type == wordstartui::INPUT_TYPE_MOUSE)
+    {
+        HandleOpeningClick(event);
+        return true;
+    }
+
     const bool escape = (event.type == wordstartui::INPUT_TYPE_SPECIAL) &&
                         (event.special == wordstartui::SPECIAL_KEY_ESCAPE);
 
@@ -3121,28 +3131,7 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         wsui::cFileBrowser::eAction action = mBrowser.HandleEvent(event);
         if (action == wsui::cFileBrowser::ACTION_FILE)
         {
-            mOpeningListActive = false;
-            mFilename = mBrowser.GetSelectedFile();
-            mEditor->SetStatusMessage("", false, 0);
-            mEditor->LoadFile(mFilename);
-            mEditor->RelayoutAndRedraw();
-            if (mOpeningWantPrint == true)
-            {
-                mOpeningWantPrint = false;
-                mEditor->Print();
-            }
-            if (mOpeningWantTOC == true)
-            {
-                mOpeningWantTOC = false;
-                GenerateTOCFromFile();
-            }
-            if (mOpeningWantIndex == true)
-            {
-                mOpeningWantIndex = false;
-                GenerateIndexFromFile();
-            }
-            // Assigned directly so a message from Print stays.
-            mMode = APP_EDITOR;
+            OpenOpeningSelection();
             return true;
         }
         if ((action == wsui::cFileBrowser::ACTION_EXIT_TOP) && (mOpeningBrowserFocus == true))
@@ -3183,6 +3172,102 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
     RunOpeningAction(action);
 
     return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  const sInputEvent& event [in] mouse event
+///
+/// @return nothing
+///
+/// @brief
+/// Act on a left click on the Opening screen. At help levels 0 to 3 a click
+/// on a panel entry runs it like its key. A click on a file list entry
+/// activates the list, selects the entry and opens it: a folder is entered,
+/// a file is loaded.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::HandleOpeningClick(const sInputEvent& event)
+{
+    if ((event.mouseAction != wordstartui::MOUSE_ACTION_PRESS) ||
+        (event.mouseButton != wordstartui::MOUSE_BUTTON_LEFT))
+    {
+        return;
+    }
+
+    if (mEditor->mHelpLevel != 4)
+    {
+        for (const sOpeningHit& hit : mOpeningPanelHits)
+        {
+            if ((event.mouseRow != hit.row) || (event.mouseCol < hit.col) || (event.mouseCol >= hit.end))
+            {
+                continue;
+            }
+            if (hit.item < 0)
+            {
+                ShowOpeningHelp();
+                return;
+            }
+            const char key = kOpeningItems[hit.item].key;
+            eOpeningAction action{};
+            int index = 0;
+            if (OpeningKeyAction(key, action, index) == true)
+            {
+                RunOpeningAction(action);
+            }
+            else if (IsUnavailableOpeningKey(key) == true)
+            {
+                ShowNotAvailable();
+            }
+            return;
+        }
+    }
+
+    if (mBrowser.EntryAt(event.mouseRow, event.mouseCol) < 0)
+    {
+        return;
+    }
+
+    mOpeningListActive = true;
+    if (mBrowser.HandleEvent(event) == wsui::cFileBrowser::ACTION_FILE)
+    {
+        OpenOpeningSelection();
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Load the file selected in the Opening list and switch to the edit screen,
+/// then run a pending print, TOC or index request on it.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::OpenOpeningSelection(void)
+{
+    mOpeningListActive = false;
+    mFilename = mBrowser.GetSelectedFile();
+    mEditor->SetStatusMessage("", false, 0);
+    mEditor->LoadFile(mFilename);
+    mEditor->RelayoutAndRedraw();
+    if (mOpeningWantPrint == true)
+    {
+        mOpeningWantPrint = false;
+        mEditor->Print();
+    }
+    if (mOpeningWantTOC == true)
+    {
+        mOpeningWantTOC = false;
+        GenerateTOCFromFile();
+    }
+    if (mOpeningWantIndex == true)
+    {
+        mOpeningWantIndex = false;
+        GenerateIndexFromFile();
+    }
+    // Assigned directly so a message from Print stays.
+    mMode = APP_EDITOR;
 }
 
 /////////////////////////////////////////////////////////////////////////////

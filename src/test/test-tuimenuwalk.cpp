@@ -2809,6 +2809,176 @@ TEST_CASE("TUI Opening screen - an entry WordTsar does not implement closes the 
 }
 
 
+namespace
+{
+
+// A left click as the terminal driver delivers it: press, then release.
+bool OpeningClick(cWSWordTsar& app, int row, int col)
+{
+    wordstartui::sInputEvent press = LeftClick(row, col);
+    bool handled = app.TestHandleEvent(press);
+    wordstartui::sInputEvent release = press;
+    release.mouseAction = wordstartui::MOUSE_ACTION_RELEASE;
+    app.TestHandleEvent(release);
+    return handled;
+}
+
+void PrepareWs7OpeningList(cWSWordTsar& app, int level, const sOpeningListDir& dir,
+                           wordstartui::cScreen& screen)
+{
+    EnterWs7Opening(app, level);
+    app.TestSetOpeningDirectory(dir.path.string());
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+}
+
+}
+
+
+TEST_CASE("TUI Opening screen - a click on a panel entry runs it")
+{
+    sOpeningListDir dir;
+
+    for (int level : {0, 1, 2, 3})
+    {
+        CAPTURE(level);
+
+        {
+            // "S speed write" on row 3, clicked on its label.
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            REQUIRE(MenuRowText(screen, 3).find("S speed write") != std::string::npos);
+            CHECK(OpeningClick(app, 3, 12) == true);
+            CHECK(app.TestInEditor() == true);
+        }
+
+        {
+            // "X exit WordTsar" on row 10, clicked on its letter.
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            REQUIRE(CellAt(screen, 10, 6).textUtf8 == "X");
+            OpeningClick(app, 10, 6);
+            CHECK(app.TestQuitRequested() == true);
+        }
+
+        {
+            // "C protect/unprotect a file" is not implemented and says so.
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            REQUIRE(CellAt(screen, 3, 43).textUtf8 == "C");
+            OpeningClick(app, 3, 50);
+            CHECK(StatusMessage(app) == kNotAvailable);
+            CHECK(app.TestInOpening() == true);
+        }
+
+        {
+            // "D open a document" gives the list letter focus.
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            OpeningClick(app, 2, 8);
+            CHECK(app.TestOpeningBrowserFocus() == true);
+        }
+
+        {
+            // A panel click runs its entry while the list has letter focus.
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_TAB));
+            REQUIRE(app.TestOpeningBrowserFocus() == true);
+            OpeningClick(app, 3, 12);
+            CHECK(app.TestInEditor() == true);
+        }
+
+        {
+            // The box border, the title and the space between the columns do
+            // nothing.
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            for (const std::pair<int, int>& cell : {std::make_pair(1, 0), std::make_pair(1, 10),
+                                                    std::make_pair(3, 0), std::make_pair(3, 79),
+                                                    std::make_pair(3, 35), std::make_pair(3, 2),
+                                                    std::make_pair(12, 5)})
+            {
+                CAPTURE(cell.first);
+                CAPTURE(cell.second);
+                OpeningClick(app, cell.first, cell.second);
+                CHECK(app.TestInOpening() == true);
+                CHECK(app.TestQuitRequested() == false);
+                CHECK(app.TestOpeningBrowserFocus() == false);
+                CHECK(StatusMessage(app).empty() == true);
+            }
+        }
+    }
+}
+
+
+TEST_CASE("TUI Opening screen - a click in the file list opens the entry")
+{
+    sOpeningListDir dir;
+
+    for (int level : {0, 3, 4})
+    {
+        CAPTURE(level);
+
+        {
+            // A file opens with one click, without letter focus.
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            const int listRow = OpeningListRow(screen);
+            REQUIRE(listRow > 0);
+            REQUIRE(CellAt(screen, listRow + 1, 1).textUtf8 == "f");
+            CHECK(OpeningClick(app, listRow + 1, 5) == true);
+            CHECK(app.TestInEditor() == true);
+            CHECK(std::filesystem::path(app.TestFilename()).filename() == "f3.txt");
+        }
+
+        {
+            // A folder is entered; the list then shows the bar on "..".
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            const int listRow = OpeningListRow(screen);
+            OpeningClick(app, listRow, 3);
+            CHECK(app.TestInOpening() == true);
+            CHECK(std::filesystem::equivalent(app.TestOpeningDirectory(), dir.path.parent_path()) == true);
+            app.TestDrawOpening(screen);
+            CheckBarEntry(screen, listRow, 1);
+        }
+
+        {
+            // Empty list space does nothing; the list stays inactive.
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            const int listRow = OpeningListRow(screen);
+            OpeningClick(app, listRow + 3, 30);
+            CHECK(app.TestInOpening() == true);
+            CHECK(app.TestOpeningSelectedName() == "../");
+            CHECK(std::filesystem::equivalent(app.TestOpeningDirectory(), dir.path) == true);
+            app.TestDrawOpening(screen);
+            CheckPlainEntry(screen, listRow, 1);
+        }
+
+        if (level == 4)
+        {
+            // A menu title click still opens its menu.
+            cWSWordTsar app;
+            wordstartui::cScreen screen;
+            PrepareWs7OpeningList(app, level, dir, screen);
+            OpeningClick(app, 1, 2);
+            CHECK(app.TestGetOpeningMenu().IsOpen() == true);
+        }
+    }
+}
+
+
 TEST_CASE("TUI Opening screen - Tab drops a pending print, TOC or index request")
 {
     sOpeningListDir dir;

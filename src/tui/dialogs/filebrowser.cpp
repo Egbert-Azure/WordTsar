@@ -682,6 +682,39 @@ void cFileBrowser::DrawWordStar(cScreen& screen, const cTheme& theme, bool focus
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  int row [in] screen row
+/// @param  int col [in] screen column
+///
+/// @return the index of the entry drawn at row, col, or -1
+///
+/////////////////////////////////////////////////////////////////////////////
+int cFileBrowser::EntryAt(int row, int col) const
+{
+    const int width = ColumnWidth();
+    const int localRow = row - mBounds.row;
+    const int localCol = col - mBounds.col;
+    if ((width <= 0) || (localRow < 0) || (localRow >= VisibleRows()) ||
+        (localCol < 0) || (localCol >= mBounds.cols))
+    {
+        return -1;
+    }
+
+    const int gridCol = localCol / width;
+    if (gridCol >= ColumnCount())
+    {
+        return -1;
+    }
+
+    const int index = IndexAt(mScrollRow + localRow, gridCol);
+    if ((index < 0) || (index >= static_cast<int>(mEntries.size())))
+    {
+        return -1;
+    }
+    return index;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return the action resulting from opening the selected entry
 ///
 /// @brief
@@ -886,23 +919,11 @@ cFileBrowser::eAction cFileBrowser::HandleEvent(const sInputEvent& event)
     if ((event.type == wordstartui::INPUT_TYPE_MOUSE) &&
         (event.mouseAction == wordstartui::MOUSE_ACTION_PRESS))
     {
-        int width = ColumnWidth();
-        int localRow = event.mouseRow - mBounds.row;
-        int localCol = event.mouseCol - mBounds.col;
-
-        if ((localRow >= 0) && (localRow < VisibleRows()) && (localCol >= 0))
+        int index = EntryAt(event.mouseRow, event.mouseCol);
+        if (index >= 0)
         {
-            int gridRow = mScrollRow + localRow;
-            int gridCol = localCol / width;
-            if (gridCol < columns)
-            {
-                int index = IndexAt(gridRow, gridCol);
-                if ((index >= 0) && (index < count))
-                {
-                    mSelected = index;
-                    return Activate();
-                }
-            }
+            mSelected = index;
+            return Activate();
         }
         return ACTION_NONE;
     }

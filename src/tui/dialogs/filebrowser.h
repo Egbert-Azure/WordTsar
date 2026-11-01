@@ -74,6 +74,7 @@ public:
     std::string GetSelectedFile(void) const;
     std::string GetCurrentDirectory(void) const;
     std::string GetSelectedName(void) const;
+    int EntryAt(int row, int col) const;
 
     static std::string FormatSize(std::uintmax_t bytes);
     static std::string ShortenName(const std::string& name, int width);

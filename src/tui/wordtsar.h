@@ -31,6 +31,7 @@
 
 #include <chrono>
 #include <string>
+#include <vector>
 
 class cWSEditorCtrl;
 class cWSEditorView;
@@ -181,6 +182,8 @@ private:
     bool HandleOpeningMenuKey(const wordstartui::sInputEvent& event);
     bool OpeningKeyAction(char typed, eOpeningAction& action, int& index) const;
     void RunOpeningAction(eOpeningAction action);
+    void HandleOpeningClick(const wordstartui::sInputEvent& event);
+    void OpenOpeningSelection(void);
     void ShowNotAvailable(void);
     void ShowOpeningStatus(void);
     void ShowOpeningHelp(void);
@@ -244,6 +247,17 @@ private:
     wsui::cFileBrowser mBrowser;  // file picker on the opening screen
     bool mOpeningBrowserFocus;    // true when the browser has focus (not the menu)
     bool mOpeningListActive;      // true when arrows have activated the list without focus
+
+    // A clickable Opening panel entry: columns [col, end) of row; item is
+    // the kOpeningItems index, -1 for F1 help.
+    struct sOpeningHit
+    {
+        int row;
+        int col;
+        int end;
+        int item;
+    };
+    std::vector<sOpeningHit> mOpeningPanelHits;
     bool mOpeningWantPrint;       // true when the browser was opened via "print a file"
     bool mOpeningWantTOC;         // true when the browser was opened via "table of contents"
     bool mOpeningWantIndex;       // true when the browser was opened via "index a document"
