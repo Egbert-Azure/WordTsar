@@ -15167,7 +15167,7 @@ TEST_CASE("GUI editor - a file opened as text saves as text, a WordStar file as 
         REQUIRE(editor.SaveFile(path.string()));
 
         std::string expected = "# key=value\r\nother=1\r\n";
-        CHECK(ReadFileBytes(path).substr(0, expected.size()) == expected);
+        CHECK(ReadFileBytes(path) == expected);
     }
 
     SUBCASE("a WordStar file with an unknown extension")
@@ -15253,7 +15253,7 @@ TEST_CASE("GUI editor - the save format follows the last save with a known exten
         REQUIRE(editor.SaveFile((dir / "y.def").string()));
 
         std::string expected = "Hello\r\n";
-        CHECK(ReadFileBytes(dir / "y.def").substr(0, expected.size()) == expected);
+        CHECK(ReadFileBytes(dir / "y.def") == expected);
     }
 
     SUBCASE("an unknown extension keeps the format")
@@ -15266,8 +15266,8 @@ TEST_CASE("GUI editor - the save format follows the last save with a known exten
         REQUIRE(editor.SaveFile((dir / "y.def").string()));
 
         std::string expected = "key=value\r\n";
-        CHECK(ReadFileBytes(dir / "x.ini").substr(0, expected.size()) == expected);
-        CHECK(ReadFileBytes(dir / "y.def").substr(0, expected.size()) == expected);
+        CHECK(ReadFileBytes(dir / "x.ini") == expected);
+        CHECK(ReadFileBytes(dir / "y.def") == expected);
     }
 
     SUBCASE("inserting a WordStar file into a text file keeps text")
@@ -15298,7 +15298,81 @@ TEST_CASE("GUI editor - the save format follows the last save with a known exten
         REQUIRE(editor.SaveFile((dir / "y.def").string()));
 
         std::string expected = "key=value\r\n";
-        CHECK(ReadFileBytes(dir / "y.def").substr(0, expected.size()) == expected);
+        CHECK(ReadFileBytes(dir / "y.def") == expected);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+namespace
+{
+
+class cBlockTargetEditor : public cEditorCtrl
+{
+public:
+    std::string mTarget;
+
+    std::string PromptForSaveFile(void) override
+    {
+        return mTarget;
+    }
+};
+
+}   // anonymous namespace
+
+
+TEST_CASE("GUI editor - plain-text output carries no end-of-file marker")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-noeof-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cBlockTargetEditor editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+    doc->Insert("Hello\rWorld");
+
+    SUBCASE("save as .txt")
+    {
+        REQUIRE(editor.SaveFile((dir / "a.txt").string()));
+        CHECK(ReadFileBytes(dir / "a.txt") == "Hello\r\nWorld");
+    }
+
+    SUBCASE("a text file saved again")
+    {
+        auto path = dir / "notes.def";
+        WriteFileBytes(path, "Hello\r\nWorld");
+        REQUIRE(editor.LoadFile(path.string()));
+        REQUIRE(editor.SaveFile(path.string()));
+        REQUIRE(editor.LoadFile(path.string()));
+        REQUIRE(editor.SaveFile(path.string()));
+        CHECK(ReadFileBytes(path) == "Hello\r\nWorld");
+    }
+
+    SUBCASE("write the whole document as a block")
+    {
+        doc->SetPosition(0);
+        doc->SetBeginBlock();
+        doc->SetPosition(doc->GetTextSize());
+        doc->SetEndBlock();
+        editor.mTarget = (dir / "block.txt").string();
+        editor.WriteBlockToFile();
+        CHECK(ReadFileBytes(dir / "block.txt") == "Hello\rWorld");
+    }
+
+    SUBCASE("copy the whole document to the clipboard")
+    {
+        doc->SetPosition(0);
+        doc->SetBeginBlock();
+        doc->SetPosition(doc->GetTextSize());
+        doc->SetEndBlock();
+        editor.ClipboardCopy();
+        CHECK(QApplication::clipboard()->text().toStdString() == "Hello\rWorld");
     }
 
     std::error_code ec;
