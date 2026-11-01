@@ -1042,7 +1042,8 @@ bool cTextFile::LoadFile(std::string filename)
 ///
 /// @brief
 /// Save document as UTF-8 plain text with Windows line endings (CRLF).
-/// Converts HARD_RETURN to CRLF. The end-of-file marker is not written.
+/// Uses cDocument::GetPlainText(): a tab marker is written as a tab, other
+/// markers and the end-of-file marker are not written.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cTextFile::SaveFile(std::string filename, POSITION_T length)
@@ -1053,27 +1054,7 @@ bool cTextFile::SaveFile(std::string filename, POSITION_T length)
         return false;
     }
 
-    for (POSITION_T loop = 0; loop < length; loop++)
-    {
-        std::string ch = mDocument->GetChar(loop);
-
-        // The end-of-file marker is not text
-        if (ch.length() == 1 && ch[0] == MARKER_CHAR && mDocument->GetControlChar(loop) == STYLE_EOF)
-        {
-            continue;
-        }
-
-        // Convert HARD_RETURN to CRLF
-        if (ch[0] == HARD_RETURN && ch.length() == 1)
-        {
-            file << '\r' << '\n';
-        }
-        else
-        {
-            // Normal character
-            file << ch;
-        }
-    }
+    file << mDocument->GetPlainText(0, length, "\r\n");
 
     file.close();
     return true;

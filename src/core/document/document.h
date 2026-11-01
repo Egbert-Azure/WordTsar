@@ -329,6 +329,7 @@ public:
     size_t GetParagraphGraphemeOffsets(const PARAGRAPH_T &para, std::vector<PARAGRAPH_T> &offsets);
     void GetParagraphGraphemes(PARAGRAPH_T para, std::vector<std::string>& graphemes, std::vector<POSITION_T>& offsets);
     std::string GetBlockText(POSITION_T start, POSITION_T end) ;
+    std::string GetPlainText(POSITION_T start, POSITION_T end, const std::string &lineEnding) ;
 
     // --- Block Operations ---
     bool GetBlock(POSITION_T &start, POSITION_T &end) ;

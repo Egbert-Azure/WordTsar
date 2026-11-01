@@ -5005,6 +5005,54 @@ std::string cDocument::GetBlockText(POSITION_T start, POSITION_T end)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  start      [IN] - first position
+/// @param  end        [IN] - position after the last one
+/// @param  lineEnding [IN] - bytes written for each hard return
+///
+/// @return the text with no internal markers
+///
+/// @brief
+/// Plain-text form of a range: a tab marker becomes 0x09, every other
+/// marker (styles, fonts, colours, variables, notes, end of file) is
+/// dropped, and a hard return becomes lineEnding. A 0x7F byte that is
+/// not a marker is kept.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDocument::GetPlainText(POSITION_T start, POSITION_T end, const std::string &lineEnding)
+{
+    std::string ret ;
+
+    for(POSITION_T loop = start; loop < end; loop++)
+    {
+        std::string ch = GetChar(loop) ;
+        if (ch.length() == 1 && static_cast<unsigned char>(ch[0]) == MARKER_CHAR)
+        {
+            eModifiers control = GetControlChar(loop) ;
+            if (control == STYLE_TAB)
+            {
+                ret += '\t' ;
+            }
+            else if (control == STYLE_END_OF_STYLES)
+            {
+                ret += ch ;
+            }
+        }
+        else if (ch.length() == 1 && ch[0] == HARD_RETURN)
+        {
+            ret += lineEnding ;
+        }
+        else
+        {
+            ret += ch ;
+        }
+    }
+
+    return ret ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  start [OUT] Reference to a POSITION_T variable where the start position will be stored.
 /// @param  end   [OUT] Reference to a POSITION_T variable where the end position will be stored.
 ///

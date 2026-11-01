@@ -24,6 +24,7 @@
 #include <vector>
 #include <fstream>
 #include <filesystem>
+#include <unistd.h>
 
 #include "src/core/include/config.h"
 #include "src/core/document/document.h"
@@ -190,6 +191,123 @@ TEST_CASE("cTextFile::LoadFile - empty file is valid")
     CHECK(file.LoadFile(path.string()) == true);
 
     std::filesystem::remove(path);
+}
+
+
+//===========================================================================
+// B3 - plain-text output: no internal markers
+//===========================================================================
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// Helper: create a unique empty temp directory.
+///
+/////////////////////////////////////////////////////////////////////////////
+static std::filesystem::path MakeTempDir(void)
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-textfile-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    return std::filesystem::path(pattern);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// Helper: load bytes as a text file, save it again, return the saved bytes.
+///
+/////////////////////////////////////////////////////////////////////////////
+static std::string TextRoundTrip(const std::string &bytes)
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path in = dir / "in.txt";
+    std::filesystem::path out = dir / "out.txt";
+    WriteFileBytes(in, bytes);
+
+    cDocument doc;
+    doc.Clear();
+    cTextFile file;
+    file.mDocument = &doc;
+    REQUIRE(file.LoadFile(in.string()));
+    REQUIRE(file.SaveFile(out.string(), doc.GetTextSize()));
+
+    std::string result = ReadFileBytes(out);
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+    return result;
+}
+
+
+TEST_CASE("cTextFile::SaveFile - a tab marker is a tab, other markers are nothing")
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path path = dir / "markers.txt";
+
+    cDocument doc;
+    doc.Clear();
+
+    sWSTab tab;
+    tab.abstabsize = 0;
+    tab.size = 0;
+    tab.tabsize = 0;
+    tab.type = TAB_TAB;
+
+    sInternalFonts font;
+    font.fontname = "Courier";
+    font.size = 12.0;
+    font.haveWSFont = false;
+    font.name = "Courier";
+
+    sSeqRGBColor color;
+    color.red = 170; color.green = 0; color.blue = 170; color.alpha = 255;
+
+    sNote footnote;
+    footnote.symbol = NOTE_NUMBER;
+    footnote.text = "a footnote";
+
+    sNote annotation;
+    annotation.kind = NOTE_KIND_ANNOTATION;
+    annotation.symbol = NOTE_NUMBER;
+    annotation.text = "an annotation";
+
+    sNote comment;
+    comment.kind = NOTE_KIND_COMMENT;
+    comment.symbol = NOTE_NUMBER;
+    comment.text = "a comment";
+
+    sNote endnote;
+    endnote.kind = NOTE_KIND_ENDNOTE;
+    endnote.symbol = NOTE_NUMBER;
+    endnote.text = "an endnote";
+
+    doc.Insert("A");
+    doc.InsertTab(tab);
+    doc.Insert("B");
+    doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc.Insert("C");
+    doc.Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc.Insert(static_cast<CHAR_T>(STYLE_UNDERLINE));
+    doc.InsertFont(font);
+    doc.InsertColor(color);
+    doc.InsertVariable(VAR_DATE);
+    doc.InsertFootnote(footnote);
+    doc.InsertFootnote(annotation);
+    doc.InsertFootnote(comment);
+    doc.InsertEndnote(endnote);
+    doc.Insert("D");
+
+    cTextFile file;
+    file.mDocument = &doc;
+    REQUIRE(file.SaveFile(path.string(), doc.GetTextSize()));
+    CHECK(ReadFileBytes(path) == "A\tBCD");
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+TEST_CASE("cTextFile - a DEL character that is not a marker is saved")
+{
+    CHECK(TextRoundTrip("a\x7f" "b") == "a\x7f" "b");
 }
 
 
