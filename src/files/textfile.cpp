@@ -1017,6 +1017,22 @@ bool cTextFile::LoadFile(std::string filename)
             // Insert hard return (creates new paragraph)
             mDocument->Insert(HARD_RETURN);
         }
+        else if (normalized[i] == '\t')
+        {
+            if (!currentLine.empty())
+            {
+                mDocument->Insert(currentLine);
+                currentLine.clear();
+            }
+
+            // A tab is a tab marker with its table entry
+            sWSTab tab;
+            tab.type = TAB_TAB;
+            tab.tabsize = 0;
+            tab.abstabsize = 0;
+            tab.size = 0;
+            mDocument->InsertTab(tab);
+        }
         else
         {
             // Accumulate character

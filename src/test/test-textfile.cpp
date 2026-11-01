@@ -305,6 +305,26 @@ TEST_CASE("cTextFile::SaveFile - a tab marker is a tab, other markers are nothin
     std::filesystem::remove_all(dir, ec);
 }
 
+TEST_CASE("cTextFile - a tab in a text file is loaded as a tab marker and saved as a tab")
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path path = dir / "tab.txt";
+    WriteFileBytes(path, "a\tb");
+
+    cDocument doc;
+    doc.Clear();
+    cTextFile file;
+    file.mDocument = &doc;
+    REQUIRE(file.LoadFile(path.string()));
+    CHECK(doc.GetControlChar(1) == STYLE_TAB);
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+
+    CHECK(TextRoundTrip("a\tb") == "a\tb");
+    CHECK(TextRoundTrip("\ta\t\tb\t") == "\ta\t\tb\t");
+}
+
 TEST_CASE("cTextFile - a DEL character that is not a marker is saved")
 {
     CHECK(TextRoundTrip("a\x7f" "b") == "a\x7f" "b");
