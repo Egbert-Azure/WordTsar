@@ -838,6 +838,12 @@ std::string MarkerCategory(eModifiers control)
     return "formatting";
 }
 
+bool SameWSFont(const sWSFont& a, const sWSFont& b)
+{
+    return a.width == b.width && a.height == b.height && a.style == b.style &&
+           a.prevwidth == b.prevwidth && a.prevheight == b.prevheight && a.prevstyle == b.prevstyle;
+}
+
 // Category of the first difference between paragraph para of a and of b,
 // or an empty string when they agree. Text graphemes are compared as UTF-8;
 // markers by control type and, for tabs, fonts, colours and variables, by
@@ -915,7 +921,7 @@ std::string CompareParagraph(cDocument* a, cDocument* b, PARAGRAPH_T para)
             bool gotB = b->GetFont(posB, fontB);
             if (gotA != gotB || fontA.fontname != fontB.fontname || fontA.size != fontB.size ||
                 fontA.name != fontB.name || fontA.haveWSFont != fontB.haveWSFont ||
-                (fontA.haveWSFont && memcmp(&fontA.wsfont, &fontB.wsfont, sizeof(sWSFont)) != 0))
+                (fontA.haveWSFont && SameWSFont(fontA.wsfont, fontB.wsfont) == false))
             {
                 category = "formatting (font)";
             }
