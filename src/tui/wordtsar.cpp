@@ -78,9 +78,6 @@ void EmergencySignalHandler(int /*sig*/)
     gShutdownPending = 1;
 }
 
-// Splash frames before auto-advancing (~50ms per loop tick).
-constexpr int SPLASH_TICKS = 12;
-
 // Status message for a menu entry or letter WordTsar does not implement.
 const char* const kNotAvailableMessage = "Not available in WordTsar";
 
@@ -205,11 +202,13 @@ cWSWordTsar::cWSWordTsar(void)
     mMenuInput = new cWordStarInput(mEditor);
     mRows = 24;
     mCols = 80;
-    mMode = APP_SPLASH;
-    mSplashFrames = 0;
+    mMode = APP_STARTUP;
     mBrowser.SetWordStarLayout(true);
     mHaveFileArg = false;
     mStartupSystemKnown = false;
+    mShowStartupScreen = true;
+    mStartupDuration = std::chrono::milliseconds(1500);
+    mStartupTiming = false;
     mOpeningBrowserFocus = false;
     mOpeningListActive = false;
     mOpeningWantPrint = false;
@@ -296,7 +295,7 @@ void cWSWordTsar::TestOpenFromOpening(const std::string& path)
 ///
 /// @brief
 /// Load an optional file from the command line, build the menu, and run the
-/// wordstartui event loop (splash, then opening menu or editor).
+/// wordstartui event loop (startup screen, then opening menu or editor).
 ///
 /////////////////////////////////////////////////////////////////////////////
 int cWSWordTsar::Run(int argc, char* argv[])
@@ -318,15 +317,7 @@ int cWSWordTsar::Run(int argc, char* argv[])
         mEditor->LayoutDocument(true);
     }
 
-    if (argc > 1)
-    {
-        mFilename = argv[1];
-        mHaveFileArg = true;
-        mEditor->LoadFile(mFilename);
-        mEditor->RelayoutAndRedraw();
-    }
-
-    BuildMenus();
+    StartSession(argc, argv);
 
     // Save the document if the app is killed or the terminal closes. The
     // handler only sets a flag; OnAfterDraw performs the actual save. Installed
@@ -355,6 +346,89 @@ int cWSWordTsar::Run(int argc, char* argv[])
     return result;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  int argc [in] argument count
+/// @param  char* argv[] [in] argument values
+///
+/// @return nothing
+///
+/// @brief
+/// Take the file name from the command line and build the menus. With Show
+/// startup screen on, the startup screen comes first and the file opens
+/// when it ends; otherwise the file opens now, or the Opening screen shows.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::StartSession(int argc, char* argv[])
+{
+    if (argc > 1)
+    {
+        mFilename = argv[1];
+        mHaveFileArg = true;
+    }
+
+    BuildMenus();
+
+    if (mShowStartupScreen == true)
+    {
+        if (mStartupSystemKnown == false)
+        {
+            mStartupSystem = abouttext::QuerySystemInfo();
+            mStartupSystemKnown = true;
+        }
+        mStartupTiming = false;
+        SetMode(APP_STARTUP);
+        return;
+    }
+
+    EndStartupScreen();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// End the startup screen once mStartupDuration has passed since its first
+/// frame.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::TickStartupScreen(void)
+{
+    if ((mMode != APP_STARTUP) || (mStartupTiming == false))
+    {
+        return;
+    }
+
+    if ((std::chrono::steady_clock::now() - mStartupShownAt) >= mStartupDuration)
+    {
+        EndStartupScreen();
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Leave the startup screen: open the command-line file in the editor, or
+/// show the Opening screen.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::EndStartupScreen(void)
+{
+    if (mHaveFileArg == true)
+    {
+        SetMode(APP_EDITOR);
+        mEditor->LoadFile(mFilename);
+        mEditor->RelayoutAndRedraw();
+    }
+    else
+    {
+        SetMode(APP_OPENING);
+    }
+}
+
 // =========================================================================
 // iWSDialogHost
 // =========================================================================
@@ -371,6 +445,15 @@ int cWSWordTsar::Run(int argc, char* argv[])
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::HostRunModal(wordstartui::cDialog& dialog)
 {
+#ifdef WORDTSAR_TUI_TEST_HOOKS
+    if (mTestCountModals == true)
+    {
+        mTestModalCount = mTestModalCount + 1;
+        dialog.SetResult(wordstartui::DIALOG_RESULT_CANCEL);
+        return;
+    }
+#endif
+
     dialog.FocusFirst();
 
     RunModalLoop(
@@ -401,6 +484,14 @@ void cWSWordTsar::HostRunModalRaw(
     const std::function<void(cScreen&, const cTheme&)>& draw,
     const std::function<bool(const sInputEvent&)>& handle)
 {
+#ifdef WORDTSAR_TUI_TEST_HOOKS
+    if (mTestCountModals == true)
+    {
+        mTestModalCount = mTestModalCount + 1;
+        return;
+    }
+#endif
+
     // Redraw the editor/opening background (with the menu closed) each frame so
     // custom modals never show a stale frame -- e.g. an open menu pull-down
     // left behind when a menu item launched the dialog.
@@ -755,6 +846,7 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
     mShowBottomStatus = config.mTuiShowStatusBar;
     mView->SetShowScrollbar(config.mTuiShowScrollBar);
     mEditor->SetCenterView(config.mTuiCenterView);
+    mShowStartupScreen = config.mTuiShowStartupScreen;
 
     mEditor->SetMeasurement(config.mMeasurement);
     mEditor->SetCodePage(static_cast<eCodePage>(config.mCodePage));
@@ -1846,27 +1938,19 @@ std::string cWSWordTsar::GetHelpText(eHelpDisplay help) const
 /// @return nothing
 ///
 /// @brief
-/// Draw the current mode: splash, opening menu, or the editor.
+/// Draw the current mode: startup screen, opening menu, or the editor.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::Draw(cScreen& screen, const cTheme& theme)
 {
-    if (mMode == APP_SPLASH)
+    if (mMode == APP_STARTUP)
     {
-        DrawStartupScreen(screen);
-
-        mSplashFrames++;
-        if (mSplashFrames >= SPLASH_TICKS)
+        if (mStartupTiming == false)
         {
-            if (mHaveFileArg == true)
-            {
-                mMode = APP_EDITOR;
-            }
-            else
-            {
-                mMode = APP_OPENING;
-            }
+            mStartupShownAt = std::chrono::steady_clock::now();
+            mStartupTiming = true;
         }
+        DrawStartupScreen(screen);
         return;
     }
 
@@ -3078,17 +3162,19 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
 /////////////////////////////////////////////////////////////////////////////
 bool cWSWordTsar::HandleEvent(const sInputEvent& event)
 {
-    if (mMode == APP_SPLASH)
+    // A key ends the startup screen and goes on to the next screen. A mouse
+    // button press only ends it; other mouse events are ignored.
+    if (mMode == APP_STARTUP)
     {
-        if (mHaveFileArg == true)
+        if (event.type == wordstartui::INPUT_TYPE_MOUSE)
         {
-            mMode = APP_EDITOR;
+            if (event.mouseAction == wordstartui::MOUSE_ACTION_PRESS)
+            {
+                EndStartupScreen();
+            }
+            return true;
         }
-        else
-        {
-            mMode = APP_OPENING;
-        }
-        return true;
+        EndStartupScreen();
     }
 
     if (mMode == APP_OPENING)
@@ -3565,7 +3651,7 @@ void cWSWordTsar::RunOpeningAction(eOpeningAction action)
 /// @return nothing
 ///
 /// @brief
-/// Switch between the splash, Opening and edit screens. The "Not available
+/// Switch between the startup, Opening and edit screens. The "Not available
 /// in WordTsar" message does not carry over to a different screen; other
 /// status messages stay until they time out.
 ///
@@ -3841,6 +3927,8 @@ void cWSWordTsar::OnAfterDraw(cTerminalDriver& driver)
         Quit();
         return;
     }
+
+    TickStartupScreen();
 
     // Periodic auto-save of the -bak backup, driven off the frame loop instead
     // of a background thread. An interval of 0 disables it.

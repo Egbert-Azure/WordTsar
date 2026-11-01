@@ -135,6 +135,21 @@ public:
         mCols = screen.GetCols();
         DrawStartupScreen(screen);
     }
+    // Start-up the way Run() does before the event loop, without the loop.
+    void TestStartSession(int argc, char* argv[]) { StartSession(argc, argv); }
+    bool TestInStartup(void) const { return mMode == APP_STARTUP; }
+    void TestDraw(wordstartui::cScreen& screen)
+    {
+        mRows = screen.GetRows();
+        mCols = screen.GetCols();
+        Draw(screen, GetTheme());
+    }
+    void TestTickStartup(void) { TickStartupScreen(); }
+    std::chrono::milliseconds TestStartupDuration(void) const { return mStartupDuration; }
+    void TestSetStartupDuration(std::chrono::milliseconds duration) { mStartupDuration = duration; }
+    // Modal dialogs are counted and cancelled instead of run.
+    void TestCountModals(void) { mTestCountModals = true; }
+    int TestModalCount(void) const { return mTestModalCount; }
 #endif
 
     // ---- iWSDialogHost ----
@@ -158,12 +173,15 @@ private:
     // Startup phases before the editor takes over.
     enum eAppMode
     {
-        APP_SPLASH,
+        APP_STARTUP,
         APP_OPENING,
         APP_EDITOR
     };
 
     void SetMode(eAppMode mode);
+    void StartSession(int argc, char* argv[]);
+    void TickStartupScreen(void);
+    void EndStartupScreen(void);
     void LayoutChrome(void);
     void BuildMenus(void);
     void BuildOpeningMenus(void);
@@ -254,11 +272,18 @@ private:
     int mCols;
     wordstartui::sTerminalCapabilities mCapabilities{};
 
-    eAppMode mMode;            // splash / opening menu / editor
-    int mSplashFrames;         // frames the splash has been shown
+    eAppMode mMode;            // startup screen / opening menu / editor
     bool mHaveFileArg;         // a file was given on the command line
     abouttext::sSystemInfo mStartupSystem;   // system values shown on the startup screen
     bool mStartupSystemKnown;                // mStartupSystem has been filled
+    bool mShowStartupScreen;                 // [tui.display] showStartupScreen
+    std::chrono::milliseconds mStartupDuration;              // how long the startup screen stays
+    std::chrono::steady_clock::time_point mStartupShownAt;   // first frame of the startup screen
+    bool mStartupTiming;                     // mStartupShownAt is set
+#ifdef WORDTSAR_TUI_TEST_HOOKS
+    bool mTestCountModals = false;
+    int mTestModalCount = 0;
+#endif
     wsui::cFileBrowser mBrowser;  // file picker on the opening screen
     bool mOpeningBrowserFocus;    // true when the browser has focus (not the menu)
     bool mOpeningListActive;      // true when arrows have activated the list without focus

@@ -26,8 +26,13 @@
 #include "src/core/utils/config.h"
 #include "src/core/include/version.h"
 
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
+
+#include <unistd.h>
 
 
 namespace
@@ -251,4 +256,252 @@ TEST_CASE("TUI startup screen - tiny terminals draw without crashing")
             CHECK(screen.GetCell(rows - 1, cols - 1)->style.bg == kBlue);
         }
     }
+}
+
+
+namespace
+{
+
+// A unique temporary folder, removed with its contents.
+class cStartupTempDir
+{
+public:
+    cStartupTempDir(void)
+    {
+        std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-startup-XXXXXX").string();
+        REQUIRE(mkdtemp(pattern.data()) != nullptr);
+        mPath = pattern;
+    }
+
+    ~cStartupTempDir(void)
+    {
+        std::error_code ec;
+        std::filesystem::remove_all(mPath, ec);
+    }
+
+    std::string WriteText(const std::string& name, const std::string& text)
+    {
+        std::filesystem::path file = mPath / name;
+        std::ofstream out(file, std::ios::binary);
+        out << text;
+        return file.string();
+    }
+
+private:
+    std::filesystem::path mPath;
+};
+
+wordstartui::sInputEvent Text(const std::string& text, bool alt = false)
+{
+    wordstartui::sInputEvent event{};
+    event.type = wordstartui::INPUT_TYPE_TEXT;
+    event.textUtf8 = text;
+    event.alt = alt;
+    return event;
+}
+
+wordstartui::sInputEvent Special(wordstartui::eSpecialKey key)
+{
+    wordstartui::sInputEvent event{};
+    event.type = wordstartui::INPUT_TYPE_SPECIAL;
+    event.special = key;
+    return event;
+}
+
+wordstartui::sInputEvent Function(int number)
+{
+    wordstartui::sInputEvent event{};
+    event.type = wordstartui::INPUT_TYPE_FUNCTION;
+    event.functionKey = number;
+    return event;
+}
+
+wordstartui::sInputEvent Mouse(wordstartui::eMouseAction action, int row, int col)
+{
+    wordstartui::sInputEvent event{};
+    event.type = wordstartui::INPUT_TYPE_MOUSE;
+    event.mouseAction = action;
+    event.mouseButton = wordstartui::MOUSE_BUTTON_LEFT;
+    event.mouseRow = row;
+    event.mouseCol = col;
+    return event;
+}
+
+// An app started without a file name, showing the startup screen at help
+// level 4, drawn once.
+void StartShowing(cWSWordTsar& app, wordstartui::cScreen& screen)
+{
+    PrepareWs7(app);
+    app.TestGetEditor()->mHelpLevel = 4;
+    app.TestCountModals();
+    char name[] = "ws";
+    char* argv[] = { name, nullptr };
+    app.TestStartSession(1, argv);
+    REQUIRE(app.TestInStartup() == true);
+    screen.Resize(25, 80);
+    app.TestDraw(screen);
+    REQUIRE(app.TestInStartup() == true);
+}
+
+}
+
+
+TEST_CASE("TUI startup screen - a key pressed during the startup screen reaches the Opening screen")
+{
+    cWSWordTsar app;
+    wordstartui::cScreen screen;
+    StartShowing(app, screen);
+
+    SUBCASE("S starts the editor")
+    {
+        CHECK(app.TestHandleEvent(Text("s")) == true);
+        CHECK(app.TestInEditor() == true);
+        CHECK(app.TestFilename().empty() == true);
+    }
+
+    SUBCASE("D gives the file list the letters")
+    {
+        CHECK(app.TestHandleEvent(Text("d")) == true);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestOpeningBrowserFocus() == true);
+    }
+
+    SUBCASE("F1 shows the Opening help")
+    {
+        CHECK(app.TestHandleEvent(Function(1)) == true);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestModalCount() == 1);
+    }
+
+    SUBCASE("Escape exits as on the Opening screen")
+    {
+        CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
+        CHECK(app.TestQuitRequested() == true);
+    }
+
+    SUBCASE("Alt+F opens the File menu")
+    {
+        CHECK(app.TestHandleEvent(Text("f", true)) == true);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestGetOpeningMenu().GetOpenMenu() == 0);
+    }
+
+    SUBCASE("a mouse click ends the startup screen and is consumed")
+    {
+        // Row 9 column 5 is in the help level 4 file list.
+        CHECK(app.TestHandleEvent(Mouse(wordstartui::MOUSE_ACTION_PRESS, 9, 5)) == true);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestOpeningBrowserFocus() == false);
+        CHECK(app.TestGetOpeningMenu().IsOpen() == false);
+        CHECK(app.TestQuitRequested() == false);
+        CHECK(app.TestModalCount() == 0);
+    }
+
+    SUBCASE("mouse releases, drags and wheel turns are ignored")
+    {
+        for (wordstartui::eMouseAction action : {wordstartui::MOUSE_ACTION_RELEASE, wordstartui::MOUSE_ACTION_DRAG,
+                                                 wordstartui::MOUSE_ACTION_WHEEL, wordstartui::MOUSE_ACTION_NONE})
+        {
+            CHECK(app.TestHandleEvent(Mouse(action, 9, 5)) == true);
+            CHECK(app.TestInStartup() == true);
+        }
+    }
+}
+
+
+TEST_CASE("TUI startup screen - shown for 1.5 seconds from the first frame")
+{
+    cWSWordTsar app;
+    CHECK(app.TestStartupDuration() == std::chrono::milliseconds(1500));
+
+    PrepareWs7(app);
+    char name[] = "ws";
+    char* argv[] = { name, nullptr };
+    app.TestStartSession(1, argv);
+    REQUIRE(app.TestInStartup() == true);
+
+    SUBCASE("the clock starts with the first frame")
+    {
+        app.TestSetStartupDuration(std::chrono::milliseconds(0));
+        app.TestTickStartup();
+        CHECK(app.TestInStartup() == true);
+        wordstartui::cScreen screen;
+        screen.Resize(25, 80);
+        app.TestDraw(screen);
+        app.TestTickStartup();
+        CHECK(app.TestInOpening() == true);
+    }
+
+    SUBCASE("it stays until the duration has passed, then the Opening screen follows")
+    {
+        app.TestSetStartupDuration(std::chrono::milliseconds(200));
+        wordstartui::cScreen screen;
+        screen.Resize(25, 80);
+        app.TestDraw(screen);
+        app.TestTickStartup();
+        CHECK(app.TestInStartup() == true);
+        usleep(250 * 1000);
+        app.TestDraw(screen);
+        app.TestTickStartup();
+        CHECK(app.TestInOpening() == true);
+    }
+}
+
+
+TEST_CASE("TUI startup screen - Show startup screen off goes straight on")
+{
+    cStartupTempDir dir;
+    std::string file = dir.WriteText("letter.txt", "dear reader\n");
+
+    cConfig config;
+    config.mTuiShowStartupScreen = false;
+
+    SUBCASE("to the Opening screen")
+    {
+        cWSWordTsar app;
+        app.TestApplyConfig(config);
+        app.TestSetSystemInfo(FixedSystem());
+        char name[] = "ws";
+        char* argv[] = { name, nullptr };
+        app.TestStartSession(1, argv);
+        CHECK(app.TestInOpening() == true);
+    }
+
+    SUBCASE("to the editor with the file opened")
+    {
+        cWSWordTsar app;
+        app.TestApplyConfig(config);
+        app.TestSetSystemInfo(FixedSystem());
+        char name[] = "ws";
+        char* argv[] = { name, file.data(), nullptr };
+        app.TestStartSession(2, argv);
+        CHECK(app.TestInEditor() == true);
+        CHECK(app.TestGetEditor()->mFileName == "letter.txt");
+    }
+}
+
+
+TEST_CASE("TUI startup screen - a file name on the command line opens after the startup screen")
+{
+    cStartupTempDir dir;
+    std::string file = dir.WriteText("letter.txt", "dear reader\n");
+
+    cWSWordTsar app;
+    PrepareWs7(app);
+    char name[] = "ws";
+    char* argv[] = { name, file.data(), nullptr };
+    app.TestStartSession(2, argv);
+    CHECK(app.TestInStartup() == true);
+    CHECK(app.TestGetEditor()->mFileName != "letter.txt");
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDraw(screen);
+    CHECK(TextCol(screen, 0, " WordTsar ") == 35);
+    CHECK(app.TestGetEditor()->mFileName != "letter.txt");
+
+    app.TestSetStartupDuration(std::chrono::milliseconds(0));
+    app.TestTickStartup();
+    CHECK(app.TestInEditor() == true);
+    CHECK(app.TestGetEditor()->mFileName == "letter.txt");
 }
