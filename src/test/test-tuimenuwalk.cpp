@@ -2698,6 +2698,73 @@ TEST_CASE("TUI Opening screen - Tab drops a pending print, TOC or index request"
 }
 
 
+TEST_CASE("TUI Opening screen - a print, TOC or index request replaces the pending one")
+{
+    sOpeningListDir dir;
+
+    SUBCASE("help level 3: a letter after P goes to the file list")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 3, dir);
+        app.TestHandleEvent(OpeningText("p"));
+        REQUIRE(app.TestOpeningBrowserFocus() == true);
+        app.TestHandleEvent(OpeningText("t"));
+        CHECK(app.TestOpeningWantPrint() == true);
+        CHECK(app.TestOpeningWantTOC() == false);
+        CHECK(app.TestOpeningWantIndex() == false);
+        CHECK(app.TestInOpening() == true);
+    }
+
+    SUBCASE("help level 4: P then Alt+U T leaves only the TOC request")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 4, dir);
+        app.TestHandleEvent(OpeningText("p"));
+        REQUIRE(app.TestOpeningWantPrint() == true);
+        app.TestHandleEvent(OpeningAltText("u"));
+        REQUIRE(app.TestGetOpeningMenu().GetOpenMenu() == 1);
+        app.TestHandleEvent(OpeningText("t"));
+        CHECK(app.TestOpeningWantPrint() == false);
+        CHECK(app.TestOpeningWantTOC() == true);
+        CHECK(app.TestOpeningWantIndex() == false);
+        CHECK(app.TestOpeningBrowserFocus() == true);
+        CHECK(app.TestInOpening() == true);
+    }
+
+    SUBCASE("help level 4: Alt+U I then Alt+F P leaves only the print request")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 4, dir);
+        app.TestHandleEvent(OpeningAltText("u"));
+        app.TestHandleEvent(OpeningText("i"));
+        REQUIRE(app.TestOpeningWantIndex() == true);
+        app.TestHandleEvent(OpeningAltText("f"));
+        REQUIRE(app.TestGetOpeningMenu().GetOpenMenu() == 0);
+        app.TestHandleEvent(OpeningText("p"));
+        CHECK(app.TestOpeningWantPrint() == true);
+        CHECK(app.TestOpeningWantTOC() == false);
+        CHECK(app.TestOpeningWantIndex() == false);
+        CHECK(app.TestInOpening() == true);
+    }
+
+    SUBCASE("help level 4: Alt+U T then Alt+U I leaves only the index request")
+    {
+        cWSWordTsar app;
+        PrepareOpeningList(app, 4, dir);
+        app.TestHandleEvent(OpeningAltText("u"));
+        app.TestHandleEvent(OpeningText("t"));
+        REQUIRE(app.TestOpeningWantTOC() == true);
+        app.TestHandleEvent(OpeningAltText("u"));
+        REQUIRE(app.TestGetOpeningMenu().GetOpenMenu() == 1);
+        app.TestHandleEvent(OpeningText("i"));
+        CHECK(app.TestOpeningWantPrint() == false);
+        CHECK(app.TestOpeningWantTOC() == false);
+        CHECK(app.TestOpeningWantIndex() == true);
+        CHECK(app.TestInOpening() == true);
+    }
+}
+
+
 TEST_CASE("TUI - a status message does not cross between the Opening and edit screens")
 {
     sOpeningListDir dir;

@@ -3268,15 +3268,21 @@ void cWSWordTsar::RunOpeningAction(eOpeningAction action)
 
         case eOpeningAction::PRINT_FILE:
             mOpeningWantPrint = true;
+            mOpeningWantTOC = false;
+            mOpeningWantIndex = false;
             mOpeningBrowserFocus = true;
             break;
 
         case eOpeningAction::TABLE_OF_CONTENTS:
+            mOpeningWantPrint = false;
             mOpeningWantTOC = true;
+            mOpeningWantIndex = false;
             mOpeningBrowserFocus = true;
             break;
 
         case eOpeningAction::INDEX_DOCUMENT:
+            mOpeningWantPrint = false;
+            mOpeningWantTOC = false;
             mOpeningWantIndex = true;
             mOpeningBrowserFocus = true;
             break;
