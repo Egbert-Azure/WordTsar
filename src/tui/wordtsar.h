@@ -57,6 +57,7 @@ enum class eOpeningAction
     TURN_DIRECTORY_OFF,
     MACROS,
     RUN_COMMAND,
+    ADDITIONAL,
     ABOUT,
     DISPLAY_STATUS,
     RECENT_FILES,

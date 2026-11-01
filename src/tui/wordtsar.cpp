@@ -116,18 +116,19 @@ const sOpeningItem kOpeningItems[] =
     { 'F', "turn directory off",     false, eOpeningAction::TURN_DIRECTORY_OFF },
     { 'M', "macros",                 false, eOpeningAction::MACROS },
     { 'R', "run a DOS command",      false, eOpeningAction::RUN_COMMAND },
-    { 'A', "about WordTsar",         true,  eOpeningAction::ABOUT },
+    { 'A', "additional",             false, eOpeningAction::ADDITIONAL },
     { '?', "display status",         true,  eOpeningAction::DISPLAY_STATUS },
 
     // WordTsar's own entries.
     { 'G', "recent files",           true,  eOpeningAction::RECENT_FILES },
     { 'V', "preferences",            true,  eOpeningAction::PREFERENCES },
+    { 'W', "about WordTsar",         true,  eOpeningAction::ABOUT },
 };
 
 constexpr int kOpeningLeftCount = 9;
 constexpr int kOpeningRightCount = 10;
 constexpr int kOpeningOwnFirst = kOpeningLeftCount + kOpeningRightCount;
-constexpr int kOpeningCount = 21;
+constexpr int kOpeningCount = 22;
 
 }
 
@@ -3306,8 +3307,8 @@ void cWSWordTsar::RunOpeningAction(eOpeningAction action)
 
         default:
             // Fax, print-from-keyboard, index/TOC, protect, rename/copy/
-            // delete, turn-directory-off, macros, and run-a-DOS-command are
-            // all disabled in kOpeningItems (nobody needs a DOS shell from
+            // delete, turn-directory-off, macros, run-a-DOS-command and
+            // additional are all disabled in kOpeningItems (nobody needs a DOS shell from
             // here today, same as fax), so this is unreachable via normal
             // dispatch -- kept as a safe no-op rather than a fallthrough
             // NotImplemented, since none of these can currently be selected.

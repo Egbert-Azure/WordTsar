@@ -1512,6 +1512,35 @@ TEST_CASE("TUI Opening screen - help level 3 own entries sit on row 12 with lett
 }
 
 
+TEST_CASE("TUI Opening screen - help level 3 A is additional and W is about WordTsar")
+{
+    cWSWordTsar app;
+    wordstartui::cScreen screen = DrawLevel3Opening(app);
+
+    CHECK(ScreenHasText(screen, "A additional") == true);
+    CHECK(ScreenHasText(screen, "A about") == false);
+    CHECK(MenuRowText(screen, 12).find("W about WordTsar") != std::string::npos);
+
+    eOpeningAction action{};
+    CHECK(app.TestOpeningKeyAction('w', action) == true);
+    CHECK(action == eOpeningAction::ABOUT);
+
+    // The Additional programs are not available: A does nothing.
+    REQUIRE(app.TestOpeningKeyAction('a', action) == false);
+    CHECK(app.TestHandleEvent(OpeningText("a")) == true);
+    CHECK(app.TestInOpening() == true);
+    CHECK(app.TestOpeningBrowserFocus() == false);
+    CHECK(app.TestOpeningSelection() == 0);
+    CHECK(app.TestQuitRequested() == false);
+
+    SUBCASE("help level 4 leaves W unbound")
+    {
+        app.TestGetEditor()->mHelpLevel = 4;
+        CHECK(app.TestOpeningKeyAction('w', action) == false);
+    }
+}
+
+
 
 namespace
 {
