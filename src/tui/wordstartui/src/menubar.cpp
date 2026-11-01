@@ -308,7 +308,7 @@ int cMenuBar::AddMenu(const std::string& title, char hotKey)
 /// @param  int menuIndex [in] menu returned by AddMenu
 /// @param  const std::string& title [in] sub-item title
 /// @param  std::function<void(void)> callback [in] activation callback
-/// @param  bool enabled [in] false to draw the item dimmed and non-activatable
+/// @param  bool enabled [in] false to make the item non-activatable
 ///
 /// @return nothing
 ///
@@ -392,7 +392,7 @@ int cMenuBar::AddSubMenu(int menuIndex, const std::string& title)
 /// @param  int subHandle [in] handle returned by AddSubMenu
 /// @param  const std::string& title [in] sub-item title
 /// @param  std::function<void(void)> callback [in] activation callback
-/// @param  bool enabled [in] false to draw dimmed and non-activatable
+/// @param  bool enabled [in] false to make the item non-activatable
 ///
 /// @return nothing
 ///
@@ -861,10 +861,6 @@ void cMenuBar::Draw(cScreen& screen, const cTheme& theme)
             {
                 rowStyle = active;
             }
-            if (entry.enabled == false)
-            {
-                rowStyle.attrs = rowStyle.attrs | CELL_ATTR_DIM;
-            }
 
             sRect lineRect;
             lineRect.row = entryRow;
@@ -875,7 +871,7 @@ void cMenuBar::Draw(cScreen& screen, const cTheme& theme)
 
             screen.PutText(entryRow, box.col + 2, entry.title, rowStyle);
 
-            if ((entry.enabled == true) && (entry.hotKeyPos >= 0) &&
+            if ((entry.hotKeyPos >= 0) &&
                 (entry.hotKeyPos < static_cast<int>(entry.title.size())))
             {
                 sStyle hotStyle = rowStyle;

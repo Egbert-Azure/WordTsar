@@ -1392,7 +1392,7 @@ void cWSWordTsar::BuildOpeningMenus(void)
     mOpeningMenu.SetWideOpenTitle(true);
 
     // Entries show the classic Opening Menu letter right-aligned. Entries
-    // without an Opening screen action are greyed out.
+    // without an Opening screen action are disabled.
     auto none = [](void) {};
     auto run = [this](eOpeningAction action)
     {
@@ -2081,9 +2081,6 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
     sStyle keyStyle = base;
     keyStyle.fg = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU_ACCEL).fg;
 
-    sStyle disabled = base;
-    disabled.attrs = wordstartui::CELL_ATTR_DIM;
-
     sRect full;
     full.row = 0;
     full.col = 0;
@@ -2149,12 +2146,7 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
         }
         else
         {
-            sStyle labelStyle = base;
-            if (item.enabled == false)
-            {
-                labelStyle = disabled;
-            }
-            screen.PutText(row, col, label, labelStyle);
+            screen.PutText(row, col, label, base);
             if (item.key != 0)
             {
                 screen.PutText(row, col, std::string(1, item.key), keyStyle);

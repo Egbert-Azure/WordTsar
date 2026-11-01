@@ -34,8 +34,8 @@ namespace wordstartui
 // One entry inside a pull-down menu. hotKey is the accelerator letter (lower
 // case) and hotKeyPos is its index in title, for highlighting. An entry is one
 // of: a leaf action (callback), a separator (isSeparator), or a submenu (submenu
-// non-empty) that opens a cascading flyout. Disabled entries are drawn dimmed
-// and cannot be activated.
+// non-empty) that opens a cascading flyout. Disabled entries are drawn like
+// enabled ones and cannot be activated.
 struct sMenuEntry
 {
     std::string title;

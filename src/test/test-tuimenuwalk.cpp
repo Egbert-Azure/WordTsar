@@ -2083,3 +2083,93 @@ TEST_CASE("TUI menu bar - the edit-screen open title is highlighted one column w
     CheckCellColours(screen, 3, 43, wordstartui::MakeRgb(170, 170, 170), wordstartui::MakeRgb(0, 0, 0));
     CheckCellColours(screen, 3, 45, wordstartui::MakeRgb(170, 170, 170), wordstartui::MakeRgb(0, 0, 0));
 }
+
+
+namespace
+{
+
+// True when no cell in the row from col for count cells carries the dim attribute.
+bool NoDimInRun(const wordstartui::cScreen& screen, int row, int col, int count)
+{
+    bool clean = true;
+    for (int c = col; c < (col + count); ++c)
+    {
+        const wordstartui::sCell& cell = CellAt(screen, row, c);
+        if ((cell.style.attrs & wordstartui::CELL_ATTR_DIM) != 0U)
+        {
+            INFO("dim cell ", row, ",", c, " \"", cell.textUtf8, "\"");
+            CHECK(false);
+            clean = false;
+        }
+    }
+    return clean;
+}
+
+}
+
+
+TEST_CASE("TUI menu bar - an entry without an action looks like the others")
+{
+    cWSWordTsar app;
+    EnterWs7Opening(app, 4);
+    REQUIRE(app.TestHandleEvent(OpeningText("f")) == true);
+    REQUIRE(app.TestGetOpeningMenu().IsOpen() == true);
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    // Open Nondocument... on row 5: black on grey, N in the accelerator colour.
+    REQUIRE(CellRun(screen, 5, 2, 19) == "Open Nondocument...");
+    CHECK(NoDimInRun(screen, 5, 1, 30) == true);
+    CheckCellColours(screen, 5, 2, kWs7Black, kWs7Grey);
+    CHECK(CellAt(screen, 5, 7).textUtf8 == "N");
+    CheckCellColours(screen, 5, 7, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 5, 29, kWs7Black, kWs7Grey);
+
+    // Edit Note on the edit screen's Edit menu.
+    app.TestBuildMenus();
+    const wordstartui::cMenuBar& menu = app.TestGetMenu();
+    wordstartui::sThemePalette palette = wordstartui::cTheme::GetDefaultPalette();
+    palette.menuFg = kWs7Black;
+    palette.menuBg = kWs7Grey;
+    palette.menuAccelFg = kWs7LightBlue;
+    palette.menuAccelBg = kWs7Grey;
+    wordstartui::cTheme theme;
+    theme.LoadPalette(palette);
+    wordstartui::cScreen edit = DrawOpenMenuWithTheme(menu, 'e', theme);
+    int noteRow = -1;
+    for (int row = 3; row < 25; ++row)
+    {
+        if (MenuRowText(edit, row).find("Edit Note") != std::string::npos)
+        {
+            noteRow = row;
+        }
+    }
+    REQUIRE(noteRow > 0);
+    const int noteCol = static_cast<int>(MenuRowText(edit, noteRow).find("Edit Note")) - 2;
+    CHECK(NoDimInRun(edit, noteRow, noteCol, 20) == true);
+    CHECK(CellAt(edit, noteRow, noteCol + 5).textUtf8 == "N");
+    CheckCellColours(edit, noteRow, noteCol + 5, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(edit, noteRow, noteCol, kWs7Black, kWs7Grey);
+}
+
+
+TEST_CASE("TUI Opening screen - help level 3 labels without an action look like the others")
+{
+    cWSWordTsar app;
+    EnterWs7Opening(app, 3);
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    // N open a nondocument on row 4, Y delete a file on row 6.
+    REQUIRE(CellRun(screen, 4, 6, 20) == "N open a nondocument");
+    CHECK(NoDimInRun(screen, 4, 6, 20) == true);
+    CheckCellColours(screen, 4, 6, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 4, 8, kWs7Black, kWs7Grey);
+    REQUIRE(CellRun(screen, 6, 43, 15) == "Y delete a file");
+    CHECK(NoDimInRun(screen, 6, 43, 15) == true);
+    CheckCellColours(screen, 6, 43, kWs7LightBlue, kWs7Grey);
+}
