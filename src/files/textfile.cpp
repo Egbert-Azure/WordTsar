@@ -47,11 +47,12 @@
  * - DOS CP437 files are converted via cCodePage437
  * - DOS CP850 files are converted via cCodePage850
  * - Line endings are normalized: LF and CR+LF are converted to CR only
- *   (WordTsar's internal paragraph delimiter)
+ *   (WordTsar's internal paragraph delimiter). The first line ending in
+ *   the file is kept for GetLineEnding(); LF if the file has none.
  *
  * @section textfile_capabilities Format Capabilities
  * - CanLoad(): always returns true (accepts any file as plain text)
- * - CanSave(): returns true (saves as UTF-8 with CRLF line endings)
+ * - CanSave(): returns true (saves as UTF-8 with the document's line ending)
  *
  * @author Gerald Brandt
  * @copyright GNU Affero General Public License v3.0
@@ -814,6 +815,36 @@ std::string cTextFile::ConvertCP850ToUTF8(const std::vector<unsigned char>& buff
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  content [in] text as loaded
+///
+/// @return the first line ending in content: CRLF, LFCR, CR or LF; LF if
+///         there is none
+///
+/// @brief
+/// Uses the same pairing as NormalizeLineEndings().
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cTextFile::DetectLineEnding(const std::string& content)
+{
+    for (size_t i = 0; i < content.size(); i++)
+    {
+        char ch = content[i];
+        if (ch == '\r' || ch == '\n')
+        {
+            char other = (ch == '\r') ? '\n' : '\r';
+            if (i + 1 < content.size() && content[i + 1] == other)
+            {
+                return std::string(1, ch) + other;
+            }
+            return std::string(1, ch);
+        }
+    }
+
+    return "\n";
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  content [in] text with mixed line endings
 ///
 /// @return text with all line endings converted to HARD_RETURN
@@ -997,6 +1028,7 @@ bool cTextFile::LoadFile(std::string filename)
     }
 
     // Normalize line endings (CR, LF, CRLF -> HARD_RETURN)
+    mLineEnding = DetectLineEnding(utf8Content);
     std::string normalized = NormalizeLineEndings(utf8Content);
 
     // Insert content into document
@@ -1057,7 +1089,7 @@ bool cTextFile::LoadFile(std::string filename)
 /// @return true if file saved successfully
 ///
 /// @brief
-/// Save document as UTF-8 plain text with Windows line endings (CRLF).
+/// Save document as UTF-8 plain text with the document's line ending.
 /// Uses cDocument::GetPlainText(): a tab marker is written as a tab, other
 /// markers and the end-of-file marker are not written.
 ///
@@ -1070,10 +1102,20 @@ bool cTextFile::SaveFile(std::string filename, POSITION_T length)
         return false;
     }
 
-    file << mDocument->GetPlainText(0, length, "\r\n");
+    file << mDocument->GetPlainText(0, length, mDocument->GetLineEnding());
 
     file.close();
     return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the first line ending of the loaded file
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cTextFile::GetLineEnding(void) const
+{
+    return mLineEnding;
 }
 
 /////////////////////////////////////////////////////////////////////////////

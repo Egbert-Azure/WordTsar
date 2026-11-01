@@ -6965,6 +6965,12 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
         MarkDocumentSaved();
     }
 
+    // A text file saves with the line ending it was opened with
+    if (success && loadedAsText)
+    {
+        mDocument->SetLineEnding(static_cast<cTextFile*>(fileReader)->GetLineEnding());
+    }
+
     delete fileReader;
 
     if (success)

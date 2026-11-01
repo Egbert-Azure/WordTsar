@@ -15252,7 +15252,7 @@ TEST_CASE("GUI editor - the save format follows the last save with a known exten
         REQUIRE(editor.SaveFile((dir / "x.txt").string()));
         REQUIRE(editor.SaveFile((dir / "y.def").string()));
 
-        std::string expected = "Hello\r\n";
+        std::string expected = "Hello\n";
         CHECK(ReadFileBytes(dir / "y.def") == expected);
     }
 
@@ -15340,7 +15340,7 @@ TEST_CASE("GUI editor - plain-text output carries no end-of-file marker")
     SUBCASE("save as .txt")
     {
         REQUIRE(editor.SaveFile((dir / "a.txt").string()));
-        CHECK(ReadFileBytes(dir / "a.txt") == "Hello\r\nWorld");
+        CHECK(ReadFileBytes(dir / "a.txt") == "Hello\nWorld");
     }
 
     SUBCASE("a text file saved again")
@@ -15373,6 +15373,89 @@ TEST_CASE("GUI editor - plain-text output carries no end-of-file marker")
         doc->SetEndBlock();
         editor.ClipboardCopy();
         CHECK(QApplication::clipboard()->text().toStdString() == "Hello\rWorld");
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("GUI editor - a text file saves with the line endings it was opened with")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-eol-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    auto roundTrip = [&](const std::string& name, const std::string& bytes)
+    {
+        auto path = dir / name;
+        WriteFileBytes(path, bytes);
+        REQUIRE(editor.LoadFile(path.string()));
+        REQUIRE(editor.SaveFile(path.string()));
+        return ReadFileBytes(path);
+    };
+
+    SUBCASE("LF")
+    {
+        std::string bytes = "one\ttwo\nthree\n\nfour\n";
+        CHECK(roundTrip("lf.txt", bytes) == bytes);
+    }
+
+    SUBCASE("CRLF")
+    {
+        std::string bytes = "one\ttwo\r\nthree\r\n\r\nfour\r\n";
+        CHECK(roundTrip("crlf.txt", bytes) == bytes);
+    }
+
+    SUBCASE("CR")
+    {
+        std::string bytes = "one\ttwo\rthree\r\rfour\r";
+        CHECK(roundTrip("cr.txt", bytes) == bytes);
+    }
+
+    SUBCASE("no newline at the end")
+    {
+        std::string bytes = "one\ntwo";
+        CHECK(roundTrip("nonl.txt", bytes) == bytes);
+    }
+
+    SUBCASE("mixed line endings use the first one")
+    {
+        CHECK(roundTrip("mixed.txt", "a\nb\r\nc\r") == "a\nb\nc\n");
+    }
+
+    SUBCASE("a new document saved as .txt uses LF")
+    {
+        doc->Insert("Hello\rWorld\r");
+        REQUIRE(editor.SaveFile((dir / "new.txt").string()));
+        CHECK(ReadFileBytes(dir / "new.txt") == "Hello\nWorld\n");
+    }
+
+    SUBCASE("a WordStar file saved as .txt uses LF")
+    {
+        doc->Insert("Hello\rWorld\r");
+        REQUIRE(editor.SaveFile((dir / "doc.ws").string()));
+        REQUIRE(editor.LoadFile((dir / "doc.ws").string()));
+        REQUIRE(editor.SaveFile((dir / "doc.txt").string()));
+        CHECK(ReadFileBytes(dir / "doc.txt") == "Hello\nWorld\n");
+    }
+
+    SUBCASE("a CRLF text file then a WordStar file")
+    {
+        doc->Insert("Hello\r");
+        REQUIRE(editor.SaveFile((dir / "doc.ws").string()));
+        WriteFileBytes(dir / "crlf.txt", "a\r\n");
+        REQUIRE(editor.LoadFile((dir / "crlf.txt").string()));
+        REQUIRE(editor.LoadFile((dir / "doc.ws").string()));
+        REQUIRE(editor.SaveFile((dir / "doc.txt").string()));
+        CHECK(ReadFileBytes(dir / "doc.txt") == "Hello\n");
     }
 
     std::error_code ec;

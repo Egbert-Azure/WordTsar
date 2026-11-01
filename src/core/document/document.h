@@ -303,6 +303,8 @@ public:
     bool GetSuppressNotify(void) ;
     void SetTextFile(bool textFile) ;
     bool IsTextFile(void) ;
+    void SetLineEnding(const std::string &lineEnding) ;
+    std::string GetLineEnding(void) ;
 
     // --- Position ---
     POSITION_T GetTextSize(void) ;
@@ -506,6 +508,7 @@ private:
     bool mSuppressNotify ;                              ///< true to suppress listener notifications without affecting undo
     bool mSuppressUndo ;                                ///< true to suppress undo recording without implying file-load semantics
     bool mTextFile ;                                    ///< true if the document was loaded or last saved as plain text
+    std::string mLineEnding = "\n" ;                  ///< line ending written by a plain-text save
 
     // --- Paragraph Lookup Cache ---
     POSITION_T mLastParagraphFromPosition ;

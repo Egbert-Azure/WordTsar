@@ -510,6 +510,7 @@ void cDocument::Clear(void)
     ClearMarkers() ;
     mSavedBlockHidden = false ;
     mTextFile = false ;
+    mLineEnding = "\n" ;
 
     mCPParagraph = 1024 ;           // random number just so it's no 0 to start (see GetParagraphCodepoints())
 
@@ -1786,6 +1787,30 @@ void cDocument::SetTextFile(bool textFile)
 bool cDocument::IsTextFile(void)
 {
     return mTextFile ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  lineEnding   [IN] - bytes a plain-text save writes for a hard return
+///
+/// @return nothing
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::SetLineEnding(const std::string &lineEnding)
+{
+    mLineEnding = lineEnding ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the bytes a plain-text save writes for a hard return
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDocument::GetLineEnding(void)
+{
+    return mLineEnding ;
 }
 
 

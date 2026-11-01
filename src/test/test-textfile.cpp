@@ -332,3 +332,77 @@ TEST_CASE("cTextFile - a DEL character that is not a marker is saved")
 
 
 //===========================================================================
+// B4 - line endings of a text file
+//===========================================================================
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// Helper: load bytes as a text file and return the line ending it reports.
+///
+/////////////////////////////////////////////////////////////////////////////
+static std::string LoadedLineEnding(const std::string &bytes)
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path path = dir / "in.txt";
+    WriteFileBytes(path, bytes);
+
+    cDocument doc;
+    doc.Clear();
+    cTextFile file;
+    file.mDocument = &doc;
+    REQUIRE(file.LoadFile(path.string()));
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+    return file.GetLineEnding();
+}
+
+TEST_CASE("cTextFile::LoadFile - reports the line ending of the file")
+{
+    CHECK(LoadedLineEnding("a\nb\n") == "\n");
+    CHECK(LoadedLineEnding("a\r\nb\r\n") == "\r\n");
+    CHECK(LoadedLineEnding("a\rb\r") == "\r");
+    CHECK(LoadedLineEnding("a\nb\r\nc\r") == "\n");         // mixed: the first one
+    CHECK(LoadedLineEnding("a\r\nb\nc\n") == "\r\n");
+    CHECK(LoadedLineEnding("no line end") == "\n");         // none: LF
+}
+
+TEST_CASE("cTextFile::SaveFile - writes the document line ending")
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path path = dir / "out.txt";
+
+    cDocument doc;
+    doc.Clear();
+    doc.Insert("a\rb\r");
+    cTextFile file;
+    file.mDocument = &doc;
+
+    SUBCASE("a new document uses LF")
+    {
+        REQUIRE(file.SaveFile(path.string(), doc.GetTextSize()));
+        CHECK(ReadFileBytes(path) == "a\nb\n");
+    }
+
+    SUBCASE("a document set to CRLF")
+    {
+        doc.SetLineEnding("\r\n");
+        REQUIRE(file.SaveFile(path.string(), doc.GetTextSize()));
+        CHECK(ReadFileBytes(path) == "a\r\nb\r\n");
+    }
+
+    SUBCASE("Clear resets to LF")
+    {
+        doc.SetLineEnding("\r");
+        doc.Clear();
+        doc.Insert("a\rb\r");
+        REQUIRE(file.SaveFile(path.string(), doc.GetTextSize()));
+        CHECK(ReadFileBytes(path) == "a\nb\n");
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+//===========================================================================

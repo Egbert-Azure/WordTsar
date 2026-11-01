@@ -71,6 +71,8 @@ public:
     static bool IsValidUTF8(const unsigned char* data, size_t length);
     static bool IsAcceptableFileSize(long long fileSize);
 
+    std::string GetLineEnding(void) const;
+
 protected:
 
 private:
@@ -84,6 +86,9 @@ private:
     std::string ConvertCP437ToUTF8(const std::vector<unsigned char>& buffer, size_t offset, size_t length);
     std::string ConvertCP850ToUTF8(const std::vector<unsigned char>& buffer, size_t offset, size_t length);
     std::string NormalizeLineEndings(const std::string& content);
+    std::string DetectLineEnding(const std::string& content);
+
+    std::string mLineEnding = "\n";              ///< first line ending of the loaded file
 };
 
 
