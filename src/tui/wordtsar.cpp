@@ -1427,6 +1427,7 @@ void cWSWordTsar::BuildOpeningMenus(void)
     mOpeningMenu.AddSubItem(util, "&Macros  \xe2\x96\xba", none, false);   // U+25BA
     mOpeningMenu.AddSeparator(util);
     mOpeningMenu.AddSubItem(util, "System &Preferences...", run(eOpeningAction::PREFERENCES));
+    mOpeningMenu.SetMenuBoxLayout(util, 20, 17);
 
     int additional = mOpeningMenu.AddMenu("Additional", 'A');
     mOpeningMenu.AddSubItem(additional, "&MailList  AM", none, false);
@@ -1438,6 +1439,7 @@ void cWSWordTsar::BuildOpeningMenus(void)
     mOpeningMenu.AddSubItem(help, "&Change Help Level...", [this](void) { mEditor->PromptHelpLevel(); });
     mOpeningMenu.AddSeparator(help);
     mOpeningMenu.AddSubItem(help, "&About WordTsar", run(eOpeningAction::ABOUT));
+    mOpeningMenu.SetMenuBoxLayout(help, 28, 26);
 }
 
 // =========================================================================

@@ -57,6 +57,8 @@ struct sMenuItem
     char hotKey;
     std::function<void(void)> callback;
     std::vector<sMenuEntry> entries;
+    int boxCols = 0;        // minimum pull-down width including borders (0 = none)
+    int shortcutEnd = -1;   // shortcut last column from the box's left border (-1 = layout rule)
 };
 
 class cMenuBar
@@ -81,6 +83,11 @@ public:
     // The open title's highlight covers one column on each side, and its
     // hotkey letter takes the highlighted hotkey colours (default off).
     void SetWideOpenTitle(bool on);
+    // Pull-down of one menu at least boxCols wide (borders included), with
+    // each shortcut ending shortcutEnd columns right of the left border and
+    // a lone U+25BA shortcut one column further; labels set the width when
+    // they need more room (letter column layout only).
+    void SetMenuBoxLayout(int menuIndex, int boxCols, int shortcutEnd);
     void Clear(void);
     void AddItem(const std::string& title, char hotKey, std::function<void(void)> callback);
     int AddMenu(const std::string& title, char hotKey);

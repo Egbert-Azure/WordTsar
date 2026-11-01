@@ -144,6 +144,33 @@ void cMenuBar::SetWideOpenTitle(bool on)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  int menuIndex [in] top-level menu index
+/// @param  int boxCols [in] minimum box width including the borders
+/// @param  int shortcutEnd [in] column of each shortcut's last cell, counted
+///                              from the box's left border
+///
+/// @return nothing
+///
+/// @brief
+/// Fix the shortcut column of one pull-down in the letter column layout. A
+/// shortcut that is the single glyph U+25BA sits one column right of the
+/// shortcut column. The box is boxCols wide, or wider when a label needs
+/// more room (two columns of padding each side of the longest label).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMenuBar::SetMenuBoxLayout(int menuIndex, int boxCols, int shortcutEnd)
+{
+    if ((menuIndex < 0) || (menuIndex >= static_cast<int>(mItems.size())))
+    {
+        return;
+    }
+
+    mItems[static_cast<size_t>(menuIndex)].boxCols = boxCols;
+    mItems[static_cast<size_t>(menuIndex)].shortcutEnd = shortcutEnd;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
@@ -667,6 +694,22 @@ sRect cMenuBar::LevelRect(int level) const
 
     int innerWidth = DropWidth(*entries);
     int boxWidth = innerWidth + 2;
+    const sMenuItem& openItem = mItems[static_cast<size_t>(mOpenMenu)];
+    if ((mLetterColumn == true) && (openItem.shortcutEnd >= 0))
+    {
+        boxWidth = std::max(openItem.boxCols, openItem.shortcutEnd + 2);
+        for (const sMenuEntry& entry : *entries)
+        {
+            if (entry.isSeparator == false)
+            {
+                boxWidth = std::max(boxWidth, cUtf8Helper::TextWidth(entry.title) + 4);
+                if (entry.shortcut == "\xe2\x96\xba")   // U+25BA
+                {
+                    boxWidth = std::max(boxWidth, openItem.shortcutEnd + 3);
+                }
+            }
+        }
+    }
     int startCol = MenuColumn(mOpenMenu);
     if (mLetterColumn == true)
     {
@@ -890,6 +933,16 @@ void cMenuBar::Draw(cScreen& screen, const cTheme& theme)
                 if (mLetterColumn == true)
                 {
                     scCol -= 1;
+                }
+                if ((mLetterColumn == true) && (level == 0) &&
+                    (mItems[static_cast<size_t>(mOpenMenu)].shortcutEnd >= 0))
+                {
+                    int end = mItems[static_cast<size_t>(mOpenMenu)].shortcutEnd;
+                    if (entry.shortcut == "\xe2\x96\xba")   // U+25BA
+                    {
+                        end += 1;
+                    }
+                    scCol = box.col + end + 1 - cUtf8Helper::TextWidth(entry.shortcut);
                 }
                 screen.PutText(entryRow, scCol, entry.shortcut, rowStyle);
             }

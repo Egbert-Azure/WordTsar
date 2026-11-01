@@ -1654,13 +1654,17 @@ TEST_CASE("TUI Opening screen - pull-down boxes follow the WordStar layout")
     SUBCASE("Utilities")
     {
         wordstartui::cScreen screen = DrawOpenMenu(opening, 'u');
+        // Letters at column 24 with the triangle one column right of them;
+        // System Preferences... sets the right border.
         CHECK(CellRun(screen, 2, 7, 1) == corner);
-        CHECK(CellRun(screen, 2, 33, 1) == "\xe2\x94\x90");
+        CHECK(CellRun(screen, 2, 31, 1) == "\xe2\x94\x90");
         CHECK(CellRun(screen, 3, 9, 8) == "Index...");
-        CHECK(CellRun(screen, 3, 30, 4) == " I " + side);
-        CHECK(CellRun(screen, 4, 30, 4) == " T " + side);
-        CHECK(CellRun(screen, 5, 30, 4) == " \xe2\x96\xba " + side);
+        CHECK(CellRun(screen, 3, 23, 3) == " I ");
+        CHECK(CellRun(screen, 4, 23, 3) == " T ");
+        CHECK(CellRun(screen, 5, 23, 4) == "  \xe2\x96\xba ");
+        CHECK(CellRun(screen, 3, 26, 6) == "     " + side);
         CHECK(CellRun(screen, 7, 9, 21) == "System Preferences...");
+        CHECK(CellRun(screen, 7, 30, 2) == " " + side);
     }
 
     SUBCASE("Additional")
@@ -1677,10 +1681,11 @@ TEST_CASE("TUI Opening screen - pull-down boxes follow the WordStar layout")
     SUBCASE("Help")
     {
         wordstartui::cScreen screen = DrawOpenMenu(opening, 'h');
-        CHECK(CellRun(screen, 2, 53, 1) == corner);
+        // The box ends at the screen edge with F1 directly against the border.
+        CHECK(CellRun(screen, 2, 52, 1) == corner);
         CHECK(CellRun(screen, 2, 79, 1) == "\xe2\x94\x90");
-        CHECK(CellRun(screen, 3, 55, 4) == "Help");
-        CHECK(CellRun(screen, 3, 75, 5) == " F1 " + side);
+        CHECK(CellRun(screen, 3, 54, 4) == "Help");
+        CHECK(CellRun(screen, 3, 76, 4) == " F1" + side);
     }
 }
 
