@@ -1968,13 +1968,12 @@ TEST_CASE("TUI Opening screen - help level 3 uses the palette colours")
     CheckCellColours(screen, 4, 6, kWs7LightBlue, kWs7Grey);
     CHECK(CellAt(screen, 4, 8).style.bg == kWs7Grey);
 
-    // The selected entry: menu highlight colours, its letter in the
-    // highlighted hotkey colours.
+    // No selection bar: the entry under the panel cursor looks like the others.
     REQUIRE(app.TestOpeningSelection() == 0);
     CHECK(CellAt(screen, 2, 6).textUtf8 == "D");
-    CheckCellColours(screen, 2, 6, kWs7Grey, kWs7Blue);
-    CheckCellColours(screen, 2, 4, kWs7Grey, kWs7Black);
-    CheckCellColours(screen, 2, 8, kWs7Grey, kWs7Black);
+    CheckCellColours(screen, 2, 6, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 2, 4, kWs7Black, kWs7Grey);
+    CheckCellColours(screen, 2, 8, kWs7Black, kWs7Grey);
 
     // WordTsar's own entries in the bottom border.
     std::string bottom = MenuRowText(screen, 12);
@@ -2177,4 +2176,33 @@ TEST_CASE("TUI Opening screen - help level 3 labels without an action look like 
     REQUIRE(CellRun(screen, 6, 43, 15) == "Y delete a file");
     CHECK(NoDimInRun(screen, 6, 43, 15) == true);
     CheckCellColours(screen, 6, 43, kWs7LightBlue, kWs7Grey);
+}
+
+
+TEST_CASE("TUI Opening screen - help level 3 panel shows no selection bar")
+{
+    cWSWordTsar app;
+    EnterWs7Opening(app, 3);
+    REQUIRE(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN)) == true);
+    REQUIRE(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_RIGHT)) == true);
+    REQUIRE(app.TestOpeningSelection() == 10);
+    REQUIRE(app.TestOpeningBrowserFocus() == false);
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestDrawOpening(screen);
+
+    // Rows 2 to 11 between the box sides: panel colours, letters in the
+    // accelerator colour, labels black, on both columns.
+    for (int row = 2; row <= 11; ++row)
+    {
+        for (int col = 1; col < 79; ++col)
+        {
+            INFO("cell ", row, ",", col);
+            CHECK(CellAt(screen, row, col).style.bg == kWs7Grey);
+        }
+    }
+    CHECK(CellAt(screen, 3, 43).textUtf8 == "C");
+    CheckCellColours(screen, 3, 43, kWs7LightBlue, kWs7Grey);
+    CheckCellColours(screen, 3, 45, kWs7Black, kWs7Grey);
 }

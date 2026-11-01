@@ -2070,15 +2070,9 @@ void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow, 
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
 {
-    // Panel in the menu bar colours, letters in the accelerator colour, the
-    // selected entry in the menu highlight colours.
+    // Panel in the menu bar colours, letters in the accelerator colour. No
+    // entry is highlighted.
     sStyle base = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU);
-
-    sStyle sel = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU_ACTIVE);
-    sel.attrs = wordstartui::CELL_ATTR_NONE;
-
-    sStyle selKey = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU_ACTIVE_ACCEL);
-    selKey.attrs = wordstartui::CELL_ATTR_NONE;
 
     sStyle keyStyle = base;
     keyStyle.fg = GetTheme().GetStyle(wordstartui::THEME_ROLE_MENU_ACCEL).fg;
@@ -2131,28 +2125,10 @@ void cWSWordTsar::DrawOpeningPanel(cScreen& screen)
         char keyChar = (item.key != 0) ? item.key : ' ';
         std::string label = std::string(1, keyChar) + " " + item.label;
 
-        bool selected = (index == mOpeningSel) && (mOpeningBrowserFocus == false);
-
-        if (selected == true)
+        screen.PutText(row, col, label, base);
+        if (item.key != 0)
         {
-            std::string padded = "  " + label;
-            while (static_cast<int>(padded.size()) < 36)
-            {
-                padded.push_back(' ');
-            }
-            screen.PutText(row, col - 2, padded, sel);
-            if (item.key != 0)
-            {
-                screen.PutText(row, col, std::string(1, item.key), selKey);
-            }
-        }
-        else
-        {
-            screen.PutText(row, col, label, base);
-            if (item.key != 0)
-            {
-                screen.PutText(row, col, std::string(1, item.key), keyStyle);
-            }
+            screen.PutText(row, col, std::string(1, item.key), keyStyle);
         }
     }
 
