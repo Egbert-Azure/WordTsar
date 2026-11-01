@@ -137,7 +137,6 @@ private :
     void ParseComment(std::string sequence, eSequence type) ;
 
     void InsertFootnote(void) ;
-    void InsertEndnote(void) ;
 
 protected:
 

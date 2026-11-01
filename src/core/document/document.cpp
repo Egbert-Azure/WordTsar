@@ -2094,7 +2094,7 @@ bool cDocument::GetColor(POSITION_T position, sSeqRGBColor &color)
 /// @param position   [IN] the position to check for a note
 /// @param note       [OUT] the found note
 ///
-/// @return bool - true if a footnote is at position
+/// @return bool - true if a footnote or endnote is at position
 ///
 /// @brief
 /// Get the note stored for a note marker
@@ -2114,15 +2114,29 @@ bool cDocument::GetNote(POSITION_T position, sNote &note)
     PairTable pcomp ;
     pcomp.first = position ;
     auto iter = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), pcomp, TableCompare) ;
-    if(iter == paraiter->pairs.end() || iter->first != position || iter->second != TYPE_FOOTNOTE)
+    if(iter == paraiter->pairs.end() || iter->first != position)
+    {
+        return false ;
+    }
+
+    std::vector<FootnotePair> *list = nullptr ;
+    if(iter->second == TYPE_FOOTNOTE)
+    {
+        list = &paraiter->footnote ;
+    }
+    else if(iter->second == TYPE_ENDNOTE)
+    {
+        list = &paraiter->endnote ;
+    }
+    else
     {
         return false ;
     }
 
     FootnotePair comp ;
     comp.first = position ;
-    auto iter1 = lower_bound(paraiter->footnote.begin(), paraiter->footnote.end(), comp, FootnoteCompare) ;
-    if(iter1 == paraiter->footnote.end() || iter1->first != position)
+    auto iter1 = lower_bound(list->begin(), list->end(), comp, FootnoteCompare) ;
+    if(iter1 == list->end() || iter1->first != position)
     {
         return false ;
     }

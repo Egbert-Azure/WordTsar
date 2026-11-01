@@ -636,6 +636,23 @@ TEST_CASE("cWordstarFile - a footnote sequence saves back byte for byte")
 }
 
 
+TEST_CASE("cWordstarFile - an endnote sequence loads as a marker and saves back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    std::string body = std::string("\x01\x00\x00\x00\x00", 5) + "end text";
+    std::string input = WordStar7File("Hi" + SequenceBytes(SEQ_ENDNOTE, body) + "!\x0D\x0A");
+    std::string saved = RoundTrip(editor, input);
+
+    cDocument* doc = editor.GetDocument();
+    CHECK(doc->GetCharNoAdvance(2)[0] == static_cast<char>(MARKER_CHAR));
+    CHECK(doc->GetControlChar(2) == STYLE_ENDNOTE);
+    CHECK(saved == input);
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief

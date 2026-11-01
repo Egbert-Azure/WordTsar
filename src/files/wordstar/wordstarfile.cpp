@@ -1256,6 +1256,7 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
                         break;
 
                     case STYLE_FOOTNOTE :
+                    case STYLE_ENDNOTE :
                         {
                             // a note loaded from a WordStar file is written back as its sequence;
                             // any other marker of this code is written as the byte itself
@@ -1263,7 +1264,7 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
                             if(mDocument->GetNote(loop, note) == true && note.raw.empty() == false)
                             {
                                 intro.size = static_cast<uint16_t>(note.raw.size() + 4) ;
-                                intro.type = eSequence::SEQ_FOOTNOTE ;
+                                intro.type = ch1 == STYLE_FOOTNOTE ? eSequence::SEQ_FOOTNOTE : eSequence::SEQ_ENDNOTE ;
 
                                 close.size = intro.size ;
 
@@ -2365,7 +2366,7 @@ void cWordstarFile::ParseTab(void)
  * @note The conversion field in sub-sequence data is currently not implemented (see @todo)
  * @todo Use subdata.note.conversion if set to change note type and insert properly
  * 
- * @see sWSBasenote, sWSFootnote, sNote, cDocument::InsertFootnote, cWordstarFile::InsertEndnote
+ * @see sWSBasenote, sWSFootnote, sNote, cDocument::InsertFootnote, cDocument::InsertEndnote
  */
 void cWordstarFile::ParseNote(std::string sequence, eSequence type)
 {
@@ -2447,7 +2448,7 @@ void cWordstarFile::ParseNote(std::string sequence, eSequence type)
     }
     else if(type == eSequence::SEQ_ENDNOTE)
     {
-        InsertEndnote() ;
+        mDocument->InsertEndnote(note) ;
     }
 }
 
@@ -2460,11 +2461,6 @@ void cWordstarFile::ParseComment(std::string sequence, eSequence type)
 
 
 void cWordstarFile::InsertFootnote(void)
-{
-}
-
-
-void cWordstarFile::InsertEndnote(void)
 {
 }
 
