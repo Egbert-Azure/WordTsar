@@ -1336,3 +1336,12 @@ TEST_CASE("TUI startup screen - the separator bars are black squares, one cell e
         CHECK(IsBar(screen, 0, cols - 1) == true);
     }
 }
+
+
+TEST_CASE("TUI Opening status - free disk space in decimal GB")
+{
+    CHECK(cWSWordTsar::TestFreeSpaceText(0) == "0.0 GB free");
+    CHECK(cWSWordTsar::TestFreeSpaceText(1000000000ULL) == "1.0 GB free");
+    CHECK(cWSWordTsar::TestFreeSpaceText(20000000000ULL) == "20.0 GB free");
+    CHECK(cWSWordTsar::TestFreeSpaceText(18849999999ULL) == "18.8 GB free");
+}

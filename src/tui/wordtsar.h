@@ -31,6 +31,7 @@
 #include "src/core/utils/abouttext.h"
 
 #include <chrono>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -155,6 +156,7 @@ public:
     // The last counted cDialog, drawn at the screen size of the last TestDraw.
     const wordstartui::cScreen& TestModalScreen(void) const { return mTestModalScreen; }
     std::string TestAboutMessage(void) const { return AboutMessage(); }
+    static std::string TestFreeSpaceText(std::uintmax_t bytes) { return FreeSpaceText(bytes); }
 #endif
 
     // ---- iWSDialogHost ----
@@ -223,6 +225,8 @@ private:
     void OpenOpeningSelection(void);
     void ShowNotAvailable(void);
     void ShowOpeningStatus(void);
+    // Free space in decimal GB, e.g. "18.8 GB free".
+    static std::string FreeSpaceText(std::uintmax_t bytes);
     void ShowOpeningHelp(void);
     // Real legal notices (copyright, no-warranty, redistribution rights, how
     // to view the licence) -- distinct from About()'s memory/status screen,

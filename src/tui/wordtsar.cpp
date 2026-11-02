@@ -3717,13 +3717,26 @@ void cWSWordTsar::ShowOpeningStatus(void)
     std::filesystem::space_info space = std::filesystem::space(directory, ec);
     if (!ec)
     {
-        double freeGb = static_cast<double>(space.available) / (1024.0 * 1024.0 * 1024.0);
-        char buffer[64];
-        std::snprintf(buffer, sizeof(buffer), "%.1f GB free", freeGb);
-        text += std::string("Disk space: ") + buffer;
+        text += "Disk space: " + FreeSpaceText(space.available);
     }
 
     wsdialogs::MessageBox(this, "Status", text);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param bytes [in] free space in bytes
+///
+/// @return the free space as "%.1f GB free", with 1 GB = 1000^3 bytes
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cWSWordTsar::FreeSpaceText(std::uintmax_t bytes)
+{
+    double freeGb = static_cast<double>(bytes) / (1000.0 * 1000.0 * 1000.0);
+    char buffer[64];
+    std::snprintf(buffer, sizeof(buffer), "%.1f GB free", freeGb);
+    return buffer;
 }
 
 
