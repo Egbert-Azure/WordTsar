@@ -175,8 +175,9 @@ public:
     void WriteBlockToFile(void);                               // Write marked block to another file (^KW)
     std::string GetClipboardText(void);                        // Marked block as clipboard copy writes it
     std::string GetAsciiBlockText(POSITION_T start, POSITION_T end);   // ^KW Copy in ASCII Format text of a range
-    bool WriteBlock(POSITION_T start, POSITION_T end, const std::string& filename,
-                    bool asciiFormat, eFileExistsChoice choice);       // ^KW write of a range to a file
+    enum class eWriteBlockResult { Written, Declined, Failed };
+    eWriteBlockResult WriteBlock(POSITION_T start, POSITION_T end, const std::string& filename,
+                                 bool asciiFormat, eFileExistsChoice choice);   // ^KW write of a range to a file
 
     // Undo/Redo (the frontend refreshes its display in UpdateAfterUndoRedo)
     bool Undo(void);                                          // Undo last action; false if nothing to undo

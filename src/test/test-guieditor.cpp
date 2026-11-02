@@ -15717,14 +15717,14 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
     SUBCASE("a WordStar document writes WordStar format whatever the extension")
     {
         auto path = dir / "out.txt";
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Overwrite));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Overwrite) == cEditorBase::eWriteBlockResult::Written);
         CHECK(ReadFileBytes(path) == wsBlock);
     }
 
     SUBCASE("the box ticked writes text whatever the extension")
     {
         auto path = dir / "out.ws";
-        REQUIRE(editor.WriteBlock(start, end, path.string(), true, eChoice::Overwrite));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), true, eChoice::Overwrite) == cEditorBase::eWriteBlockResult::Written);
         CHECK(ReadFileBytes(path) == "a    b\n");
     }
 
@@ -15732,7 +15732,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
     {
         doc->SetTextFile(true);
         auto path = dir / "out.ws";
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Overwrite));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Overwrite) == cEditorBase::eWriteBlockResult::Written);
         CHECK(ReadFileBytes(path) == "a\tb\n");
     }
 
@@ -15740,7 +15740,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
     {
         auto path = dir / "old.ws";
         WriteFileBytes(path, std::string(300, 'x'));
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Overwrite));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Overwrite) == cEditorBase::eWriteBlockResult::Written);
         CHECK(ReadFileBytes(path) == wsBlock);
     }
 
@@ -15748,7 +15748,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
     {
         auto path = dir / "empty.ws";
         WriteFileBytes(path, "");
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
         CHECK(ReadFileBytes(path) == wsBlock);
     }
 
@@ -15756,7 +15756,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
     {
         auto path = dir / "crlf.ws";
         WriteFileBytes(path, "x\r\ny\r\n");
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
         CHECK(ReadFileBytes(path) == "x\r\ny\r\na    b\r\n");
     }
 
@@ -15764,7 +15764,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
     {
         auto path = dir / "lf.txt";
         WriteFileBytes(path, "x\ny\n");
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
         CHECK(ReadFileBytes(path) == "x\ny\na    b\n");
     }
 
@@ -15812,7 +15812,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
         std::string target = wordStarTarget("Old\x0D\x0A", 256, library);
         auto path = dir / "target.dat";
         WriteFileBytes(path, target);
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
 
         std::string expected = padded(target.substr(0, 128 + 5) + wsBytes);
         setStyles(expected, expected.size());
@@ -15825,7 +15825,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
         std::string target = wordStarTarget("Old\x0D\x0A", 256, "");
         auto path = dir / "target.ws";
         WriteFileBytes(path, target);
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
 
         std::string expected = padded(target.substr(0, 128 + 5) + wsBytes);
         CHECK(ReadFileBytes(path) == expected);
@@ -15837,7 +15837,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
         std::string target = wordStarTarget("Old\x0D\x0A", 0, "");
         auto path = dir / "target.ws";
         WriteFileBytes(path, target);
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
 
         CHECK(ReadFileBytes(path) == padded(target + wsBytes));
     }
@@ -15847,7 +15847,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
         std::string target = wordStarTarget("Old\x0D\x0A", 256, library);
         auto path = dir / "target.ws";
         WriteFileBytes(path, target);
-        REQUIRE(editor.WriteBlock(start, end, path.string(), true, eChoice::Append));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), true, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
 
         std::string expected = padded(target.substr(0, 128 + 5) + "a    b\r\n");
         setStyles(expected, expected.size());
@@ -15862,7 +15862,7 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
         auto path = dir / "target.ws";
         WriteFileBytes(path, target);
         REQUIRE(cWordstarFile::IsWordStarData(path.string()));
-        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
 
         CHECK(ReadFileBytes(path) == padded(text + "a    b\r\n"));
     }
@@ -15957,7 +15957,7 @@ TEST_CASE("cEditorBase::WriteBlock - append to a copy of an archive file with a 
     uint32_t counted = 0;
     std::string wsBytes = writer.EncodeRange(0, end, counted);
 
-    REQUIRE(editor.WriteBlock(0, end, copy.string(), false, cEditorBase::eFileExistsChoice::Append));
+    REQUIRE(editor.WriteBlock(0, end, copy.string(), false, cEditorBase::eFileExistsChoice::Append) == cEditorBase::eWriteBlockResult::Written);
     std::string result = ReadFileBytes(copy);
 
     size_t oldStyles = stylesOf(original);
@@ -15985,6 +15985,108 @@ TEST_CASE("cEditorBase::WriteBlock - append to a copy of an archive file with a 
     REQUIRE(after.LoadFile(copy.string()));
     std::string textAfter = after.GetDocument()->GetPlainText(0, after.GetDocument()->GetTextSize(), "\n");
     CHECK(textAfter == textBefore + "Appended block\n");
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("GUI editor - ^KW gives the code page warning for every WordStar-format write")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kwcodepage-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    class cAskingEditor : public cBlockTargetEditor
+    {
+    public:
+        bool mAnswer = false;
+        int mAsks = 0;
+        bool mAscii = false;
+
+        bool AskYesNo(const std::string& title, const std::string& question) override
+        {
+            (void)title;
+            (void)question;
+            ++mAsks;
+            return mAnswer;
+        }
+
+        std::string PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked) override
+        {
+            (void)asciiLocked;
+            asciiFormat = mAscii;
+            return mTarget;
+        }
+    };
+
+    cAskingEditor editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+    doc->Insert("a\xE4\xB8\xAD" "b\r");
+    doc->SetPosition(0);
+    doc->SetBeginBlock();
+    doc->SetPosition(doc->GetTextSize());
+    doc->SetEndBlock();
+    editor.GetLayout()->LayoutDocument(doc);
+
+    // a WordStar file without a style library
+    cBlockTargetEditor other;
+    other.GetDocument()->Insert("Old\r");
+    REQUIRE(other.SaveFile((dir / "target.ws").string()));
+    const std::string target = ReadFileBytes(dir / "target.ws");
+
+    SUBCASE("a new file, declined: nothing written, no error")
+    {
+        editor.mTarget = (dir / "new.ws").string();
+        editor.WriteBlockToFile();
+        CHECK(editor.mAsks == 1);
+        CHECK(editor.mErrors == 0);
+        CHECK_FALSE(std::filesystem::exists(dir / "new.ws"));
+    }
+
+    SUBCASE("a new file, accepted: asked once")
+    {
+        editor.mAnswer = true;
+        editor.mTarget = (dir / "new.ws").string();
+        editor.WriteBlockToFile();
+        CHECK(editor.mAsks == 1);
+        CHECK(editor.mErrors == 0);
+        CHECK(std::filesystem::exists(dir / "new.ws"));
+    }
+
+    SUBCASE("append to a WordStar file, declined: target unchanged, no error")
+    {
+        editor.mTarget = (dir / "target.ws").string();
+        editor.mChoice = cEditorBase::eFileExistsChoice::Append;
+        editor.WriteBlockToFile();
+        CHECK(editor.mAsks == 1);
+        CHECK(editor.mErrors == 0);
+        CHECK(ReadFileBytes(dir / "target.ws") == target);
+    }
+
+    SUBCASE("append to a WordStar file, accepted: asked once")
+    {
+        editor.mAnswer = true;
+        editor.mTarget = (dir / "target.ws").string();
+        editor.mChoice = cEditorBase::eFileExistsChoice::Append;
+        editor.WriteBlockToFile();
+        CHECK(editor.mAsks == 1);
+        CHECK(editor.mErrors == 0);
+        CHECK(ReadFileBytes(dir / "target.ws") != target);
+    }
+
+    SUBCASE("the box ticked: no warning")
+    {
+        editor.mAscii = true;
+        editor.mTarget = (dir / "new.txt").string();
+        editor.WriteBlockToFile();
+        CHECK(editor.mAsks == 0);
+        CHECK(ReadFileBytes(dir / "new.txt") == "a\xE4\xB8\xAD" "b\n");
+    }
 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);

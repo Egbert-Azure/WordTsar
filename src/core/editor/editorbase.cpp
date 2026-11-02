@@ -3777,7 +3777,7 @@ void cEditorBase::WriteBlockToFile(void)
     POSITION_T start = 0, end = 0 ;
     mDocument->GetBlock(start, end) ;
 
-    if (WriteBlock(start, end, filename, asciiFormat, choice) == false)
+    if (WriteBlock(start, end, filename, asciiFormat, choice) == eWriteBlockResult::Failed)
     {
         ShowError("Write Block", "Could not write to \"" + filename + "\".") ;
     }
@@ -3892,7 +3892,8 @@ std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
 /// @param  choice      [in] - Overwrite or Append, used when the file exists
 ///                            and is not empty
 ///
-/// @return true if the file was written, false otherwise
+/// @return Written, Declined when the user declined the code page warning,
+///         Failed otherwise
 ///
 /// @brief
 /// ^KW write of a range. A text document always writes its text as it is
@@ -3903,15 +3904,16 @@ std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
 /// at its text end (cWordstarFile::InsertAtTextEnd): as WordStar bytes into
 /// a file with a WordStar 5+ header unless the text is written, else as
 /// the text with CR LF. Append to any other file adds the text, with CRLF
-/// if the file contains CRLF, else LF.
+/// if the file contains CRLF, else LF. Every write in WordStar format first
+/// gives the code page warning (cWordstarFile::ConfirmCodePage).
 ///
 /////////////////////////////////////////////////////////////////////////////
-bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string& filename,
-                             bool asciiFormat, eFileExistsChoice choice)
+cEditorBase::eWriteBlockResult cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string& filename,
+                                                       bool asciiFormat, eFileExistsChoice choice)
 {
     if (mDocument == nullptr || choice == eFileExistsChoice::Cancel)
     {
-        return false ;
+        return eWriteBlockResult::Failed ;
     }
 
     if (mDocument->IsTextFile())
@@ -3927,6 +3929,11 @@ bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string
     cWordstarFile writer(this) ;
     writer.mDocument = mDocument ;
 
+    auto result = [](bool written)
+    {
+        return written ? eWriteBlockResult::Written : eWriteBlockResult::Failed ;
+    } ;
+
     auto blockText = [&](void)
     {
         if (mDocument->IsTextFile())
@@ -3940,17 +3947,22 @@ bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string
     {
         if (asciiFormat == false)
         {
-            return writer.SaveRange(filename, start, end) ;
+            if (writer.ConfirmCodePage(start, end) == false)
+            {
+                return eWriteBlockResult::Declined ;
+            }
+            writer.SetSilent(true) ;
+            return result(writer.SaveRange(filename, start, end)) ;
         }
 
         std::ofstream file(filename, std::ios::out | std::ios::binary | std::ios::trunc) ;
         if (!file.is_open())
         {
-            return false ;
+            return eWriteBlockResult::Failed ;
         }
         file << blockText() ;
         file.close() ;
-        return !file.fail() ;
+        return result(!file.fail()) ;
     }
 
     std::string existing ;
@@ -3965,6 +3977,10 @@ bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string
     std::string bytes ;
     if (header && asciiFormat == false)
     {
+        if (writer.ConfirmCodePage(start, end) == false)
+        {
+            return eWriteBlockResult::Declined ;
+        }
         uint32_t counted = 0 ;
         bytes = writer.EncodeRange(start, end, counted) ;
     }
@@ -3988,17 +4004,17 @@ bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string
 
     if (wordstarTarget)
     {
-        return cWordstarFile::InsertAtTextEnd(filename, bytes) ;
+        return result(cWordstarFile::InsertAtTextEnd(filename, bytes)) ;
     }
 
     std::ofstream file(filename, std::ios::out | std::ios::binary | std::ios::app) ;
     if (!file.is_open())
     {
-        return false ;
+        return eWriteBlockResult::Failed ;
     }
     file << bytes ;
     file.close() ;
-    return !file.fail() ;
+    return result(!file.fail()) ;
 }
 
 

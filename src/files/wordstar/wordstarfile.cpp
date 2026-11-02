@@ -956,22 +956,19 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  filename [in] - file to write
-/// @param  start    [in] - first position to write
-/// @param  end      [in] - position after the last one to write
+/// @param  start [in] - first position to write
+/// @param  end   [in] - position after the last one to write
 ///
-/// @return true if the file was written, false otherwise
+/// @return false if the user declined the warning, true otherwise
 ///
 /// @brief
-/// Writes positions start..end as a WordStar 7 file: the header, the
-/// sequences EncodeRange() gives, then 0x1A up to the next multiple of 128
-/// bytes. The header's style offset is the size of the file.
+/// Counts the characters of start..end the current code page cannot
+/// write. If there are any and the file is not silent, asks whether to
+/// write anyway.
 ///
 /////////////////////////////////////////////////////////////////////////////
-bool cWordstarFile::SaveRange(std::string filename, POSITION_T start, POSITION_T end)
+bool cWordstarFile::ConfirmCodePage(POSITION_T start, POSITION_T end)
 {
-    bool retval = false ;
-
     // Scan for Unicode characters that cannot be saved in WordStar format.
     // Count unmappable graphemes and warn the user before any data is lost.
     size_t unmappableCount = 0 ;
@@ -1055,6 +1052,33 @@ bool cWordstarFile::SaveRange(std::string filename, POSITION_T start, POSITION_T
         {
             return false ;
         }
+    }
+
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] - file to write
+/// @param  start    [in] - first position to write
+/// @param  end      [in] - position after the last one to write
+///
+/// @return true if the file was written, false otherwise
+///
+/// @brief
+/// Writes positions start..end as a WordStar 7 file: the header, the
+/// sequences EncodeRange() gives, then 0x1A up to the next multiple of 128
+/// bytes. The header's style offset is the size of the file.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::SaveRange(std::string filename, POSITION_T start, POSITION_T end)
+{
+    bool retval = false ;
+
+    if(ConfirmCodePage(start, end) == false)
+    {
+        return false ;
     }
 
     sSeqIntro intro ;
