@@ -82,6 +82,7 @@
 #include <numeric>
 #include <vector>
 
+#include <copyfile.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -1717,8 +1718,9 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
 ///
 /// @brief
 /// Writes data to a temporary file in the folder of the file, with the
-/// permissions of the file, and renames it over the file. A symbolic link
-/// is followed. On failure the file is not changed.
+/// permission bits, ACL and extended attributes of the file, and renames
+/// it over the file. A symbolic link is followed. On failure, including a
+/// temporary file that cannot be created, the file is not changed.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWordstarFile::ReplaceFileContent(const std::string &filename, const std::string &data)
@@ -1747,6 +1749,7 @@ bool cWordstarFile::ReplaceFileContent(const std::string &filename, const std::s
         written += ok ? static_cast<size_t>(count) : 0 ;
     }
     ok = (close(fd) == 0) && ok ;
+    ok = ok && (copyfile(target.c_str(), temp.c_str(), nullptr, COPYFILE_ACL | COPYFILE_XATTR) == 0) ;
     ok = ok && (rename(temp.c_str(), target.c_str()) == 0) ;
     if (ok == false)
     {

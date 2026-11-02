@@ -46,6 +46,7 @@
 #include <random>
 #include <stdexcept>
 #include <unistd.h>
+#include <sys/xattr.h>
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -16232,6 +16233,62 @@ TEST_CASE("cEditorBase::WriteBlock - a failed append leaves the target unchanged
     }
 
     std::filesystem::permissions(dir, std::filesystem::perms::owner_all);
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("cEditorBase::WriteBlock - an append keeps the extended attributes of the target")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kwxattr-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cBlockTargetEditor editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+    doc->Insert("Block\r");
+    editor.GetLayout()->LayoutDocument(doc);
+    POSITION_T end = doc->GetTextSize();
+
+    cBlockTargetEditor other;
+    other.GetDocument()->Insert("Old\r");
+    REQUIRE(other.SaveFile((dir / "target.ws").string()));
+    WriteFileBytes(dir / "target.txt", "x\ny\n");
+
+    const char* name = "ca.wordtsar.test";
+    const std::string value = "kept";
+
+    auto attribute = [&](const std::filesystem::path& path)
+    {
+        char buffer[64] = {};
+        ssize_t size = getxattr(path.c_str(), name, buffer, sizeof(buffer), 0, 0);
+        return size < 0 ? std::string() : std::string(buffer, static_cast<size_t>(size));
+    };
+
+    using eChoice = cEditorBase::eFileExistsChoice;
+    using eResult = cEditorBase::eWriteBlockResult;
+
+    SUBCASE("a WordStar target")
+    {
+        std::filesystem::path path = dir / "target.ws";
+        REQUIRE(setxattr(path.c_str(), name, value.data(), value.size(), 0, 0) == 0);
+        REQUIRE(editor.WriteBlock(0, end, path.string(), false, eChoice::Append) == eResult::Written);
+        CHECK(attribute(path) == value);
+    }
+
+    SUBCASE("a text target")
+    {
+        std::filesystem::path path = dir / "target.txt";
+        REQUIRE(setxattr(path.c_str(), name, value.data(), value.size(), 0, 0) == 0);
+        REQUIRE(editor.WriteBlock(0, end, path.string(), true, eChoice::Append) == eResult::Written);
+        CHECK(attribute(path) == value);
+        CHECK(ReadFileBytes(path) == "x\ny\nBlock\n");
+    }
+
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }
