@@ -1508,9 +1508,9 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
 /// @return text with one byte per code point in the current code page
 ///
 /// @brief
-/// ASCII stays as it is. Any other code point becomes the byte the code
-/// page's toChar() gives, as in EncodeRange(); a code point the code page
-/// cannot hold is left out.
+/// ASCII stays as it is. Any other code point becomes the single byte the
+/// code page's toChar() gives, without the ESC x FS that EncodeRange()
+/// puts around it; a code point the code page cannot hold is left out.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cWordstarFile::EncodeText(const std::string &text)
@@ -1627,8 +1627,9 @@ bool cWordstarFile::HasHeader(const std::string &filename)
 /// @brief
 /// A 0x1D sequence has its length repeated before the closing 0x1D. The
 /// text ends at the first 0x1A outside a 0x1D sequence and an ESC x FS
-/// extended character, or at the end of the file. In a file with a WordStar 5+ header, a style offset at or
-/// after the text end and before the end of the file is where the style
+/// extended character, or at the end of the file. In a file with a
+/// WordStar 5+ header, a style offset at or after the text end and
+/// before the end of the file is where the style
 /// library starts. The bytes between the text end and the library (or the
 /// end of the file) are padding. Writes the text, bytes, 0x1A up to the
 /// next multiple of 128 (at least one), then the library unchanged, and

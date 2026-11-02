@@ -3915,9 +3915,10 @@ std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
 /// GetAsciiBlockText(). New files use LF. A missing or empty file is
 /// written as new; with Append, a file whose status cannot be read fails.
 /// Append to a WordStar file (by content) inserts the block
-/// at its text end (cWordstarFile::InsertAtTextEnd): as WordStar bytes into
-/// a file with a WordStar 5+ header unless the text is written, else as
-/// the text with CR LF, in single bytes of the code page
+/// at its text end (cWordstarFile::InsertAtTextEnd). Into a file with a
+/// WordStar 5+ header, a WordStar document without asciiFormat writes
+/// WordStar bytes (cWordstarFile::EncodeRange). Otherwise it writes the
+/// text with CR LF, in single bytes of the code page
 /// (cWordstarFile::EncodeText). Append to any other file adds the text,
 /// with CRLF if the file contains CRLF, else LF. Before the block, an
 /// append writes cWordstarFile::LineEndBeforeAppend(). An append replaces the
