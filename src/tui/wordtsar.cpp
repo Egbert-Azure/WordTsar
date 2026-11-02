@@ -3372,16 +3372,11 @@ bool cWSWordTsar::HandleOpeningKey(const sInputEvent& event)
         return true;
     }
 
-    // ----- Letters and Escape -----
+    // ----- Letters; Escape without list focus does nothing -----
     eOpeningAction action{};
     bool haveAction = false;
 
-    if (escape == true)
-    {
-        action = eOpeningAction::EXIT;
-        haveAction = true;
-    }
-    else if ((event.type == wordstartui::INPUT_TYPE_TEXT) && (event.textUtf8.empty() == false))
+    if ((event.type == wordstartui::INPUT_TYPE_TEXT) && (event.textUtf8.empty() == false))
     {
         int index = 0;
         haveAction = OpeningKeyAction(event.textUtf8[0], action, index);

@@ -380,14 +380,16 @@ TEST_CASE("TUI startup screen - a key pressed during the startup screen reaches 
         CHECK(app.TestModalCount() == 1);
     }
 
-    SUBCASE("Escape only ends the startup screen; a second Escape exits")
+    SUBCASE("Escape only ends the startup screen; a second Escape does nothing")
     {
         CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
         CHECK(app.TestInOpening() == true);
         CHECK(app.TestQuitRequested() == false);
         CHECK(app.TestOpeningBrowserFocus() == false);
         CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
-        CHECK(app.TestQuitRequested() == true);
+        CHECK(app.TestQuitRequested() == false);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestOpeningBrowserFocus() == false);
     }
 
     SUBCASE("Alt+F opens the File menu")

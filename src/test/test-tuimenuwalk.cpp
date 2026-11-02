@@ -192,9 +192,14 @@ TEST_CASE("TUI Opening screen - letter keys run their actions")
         CHECK(app.TestQuitRequested() == true);
     }
 
-    SUBCASE("Escape exits")
+    SUBCASE("Escape does nothing")
     {
         CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
+        CHECK(app.TestQuitRequested() == false);
+        CHECK(app.TestInOpening() == true);
+        CHECK(app.TestOpeningBrowserFocus() == false);
+        CHECK(app.TestGetOpeningMenu().IsOpen() == false);
+        CHECK(app.TestHandleEvent(OpeningText("x")) == true);
         CHECK(app.TestQuitRequested() == true);
     }
 
@@ -2476,7 +2481,7 @@ TEST_CASE("TUI Opening screen - arrows and Enter work the file list")
 
         {
             // Tab gives the letters to the list; Escape takes them back, a
-            // second Escape exits.
+            // second Escape does nothing.
             cWSWordTsar app;
             PrepareOpeningList(app, level, dir);
             app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_TAB));
@@ -2488,7 +2493,9 @@ TEST_CASE("TUI Opening screen - arrows and Enter work the file list")
             CHECK(app.TestOpeningBrowserFocus() == false);
             CHECK(app.TestQuitRequested() == false);
             app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ESCAPE));
-            CHECK(app.TestQuitRequested() == true);
+            CHECK(app.TestQuitRequested() == false);
+            CHECK(app.TestInOpening() == true);
+            CHECK(app.TestOpeningBrowserFocus() == false);
         }
     }
 }
