@@ -16093,6 +16093,126 @@ TEST_CASE("GUI editor - ^KW gives the code page warning for every WordStar-forma
 }
 
 
+TEST_CASE("cEditorBase::WriteBlock - a failed append leaves the target unchanged")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kwfail-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cBlockTargetEditor editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+    doc->Insert("Block\r");
+    editor.GetLayout()->LayoutDocument(doc);
+    POSITION_T end = doc->GetTextSize();
+
+    cBlockTargetEditor other;
+    other.GetDocument()->Insert("Old\r");
+    REQUIRE(other.SaveFile((dir / "target.ws").string()));
+    const std::string wordstar = ReadFileBytes(dir / "target.ws");
+    const std::string text = "x\r\ny\r\n";
+    WriteFileBytes(dir / "target.txt", text);
+
+    // the files stay writable, the folder does not
+    std::filesystem::permissions(dir, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
+
+    using eChoice = cEditorBase::eFileExistsChoice;
+    using eResult = cEditorBase::eWriteBlockResult;
+
+    SUBCASE("a WordStar target")
+    {
+        CHECK(editor.WriteBlock(0, end, (dir / "target.ws").string(), false, eChoice::Append) == eResult::Failed);
+        CHECK(ReadFileBytes(dir / "target.ws") == wordstar);
+    }
+
+    SUBCASE("a text target")
+    {
+        CHECK(editor.WriteBlock(0, end, (dir / "target.txt").string(), false, eChoice::Append) == eResult::Failed);
+        CHECK(ReadFileBytes(dir / "target.txt") == text);
+    }
+
+    std::filesystem::permissions(dir, std::filesystem::perms::owner_all);
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("GUI editor - ^KW Append to a file whose status cannot be read fails with an error")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kwstat-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+    std::filesystem::path locked = dir / "locked";
+    std::filesystem::create_directory(locked);
+    WriteFileBytes(locked / "target.txt", "x\n");
+    std::filesystem::permissions(locked, std::filesystem::perms::none);
+
+    cBlockTargetEditor editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+    doc->Insert("Block\r");
+    doc->SetPosition(0);
+    doc->SetBeginBlock();
+    doc->SetPosition(doc->GetTextSize());
+    doc->SetEndBlock();
+    editor.GetLayout()->LayoutDocument(doc);
+
+    std::string target = (locked / "target.txt").string();
+
+    SUBCASE("WriteBlock")
+    {
+        CHECK(editor.WriteBlock(0, doc->GetTextSize(), target, true, cEditorBase::eFileExistsChoice::Append) ==
+              cEditorBase::eWriteBlockResult::Failed);
+    }
+
+    SUBCASE("^KW")
+    {
+        editor.mTarget = target;
+        editor.mChoice = cEditorBase::eFileExistsChoice::Append;
+        CHECK_NOTHROW(editor.WriteBlockToFile());
+        CHECK(editor.mErrors == 1);
+    }
+
+    std::filesystem::permissions(locked, std::filesystem::perms::owner_all);
+    CHECK(ReadFileBytes(locked / "target.txt") == "x\n");
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("GUI editor - ^KW writes a block whose start is after its end")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kwreversed-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cBlockTargetEditor editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+    doc->Insert("one two three\r");
+    doc->SetTextFile(true);
+    doc->mStartBlock = 7;
+    doc->mEndBlock = 4;
+    doc->mBlockSet = true;
+
+    editor.mTarget = (dir / "block.txt").string();
+    editor.WriteBlockToFile();
+    CHECK(ReadFileBytes(dir / "block.txt") == "two");
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
 namespace
 {
 

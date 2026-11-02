@@ -76,10 +76,15 @@
 #include <cstddef>
 #include <cstring>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <numeric>
 #include <vector>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "wordstarfile.h"
 #include "fontclassifier.h"
@@ -1618,14 +1623,55 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
         out.append(data, library, std::string::npos) ;
     }
 
-    std::ofstream file(filename, std::ios::binary | std::ios::trunc) ;
-    if (!file.is_open())
+    return ReplaceFileContent(filename, out) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] - existing file to replace
+/// @param  data     [in] - new content
+///
+/// @return true if the file now holds data, false otherwise
+///
+/// @brief
+/// Writes data to a temporary file in the folder of the file, with the
+/// permissions of the file, and renames it over the file. A symbolic link
+/// is followed. On failure the file is not changed.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::ReplaceFileContent(const std::string &filename, const std::string &data)
+{
+    std::error_code ec ;
+    std::filesystem::path target = std::filesystem::canonical(filename, ec) ;
+    struct stat info ;
+    if (ec || stat(target.c_str(), &info) != 0)
     {
         return false ;
     }
-    file.write(out.data(), static_cast<std::streamsize>(out.size())) ;
-    file.close() ;
-    return !file.fail() ;
+
+    std::string temp = (target.parent_path() / ("." + target.filename().string() + ".XXXXXX")).string() ;
+    int fd = mkstemp(&temp[0]) ;
+    if (fd < 0)
+    {
+        return false ;
+    }
+
+    bool ok = (fchmod(fd, info.st_mode & 07777) == 0) ;
+    size_t written = 0 ;
+    while (ok && written < data.size())
+    {
+        ssize_t count = write(fd, data.data() + written, data.size() - written) ;
+        ok = (count > 0) ;
+        written += ok ? static_cast<size_t>(count) : 0 ;
+    }
+    ok = (close(fd) == 0) && ok ;
+    ok = ok && (rename(temp.c_str(), target.c_str()) == 0) ;
+    if (ok == false)
+    {
+        unlink(temp.c_str()) ;
+    }
+    return ok ;
 }
 
 

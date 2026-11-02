@@ -3745,7 +3745,9 @@ bool cEditorBase::IsPageBreakDotCommand(PARAGRAPH_T para)
 /// Real WordStar 7 ^KW: writes the marked block to another file. Prompts
 /// for a file name and the Copy in ASCII Format box, which starts unticked;
 /// a text document shows it ticked and locked. If the file exists, prompts
-/// to Overwrite, Append, or Cancel. WriteBlock() writes the block.
+/// to Overwrite, Append, or Cancel. WriteBlock() writes the block, from
+/// the lower to the higher of its begin and end. A declined code page
+/// warning shows no error.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::WriteBlockToFile(void)
@@ -3765,7 +3767,14 @@ void cEditorBase::WriteBlockToFile(void)
     }
 
     eFileExistsChoice choice = eFileExistsChoice::Overwrite ;
-    if (std::filesystem::exists(filename))
+    std::error_code ec ;
+    bool exists = std::filesystem::exists(filename, ec) ;
+    if (ec)
+    {
+        ShowError("Write Block", "Could not write to \"" + filename + "\".") ;
+        return ;
+    }
+    if (exists)
     {
         choice = ConfirmOverwriteOrAppend(filename) ;
         if (choice == eFileExistsChoice::Cancel)
@@ -3776,6 +3785,10 @@ void cEditorBase::WriteBlockToFile(void)
 
     POSITION_T start = 0, end = 0 ;
     mDocument->GetBlock(start, end) ;
+    if (start > end)
+    {
+        std::swap(start, end) ;
+    }
 
     if (WriteBlock(start, end, filename, asciiFormat, choice) == eWriteBlockResult::Failed)
     {
@@ -3900,11 +3913,13 @@ std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
 /// (cDocument::GetPlainText). A WordStar document writes a WordStar 7 file
 /// (cWordstarFile::SaveRange) unless asciiFormat is set; then it writes
 /// GetAsciiBlockText(). New files use LF. A missing or empty file is
-/// written as new. Append to a WordStar file (by content) inserts the block
+/// written as new; with Append, a file whose status cannot be read fails.
+/// Append to a WordStar file (by content) inserts the block
 /// at its text end (cWordstarFile::InsertAtTextEnd): as WordStar bytes into
 /// a file with a WordStar 5+ header unless the text is written, else as
 /// the text with CR LF. Append to any other file adds the text, with CRLF
-/// if the file contains CRLF, else LF. Every write in WordStar format first
+/// if the file contains CRLF, else LF. An append replaces the file through
+/// cWordstarFile::ReplaceFileContent. Every write in WordStar format first
 /// gives the code page warning (cWordstarFile::ConfirmCodePage).
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -3922,9 +3937,15 @@ cEditorBase::eWriteBlockResult cEditorBase::WriteBlock(POSITION_T start, POSITIO
     }
 
     std::error_code ec ;
-    bool append = (choice == eFileExistsChoice::Append) &&
-                  std::filesystem::exists(filename, ec) &&
-                  std::filesystem::file_size(filename, ec) > 0 && !ec ;
+    bool append = false ;
+    if (choice == eFileExistsChoice::Append && std::filesystem::exists(filename, ec))
+    {
+        append = (std::filesystem::file_size(filename, ec) > 0) ;
+    }
+    if (ec && choice == eFileExistsChoice::Append)
+    {
+        return eWriteBlockResult::Failed ;
+    }
 
     cWordstarFile writer(this) ;
     writer.mDocument = mDocument ;
@@ -3968,6 +3989,10 @@ cEditorBase::eWriteBlockResult cEditorBase::WriteBlock(POSITION_T start, POSITIO
     std::string existing ;
     {
         std::ifstream in(filename, std::ios::binary) ;
+        if (!in.is_open())
+        {
+            return eWriteBlockResult::Failed ;
+        }
         existing.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()) ;
     }
 
@@ -4007,14 +4032,7 @@ cEditorBase::eWriteBlockResult cEditorBase::WriteBlock(POSITION_T start, POSITIO
         return result(cWordstarFile::InsertAtTextEnd(filename, bytes)) ;
     }
 
-    std::ofstream file(filename, std::ios::out | std::ios::binary | std::ios::app) ;
-    if (!file.is_open())
-    {
-        return eWriteBlockResult::Failed ;
-    }
-    file << bytes ;
-    file.close() ;
-    return result(!file.fail()) ;
+    return result(cWordstarFile::ReplaceFileContent(filename, existing + bytes)) ;
 }
 
 
