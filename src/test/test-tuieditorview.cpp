@@ -382,11 +382,19 @@ class cBlockTargetEditor : public cWSEditorCtrl
 public:
     std::string mTarget;
 
+    eFileExistsChoice mChoice = eFileExistsChoice::Overwrite;
+
     std::string PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked) override
     {
         (void)asciiFormat;
         (void)asciiLocked;
         return mTarget;
+    }
+
+    eFileExistsChoice ConfirmOverwriteOrAppend(const std::string& filename) override
+    {
+        (void)filename;
+        return mChoice;
     }
 };
 
@@ -546,7 +554,32 @@ TEST_CASE("cWSEditorCtrl - Write Block to File writes plain text from a text doc
     {
         WriteFileBytes(dir / "crlf.txt", "a\tb\r\nc\r\n");
         REQUIRE(editor.LoadFile((dir / "crlf.txt").string()));
-        CHECK(writeWholeDocument() == "a    b\nc\n");
+        CHECK(writeWholeDocument() == "a\tb\nc\n");
+    }
+
+    SUBCASE("a line that starts with a dot")
+    {
+        WriteFileBytes(dir / "dot.txt", "a\n.pa\n\tb\n");
+        REQUIRE(editor.LoadFile((dir / "dot.txt").string()));
+        CHECK(writeWholeDocument() == "a\n.pa\n\tb\n");
+    }
+
+    SUBCASE("append to an LF text file")
+    {
+        WriteFileBytes(dir / "doc.txt", "a\tb\n.pa x\n");
+        REQUIRE(editor.LoadFile((dir / "doc.txt").string()));
+        WriteFileBytes(dir / "block.txt", "x\n");
+        editor.mChoice = cEditorBase::eFileExistsChoice::Append;
+        CHECK(writeWholeDocument() == "x\na\tb\n.pa x\n");
+    }
+
+    SUBCASE("append to a CRLF text file")
+    {
+        WriteFileBytes(dir / "doc.txt", "a\tb\n.pa x\n");
+        REQUIRE(editor.LoadFile((dir / "doc.txt").string()));
+        WriteFileBytes(dir / "block.txt", "x\r\n");
+        editor.mChoice = cEditorBase::eFileExistsChoice::Append;
+        CHECK(writeWholeDocument() == "x\r\na\tb\r\n.pa x\r\n");
     }
 
     SUBCASE("markers in a text document")
@@ -565,7 +598,7 @@ TEST_CASE("cWSEditorCtrl - Write Block to File writes plain text from a text doc
         doc->InsertVariable(VAR_DATE);
         doc->Insert("\rC\x7f" "D");
         doc->SetTextFile(true);
-        CHECK(writeWholeDocument() == "A B\nC\x7f" "D");
+        CHECK(writeWholeDocument() == "A\tB\nC\x7f" "D");
     }
 
     std::error_code ec;

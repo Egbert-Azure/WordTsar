@@ -3895,14 +3895,14 @@ std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
 /// @return true if the file was written, false otherwise
 ///
 /// @brief
-/// ^KW write of a range. A text document always writes text. A WordStar
-/// document writes a WordStar 7 file (cWordstarFile::SaveRange) unless
-/// asciiFormat is set; then it writes GetAsciiBlockText() with LF. A
-/// missing or empty file is written as new. Append to a WordStar file
-/// (by content) inserts the block at its text end
-/// (cWordstarFile::InsertAtTextEnd), as WordStar bytes or as text by the
-/// same rule. Append to any other file adds GetAsciiBlockText(), with CRLF
-/// if the file contains CRLF, else LF.
+/// ^KW write of a range. A text document always writes its text as it is
+/// (cDocument::GetPlainText). A WordStar document writes a WordStar 7 file
+/// (cWordstarFile::SaveRange) unless asciiFormat is set; then it writes
+/// GetAsciiBlockText(). New files use LF. A missing or empty file is
+/// written as new. Append to a WordStar file (by content) inserts the block
+/// at its text end (cWordstarFile::InsertAtTextEnd), as WordStar bytes or
+/// as text by the same rule. Append to any other file adds the text, with
+/// CRLF if the file contains CRLF, else LF.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string& filename,
@@ -3926,6 +3926,15 @@ bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string
     cWordstarFile writer(this) ;
     writer.mDocument = mDocument ;
 
+    auto blockText = [&](void)
+    {
+        if (mDocument->IsTextFile())
+        {
+            return mDocument->GetPlainText(start, end, "\n") ;
+        }
+        return GetAsciiBlockText(start, end) ;
+    } ;
+
     if (append == false)
     {
         if (asciiFormat == false)
@@ -3938,7 +3947,7 @@ bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string
         {
             return false ;
         }
-        file << GetAsciiBlockText(start, end) ;
+        file << blockText() ;
         file.close() ;
         return !file.fail() ;
     }
@@ -3959,7 +3968,7 @@ bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string
     }
     else
     {
-        bytes = GetAsciiBlockText(start, end) ;
+        bytes = blockText() ;
         if (existing.find("\r\n") != std::string::npos)
         {
             std::string crlf ;
