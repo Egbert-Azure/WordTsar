@@ -115,6 +115,7 @@ public:
     std::string EncodeRange(POSITION_T start, POSITION_T end, uint32_t &stylecounter) ;
 
     static bool IsWordStarData(const std::string &filename) ;
+    static bool HasHeader(const std::string &filename) ;
     static bool InsertAtTextEnd(const std::string &filename, const std::string &bytes) ;
 
     bool CanLoad(void) ;

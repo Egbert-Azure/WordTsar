@@ -3900,9 +3900,10 @@ std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
 /// (cWordstarFile::SaveRange) unless asciiFormat is set; then it writes
 /// GetAsciiBlockText(). New files use LF. A missing or empty file is
 /// written as new. Append to a WordStar file (by content) inserts the block
-/// at its text end (cWordstarFile::InsertAtTextEnd), as WordStar bytes or
-/// as text by the same rule. Append to any other file adds the text, with
-/// CRLF if the file contains CRLF, else LF.
+/// at its text end (cWordstarFile::InsertAtTextEnd): as WordStar bytes into
+/// a file with a WordStar 5+ header unless the text is written, else as
+/// the text with CR LF. Append to any other file adds the text, with CRLF
+/// if the file contains CRLF, else LF.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string& filename,
@@ -3959,9 +3960,10 @@ bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string
     }
 
     bool wordstarTarget = cWordstarFile::IsWordStarData(filename) ;
+    bool header = wordstarTarget && cWordstarFile::HasHeader(filename) ;
 
     std::string bytes ;
-    if (wordstarTarget && asciiFormat == false)
+    if (header && asciiFormat == false)
     {
         uint32_t counted = 0 ;
         bytes = writer.EncodeRange(start, end, counted) ;
@@ -3969,7 +3971,7 @@ bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string
     else
     {
         bytes = blockText() ;
-        if (existing.find("\r\n") != std::string::npos)
+        if (wordstarTarget || existing.find("\r\n") != std::string::npos)
         {
             std::string crlf ;
             for (char c : bytes)

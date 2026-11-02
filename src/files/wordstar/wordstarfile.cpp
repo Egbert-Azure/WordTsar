@@ -1490,17 +1490,51 @@ bool cWordstarFile::IsWordStarData(const std::string &filename)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  data [in] - bytes of a file
+///
+/// @return true if data starts with a WordStar 5+ header sequence
+///
+/////////////////////////////////////////////////////////////////////////////
+static bool HasHeaderData(const std::string &data)
+{
+    const size_t headerSize = sizeof(sSeqIntro) + sizeof(sWSHeader) + sizeof(sSeqClose) ;
+    return data.size() >= headerSize && data[0] == 0x1D && data[3] == 0x00 ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] - file to inspect
+///
+/// @return true if the file starts with a WordStar 5+ header
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::HasHeader(const std::string &filename)
+{
+    std::string data(sizeof(sSeqIntro) + sizeof(sWSHeader) + sizeof(sSeqClose), '\0') ;
+    std::ifstream in(filename, std::ios::binary) ;
+    in.read(&data[0], static_cast<std::streamsize>(data.size())) ;
+    data.resize(static_cast<size_t>(in.gcount())) ;
+    return HasHeaderData(data) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  filename [in] - WordStar file to change
 /// @param  bytes    [in] - bytes to insert
 ///
 /// @return true if the file was written, false otherwise
 ///
 /// @brief
-/// Inserts bytes where the text of a WordStar file ends: at the first 0x1A
-/// outside a 0x1D sequence, or at the end of the file. What follows (0x1A
-/// padding, style library) moves back unchanged. In a file with a WordStar
-/// 5+ header, a style offset at or after the insertion point is moved by
-/// the inserted size; no other byte of the file changes.
+/// The text ends at the first 0x1A outside a 0x1D sequence, or at the end
+/// of the file. In a file with a WordStar 5+ header, a style offset at or
+/// after the text end and before the end of the file is where the style
+/// library starts. The bytes between the text end and the library (or the
+/// end of the file) are padding. Writes the text, bytes, 0x1A up to the
+/// next multiple of 128 (at least one), then the library unchanged, and
+/// sets the style offset to the new library position. Without a library
+/// the header is not changed.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::string &bytes)
@@ -1537,29 +1571,37 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
     }
     textEnd = std::min(textEnd, data.size()) ;
 
-    const size_t headerSize = sizeof(sSeqIntro) + sizeof(sWSHeader) + sizeof(sSeqClose) ;
     const size_t stylesAt = sizeof(sSeqIntro) + offsetof(sWSHeader, styles) ;
-    if (data.size() >= headerSize && data[0] == 0x1D && data[3] == 0x00 && textEnd >= headerSize)
+    bool header = HasHeaderData(data) ;
+    size_t library = data.size() ;
+    if (header)
     {
         uint32_t styles = 0 ;
         memcpy(&styles, &data[stylesAt], sizeof(styles)) ;
-        if (styles >= textEnd)
+        if (styles >= textEnd && styles < data.size())
         {
-            styles += static_cast<uint32_t>(bytes.size()) ;
-            memcpy(&data[stylesAt], &styles, sizeof(styles)) ;
+            library = styles ;
         }
     }
 
-    data.insert(textEnd, bytes) ;
+    // the block goes at the end of the text, before the 0x1A padding and the style library
+    std::string out = data.substr(0, textEnd) + bytes ;
+    out.append(128 - out.size() % 128, static_cast<char>(STYLE_EOF)) ;
+    if (library < data.size())
+    {
+        uint32_t styles = static_cast<uint32_t>(out.size()) ;
+        memcpy(&out[stylesAt], &styles, sizeof(styles)) ;
+        out.append(data, library, std::string::npos) ;
+    }
 
-    std::ofstream out(filename, std::ios::binary | std::ios::trunc) ;
-    if (!out.is_open())
+    std::ofstream file(filename, std::ios::binary | std::ios::trunc) ;
+    if (!file.is_open())
     {
         return false ;
     }
-    out.write(data.data(), static_cast<std::streamsize>(data.size())) ;
-    out.close() ;
-    return !out.fail() ;
+    file.write(out.data(), static_cast<std::streamsize>(out.size())) ;
+    file.close() ;
+    return !file.fail() ;
 }
 
 

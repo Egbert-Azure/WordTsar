@@ -15768,31 +15768,223 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
         CHECK(ReadFileBytes(path) == "x\ny\na    b\n");
     }
 
-    SUBCASE("Append to a WordStar file goes before its end of file and style library")
+    // a WordStar 7 file: header, text, 0x1A up to padTo, then the library;
+    // the header's style offset is the library position, or the file size
+    auto wordStarTarget = [](const std::string& text, size_t padTo, const std::string& library)
     {
-        // header, text, 0x1A up to 256, then a style library at 256
+        std::string target("\x1D\x7D\x00\x00", 4);
         sWSHeader header;
         memset(&header, 0, sizeof(header));
         header.version = 0x70;
         memcpy(header.driver, "LASERJET", 9);
-        header.styles = 256;
-        std::string target("\x1D\x7D\x00\x00", 4);
+        header.styles = static_cast<uint32_t>(std::max(padTo, 128 + text.size()) + library.size());
+        if (library.empty() == false)
+        {
+            header.styles = static_cast<uint32_t>(padTo);
+        }
         target.append(reinterpret_cast<const char*>(&header), sizeof(header));
         target.append("\x7D\x00\x1D", 3);
-        target += "Old\x0D\x0A";
-        target.append(256 - target.size(), '\x1A');
-        target += std::string("\x1A\x55\x01\x00\x01\x02\x00\x66", 8) + "Library";
+        target += text;
+        if (padTo > target.size())
+        {
+            target.append(padTo - target.size(), '\x1A');
+        }
+        return target + library;
+    };
 
+    // 0x1A up to the next multiple of 128, at least one
+    auto padded = [](std::string bytes)
+    {
+        bytes.append(128 - bytes.size() % 128, '\x1A');
+        return bytes;
+    };
+
+    auto setStyles = [](std::string& bytes, size_t styles)
+    {
+        uint32_t value = static_cast<uint32_t>(styles);
+        memcpy(&bytes[4 + offsetof(sWSHeader, styles)], &value, sizeof(value));
+    };
+
+    const std::string library = std::string("\x1A\x55\x01\x00\x01\x02\x00\x66", 8) + "Library";
+
+    SUBCASE("Append to a WordStar file with a style library: block at the text end, padding again, library unchanged")
+    {
+        std::string target = wordStarTarget("Old\x0D\x0A", 256, library);
         auto path = dir / "target.dat";
         WriteFileBytes(path, target);
         REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
 
-        size_t textEnd = 128 + 5;
-        std::string expected = target.substr(0, textEnd) + wsBytes + target.substr(textEnd);
-        uint32_t styles = 256 + static_cast<uint32_t>(wsBytes.size());
-        memcpy(&expected[4 + offsetof(sWSHeader, styles)], &styles, sizeof(styles));
+        std::string expected = padded(target.substr(0, 128 + 5) + wsBytes);
+        setStyles(expected, expected.size());
+        expected += library;
         CHECK(ReadFileBytes(path) == expected);
     }
+
+    SUBCASE("Append to a WordStar file without a style library leaves the header alone")
+    {
+        std::string target = wordStarTarget("Old\x0D\x0A", 256, "");
+        auto path = dir / "target.ws";
+        WriteFileBytes(path, target);
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+
+        std::string expected = padded(target.substr(0, 128 + 5) + wsBytes);
+        CHECK(ReadFileBytes(path) == expected);
+        CHECK(expected.size() % 128 == 0);
+    }
+
+    SUBCASE("Append to a WordStar file with no 0x1A at all")
+    {
+        std::string target = wordStarTarget("Old\x0D\x0A", 0, "");
+        auto path = dir / "target.ws";
+        WriteFileBytes(path, target);
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+
+        CHECK(ReadFileBytes(path) == padded(target + wsBytes));
+    }
+
+    SUBCASE("Append with the box ticked to a WordStar file inserts ASCII with CR LF")
+    {
+        std::string target = wordStarTarget("Old\x0D\x0A", 256, library);
+        auto path = dir / "target.ws";
+        WriteFileBytes(path, target);
+        REQUIRE(editor.WriteBlock(start, end, path.string(), true, eChoice::Append));
+
+        std::string expected = padded(target.substr(0, 128 + 5) + "a    b\r\n");
+        setStyles(expected, expected.size());
+        expected += library;
+        CHECK(ReadFileBytes(path) == expected);
+    }
+
+    SUBCASE("Append to a WordStar file without a header inserts ASCII with CR LF")
+    {
+        std::string text = "Old\x8D\x0Aline\x0D\x0A";
+        std::string target = padded(text);
+        auto path = dir / "target.ws";
+        WriteFileBytes(path, target);
+        REQUIRE(cWordstarFile::IsWordStarData(path.string()));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+
+        CHECK(ReadFileBytes(path) == padded(text + "a    b\r\n"));
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Takes the first .WS file under WORDTSAR_ARCHIVE_DIR (recursive, sorted)
+/// with a style library at its header's style offset, appends a block to a
+/// copy of it and checks the result. Without WORDTSAR_ARCHIVE_DIR the test
+/// does nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("cEditorBase::WriteBlock - append to a copy of an archive file with a style library")
+{
+    const char* archiveEnv = std::getenv("WORDTSAR_ARCHIVE_DIR");
+    if (archiveEnv == nullptr || archiveEnv[0] == '\0')
+    {
+        MESSAGE("WORDTSAR_ARCHIVE_DIR is not set, archive append test skipped");
+        return;
+    }
+
+    const size_t stylesAt = 4 + offsetof(sWSHeader, styles);
+    auto stylesOf = [&](const std::string& bytes)
+    {
+        uint32_t styles = 0;
+        memcpy(&styles, &bytes[stylesAt], sizeof(styles));
+        return static_cast<size_t>(styles);
+    };
+
+    std::vector<std::filesystem::path> files;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(archiveEnv))
+    {
+        std::string ext = entry.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        if (entry.is_regular_file() && ext == ".ws")
+        {
+            files.push_back(entry.path());
+        }
+    }
+    std::sort(files.begin(), files.end());
+
+    std::filesystem::path source;
+    std::string original;
+    for (const std::filesystem::path& path : files)
+    {
+        std::string bytes = ReadFileBytes(path);
+        if (bytes.size() > 132 && static_cast<unsigned char>(bytes[0]) == 0x1D && bytes[3] == 0)
+        {
+            size_t styles = stylesOf(bytes);
+            if (styles + 1 < bytes.size() && bytes[styles] == '\x1A' && bytes[styles + 1] == '\x55')
+            {
+                source = path;
+                original = bytes;
+                break;
+            }
+        }
+    }
+    REQUIRE_MESSAGE(source.empty() == false, "no .WS file with a style library in " << archiveEnv);
+    MESSAGE("archive file: " << source.string());
+
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kwarchive-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+    std::filesystem::path copy = dir / "copy.ws";
+    WriteFileBytes(copy, original);
+
+    cEditorCtrl before;
+    REQUIRE(before.LoadFile(copy.string()));
+    std::string textBefore = before.GetDocument()->GetPlainText(0, before.GetDocument()->GetTextSize(), "\n");
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("Appended ");
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->Insert("block");
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->Insert("\r");
+    editor.GetLayout()->LayoutDocument(doc);
+    POSITION_T end = doc->GetTextSize();
+
+    cWordstarFile writer(&editor);
+    writer.mDocument = doc;
+    uint32_t counted = 0;
+    std::string wsBytes = writer.EncodeRange(0, end, counted);
+
+    REQUIRE(editor.WriteBlock(0, end, copy.string(), false, cEditorBase::eFileExistsChoice::Append));
+    std::string result = ReadFileBytes(copy);
+
+    size_t oldStyles = stylesOf(original);
+    size_t newStyles = stylesOf(result);
+    std::string oldLibrary = original.substr(oldStyles);
+
+    CHECK(newStyles % 128 == 0);
+    REQUIRE(newStyles + oldLibrary.size() == result.size());
+    CHECK(result.substr(newStyles) == oldLibrary);
+
+    // old text bytes unchanged up to the block, then 0x1A padding up to the library
+    size_t blockAt = result.rfind(wsBytes, newStyles);
+    REQUIRE(blockAt != std::string::npos);
+    std::string head = result.substr(0, blockAt);
+    std::string oldHead = original.substr(0, blockAt);
+    memcpy(&oldHead[stylesAt], &head[stylesAt], 4);
+    CHECK(head == oldHead);
+    REQUIRE(oldStyles >= blockAt);
+    CHECK(original.substr(blockAt, oldStyles - blockAt) == std::string(oldStyles - blockAt, '\x1A'));
+    size_t padAt = blockAt + wsBytes.size();
+    REQUIRE(newStyles > padAt);
+    CHECK(result.substr(padAt, newStyles - padAt) == std::string(newStyles - padAt, '\x1A'));
+
+    cEditorCtrl after;
+    REQUIRE(after.LoadFile(copy.string()));
+    std::string textAfter = after.GetDocument()->GetPlainText(0, after.GetDocument()->GetTextSize(), "\n");
+    CHECK(textAfter == textBefore + "Appended block\n");
 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
