@@ -79,7 +79,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
-#include <numeric>
 #include <vector>
 
 #include <copyfile.h>
