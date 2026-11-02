@@ -525,6 +525,7 @@ void ScrollingMessageBox(iWSDialogHost* host, const std::string& title, const st
 
     auto view = std::make_unique<cScrollTextView>(viewRect);
     view->SetLines(lines);
+    view->SetRole(THEME_ROLE_DIALOG);
     dialog.AddWidget(std::move(view));
 
     sRect buttonRect;

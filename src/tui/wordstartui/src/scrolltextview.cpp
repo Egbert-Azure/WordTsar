@@ -46,6 +46,7 @@ cScrollTextView::cScrollTextView(const sRect& bounds)
 {
     mBounds = bounds;
     mTopLine = 0;
+    mRole = THEME_ROLE_HELP;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -66,18 +67,33 @@ void cScrollTextView::SetLines(const std::vector<std::string>& lines)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  eThemeRole role [in] theme role for the text area
+///
+/// @return nothing
+///
+/// @brief
+/// Set the colours of the text area. The default is THEME_ROLE_HELP.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cScrollTextView::SetRole(eThemeRole role)
+{
+    mRole = role;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  cScreen& screen [in,out] target screen
 /// @param  const cTheme& theme [in] color theme
 ///
 /// @return nothing
 ///
 /// @brief
-/// Draw visible help text lines.
+/// Draw the visible text lines in the colours of the view's theme role.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cScrollTextView::Draw(cScreen& screen, const cTheme& theme)
 {
-    sStyle style = theme.GetStyle(THEME_ROLE_HELP);
+    sStyle style = theme.GetStyle(mRole);
 
     screen.FillRect(mBounds, " ", style);
 

@@ -38,6 +38,7 @@ public:
     cScrollTextView(const sRect& bounds);
 
     void SetLines(const std::vector<std::string>& lines);
+    void SetRole(eThemeRole role);
     void Draw(cScreen& screen, const cTheme& theme) override;
     bool HandleEvent(const sInputEvent& event) override;
     bool CanFocus(void) const override;
@@ -54,6 +55,7 @@ private:
 private:
     std::vector<std::string> mLines;
     int mTopLine;
+    eThemeRole mRole;                        // colours of the text area
 };
 
 }

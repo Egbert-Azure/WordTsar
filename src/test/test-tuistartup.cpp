@@ -1224,3 +1224,64 @@ TEST_CASE("TUI terminal driver - ESC ESC is one Escape and a lone Escape is Esca
     REQUIRE(lone.size() == 1);
     CHECK(IsEscapeEvent(lone[0]) == true);
 }
+
+
+namespace
+{
+
+// Cells of the About text area, opened from the Opening screen at 80x25 in
+// the given palette, all carry the dialog colours.
+void CheckAboutTextColours(const sTUIPalette& palette, wordstartui::sStyle& dialog)
+{
+    cConfig config;
+    config.ApplyTUIPalette(palette);
+    cWSWordTsar app;
+    app.TestApplyConfig(config);
+    app.TestSetSystemInfo(FixedSystem());
+    app.TestCountModals();
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+    app.TestEnterOpening();
+    app.TestGetEditor()->mHelpLevel = 3;
+    app.TestDraw(screen);
+    REQUIRE(app.TestHandleEvent(Text("w")) == true);
+    REQUIRE(app.TestModalCount() == 1);
+
+    const wordstartui::cScreen& modal = app.TestModalScreen();
+    dialog = app.GetTheme().GetStyle(wordstartui::THEME_ROLE_DIALOG);
+
+    sBox box = FindBox(modal);
+    REQUIRE(box.top >= 0);
+    REQUIRE(box.bottom - box.top > 5);
+    int wrong = 0;
+    for (int row = box.top + 2; row <= box.bottom - 3; ++row)
+    {
+        for (int col = box.left + 2; col <= box.right - 2; ++col)
+        {
+            const wordstartui::sCell* cell = modal.GetCell(row, col);
+            if ((cell->style.fg != dialog.fg) || (cell->style.bg != dialog.bg))
+            {
+                ++wrong;
+            }
+        }
+    }
+    CHECK(wrong == 0);
+}
+
+}
+
+
+TEST_CASE("TUI About box - the text area uses the dialog colours")
+{
+    for (const sTUIPalette& palette : cConfig::GetTUIPalettes())
+    {
+        CAPTURE(palette.name);
+        wordstartui::sStyle dialog;
+        CheckAboutTextColours(palette, dialog);
+        if (palette.name == "WordStar 7")
+        {
+            CHECK(dialog.fg == wordstartui::MakeRgb(0, 0, 0));
+            CHECK(dialog.bg == kGrey);
+        }
+    }
+}
