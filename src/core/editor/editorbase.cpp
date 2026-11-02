@@ -3918,7 +3918,7 @@ std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
 /// at its text end (cWordstarFile::InsertAtTextEnd). Into a file with a
 /// WordStar 5+ header, a WordStar document without asciiFormat writes
 /// WordStar bytes (cWordstarFile::EncodeRange). Otherwise it writes the
-/// text with CR LF, in single bytes of the code page
+/// text with CR LF, each character encoded as EncodeRange encodes it
 /// (cWordstarFile::EncodeText). Append to any other file adds the text,
 /// with CRLF if the file contains CRLF, else LF. Before the block, an
 /// append writes cWordstarFile::LineEndBeforeAppend(). An append replaces the
@@ -4018,11 +4018,10 @@ cEditorBase::eWriteBlockResult cEditorBase::WriteBlock(POSITION_T start, POSITIO
         bytes = blockText() ;
         if (wordstarTarget)
         {
-            if (writer.ConfirmCodePage(start, end) == false)
+            if (writer.ConfirmCodePage(bytes) == false)
             {
                 return eWriteBlockResult::Declined ;
             }
-            bytes = writer.EncodeText(bytes) ;
         }
         if (wordstarTarget || existing.find("\r\n") != std::string::npos)
         {
@@ -4036,6 +4035,10 @@ cEditorBase::eWriteBlockResult cEditorBase::WriteBlock(POSITION_T start, POSITIO
                 crlf += c ;
             }
             bytes = crlf ;
+        }
+        if (wordstarTarget)
+        {
+            bytes = writer.EncodeText(bytes) ;
         }
     }
 

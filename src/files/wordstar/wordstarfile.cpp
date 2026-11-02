@@ -94,6 +94,7 @@
 #include "src/core/codepage/cp850.h"
 #include "src/core/codepage/cp1252.h"
 #include "src/core/include/utils.h"
+#include "unicodelib_encodings.h"
 
 // a WordStar binding space (0x0F) is a U+00A0 non-breaking space in the document
 static constexpr CHAR_T NOBREAK_SPACE = 0x00A0 ;
@@ -961,79 +962,87 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  start [in] - first position to write
-/// @param  end   [in] - position after the last one to write
+/// @param  codepage [in] - code page to use
+/// @param  cp       [in] - code point
+///
+/// @return the byte of cp in codepage, 0 if the code page cannot hold it
+///
+/////////////////////////////////////////////////////////////////////////////
+static unsigned char CodePageByte(eCodePage codepage, char32_t cp)
+{
+    switch(codepage)
+    {
+        case CP437 :
+        {
+            cCodePage437 page ;
+            return page.toChar(cp) ;
+        }
+
+        case CP737 :
+        {
+            cCodePage737 page ;
+            return page.toChar(cp) ;
+        }
+
+        case CP850 :
+        {
+            cCodePage850 page ;
+            return page.toChar(cp) ;
+        }
+
+        case CP1252 :
+        {
+            cCodePageWin1252 page ;
+            return page.toChar(cp) ;
+        }
+    }
+
+    return 0 ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  str [in] - one character, UTF-8
+///
+/// @return the number of code points of a multi-byte character other than
+///         NBSP that the current code page cannot hold
+///
+/////////////////////////////////////////////////////////////////////////////
+size_t cWordstarFile::CountUnmappable(const std::string &str)
+{
+    size_t unmappableCount = 0 ;
+    if(str.length() > 1 && str != NOBREAK_SPACE_UTF8)
+    {
+        std::u32string codepoints ;
+        mDocument->GetCodePoints(str, codepoints) ;
+        eCodePage codepage = mEditor->GetCodePage() ;
+
+        for(char32_t cp : codepoints)
+        {
+            if(CodePageByte(codepage, cp) == 0)
+            {
+                unmappableCount++ ;
+            }
+        }
+    }
+    return unmappableCount ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  unmappableCount [in] - characters that will be lost
 ///
 /// @return false if the user declined the warning, true otherwise
 ///
 /// @brief
-/// Counts the characters of start..end the current code page cannot
-/// write. If there are any and the file is not silent, asks whether to
-/// write anyway.
+/// If unmappableCount is not 0 and the file is not silent, asks whether
+/// to write anyway.
 ///
 /////////////////////////////////////////////////////////////////////////////
-bool cWordstarFile::ConfirmCodePage(POSITION_T start, POSITION_T end)
+bool cWordstarFile::AskCodePage(size_t unmappableCount)
 {
-    // Scan for Unicode characters that cannot be saved in WordStar format.
-    // Count unmappable graphemes and warn the user before any data is lost.
-    size_t unmappableCount = 0 ;
-    eCodePage scanCodePage = mEditor->GetCodePage() ;
-
-    for(POSITION_T scan = start; scan < end; scan++)
-    {
-        std::string str = mDocument->GetChar(scan) ;
-        if(str.length() > 1 && str != NOBREAK_SPACE_UTF8)
-        {
-            // Multi-byte UTF-8 grapheme -- check if the code page can represent it
-            std::u32string codepoints ;
-            size_t cpLen = mDocument->GetCodePoints(str, codepoints) ;
-
-            if(cpLen > 0)
-            {
-                for(size_t cpIdx = 0; cpIdx < codepoints.length(); cpIdx++)
-                {
-                    unsigned char mapped = 0 ;
-
-                    switch(scanCodePage)
-                    {
-                        case CP437 :
-                        {
-                            cCodePage437 cp ;
-                            mapped = cp.toChar(codepoints[cpIdx]) ;
-                            break ;
-                        }
-
-                        case CP737 :
-                        {
-                            cCodePage737 cp ;
-                            mapped = cp.toChar(codepoints[cpIdx]) ;
-                            break ;
-                        }
-
-                        case CP850 :
-                        {
-                            cCodePage850 cp ;
-                            mapped = cp.toChar(codepoints[cpIdx]) ;
-                            break ;
-                        }
-
-                        case CP1252 :
-                        {
-                            cCodePageWin1252 cp ;
-                            mapped = cp.toChar(codepoints[cpIdx]) ;
-                            break ;
-                        }
-                    }
-
-                    if(mapped == 0)
-                    {
-                        unmappableCount++ ;
-                    }
-                }
-            }
-        }
-    }
-
     // Warn the user if characters will be lost during save. The loss is a
     // property of the *code page* currently selected (Preferences > Code
     // Page), not of the WordStar format itself -- a document with the same
@@ -1041,6 +1050,7 @@ bool cWordstarFile::ConfirmCodePage(POSITION_T start, POSITION_T end)
     // message names the one actually in effect instead of blaming the format.
     if(unmappableCount > 0 && !mSilent)
     {
+        eCodePage scanCodePage = mEditor->GetCodePage() ;
         static const char *codePageNames[] = { "CP437", "CP737", "CP850", "CP1252" } ;
         const char *codePageName = "the current code page" ;
         if(static_cast<size_t>(scanCodePage) < sizeof(codePageNames) / sizeof(codePageNames[0]))
@@ -1060,6 +1070,67 @@ bool cWordstarFile::ConfirmCodePage(POSITION_T start, POSITION_T end)
     }
 
     return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  start [in] - first position to write
+/// @param  end   [in] - position after the last one to write
+///
+/// @return false if the user declined the warning, true otherwise
+///
+/// @brief
+/// Counts the characters of start..end the current code page cannot
+/// write. If there are any and the file is not silent, asks whether to
+/// write anyway.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::ConfirmCodePage(POSITION_T start, POSITION_T end)
+{
+    size_t unmappableCount = 0 ;
+    for(POSITION_T scan = start; scan < end; scan++)
+    {
+        unmappableCount += CountUnmappable(mDocument->GetChar(scan)) ;
+    }
+
+    return AskCodePage(unmappableCount) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  text [in] - UTF-8 text
+///
+/// @return false if the user declined the warning, true otherwise
+///
+/// @brief
+/// ConfirmCodePage() for text that EncodeText() writes: counts the code
+/// points the current code page cannot write and the bytes 0x1A, 0x1B and
+/// 0x1D that EncodeText() leaves out.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::ConfirmCodePage(const std::string &text)
+{
+    size_t unmappableCount = 0 ;
+    std::u32string codepoints ;
+    mDocument->GetCodePoints(text, codepoints) ;
+
+    for(char32_t cp : codepoints)
+    {
+        if(cp == 0x1A || cp == 0x1B || cp == 0x1D)
+        {
+            unmappableCount++ ;
+        }
+        else if(cp >= 0x80)
+        {
+            std::string str ;
+            unicode::utf8::encode_codepoint(cp, str) ;
+            unmappableCount += CountUnmappable(str) ;
+        }
+    }
+
+    return AskCodePage(unmappableCount) ;
 }
 
 
@@ -1406,94 +1477,9 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
                     break ;
             }    // switch
         }  // if
-        else if(str == NOBREAK_SPACE_UTF8)
+        else
         {
-            out += static_cast<char>(STYLE_CTRL_O) ;          // binding space
-            stylecounter++ ;
-        }
-        else            // this is a unicode (UTF-8 char)
-        {
-            // check if this is a extended char.
-            if(static_cast<unsigned long>(ch1) < 32 || static_cast<unsigned long>(ch1) > 126)
-            {
-                std::u32string codepoints ;
-                eCodePage codepage = mEditor->GetCodePage() ;
-
-                size_t len = mDocument->GetCodePoints(str, codepoints) ;
-
-                if(len > 0)
-                {
-                    for(size_t loop = 0; loop < codepoints.length(); loop++)
-                    {
-                        switch(codepage)
-                        {
-                            case CP437 :
-                            {
-                                cCodePage437 cp ;
-                                unsigned char chws = cp.toChar(codepoints[loop]) ;
-                                if(chws != 0)
-                                {
-                                    ch1 = STYLE_EXTSTART ;
-                                    out += static_cast<char>(ch1) ;
-                                    out += static_cast<char>(chws) ;
-                                    ch1 = STYLE_EXTEND ;
-                                    out += static_cast<char>(ch1) ;
-                                    stylecounter += 3 ;
-                                }
-                                break ;
-                            }
-
-                            case CP737 :
-                            {
-                                cCodePage737 cp ;
-                                unsigned char chws = cp.toChar(codepoints[loop]) ;
-                                if(chws != 0)
-                                {
-                                    ch1 = STYLE_EXTSTART ;
-                                    out += static_cast<char>(ch1) ;
-                                    out += static_cast<char>(chws) ;
-                                    ch1 = STYLE_EXTEND ;
-                                    out += static_cast<char>(ch1) ;
-                                    stylecounter += 3 ;
-                                }
-                                break ;
-                            }
-
-                            case CP850 :
-                            {
-                                cCodePage850 cp ;
-                                unsigned char chws = cp.toChar(codepoints[loop]) ;
-                                if(chws != 0)
-                                {
-                                    ch1 = STYLE_EXTSTART ;
-                                    out += static_cast<char>(ch1) ;
-                                    out += static_cast<char>(chws) ;
-                                    ch1 = STYLE_EXTEND ;
-                                    out += static_cast<char>(ch1) ;
-                                    stylecounter += 3 ;
-                                }
-                                break ;
-                            }
-
-                            case CP1252 :
-                            {
-                                cCodePageWin1252 cp ;
-                                unsigned char chws = cp.toChar(codepoints[loop]) ;
-                                if(chws != 0)
-                                {
-                                    ch1 = STYLE_EXTSTART ;
-                                    out += static_cast<char>(ch1) ;
-                                    out += static_cast<char>(chws) ;
-                                    ch1 = STYLE_EXTEND ;
-                                    out += static_cast<char>(ch1) ;
-                                    stylecounter += 3 ;
-                                }
-                                break ;
-                            }
-                        }
-                    }
-                }
-            }
+            EncodeCharacter(str, out, stylecounter) ;
         }
     }
 
@@ -1503,67 +1489,82 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  text [in] - UTF-8 text
-///
-/// @return text with one byte per code point in the current code page
+/// @param  str          [in]     - one character of more than one byte, UTF-8
+/// @param  out          [in,out] - WordStar bytes, the character is appended
+/// @param  stylecounter [in,out] - byte count, advanced by what is appended
 ///
 /// @brief
-/// ASCII stays as it is. Any other code point becomes the single byte the
-/// code page's toChar() gives, without the ESC x FS that EncodeRange()
-/// puts around it; a code point the code page cannot hold is left out.
+/// NBSP becomes ^O. Any other character becomes ESC x FS for each of its
+/// code points, x being the byte of the current code page; a code point
+/// the code page cannot hold is left out.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, uint32_t &stylecounter)
+{
+    char ch1 = str[0] ;
+
+    if(str == NOBREAK_SPACE_UTF8)
+    {
+        out += static_cast<char>(STYLE_CTRL_O) ;          // binding space
+        stylecounter++ ;
+    }
+    else if(static_cast<unsigned long>(ch1) < 32 || static_cast<unsigned long>(ch1) > 126)
+    {
+        std::u32string codepoints ;
+        eCodePage codepage = mEditor->GetCodePage() ;
+
+        mDocument->GetCodePoints(str, codepoints) ;
+
+        for(char32_t cp : codepoints)
+        {
+            unsigned char chws = CodePageByte(codepage, cp) ;
+            if(chws != 0)
+            {
+                out += static_cast<char>(STYLE_EXTSTART) ;
+                out += static_cast<char>(chws) ;
+                out += static_cast<char>(STYLE_EXTEND) ;
+                stylecounter += 3 ;
+            }
+        }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  text [in] - UTF-8 text
+///
+/// @return the WordStar bytes of text
+///
+/// @brief
+/// ASCII stays as it is, except 0x1A, 0x1B and 0x1D, which are left out.
+/// Any other code point is encoded as EncodeRange() encodes it
+/// (EncodeCharacter()).
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cWordstarFile::EncodeText(const std::string &text)
 {
     std::string out ;
+    uint32_t counted = 0 ;
     std::u32string codepoints ;
     mDocument->GetCodePoints(text, codepoints) ;
-    eCodePage codepage = mEditor->GetCodePage() ;
 
-    for(char32_t cp32 : codepoints)
+    for(char32_t cp : codepoints)
     {
-        if(cp32 < 0x80)
+        if(cp == 0x1A || cp == 0x1B || cp == 0x1D)
         {
-            out += static_cast<char>(cp32) ;
             continue ;
         }
 
-        unsigned char chws = 0 ;
-        switch(codepage)
+        if(cp < 0x80)
         {
-            case CP437 :
-            {
-                cCodePage437 cp ;
-                chws = cp.toChar(cp32) ;
-                break ;
-            }
-
-            case CP737 :
-            {
-                cCodePage737 cp ;
-                chws = cp.toChar(cp32) ;
-                break ;
-            }
-
-            case CP850 :
-            {
-                cCodePage850 cp ;
-                chws = cp.toChar(cp32) ;
-                break ;
-            }
-
-            case CP1252 :
-            {
-                cCodePageWin1252 cp ;
-                chws = cp.toChar(cp32) ;
-                break ;
-            }
+            out += static_cast<char>(cp) ;
+            continue ;
         }
 
-        if(chws != 0)
-        {
-            out += static_cast<char>(chws) ;
-        }
+        std::string str ;
+        unicode::utf8::encode_codepoint(cp, str) ;
+        EncodeCharacter(str, out, counted) ;
     }
 
     return out ;
@@ -1626,13 +1627,12 @@ bool cWordstarFile::HasHeader(const std::string &filename)
 ///
 /// @brief
 /// A 0x1D sequence has its length repeated before the closing 0x1D. In a
-/// file with a WordStar 5+ header, the text starts after the header. The
-/// text ends at the first 0x1A outside a 0x1D sequence and an ESC x FS
-/// extended character, or at the end of the file. In a file with a
-/// WordStar 5+ header, a style offset at or after the text end and
-/// before the end of the file is where the style
-/// library starts. The bytes between the text end and the library (or the
-/// end of the file) are padding. Writes the text, bytes, 0x1A up to the
+/// file with a WordStar 5+ header, the text starts after the header, and a
+/// style offset at or after the text end and before the end of the file is
+/// where the style library starts. The text ends at the first 0x1A outside
+/// a 0x1D sequence and an ESC x FS extended character, or at the end of
+/// the file. The bytes between the text end and the library (or the end
+/// of the file) are padding. Writes the text, bytes, 0x1A up to the
 /// next multiple of 128 (at least one), then the library unchanged, and
 /// sets the style offset to the new library position. Without a library
 /// the header is not changed. A file without a header and without 0x1A

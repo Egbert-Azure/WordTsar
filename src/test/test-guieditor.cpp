@@ -16204,7 +16204,7 @@ TEST_CASE("cEditorBase::WriteBlock - text into a WordStar target is written in t
         POSITION_T end = setBlock("a\xC3\xA4" "b\r");
         REQUIRE(editor.WriteBlock(0, end, path, true, eChoice::Append) == eResult::Written);
         std::string result = ReadFileBytes(path);
-        CHECK(result.find("a\x84" "b\r\n") != std::string::npos);
+        CHECK(result.find("a\x1B\x84\x1C" "b\r\n") != std::string::npos);
         CHECK(result.find("\xC3\xA4") == std::string::npos);
         CHECK(editor.mAsks == 0);
     }
@@ -16215,7 +16215,7 @@ TEST_CASE("cEditorBase::WriteBlock - text into a WordStar target is written in t
         doc->SetTextFile(true);
         REQUIRE(editor.WriteBlock(0, end, path, false, eChoice::Append) == eResult::Written);
         std::string result = ReadFileBytes(path);
-        CHECK(result.find("a\x84" "b\r\n") != std::string::npos);
+        CHECK(result.find("a\x1B\x84\x1C" "b\r\n") != std::string::npos);
         CHECK(result.find("\xC3\xA4") == std::string::npos);
         CHECK(editor.mAsks == 0);
     }
@@ -16244,6 +16244,173 @@ TEST_CASE("cEditorBase::WriteBlock - text into a WordStar target is written in t
         REQUIRE(editor.WriteBlock(0, end, path, true, eChoice::Append) == eResult::Written);
         CHECK(editor.mAsks == 1);
         CHECK(ReadFileBytes(path).find("ab\r\n") != std::string::npos);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("cEditorBase::WriteBlock - text into a WordStar target reloads as written, a second append follows it")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kwtextenc-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    class cAskingEditor : public cBlockTargetEditor
+    {
+    public:
+        bool mAnswer = true;
+        int mAsks = 0;
+        std::string mQuestion;
+
+        bool AskYesNo(const std::string& title, const std::string& question) override
+        {
+            (void)title;
+            mQuestion = question;
+            ++mAsks;
+            return mAnswer;
+        }
+    };
+
+    cAskingEditor editor;
+    editor.SetCodePage(CP437);
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    cBlockTargetEditor other;
+    other.GetDocument()->Insert("Old\r");
+    REQUIRE(other.SaveFile((dir / "target.ws").string()));
+    const std::string path = (dir / "target.ws").string();
+    const std::string target = ReadFileBytes(path);
+
+    using eChoice = cEditorBase::eFileExistsChoice;
+    using eResult = cEditorBase::eWriteBlockResult;
+
+    // first block: a, ä, NBSP, b; second block: second
+    doc->Insert("a\xC3\xA4\xC2\xA0" "b\rsecond\r");
+    editor.GetLayout()->LayoutDocument(doc);
+    const POSITION_T firstEnd = 5;
+    const POSITION_T end = doc->GetTextSize();
+
+    auto reload = [&](void)
+    {
+        cBlockTargetEditor reader;
+        reader.SetCodePage(CP437);
+        cWordstarFile file(&reader);
+        file.mDocument = reader.GetDocument();
+        REQUIRE(file.LoadFile(path));
+        return reader.GetDocument()->GetPlainText(0, reader.GetDocument()->GetTextSize(), "\n");
+    };
+
+    auto appendBoth = [&](bool asciiFormat)
+    {
+        REQUIRE(editor.WriteBlock(0, firstEnd, path, asciiFormat, eChoice::Append) == eResult::Written);
+        REQUIRE(editor.WriteBlock(firstEnd, end, path, asciiFormat, eChoice::Append) == eResult::Written);
+
+        std::string result = ReadFileBytes(path);
+        CHECK(result.find("a\x1B\x84\x1C\x0F" "b\r\nsecond\r\n") != std::string::npos);
+        CHECK(reload() == "Old\na\xC3\xA4\xC2\xA0" "b\nsecond\n");
+        CHECK(editor.mAsks == 0);
+    };
+
+    SUBCASE("the box ticked")
+    {
+        appendBoth(true);
+    }
+
+    SUBCASE("a text document")
+    {
+        doc->SetTextFile(true);
+        appendBoth(false);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("cWordstarFile::EncodeText - text for a WordStar target, 0x1A 0x1B 0x1D left out and counted in the warning")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-encodetext-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    class cAskingEditor : public cBlockTargetEditor
+    {
+    public:
+        bool mAnswer = false;
+        int mAsks = 0;
+        std::string mQuestion;
+
+        bool AskYesNo(const std::string& title, const std::string& question) override
+        {
+            (void)title;
+            mQuestion = question;
+            ++mAsks;
+            return mAnswer;
+        }
+    };
+
+    cAskingEditor editor;
+    editor.SetCodePage(CP437);
+    cWordstarFile writer(&editor);
+    writer.mDocument = editor.GetDocument();
+
+    SUBCASE("appended twice: reloads with the characters, no 0x1A in the text, second block after the first")
+    {
+        cBlockTargetEditor other;
+        other.GetDocument()->Insert("Old\r");
+        const std::string path = (dir / "target.ws").string();
+        REQUIRE(other.SaveFile(path));
+
+        std::string first = writer.EncodeText("a\xC3\xA4\xC2\xA0\x1A" "b\r\n");
+        CHECK(first == "a\x1B\x84\x1C\x0F" "b\r\n");
+        REQUIRE(cWordstarFile::InsertAtTextEnd(path, first));
+        REQUIRE(cWordstarFile::InsertAtTextEnd(path, writer.EncodeText("second\r\n")));
+
+        std::string result = ReadFileBytes(path);
+        size_t secondAt = result.find("second\r\n");
+        REQUIRE(secondAt != std::string::npos);
+        CHECK(result.substr(128, secondAt - 128).find('\x1A') == std::string::npos);
+
+        cBlockTargetEditor reader;
+        reader.SetCodePage(CP437);
+        cWordstarFile file(&reader);
+        file.mDocument = reader.GetDocument();
+        REQUIRE(file.LoadFile(path));
+        cDocument* loaded = reader.GetDocument();
+        CHECK(loaded->GetPlainText(0, loaded->GetTextSize(), "\n") == "Old\na\xC3\xA4\xC2\xA0" "b\nsecond\n");
+    }
+
+    SUBCASE("0x1B and 0x1D are left out")
+    {
+        CHECK(writer.EncodeText("a\x1B" "b\x1D" "c") == "abc");
+    }
+
+    SUBCASE("the warning counts left-out bytes and characters the code page cannot hold")
+    {
+        CHECK(writer.ConfirmCodePage("a\x1A\x1B\x1D\xE4\xB8\xAD\xC3\xA4\xC2\xA0" "b\r\n") == false);
+        CHECK(editor.mAsks == 1);
+        CHECK(editor.mQuestion.find("contains 4 character(s)") != std::string::npos);
+    }
+
+    SUBCASE("a 0x1A alone gives the warning, declined")
+    {
+        CHECK(writer.ConfirmCodePage(std::string("a\x1A" "b")) == false);
+        CHECK(editor.mAsks == 1);
+    }
+
+    SUBCASE("text the code page can hold gives no warning")
+    {
+        CHECK(writer.ConfirmCodePage(std::string("a\xC3\xA4\xC2\xA0" "b\r\n")) == true);
+        CHECK(editor.mAsks == 0);
     }
 
     std::error_code ec;
