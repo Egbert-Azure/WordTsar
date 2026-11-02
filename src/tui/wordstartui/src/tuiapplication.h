@@ -45,6 +45,7 @@ public:
     cTheme& GetTheme(void);
 #ifdef WORDTSAR_TUI_TEST_HOOKS
     bool TestQuitRequested(void) const { return mQuit; }
+    void TestPumpEvent(cTerminalDriver& driver, int timeoutMs) { PumpEvent(driver, timeoutMs); }
 #endif
 
 protected:
@@ -68,6 +69,7 @@ protected:
     void PresentFrame(const std::function<void(cScreen&, const cTheme&)>& draw);
 
 private:
+    void PumpEvent(cTerminalDriver& driver, int timeoutMs);
     bool Initialize(void);
     void ResizeFromTerminal(void);
 

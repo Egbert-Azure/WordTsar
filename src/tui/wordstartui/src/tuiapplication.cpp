@@ -81,29 +81,46 @@ int cTuiApplication::Run(void)
         OnAfterDraw(*mDriver);
         mDriver->Flush();
 
-        sInputEvent event;
-
-        if (mDriver->ReadEvent(event, 50) == true)
-        {
-            if (event.type == INPUT_TYPE_RESIZE)
-            {
-                mScreen.Resize(event.resizeRows, event.resizeCols);
-                OnResize(event.resizeRows, event.resizeCols);
-            }
-            else
-            {
-                HandleEvent(event);
-            }
-        }
-        else
-        {
-            OnIdle();
-        }
+        PumpEvent(*mDriver, 50);
     }
 
     mDriver->Close();
 
     return 0;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  cTerminalDriver& driver [in,out] terminal driver to read from
+/// @param  int timeoutMs [in] maximum time to wait for input
+///
+/// @return nothing
+///
+/// @brief
+/// Read one event and dispatch it: a resize resizes the screen, other events
+/// go to HandleEvent(). A read that returned no event calls OnIdle().
+///
+/////////////////////////////////////////////////////////////////////////////
+void cTuiApplication::PumpEvent(cTerminalDriver& driver, int timeoutMs)
+{
+    sInputEvent event;
+
+    if (driver.ReadEvent(event, timeoutMs) == true)
+    {
+        if (event.type == INPUT_TYPE_RESIZE)
+        {
+            mScreen.Resize(event.resizeRows, event.resizeCols);
+            OnResize(event.resizeRows, event.resizeCols);
+        }
+        else
+        {
+            HandleEvent(event);
+        }
+    }
+    else
+    {
+        OnIdle();
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////
