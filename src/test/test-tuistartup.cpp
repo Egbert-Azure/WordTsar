@@ -1160,3 +1160,31 @@ TEST_CASE("TUI startup screen - an ignored sequence in the dropped burst does no
         CHECK(app.TestGetEditor()->GetDocument()->IsModified() == true);
     }
 }
+
+
+TEST_CASE("TUI terminal driver - SS3 arrows, Home and End decode as the keys")
+{
+    struct sCase
+    {
+        const char* sequence;
+        wordstartui::eSpecialKey key;
+    };
+    const sCase cases[] = {
+        {"\x1bOA", wordstartui::SPECIAL_KEY_ARROW_UP},
+        {"\x1bOB", wordstartui::SPECIAL_KEY_ARROW_DOWN},
+        {"\x1bOC", wordstartui::SPECIAL_KEY_ARROW_RIGHT},
+        {"\x1bOD", wordstartui::SPECIAL_KEY_ARROW_LEFT},
+        {"\x1bOH", wordstartui::SPECIAL_KEY_HOME},
+        {"\x1bOF", wordstartui::SPECIAL_KEY_END},
+    };
+
+    for (const sCase& item : cases)
+    {
+        std::string sequence = std::string("ESC ") + (item.sequence + 1);
+        CAPTURE(sequence);
+        std::vector<wordstartui::sInputEvent> events = DriverEvents(item.sequence);
+        REQUIRE(events.size() == 1);
+        CHECK(events[0].type == wordstartui::INPUT_TYPE_SPECIAL);
+        CHECK(events[0].special == item.key);
+    }
+}

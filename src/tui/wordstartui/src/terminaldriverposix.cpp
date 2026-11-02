@@ -786,6 +786,45 @@ bool cTerminalDriverPosix::DecodeEscape(sInputEvent& event, const std::vector<ui
         return true;
     }
 
+    // SS3 arrows, Home and End: application cursor-key mode.
+    if ((bytes.size() == 3U) && (bytes[1] == 'O'))
+    {
+        const uint8_t final = bytes[2];
+        eSpecialKey key = SPECIAL_KEY_NONE;
+
+        if (final == 'A')
+        {
+            key = SPECIAL_KEY_ARROW_UP;
+        }
+        else if (final == 'B')
+        {
+            key = SPECIAL_KEY_ARROW_DOWN;
+        }
+        else if (final == 'C')
+        {
+            key = SPECIAL_KEY_ARROW_RIGHT;
+        }
+        else if (final == 'D')
+        {
+            key = SPECIAL_KEY_ARROW_LEFT;
+        }
+        else if (final == 'H')
+        {
+            key = SPECIAL_KEY_HOME;
+        }
+        else if (final == 'F')
+        {
+            key = SPECIAL_KEY_END;
+        }
+
+        if (key != SPECIAL_KEY_NONE)
+        {
+            event.type = INPUT_TYPE_SPECIAL;
+            event.special = key;
+            return true;
+        }
+    }
+
     // ESC followed by a single printable byte is Alt+key (meta). Deliver it as
     // a text event with the alt modifier set so menu hotkeys and WordStar
     // Alt-chords work; the raw bytes remain available on the event.
