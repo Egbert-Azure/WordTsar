@@ -1556,8 +1556,8 @@ bool cWordstarFile::HasHeader(const std::string &filename)
 /// @return true if the file was written, false otherwise
 ///
 /// @brief
-/// The text ends at the first 0x1A outside a 0x1D sequence, or at the end
-/// of the file. In a file with a WordStar 5+ header, a style offset at or
+/// The text ends at the first 0x1A outside a 0x1D sequence and an ESC x FS
+/// extended character, or at the end of the file. In a file with a WordStar 5+ header, a style offset at or
 /// after the text end and before the end of the file is where the style
 /// library starts. The bytes between the text end and the library (or the
 /// end of the file) are padding. Writes the text, bytes, 0x1A up to the
@@ -1582,6 +1582,11 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
     while (textEnd < data.size())
     {
         unsigned char c = static_cast<unsigned char>(data[textEnd]) ;
+        if (c == 0x1B && textEnd + 2 < data.size() && data[textEnd + 2] == 0x1C)
+        {
+            textEnd += 3 ;
+            continue ;
+        }
         if (c == 0x1D && textEnd + 2 < data.size())
         {
             size_t len = static_cast<unsigned char>(data[textEnd + 1]) |

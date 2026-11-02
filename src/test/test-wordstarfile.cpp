@@ -2625,3 +2625,46 @@ TEST_CASE("cWordstarFile::SaveRange - every .WS file in WORDTSAR_ARCHIVE_DIR: th
     }
     CHECK_MESSAGE(failures.empty(), failures.size() << " of " << files.size() << " .WS files differ" << report);
 }
+
+
+namespace
+{
+
+// Writes target to a file in a new temp directory, inserts bytes with
+// cWordstarFile::InsertAtTextEnd() and returns the file content
+std::string InsertedAtTextEnd(const std::string &target, const std::string &bytes)
+{
+    std::filesystem::path dir = UniqueTempDir("wordtsar_textend");
+    std::filesystem::path path = dir / "target.ws";
+    WriteFileBytes(path, target);
+    bool written = cWordstarFile::InsertAtTextEnd(path.string(), bytes);
+    std::string result = ReadFileBytes(path);
+    std::filesystem::remove_all(dir);
+    return written ? result : std::string();
+}
+
+}
+
+
+TEST_CASE("cWordstarFile::InsertAtTextEnd - ESC x FS triples are text")
+{
+    SUBCASE("ESC 1A FS")
+    {
+        std::string text = std::string("A\x1B\x1A\x1C" "B\r\n", 7);
+        std::string target = WordStar7File(text);
+        CHECK(InsertedAtTextEnd(target, "new\r\n") == PadEof(target.substr(0, 128 + text.size()) + "new\r\n"));
+    }
+
+    SUBCASE("ESC 1D FS before a style library")
+    {
+        std::string text = std::string("A\x1B\x1D\x1C" "B\r\n", 7);
+        std::string library = "\x1A\x55" + std::string(17000, 'L');
+        std::string target = WordStar7File(text) + library;
+
+        std::string expected = PadEof(target.substr(0, 128 + text.size()) + "new\r\n");
+        uint32_t styles = static_cast<uint32_t>(expected.size());
+        memcpy(&expected[4 + offsetof(sWSHeader, styles)], &styles, sizeof(styles));
+        expected += library;
+        CHECK(InsertedAtTextEnd(target, "new\r\n") == expected);
+    }
+}
