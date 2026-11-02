@@ -2676,3 +2676,10 @@ TEST_CASE("cWordstarFile::InsertAtTextEnd - a stray 0x1D is not skipped as a seq
     std::string target = WordStar7File(text);
     CHECK(InsertedAtTextEnd(target, "new\r\n") == PadEof(target.substr(0, 128 + text.size()) + "new\r\n"));
 }
+
+
+TEST_CASE("cWordstarFile::InsertAtTextEnd - a file without a header and without 0x1A is not padded")
+{
+    std::string target = "Old\x8D\x0Aline\r\n";
+    CHECK(InsertedAtTextEnd(target, "new\r\n") == target + "new\r\n");
+}

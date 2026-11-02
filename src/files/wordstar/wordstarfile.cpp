@@ -1564,7 +1564,8 @@ bool cWordstarFile::HasHeader(const std::string &filename)
 /// end of the file) are padding. Writes the text, bytes, 0x1A up to the
 /// next multiple of 128 (at least one), then the library unchanged, and
 /// sets the style offset to the new library position. Without a library
-/// the header is not changed.
+/// the header is not changed. A file without a header and without 0x1A
+/// gets the bytes after the text and no padding.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::string &bytes)
@@ -1623,7 +1624,10 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
 
     // the block goes at the end of the text, before the 0x1A padding and the style library
     std::string out = data.substr(0, textEnd) + bytes ;
-    out.append(128 - out.size() % 128, static_cast<char>(STYLE_EOF)) ;
+    if (header || textEnd < data.size())
+    {
+        out.append(128 - out.size() % 128, static_cast<char>(STYLE_EOF)) ;
+    }
     if (library < data.size())
     {
         uint32_t styles = static_cast<uint32_t>(out.size()) ;
