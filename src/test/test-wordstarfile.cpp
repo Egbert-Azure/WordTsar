@@ -2668,3 +2668,11 @@ TEST_CASE("cWordstarFile::InsertAtTextEnd - ESC x FS triples are text")
         CHECK(InsertedAtTextEnd(target, "new\r\n") == expected);
     }
 }
+
+
+TEST_CASE("cWordstarFile::InsertAtTextEnd - a stray 0x1D is not skipped as a sequence")
+{
+    std::string text = std::string("A\x1D\x05\x00" "B\r\n", 7);
+    std::string target = WordStar7File(text);
+    CHECK(InsertedAtTextEnd(target, "new\r\n") == PadEof(target.substr(0, 128 + text.size()) + "new\r\n"));
+}
