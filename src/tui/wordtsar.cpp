@@ -1977,8 +1977,9 @@ void cWSWordTsar::Draw(cScreen& screen, const cTheme& theme)
 /// @brief
 /// Draw the startup screen. Row 0 is a bar of upper half blocks with the
 /// name centred. Below it, each separated by a blank row: the product block;
-/// a separator, 70 % of the width, followed by the system block, which
-/// starts three columns inside the separator; a separator, a blank row and
+/// a separator of black squares, 70 % of the width, followed by the system
+/// block, which starts three columns inside the separator; a separator, a
+/// blank row and
 /// the technology block; the legal block. Lines are centred and wrapped to
 /// leave one blank column on each side. A block that does not fit in full
 /// is left out together with every block after it. Bars are in the title
@@ -2005,17 +2006,17 @@ void cWSWordTsar::DrawStartupScreen(cScreen& screen)
         return;
     }
 
-    auto barRow = [&](int row, int col, int cols)
+    auto barRow = [&](int row, int col, int cols, const char* glyph)
     {
         sRect line;
         line.row = row;
         line.col = col;
         line.rows = 1;
         line.cols = cols;
-        screen.FillRect(line, "\xe2\x96\x80", bar);   // U+2580 UPPER HALF BLOCK
+        screen.FillRect(line, glyph, bar);
     };
 
-    barRow(0, 0, mCols);
+    barRow(0, 0, mCols, "\xe2\x96\x80");   // U+2580 UPPER HALF BLOCK
     const std::string name = " WordTsar ";
     int nameCol = std::max(0, (mCols - wordstartui::cUtf8Helper::TextWidth(name)) / 2);
     screen.PutText(0, nameCol, name, body);
@@ -2099,7 +2100,7 @@ void cWSWordTsar::DrawStartupScreen(cScreen& screen)
             }
             else if ((line.kind == sRow::SEPARATOR) && (sepWidth > 0))
             {
-                barRow(row, sepCol, sepWidth);
+                barRow(row, sepCol, sepWidth, "\xe2\x96\xa0");   // U+25A0 BLACK SQUARE
             }
             ++row;
         }

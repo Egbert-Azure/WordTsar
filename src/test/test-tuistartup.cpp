@@ -48,6 +48,7 @@ namespace
 const wordstartui::sColor kBlue = wordstartui::MakeRgb(0, 0, 170);
 const wordstartui::sColor kGrey = wordstartui::MakeRgb(170, 170, 170);
 const char* const kUpperHalf = "\xe2\x96\x80";   // U+2580
+const char* const kSquare = "\xe2\x96\xa0";      // U+25A0
 
 abouttext::sSystemInfo FixedSystem(void)
 {
@@ -111,6 +112,11 @@ bool IsBar(const wordstartui::cScreen& screen, int row, int col)
     return screen.GetCell(row, col)->textUtf8 == kUpperHalf;
 }
 
+bool IsSeparator(const wordstartui::cScreen& screen, int row, int col)
+{
+    return screen.GetCell(row, col)->textUtf8 == kSquare;
+}
+
 // Expected rows of the startup screen for one terminal width.
 void CheckLayout(int rows, int cols)
 {
@@ -139,16 +145,16 @@ void CheckLayout(int rows, int cols)
     }
     CHECK(Trimmed(RowText(screen, 6)).empty());
 
-    // Separators: 70 % of the width, centred, upper half blocks.
+    // Separators: 70 % of the width, centred, black squares.
     const int sepWidth = cols * 7 / 10;
     const int sepCol = (cols - sepWidth) / 2;
     for (int row : {7, 11})
     {
         CAPTURE(row);
-        CHECK(IsBar(screen, row, sepCol - 1) == false);
-        CHECK(IsBar(screen, row, sepCol) == true);
-        CHECK(IsBar(screen, row, sepCol + sepWidth - 1) == true);
-        CHECK(IsBar(screen, row, sepCol + sepWidth) == false);
+        CHECK(IsSeparator(screen, row, sepCol - 1) == false);
+        CHECK(IsSeparator(screen, row, sepCol) == true);
+        CHECK(IsSeparator(screen, row, sepCol + sepWidth - 1) == true);
+        CHECK(IsSeparator(screen, row, sepCol + sepWidth) == false);
     }
 
     // System block left-aligned three columns inside the separator.
@@ -1283,5 +1289,50 @@ TEST_CASE("TUI About box - the text area uses the dialog colours")
             CHECK(dialog.fg == wordstartui::MakeRgb(0, 0, 0));
             CHECK(dialog.bg == kGrey);
         }
+    }
+}
+
+
+TEST_CASE("TUI startup screen - the separator bars are black squares, one cell each")
+{
+    for (std::pair<int, int> size : {std::make_pair(25, 80), std::make_pair(40, 120), std::make_pair(20, 60)})
+    {
+        const int rows = size.first;
+        const int cols = size.second;
+        CAPTURE(rows);
+        CAPTURE(cols);
+        cWSWordTsar app;
+        PrepareWs7(app);
+        wordstartui::cScreen screen;
+        screen.Resize(rows, cols);
+        app.TestDrawStartup(screen);
+
+        const int sepWidth = cols * 7 / 10;
+        const int sepCol = (cols - sepWidth) / 2;
+        int separators = 0;
+        for (int row = 1; row < rows; ++row)
+        {
+            CAPTURE(row);
+            CHECK(IsBar(screen, row, sepCol) == false);
+            if (IsSeparator(screen, row, sepCol) == false)
+            {
+                continue;
+            }
+            ++separators;
+            for (int col = 0; col < cols; ++col)
+            {
+                CAPTURE(col);
+                const wordstartui::sCell* cell = screen.GetCell(row, col);
+                const bool inside = (col >= sepCol) && (col < sepCol + sepWidth);
+                CHECK(IsSeparator(screen, row, col) == inside);
+                CHECK(cell->width == 1);
+                CHECK(cell->wideTail == false);
+            }
+        }
+        CHECK(separators == 2);
+
+        // The title bar keeps the upper half block.
+        CHECK(IsBar(screen, 0, 0) == true);
+        CHECK(IsBar(screen, 0, cols - 1) == true);
     }
 }
