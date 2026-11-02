@@ -1503,6 +1503,75 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  text [in] - UTF-8 text
+///
+/// @return text with one byte per code point in the current code page
+///
+/// @brief
+/// ASCII stays as it is. Any other code point becomes the byte the code
+/// page's toChar() gives, as in EncodeRange(); a code point the code page
+/// cannot hold is left out.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cWordstarFile::EncodeText(const std::string &text)
+{
+    std::string out ;
+    std::u32string codepoints ;
+    mDocument->GetCodePoints(text, codepoints) ;
+    eCodePage codepage = mEditor->GetCodePage() ;
+
+    for(char32_t cp32 : codepoints)
+    {
+        if(cp32 < 0x80)
+        {
+            out += static_cast<char>(cp32) ;
+            continue ;
+        }
+
+        unsigned char chws = 0 ;
+        switch(codepage)
+        {
+            case CP437 :
+            {
+                cCodePage437 cp ;
+                chws = cp.toChar(cp32) ;
+                break ;
+            }
+
+            case CP737 :
+            {
+                cCodePage737 cp ;
+                chws = cp.toChar(cp32) ;
+                break ;
+            }
+
+            case CP850 :
+            {
+                cCodePage850 cp ;
+                chws = cp.toChar(cp32) ;
+                break ;
+            }
+
+            case CP1252 :
+            {
+                cCodePageWin1252 cp ;
+                chws = cp.toChar(cp32) ;
+                break ;
+            }
+        }
+
+        if(chws != 0)
+        {
+            out += static_cast<char>(chws) ;
+        }
+    }
+
+    return out ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  filename [in] - file to inspect
 ///
 /// @return true if the content of the file is a WordStar document

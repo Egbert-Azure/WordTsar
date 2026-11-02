@@ -16093,6 +16093,103 @@ TEST_CASE("GUI editor - ^KW gives the code page warning for every WordStar-forma
 }
 
 
+TEST_CASE("cEditorBase::WriteBlock - text into a WordStar target is written in the code page")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kwtextcp-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    class cAskingEditor : public cBlockTargetEditor
+    {
+    public:
+        bool mAnswer = false;
+        int mAsks = 0;
+
+        bool AskYesNo(const std::string& title, const std::string& question) override
+        {
+            (void)title;
+            (void)question;
+            ++mAsks;
+            return mAnswer;
+        }
+    };
+
+    cAskingEditor editor;
+    editor.SetCodePage(CP437);
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    cBlockTargetEditor other;
+    other.GetDocument()->Insert("Old\r");
+    REQUIRE(other.SaveFile((dir / "target.ws").string()));
+    const std::string path = (dir / "target.ws").string();
+    const std::string target = ReadFileBytes(path);
+
+    using eChoice = cEditorBase::eFileExistsChoice;
+    using eResult = cEditorBase::eWriteBlockResult;
+
+    auto setBlock = [&](const std::string& text)
+    {
+        doc->Insert(text);
+        editor.GetLayout()->LayoutDocument(doc);
+        return doc->GetTextSize();
+    };
+
+    SUBCASE("the box ticked: a non-ASCII character lands as its code page byte")
+    {
+        POSITION_T end = setBlock("a\xC3\xA4" "b\r");
+        REQUIRE(editor.WriteBlock(0, end, path, true, eChoice::Append) == eResult::Written);
+        std::string result = ReadFileBytes(path);
+        CHECK(result.find("a\x84" "b\r\n") != std::string::npos);
+        CHECK(result.find("\xC3\xA4") == std::string::npos);
+        CHECK(editor.mAsks == 0);
+    }
+
+    SUBCASE("a text document: a non-ASCII character lands as its code page byte")
+    {
+        POSITION_T end = setBlock("a\xC3\xA4" "b\r");
+        doc->SetTextFile(true);
+        REQUIRE(editor.WriteBlock(0, end, path, false, eChoice::Append) == eResult::Written);
+        std::string result = ReadFileBytes(path);
+        CHECK(result.find("a\x84" "b\r\n") != std::string::npos);
+        CHECK(result.find("\xC3\xA4") == std::string::npos);
+        CHECK(editor.mAsks == 0);
+    }
+
+    SUBCASE("the box ticked: a character the code page cannot hold, declined: nothing written")
+    {
+        POSITION_T end = setBlock("a\xE4\xB8\xAD" "b\r");
+        CHECK(editor.WriteBlock(0, end, path, true, eChoice::Append) == eResult::Declined);
+        CHECK(editor.mAsks == 1);
+        CHECK(ReadFileBytes(path) == target);
+    }
+
+    SUBCASE("a text document: a character the code page cannot hold, declined: nothing written")
+    {
+        POSITION_T end = setBlock("a\xE4\xB8\xAD" "b\r");
+        doc->SetTextFile(true);
+        CHECK(editor.WriteBlock(0, end, path, false, eChoice::Append) == eResult::Declined);
+        CHECK(editor.mAsks == 1);
+        CHECK(ReadFileBytes(path) == target);
+    }
+
+    SUBCASE("a character the code page cannot hold, accepted: the character is left out")
+    {
+        editor.mAnswer = true;
+        POSITION_T end = setBlock("a\xE4\xB8\xAD" "b\r");
+        REQUIRE(editor.WriteBlock(0, end, path, true, eChoice::Append) == eResult::Written);
+        CHECK(editor.mAsks == 1);
+        CHECK(ReadFileBytes(path).find("ab\r\n") != std::string::npos);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
 TEST_CASE("cEditorBase::WriteBlock - a failed append leaves the target unchanged")
 {
     ensureQApplication();

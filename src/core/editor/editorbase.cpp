@@ -3917,10 +3917,12 @@ std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
 /// Append to a WordStar file (by content) inserts the block
 /// at its text end (cWordstarFile::InsertAtTextEnd): as WordStar bytes into
 /// a file with a WordStar 5+ header unless the text is written, else as
-/// the text with CR LF. Append to any other file adds the text, with CRLF
-/// if the file contains CRLF, else LF. An append replaces the file through
-/// cWordstarFile::ReplaceFileContent. Every write in WordStar format first
-/// gives the code page warning (cWordstarFile::ConfirmCodePage).
+/// the text with CR LF, in single bytes of the code page
+/// (cWordstarFile::EncodeText). Append to any other file adds the text,
+/// with CRLF if the file contains CRLF, else LF. An append replaces the
+/// file through cWordstarFile::ReplaceFileContent. Every write in WordStar
+/// format and every write of text into a WordStar file first gives the
+/// code page warning (cWordstarFile::ConfirmCodePage).
 ///
 /////////////////////////////////////////////////////////////////////////////
 cEditorBase::eWriteBlockResult cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string& filename,
@@ -4012,6 +4014,14 @@ cEditorBase::eWriteBlockResult cEditorBase::WriteBlock(POSITION_T start, POSITIO
     else
     {
         bytes = blockText() ;
+        if (wordstarTarget)
+        {
+            if (writer.ConfirmCodePage(start, end) == false)
+            {
+                return eWriteBlockResult::Declined ;
+            }
+            bytes = writer.EncodeText(bytes) ;
+        }
         if (wordstarTarget || existing.find("\r\n") != std::string::npos)
         {
             std::string crlf ;
