@@ -17,4 +17,6 @@ doxygen/
 DEV_DOCUMENTS/
 .DS_Store
 Roadmap-draft-Plan.md
-.bak
+*.bak
+
+*-bak.ws
