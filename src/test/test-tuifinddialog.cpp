@@ -23,6 +23,7 @@
 #include "src/tui/dialogs/dialoghost.h"
 #include "src/tui/dialogs/dialogs.h"
 #include "src/tui/wordstartui/src/dialog.h"
+#include "src/tui/wordstartui/src/glyphs.h"
 #include "src/tui/wordstartui/src/screen.h"
 #include "src/tui/wordstartui/src/terminaldriver.h"
 #include "src/tui/wordstartui/src/theme.h"
@@ -368,6 +369,124 @@ TEST_CASE("TUI Find and Replace dialog - WordStar 7 wording")
     CHECK(host.Shows("Backward"));
     CHECK(host.Shows("Use ? Wildcard Character"));
     CHECK(host.RightBorderIntact());
+}
+
+
+namespace
+{
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief Dialog host that renders the modal dialog, feeds it events and
+/// renders it again.
+///
+/////////////////////////////////////////////////////////////////////////////
+class cEventHost : public cRenderHost
+{
+public:
+    std::vector<wordstartui::sInputEvent> mEvents;
+
+    void HostRunModal(wordstartui::cDialog& dialog) override
+    {
+        for (const wordstartui::sInputEvent& event : mEvents)
+        {
+            dialog.HandleEvent(event);
+        }
+        cRenderHost::HostRunModal(dialog);
+        if (mEvents.empty() == false)
+        {
+            dialog.SetResult(wordstartui::DIALOG_RESULT_OK);
+        }
+    }
+
+    void Type(const std::string& text)
+    {
+        for (char ch : text)
+        {
+            wordstartui::sInputEvent event{};
+            event.type = wordstartui::INPUT_TYPE_TEXT;
+            event.textUtf8 = std::string(1, ch);
+            event.codepoint = static_cast<char32_t>(ch);
+            mEvents.push_back(event);
+        }
+    }
+
+    void Tab(void)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_SPECIAL;
+        event.special = wordstartui::SPECIAL_KEY_TAB;
+        mEvents.push_back(event);
+    }
+};
+
+}
+
+
+TEST_CASE("TUI Write Block dialog - file name and Copy in ASCII Format box")
+{
+    const std::string unticked = std::string(wordstartui::GLYPH_CHECK_OFF) + " Copy in ASCII Format";
+    const std::string ticked = std::string(wordstartui::GLYPH_CHECK_ON) + " Copy in ASCII Format";
+
+    SUBCASE("the dialog shows the file field and the box unticked")
+    {
+        cRenderHost host;
+        std::string filename;
+        bool ascii = false;
+        CHECK_FALSE(wsdialogs::WriteBlockDialog(&host, filename, ascii, false));
+
+        CHECK(host.Shows(" Write Block "));
+        CHECK(host.Shows("File:"));
+        CHECK(host.Shows(unticked));
+        CHECK(host.Shows(" OK "));
+        CHECK(host.Shows(" Cancel "));
+        CHECK(host.RightBorderIntact());
+    }
+
+    SUBCASE("a locked box shows ticked")
+    {
+        cRenderHost host;
+        std::string filename;
+        bool ascii = true;
+        wsdialogs::WriteBlockDialog(&host, filename, ascii, true);
+        CHECK(host.Shows(ticked));
+    }
+
+    SUBCASE("OK returns the file name and the box state")
+    {
+        cEventHost host;
+        host.Type("out.txt");
+        host.Tab();
+        host.Type(" ");
+        std::string filename;
+        bool ascii = false;
+        REQUIRE(wsdialogs::WriteBlockDialog(&host, filename, ascii, false));
+        CHECK(filename == "out.txt");
+        CHECK(ascii == true);
+        CHECK(host.Shows(ticked));
+    }
+
+    SUBCASE("a locked box cannot be unticked")
+    {
+        cEventHost host;
+        host.Type("out.txt");
+        host.Tab();
+        host.Type(" ");
+        std::string filename;
+        bool ascii = true;
+        REQUIRE(wsdialogs::WriteBlockDialog(&host, filename, ascii, true));
+        CHECK(filename == "out.txt");
+        CHECK(ascii == true);
+        CHECK(host.Shows(ticked));
+    }
+
+    SUBCASE("cancel returns false")
+    {
+        cRenderHost host;
+        std::string filename = "x";
+        bool ascii = false;
+        CHECK_FALSE(wsdialogs::WriteBlockDialog(&host, filename, ascii, false));
+    }
 }
 
 

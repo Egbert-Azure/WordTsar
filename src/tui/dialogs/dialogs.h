@@ -55,6 +55,12 @@ bool InputBox(iWSDialogHost* host, const std::string& title, const std::string& 
 bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
                  const std::string& startPath, std::string& result);
 
+// ^KW Write Block: file name field and Copy in ASCII Format box. filename and
+// asciiFormat are the initial values; with asciiLocked the box cannot change.
+// Returns true on OK with a file name (values updated), false on cancel.
+bool WriteBlockDialog(iWSDialogHost* host, std::string& filename, bool& asciiFormat,
+                      bool asciiLocked);
+
 // A scrollable multi-line viewer (used for print preview). Returns when closed.
 void TextViewer(iWSDialogHost* host, const std::string& title,
                 const std::vector<std::string>& lines);

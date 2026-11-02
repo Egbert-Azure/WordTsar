@@ -967,6 +967,96 @@ bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @param  iWSDialogHost* host [in] dialog host
+/// @param  std::string& filename [in,out] initial and returned file name
+/// @param  bool& asciiFormat [in,out] initial and returned box state
+/// @param  bool asciiLocked [in] the box cannot be changed
+///
+/// @return true when OK was pressed with a file name
+///
+/// @brief
+/// Display the ^KW Write Block dialog: a file name field and the Copy in
+/// ASCII Format check box.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool WriteBlockDialog(iWSDialogHost* host, std::string& filename, bool& asciiFormat,
+                      bool asciiLocked)
+{
+    int width = 54;
+    int height = 8;
+
+    sRect rect = CenteredRect(host, height, width);
+    cDialog dialog(rect, "Write Block");
+
+    sRect labelRect;
+    labelRect.row = rect.row + 2;
+    labelRect.col = rect.col + 2;
+    labelRect.rows = 1;
+    labelRect.cols = 6;
+    dialog.AddWidget(std::make_unique<cLabel>(labelRect, "File:"));
+
+    sRect fieldRect;
+    fieldRect.row = rect.row + 2;
+    fieldRect.col = rect.col + 10;
+    fieldRect.rows = 1;
+    fieldRect.cols = rect.cols - 12;
+
+    auto field = std::make_unique<cTextField>(fieldRect, filename);
+    cTextField* fieldPtr = field.get();
+    dialog.AddWidget(std::move(field));
+
+    sRect asciiRect;
+    asciiRect.row = rect.row + 4;
+    asciiRect.col = rect.col + 2;
+    asciiRect.rows = 1;
+    asciiRect.cols = 24;
+    auto asciiBox = std::make_unique<cCheckBox>(asciiRect, "Copy in ASCII Format",
+                                                BoolToTri(asciiFormat || asciiLocked));
+    asciiBox->SetEnabled(asciiLocked == false);
+    cCheckBox* asciiPtr = asciiBox.get();
+    dialog.AddWidget(std::move(asciiBox));
+
+    cDialog* dialogPtr = &dialog;
+
+    sRect okRect;
+    okRect.rows = 1;
+    okRect.cols = 10;
+    okRect.row = rect.row + rect.rows - 2;
+    okRect.col = rect.col + ((rect.cols - 24) / 2);
+    dialog.AddWidget(std::make_unique<cButton>(okRect, "OK", [dialogPtr]() {
+        dialogPtr->SetResult(DIALOG_RESULT_OK);
+    }));
+
+    sRect cancelRect;
+    cancelRect.rows = 1;
+    cancelRect.cols = 10;
+    cancelRect.row = okRect.row;
+    cancelRect.col = okRect.col + 12;
+    dialog.AddWidget(std::make_unique<cButton>(cancelRect, "Cancel", [dialogPtr]() {
+        dialogPtr->SetResult(DIALOG_RESULT_CANCEL);
+    }));
+
+    dialog.FocusFirst();
+    host->HostRunModal(dialog);
+
+    if (dialog.GetResult() != DIALOG_RESULT_OK)
+    {
+        return false;
+    }
+
+    std::string name = fieldPtr->GetText();
+    if (name.empty() == true)
+    {
+        return false;
+    }
+
+    filename = name;
+    asciiFormat = asciiLocked || TriToBool(asciiPtr);
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  iWSDialogHost* host [in] dialog host
 /// @param  const std::string& title [in] dialog title
 /// @param  const std::vector<std::string>& lines [in] text lines
 ///

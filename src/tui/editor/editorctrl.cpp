@@ -1554,14 +1554,29 @@ std::string cWSEditorCtrl::PromptForSaveFile(void)
 /// @return the chosen file name, empty if cancelled
 ///
 /// @brief
-/// ^KW file prompt.
+/// ^KW file prompt: the Write Block dialog. A relative name is taken from
+/// the document's folder.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cWSEditorCtrl::PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked)
 {
-    (void)asciiFormat;
-    (void)asciiLocked;
-    return PromptForSaveFile();
+    if (mHost == nullptr)
+    {
+        return "";
+    }
+
+    std::string name;
+    if (wsdialogs::WriteBlockDialog(mHost, name, asciiFormat, asciiLocked) == false)
+    {
+        return "";
+    }
+
+    std::filesystem::path path(name);
+    if ((path.is_relative() == true) && (mFileDir.empty() == false))
+    {
+        path = std::filesystem::path(mFileDir) / path;
+    }
+    return path.string();
 }
 
 
