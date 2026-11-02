@@ -78,12 +78,14 @@
  */
 
 #include "editorbase.h"
+#include "src/files/wordstar/wordstarfile.h"
 #include "SimpleIni.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <random>
 
@@ -3887,6 +3889,114 @@ std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
     }
 
     return ret ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  start       [in] - first position of the block
+/// @param  end         [in] - position after the last one
+/// @param  filename    [in] - file to write
+/// @param  asciiFormat [in] - Copy in ASCII Format box
+/// @param  choice      [in] - Overwrite or Append, used when the file exists
+///                            and is not empty
+///
+/// @return true if the file was written, false otherwise
+///
+/// @brief
+/// ^KW write of a range. A text document always writes text. A WordStar
+/// document writes a WordStar 7 file (cWordstarFile::SaveRange) unless
+/// asciiFormat is set; then it writes GetAsciiBlockText() with LF. A
+/// missing or empty file is written as new. Append to a WordStar file
+/// (by content) inserts the block at its text end
+/// (cWordstarFile::InsertAtTextEnd), as WordStar bytes or as text by the
+/// same rule. Append to any other file adds GetAsciiBlockText(), with CRLF
+/// if the file contains CRLF, else LF.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::WriteBlock(POSITION_T start, POSITION_T end, const std::string& filename,
+                             bool asciiFormat, eFileExistsChoice choice)
+{
+    if (mDocument == nullptr || choice == eFileExistsChoice::Cancel)
+    {
+        return false ;
+    }
+
+    if (mDocument->IsTextFile())
+    {
+        asciiFormat = true ;
+    }
+
+    std::error_code ec ;
+    bool append = (choice == eFileExistsChoice::Append) &&
+                  std::filesystem::exists(filename, ec) &&
+                  std::filesystem::file_size(filename, ec) > 0 && !ec ;
+
+    cWordstarFile writer(this) ;
+    writer.mDocument = mDocument ;
+
+    if (append == false)
+    {
+        if (asciiFormat == false)
+        {
+            return writer.SaveRange(filename, start, end) ;
+        }
+
+        std::ofstream file(filename, std::ios::out | std::ios::binary | std::ios::trunc) ;
+        if (!file.is_open())
+        {
+            return false ;
+        }
+        file << GetAsciiBlockText(start, end) ;
+        file.close() ;
+        return !file.fail() ;
+    }
+
+    std::string existing ;
+    {
+        std::ifstream in(filename, std::ios::binary) ;
+        existing.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()) ;
+    }
+
+    bool wordstarTarget = cWordstarFile::IsWordStarData(filename) ;
+
+    std::string bytes ;
+    if (wordstarTarget && asciiFormat == false)
+    {
+        uint32_t counted = 0 ;
+        bytes = writer.EncodeRange(start, end, counted) ;
+    }
+    else
+    {
+        bytes = GetAsciiBlockText(start, end) ;
+        if (existing.find("\r\n") != std::string::npos)
+        {
+            std::string crlf ;
+            for (char c : bytes)
+            {
+                if (c == '\n')
+                {
+                    crlf += '\r' ;
+                }
+                crlf += c ;
+            }
+            bytes = crlf ;
+        }
+    }
+
+    if (wordstarTarget)
+    {
+        return cWordstarFile::InsertAtTextEnd(filename, bytes) ;
+    }
+
+    std::ofstream file(filename, std::ios::out | std::ios::binary | std::ios::app) ;
+    if (!file.is_open())
+    {
+        return false ;
+    }
+    file << bytes ;
+    file.close() ;
+    return !file.fail() ;
 }
 
 

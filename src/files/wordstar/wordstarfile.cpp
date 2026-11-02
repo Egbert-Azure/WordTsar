@@ -69,11 +69,15 @@
  * @see sOrgFont Original font property storage
  */
 
+#include <algorithm>
 #include <bitset>
 #include <cctype>
 #include <climits>
+#include <cstddef>
 #include <cstring>
 #include <cstdint>
+#include <fstream>
+#include <iterator>
 #include <numeric>
 #include <vector>
 
@@ -1465,6 +1469,97 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
     }
 
     return out ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] - file to inspect
+///
+/// @return true if the content of the file is a WordStar document
+///
+/// @brief
+/// IsWordStarContent() without regard to the extension.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::IsWordStarData(const std::string &filename)
+{
+    return IsWordStarContent(filename) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] - WordStar file to change
+/// @param  bytes    [in] - bytes to insert
+///
+/// @return true if the file was written, false otherwise
+///
+/// @brief
+/// Inserts bytes where the text of a WordStar file ends: at the first 0x1A
+/// outside a 0x1D sequence, or at the end of the file. What follows (0x1A
+/// padding, style library) moves back unchanged. In a file with a WordStar
+/// 5+ header, a style offset at or after the insertion point is moved by
+/// the inserted size; no other byte of the file changes.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::string &bytes)
+{
+    std::string data ;
+    {
+        std::ifstream in(filename, std::ios::binary) ;
+        if (!in.is_open())
+        {
+            return false ;
+        }
+        data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()) ;
+    }
+
+    size_t textEnd = 0 ;
+    while (textEnd < data.size())
+    {
+        unsigned char c = static_cast<unsigned char>(data[textEnd]) ;
+        if (c == 0x1D && textEnd + 2 < data.size())
+        {
+            size_t len = static_cast<unsigned char>(data[textEnd + 1]) |
+                         (static_cast<size_t>(static_cast<unsigned char>(data[textEnd + 2])) << 8) ;
+            if (len >= 4 && textEnd + len + 2 < data.size())
+            {
+                textEnd += len + 3 ;
+                continue ;
+            }
+        }
+        if (c == static_cast<unsigned char>(STYLE_EOF))
+        {
+            break ;
+        }
+        textEnd++ ;
+    }
+    textEnd = std::min(textEnd, data.size()) ;
+
+    const size_t headerSize = sizeof(sSeqIntro) + sizeof(sWSHeader) + sizeof(sSeqClose) ;
+    const size_t stylesAt = sizeof(sSeqIntro) + offsetof(sWSHeader, styles) ;
+    if (data.size() >= headerSize && data[0] == 0x1D && data[3] == 0x00 && textEnd >= headerSize)
+    {
+        uint32_t styles = 0 ;
+        memcpy(&styles, &data[stylesAt], sizeof(styles)) ;
+        if (styles >= textEnd)
+        {
+            styles += static_cast<uint32_t>(bytes.size()) ;
+            memcpy(&data[stylesAt], &styles, sizeof(styles)) ;
+        }
+    }
+
+    data.insert(textEnd, bytes) ;
+
+    std::ofstream out(filename, std::ios::binary | std::ios::trunc) ;
+    if (!out.is_open())
+    {
+        return false ;
+    }
+    out.write(data.data(), static_cast<std::streamsize>(data.size())) ;
+    out.close() ;
+    return !out.fail() ;
 }
 
 

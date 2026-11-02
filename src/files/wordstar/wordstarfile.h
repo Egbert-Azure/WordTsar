@@ -114,6 +114,9 @@ public:
     bool SaveRange(std::string filename, POSITION_T start, POSITION_T end) ;
     std::string EncodeRange(POSITION_T start, POSITION_T end, uint32_t &stylecounter) ;
 
+    static bool IsWordStarData(const std::string &filename) ;
+    static bool InsertAtTextEnd(const std::string &filename, const std::string &bytes) ;
+
     bool CanLoad(void) ;
     bool CanSave(void) ;
 

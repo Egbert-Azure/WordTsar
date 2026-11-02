@@ -26,6 +26,7 @@
 #include "src/gui/dialogs/colordialog.h"
 #include "src/gui/layout/layout.h"
 #include "src/core/document/document.h"
+#include "src/files/wordstar/wordstarfile.h"
 #include <QCheckBox>
 #include "src/input/wordtsarinput.h"  // For CTRL_* constants and eSpecialChars
 #include "src/input/moderninput.h"   // For Modern/CUA input handler tests
@@ -39,6 +40,7 @@
 #include <filesystem>
 #include <fstream>
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <memory>
 #include <random>
@@ -15617,6 +15619,141 @@ TEST_CASE("cEditorBase::GetAsciiBlockText - no control bytes, tabs become spaces
         }
     }
     CHECK_FALSE(controlBytes);
+}
+
+
+TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-writeblock-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    sInternalFonts font;
+    font.fontname = "Courier";
+    font.size = 12.0;
+    font.haveWSFont = false;
+    font.name = "Courier";
+
+    doc->InsertFont(font);
+    doc->Insert("a");
+    doc->InsertTab(tab);
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->Insert("b");
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->Insert("\r");
+    editor.GetLayout()->LayoutDocument(doc);
+
+    POSITION_T start = 1;
+    POSITION_T end = doc->GetTextSize();
+
+    // the block as a WordStar file and as the bytes inside one
+    std::filesystem::path wsBlockPath = dir / "expected.ws";
+    cWordstarFile writer(&editor);
+    writer.mDocument = doc;
+    writer.SetSilent(true);
+    REQUIRE(writer.SaveRange(wsBlockPath.string(), start, end));
+    std::string wsBlock = ReadFileBytes(wsBlockPath);
+    uint32_t counted = 0;
+    std::string wsBytes = writer.EncodeRange(start, end, counted);
+    REQUIRE(wsBlock.substr(128, wsBytes.size()) == wsBytes);
+
+    using eChoice = cEditorBase::eFileExistsChoice;
+
+    SUBCASE("a WordStar document writes WordStar format whatever the extension")
+    {
+        auto path = dir / "out.txt";
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Overwrite));
+        CHECK(ReadFileBytes(path) == wsBlock);
+    }
+
+    SUBCASE("the box ticked writes text whatever the extension")
+    {
+        auto path = dir / "out.ws";
+        REQUIRE(editor.WriteBlock(start, end, path.string(), true, eChoice::Overwrite));
+        CHECK(ReadFileBytes(path) == "a    b\n");
+    }
+
+    SUBCASE("a text document writes text with the box unticked")
+    {
+        doc->SetTextFile(true);
+        auto path = dir / "out.ws";
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Overwrite));
+        CHECK(ReadFileBytes(path) == "a    b\n");
+    }
+
+    SUBCASE("Overwrite replaces an existing file")
+    {
+        auto path = dir / "old.ws";
+        WriteFileBytes(path, std::string(300, 'x'));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Overwrite));
+        CHECK(ReadFileBytes(path) == wsBlock);
+    }
+
+    SUBCASE("Append to an empty file writes a new file")
+    {
+        auto path = dir / "empty.ws";
+        WriteFileBytes(path, "");
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        CHECK(ReadFileBytes(path) == wsBlock);
+    }
+
+    SUBCASE("Append to a CRLF text file writes text with CRLF")
+    {
+        auto path = dir / "crlf.ws";
+        WriteFileBytes(path, "x\r\ny\r\n");
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        CHECK(ReadFileBytes(path) == "x\r\ny\r\na    b\r\n");
+    }
+
+    SUBCASE("Append to an LF text file writes text with LF")
+    {
+        auto path = dir / "lf.txt";
+        WriteFileBytes(path, "x\ny\n");
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+        CHECK(ReadFileBytes(path) == "x\ny\na    b\n");
+    }
+
+    SUBCASE("Append to a WordStar file goes before its end of file and style library")
+    {
+        // header, text, 0x1A up to 256, then a style library at 256
+        sWSHeader header;
+        memset(&header, 0, sizeof(header));
+        header.version = 0x70;
+        memcpy(header.driver, "LASERJET", 9);
+        header.styles = 256;
+        std::string target("\x1D\x7D\x00\x00", 4);
+        target.append(reinterpret_cast<const char*>(&header), sizeof(header));
+        target.append("\x7D\x00\x1D", 3);
+        target += "Old\x0D\x0A";
+        target.append(256 - target.size(), '\x1A');
+        target += std::string("\x1A\x55\x01\x00\x01\x02\x00\x66", 8) + "Library";
+
+        auto path = dir / "target.dat";
+        WriteFileBytes(path, target);
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append));
+
+        size_t textEnd = 128 + 5;
+        std::string expected = target.substr(0, textEnd) + wsBytes + target.substr(textEnd);
+        uint32_t styles = 256 + static_cast<uint32_t>(wsBytes.size());
+        memcpy(&expected[4 + offsetof(sWSHeader, styles)], &styles, sizeof(styles));
+        CHECK(ReadFileBytes(path) == expected);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
 }
 
 
