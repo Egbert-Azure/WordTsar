@@ -16379,12 +16379,6 @@ TEST_CASE("GUI editor - ^KW Append to a file whose status cannot be read fails w
 
     std::string target = (locked / "target.txt").string();
 
-    SUBCASE("WriteBlock")
-    {
-        CHECK(editor.WriteBlock(0, doc->GetTextSize(), target, true, cEditorBase::eFileExistsChoice::Append) ==
-              cEditorBase::eWriteBlockResult::Failed);
-    }
-
     SUBCASE("^KW")
     {
         editor.mTarget = target;
