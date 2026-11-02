@@ -384,11 +384,14 @@ std::string LpstatPath(void)
 ///         has not finished after timeoutMs
 ///
 /// @brief
-/// The program runs in its own process group with LC_ALL=C, standard
-/// input and error on /dev/null and no other open descriptors. Output is
-/// read through a pipe with poll() until end of file and the program is
-/// reaped with waitpid(); past the deadline the process group is killed
-/// with SIGKILL and the program reaped.
+/// The program runs in its own process group with LC_ALL=C and standard
+/// input and error on /dev/null. Where POSIX_SPAWN_CLOEXEC_DEFAULT exists
+/// (macOS) it has no other open descriptors. Elsewhere the read end of the
+/// pipe is closed in the program, and it inherits every other descriptor
+/// of the caller that is not close-on-exec, the pipe's write end among
+/// them. Output is read through a pipe with poll() until end of file and
+/// the program is reaped with waitpid(); past the deadline the process
+/// group is killed with SIGKILL and the program reaped.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string RunCommand(const std::string& path, const std::vector<std::string>& args, int timeoutMs)
