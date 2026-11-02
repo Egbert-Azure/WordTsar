@@ -15565,6 +15565,61 @@ TEST_CASE("GUI editor - clipboard copy writes plain text with LF line endings")
 }
 
 
+TEST_CASE("cEditorBase::GetAsciiBlockText - no control bytes, tabs become spaces up to the tab stops of the line")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(doc != nullptr);
+    REQUIRE(layout != nullptr);
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    sInternalFonts font;
+    font.fontname = "Courier";
+    font.size = 12.0;
+    font.haveWSFont = false;
+    font.name = "Courier";
+
+    sNote footnote;
+    footnote.symbol = NOTE_NUMBER;
+    footnote.text = "a footnote";
+
+    doc->InsertFont(font);
+    doc->Insert("A");
+    doc->InsertTab(tab);
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->Insert("B");
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->InsertFootnote(footnote);
+    doc->Insert("\rabcdef");
+    doc->InsertTab(tab);
+    doc->Insert("g\r.tb 1.2i\r1234567");
+    doc->InsertTab(tab);
+    doc->Insert("h\r");
+    layout->LayoutDocument(doc);
+
+    std::string text = editor.GetAsciiBlockText(0, doc->GetTextSize());
+    CHECK(text == "A    B\nabcdef    g\n1234567     h\n");
+
+    bool controlBytes = false;
+    for (unsigned char c : text)
+    {
+        if (c < 0x20 && c != '\n')
+        {
+            controlBytes = true;
+        }
+    }
+    CHECK_FALSE(controlBytes);
+}
+
+
 TEST_CASE("GUI editor - an export format leaves the save format unchanged")
 {
     ensureQApplication();

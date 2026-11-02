@@ -3793,6 +3793,105 @@ void cEditorBase::WriteBlockToFile(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  layout [in] - laid-out document, may be null
+/// @param  pos    [in] - position of the tab
+/// @param  column [in] - characters written since the start of the laid-out line
+///
+/// @return number of spaces that replace the tab, at least one
+///
+/// @brief
+/// A tab expands to the column where the layout puts the character after
+/// it, in 1/10 inch columns from the start of the laid-out line. Without a
+/// layout for pos, the tab expands to the next multiple of 5 columns.
+///
+/////////////////////////////////////////////////////////////////////////////
+static size_t AsciiTabSpaces(cLayoutBase* layout, POSITION_T pos, size_t column)
+{
+    const double twipsPerColumn = TWIPSPERINCH / 10.0 ;
+    size_t stop = (column / 5 + 1) * 5 ;
+
+    LINE_T line = (layout != nullptr) ? layout->GetLineFromPosition(pos) : -1 ;
+    if (line >= 0)
+    {
+        COORD_T left = layout->FindLayoutCoordInLine(layout->GetLineStartDocumentPosition(line), line) ;
+        COORD_T after = layout->FindLayoutCoordInLine(pos + 1, line) ;
+        double columns = std::round(static_cast<double>(after - left) / twipsPerColumn) ;
+        stop = (columns > 0.0) ? static_cast<size_t>(columns) : 0 ;
+    }
+
+    return (stop > column) ? stop - column : 1 ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  start [in] - first position
+/// @param  end   [in] - position after the last one
+///
+/// @return the range as ^KW writes it with Copy in ASCII Format
+///
+/// @brief
+/// GetPlainText() of the range with LF line endings, without dot command
+/// and comment paragraphs, and with each tab replaced by the spaces
+/// AsciiTabSpaces() gives. A paragraph stays one line.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorBase::GetAsciiBlockText(POSITION_T start, POSITION_T end)
+{
+    std::string ret ;
+    if (mDocument == nullptr)
+    {
+        return ret ;
+    }
+
+    cLayoutBase* layout = GetLayout() ;
+    LINE_T currentLine = -1 ;
+    size_t column = 0 ;
+
+    for (POSITION_T pos = start; pos < end; pos++)
+    {
+        if (layout != nullptr)
+        {
+            PARAGRAPH_T para = mDocument->GetParagraphFromPosition(pos) ;
+            if (layout->ParagraphIsCommand(para) || layout->ParagraphIsComment(para))
+            {
+                continue ;
+            }
+
+            LINE_T line = layout->GetLineFromPosition(pos) ;
+            if (line != currentLine)
+            {
+                currentLine = line ;
+                column = 0 ;
+            }
+        }
+
+        std::string ch = mDocument->GetChar(pos) ;
+        if (ch.length() == 1 && static_cast<unsigned char>(ch[0]) == MARKER_CHAR &&
+            mDocument->GetControlChar(pos) == STYLE_TAB)
+        {
+            size_t spaces = AsciiTabSpaces(layout, pos, column) ;
+            ret.append(spaces, ' ') ;
+            column += spaces ;
+        }
+        else
+        {
+            std::string text = mDocument->GetPlainText(pos, pos + 1, "\n") ;
+            ret += text ;
+            column += text.empty() ? 0 : 1 ;
+            if (text == "\n")
+            {
+                column = 0 ;
+            }
+        }
+    }
+
+    return ret ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return the marked block as ClipboardCopy() writes it, empty if no block
 ///
 /// @brief
