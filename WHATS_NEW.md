@@ -21,6 +21,16 @@ Release history for WordTsar, in reverse chronological order.
 - Fixed: a text file keeps its line endings when it is saved. New text files, Write Block to File and clipboard copy use LF (#51).
 - Fixed: a text save that fails to write is now reported (#51).
 - Fixed: Opening-screen entries without an action are drawn like the other entries (#24).
+- Fixed: Alt plus a letter no longer runs Opening Menu commands (#24).
+- Fixed: Escape on the Opening screen does nothing. X exits (#24).
+- Fixed: Tab on the Opening screen cancels a pending print, index or table of contents request. Choosing one of the three replaces the pending one (#24).
+- Fixed: a pull-down menu entry that WordTsar does not implement closes the menu, so the message is not hidden at 24 rows (#24).
+- Fixed: an error message such as a failed backup stays visible when WordTsar says an entry is not available, and when you switch between the Opening screen and the edit screen (#24).
+- Fixed: terminal keys that WordTsar does not know, such as Shift+Tab and Ctrl+arrows, are ignored. They used to act as Escape (#58).
+- Fixed: Alt+Backspace and Alt with an accented letter are ignored instead of acting as Escape (#58).
+- Fixed: ESC ESC is read as one Escape (#58).
+- Fixed: the arrow keys, Home and End work when the terminal is in application cursor mode (#58).
+- Fixed: printing and the printer lookup (lpstat) wait at most one second (#58).
 
 **Changes**
 
@@ -33,10 +43,17 @@ Release history for WordTsar, in reverse chronological order.
 - Changed: the Opening file list starts in the folder ws was started from, unless Default Directory is set (#24).
 - Changed: the Opening screen colours follow the active colour preset (#24).
 - Changed: menu hotkey letters and highlighted entries use colour only, with no bold (#55).
+- Changed: the Opening file list shows no selection until you use it. Then a highlight bar follows the arrow keys, a click or letter focus. Enter opens the highlighted entry (#24).
+- Changed: a click on a file in the Opening file list opens it. At help levels 0 to 3 a click on a panel entry runs it (#24).
+- Changed: Opening screen and menu entries that WordTsar does not implement show "Not available in WordTsar" on the status line (#24, #55).
+- Changed: the TUI About box starts with "A WordStar 7 clone for the 21st century.", lists the open-source components with their licences and shows the trademark line. It scrolls, the OK button stays visible, and it uses the dialog colours (#58).
 
 **Additions**
 
 - Added: the colour setting "Selected hotkey" in System Preferences, for the hotkey letter of a highlighted menu entry (#55).
+- Added: ws shows a startup screen for 1.5 seconds or until the first key. It shows the WordTsar title, the version, the credits, a system line (macOS version, chip, terminal and its size, and the default printer or Printing to PDF), what the app uses from macOS, the licence and the trademark note (#58).
+- Added: keys typed during the startup screen go to the Opening screen. When ws starts with a file name they are dropped. Escape only ends the startup screen (#58).
+- Added: the preference "Show startup screen" in System Preferences. It is on by default (#58).
 
 ## 0.14.2 (2026-10-30)
 
