@@ -16209,6 +16209,16 @@ TEST_CASE("cEditorBase::WriteBlock - text into a WordStar target is written in t
         CHECK(editor.mAsks == 0);
     }
 
+    SUBCASE("the box ticked: a character whose code page byte is 0x0A gets no CR inside its escape")
+    {
+        POSITION_T end = setBlock("a\xE2\x97\x99\r" "b\r");
+        REQUIRE(editor.WriteBlock(0, end, path, true, eChoice::Append) == eResult::Written);
+        std::string result = ReadFileBytes(path);
+        CHECK(result.find("a\x1B\x0A\x1C\r\n" "b\r\n") != std::string::npos);
+        CHECK(result.find("\x1B\r\n\x1C") == std::string::npos);
+        CHECK(editor.mAsks == 0);
+    }
+
     SUBCASE("a text document: a non-ASCII character lands as its code page byte")
     {
         POSITION_T end = setBlock("a\xC3\xA4" "b\r");
