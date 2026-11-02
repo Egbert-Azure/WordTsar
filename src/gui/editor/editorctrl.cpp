@@ -7486,6 +7486,25 @@ std::string cEditorCtrl::PromptForSaveFile(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  asciiFormat [in,out] - Copy in ASCII Format box state
+/// @param  asciiLocked [in]     - the box cannot be changed
+///
+/// @return the chosen file name, empty if cancelled
+///
+/// @brief
+/// ^KW file prompt.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorCtrl::PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked)
+{
+    (void)asciiFormat ;
+    (void)asciiLocked ;
+    return PromptForSaveFile() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return bool - true if a file was loaded, false if user cancelled or load failed
 ///
 /// @brief

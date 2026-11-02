@@ -3743,10 +3743,9 @@ bool cEditorBase::IsPageBreakDotCommand(PARAGRAPH_T para)
 ///
 /// @brief
 /// Real WordStar 7 ^KW: writes the marked block to another file. Prompts
-/// for a filename; if it already exists, prompts to Overwrite, Append, or
-/// Cancel (matching the classic keyboard command's own O/A/Esc prompt).
-/// The block is written as plain text (cDocument::GetPlainText) with LF
-/// line endings.
+/// for a file name and the Copy in ASCII Format box, which starts unticked;
+/// a text document shows it ticked and locked. If the file exists, prompts
+/// to Overwrite, Append, or Cancel. WriteBlock() writes the block.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::WriteBlockToFile(void)
@@ -3757,39 +3756,31 @@ void cEditorBase::WriteBlockToFile(void)
         return ;
     }
 
-    std::string filename = PromptForSaveFile() ;
+    bool asciiLocked = mDocument->IsTextFile() ;
+    bool asciiFormat = asciiLocked ;
+    std::string filename = PromptForWriteBlockFile(asciiFormat, asciiLocked) ;
     if (filename.empty())
     {
         return ;
     }
 
-    std::ios_base::openmode mode = std::ios::out | std::ios::binary ;
-
+    eFileExistsChoice choice = eFileExistsChoice::Overwrite ;
     if (std::filesystem::exists(filename))
     {
-        eFileExistsChoice choice = ConfirmOverwriteOrAppend(filename) ;
-        if (choice == eFileExistsChoice::Append)
+        choice = ConfirmOverwriteOrAppend(filename) ;
+        if (choice == eFileExistsChoice::Cancel)
         {
-            mode = std::ios::out | std::ios::binary | std::ios::app ;
-        }
-        else if (choice != eFileExistsChoice::Overwrite)
-        {
-            return ;  // Cancel or Escape
+            return ;
         }
     }
 
     POSITION_T start = 0, end = 0 ;
     mDocument->GetBlock(start, end) ;
-    std::string text = mDocument->GetPlainText(start, end, "\n") ;
 
-    std::ofstream file(filename, mode) ;
-    if (!file.is_open())
+    if (WriteBlock(start, end, filename, asciiFormat, choice) == false)
     {
         ShowError("Write Block", "Could not write to \"" + filename + "\".") ;
-        return ;
     }
-    file << text ;
-    file.close() ;
 }
 
 

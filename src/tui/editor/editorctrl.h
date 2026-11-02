@@ -119,6 +119,7 @@ public:
     void AutoSaveBackup(void);
     std::string PromptForLoadFile(void) override;
     std::string PromptForSaveFile(void) override;
+    std::string PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked) override;
     bool CloseEvent(void) override;
     void FileIOProgress(int percent) override;
 

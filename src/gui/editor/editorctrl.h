@@ -195,6 +195,7 @@ public:
     bool SaveFile(const std::string& filename) override;
     std::string PromptForLoadFile(void) override;
     std::string PromptForSaveFile(void) override;
+    std::string PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked) override;
 
     // --- High-level file operations for menu actions. Bypass the input
     // handler so they work correctly in all input modes (WordStar / Modern).

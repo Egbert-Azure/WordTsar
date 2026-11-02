@@ -382,8 +382,10 @@ class cBlockTargetEditor : public cWSEditorCtrl
 public:
     std::string mTarget;
 
-    std::string PromptForSaveFile(void) override
+    std::string PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked) override
     {
+        (void)asciiFormat;
+        (void)asciiLocked;
         return mTarget;
     }
 };
@@ -544,7 +546,7 @@ TEST_CASE("cWSEditorCtrl - Write Block to File writes plain text from a text doc
     {
         WriteFileBytes(dir / "crlf.txt", "a\tb\r\nc\r\n");
         REQUIRE(editor.LoadFile((dir / "crlf.txt").string()));
-        CHECK(writeWholeDocument() == "a\tb\nc\n");
+        CHECK(writeWholeDocument() == "a    b\nc\n");
     }
 
     SUBCASE("markers in a text document")
@@ -563,7 +565,7 @@ TEST_CASE("cWSEditorCtrl - Write Block to File writes plain text from a text doc
         doc->InsertVariable(VAR_DATE);
         doc->Insert("\rC\x7f" "D");
         doc->SetTextFile(true);
-        CHECK(writeWholeDocument() == "A\tB\nC\x7f" "D");
+        CHECK(writeWholeDocument() == "A B\nC\x7f" "D");
     }
 
     std::error_code ec;

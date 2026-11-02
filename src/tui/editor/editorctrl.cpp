@@ -1548,6 +1548,25 @@ std::string cWSEditorCtrl::PromptForSaveFile(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  asciiFormat [in,out] - Copy in ASCII Format box state
+/// @param  asciiLocked [in]     - the box cannot be changed
+///
+/// @return the chosen file name, empty if cancelled
+///
+/// @brief
+/// ^KW file prompt.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cWSEditorCtrl::PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked)
+{
+    (void)asciiFormat;
+    (void)asciiLocked;
+    return PromptForSaveFile();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return bool - true when it may close (unmodified, Don't Save, or saved);
 ///                false on Cancel, a cancelled name prompt or a failed save
 ///

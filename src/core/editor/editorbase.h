@@ -162,6 +162,11 @@ public:
     enum class eFileExistsChoice { Overwrite, Append, Cancel };
     virtual eFileExistsChoice ConfirmOverwriteOrAppend(const std::string& filename) = 0;
 
+    // Pure Virtual - ^KW file prompt with the Copy in ASCII Format box.
+    // asciiFormat [in,out] is the box state; with asciiLocked the box shows
+    // ticked and cannot be changed. Returns the file name, empty on cancel.
+    virtual std::string PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked) = 0;
+
     // Shared (concrete) -- implemented once in editorbase.cpp since they only
     // need cEditorBase's own document/layout access, no frontend-specific UI.
     void SortBlock(bool ascending);                           // Sort marked block's paragraphs (^KZ,A/D)

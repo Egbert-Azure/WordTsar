@@ -15316,8 +15316,10 @@ class cBlockTargetEditor : public cEditorCtrl
 public:
     std::string mTarget;
 
-    std::string PromptForSaveFile(void) override
+    std::string PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked) override
     {
+        (void)asciiFormat;
+        (void)asciiLocked;
         return mTarget;
     }
 };
@@ -15494,7 +15496,7 @@ TEST_CASE("GUI editor - Write Block to File writes plain text from a text docume
     {
         WriteFileBytes(dir / "crlf.txt", "a\tb\r\nc\r\n");
         REQUIRE(editor.LoadFile((dir / "crlf.txt").string()));
-        CHECK(writeWholeDocument() == "a\tb\nc\n");
+        CHECK(writeWholeDocument() == "a    b\nc\n");
     }
 
     SUBCASE("markers in a text document")
@@ -15513,7 +15515,7 @@ TEST_CASE("GUI editor - Write Block to File writes plain text from a text docume
         doc->InsertVariable(VAR_DATE);
         doc->Insert("\rC\x7f" "D");
         doc->SetTextFile(true);
-        CHECK(writeWholeDocument() == "A\tB\nC\x7f" "D");
+        CHECK(writeWholeDocument() == "A B\nC\x7f" "D");
     }
 
     std::error_code ec;
@@ -15750,6 +15752,157 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
         uint32_t styles = 256 + static_cast<uint32_t>(wsBytes.size());
         memcpy(&expected[4 + offsetof(sWSHeader, styles)], &styles, sizeof(styles));
         CHECK(ReadFileBytes(path) == expected);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+namespace
+{
+
+class cWriteBlockPromptEditor : public cEditorCtrl
+{
+public:
+    std::string mTarget;
+    bool mTick = false;
+    int mCalls = 0;
+    bool mShownAscii = false;
+    bool mShownLocked = false;
+
+    std::string PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked) override
+    {
+        ++mCalls;
+        mShownAscii = asciiFormat;
+        mShownLocked = asciiLocked;
+        asciiFormat = mTick;
+        return mTarget;
+    }
+};
+
+}   // anonymous namespace
+
+
+TEST_CASE("GUI editor - ^KW prompts for the file and the Copy in ASCII Format box")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-kwprompt-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cWriteBlockPromptEditor editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    sInternalFonts font;
+    font.fontname = "Courier";
+    font.size = 12.0;
+    font.haveWSFont = false;
+    font.name = "Courier";
+
+    doc->InsertFont(font);
+    doc->Insert("a");
+    doc->InsertTab(tab);
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->Insert("b");
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+    doc->Insert("\r");
+
+    doc->SetPosition(1);
+    doc->SetBeginBlock();
+    doc->SetPosition(doc->GetTextSize());
+    doc->SetEndBlock();
+    editor.GetLayout()->LayoutDocument(doc);
+
+    POSITION_T start = 0;
+    POSITION_T end = 0;
+    REQUIRE(doc->GetBlock(start, end));
+
+    std::filesystem::path wsBlockPath = dir / "expected.ws";
+    cWordstarFile writer(&editor);
+    writer.mDocument = doc;
+    writer.SetSilent(true);
+    REQUIRE(writer.SaveRange(wsBlockPath.string(), start, end));
+    std::string wsBlock = ReadFileBytes(wsBlockPath);
+    std::string asciiBlock = editor.GetAsciiBlockText(start, end);
+    REQUIRE(asciiBlock != wsBlock);
+
+    auto pressKW = [&](void)
+    {
+        editor.mInput->HandleKey(CTRL_K, false);
+        editor.mInput->HandleKey('W', false);
+    };
+
+    SUBCASE("a WordStar document with the box unticked writes WordStar format")
+    {
+        auto path = dir / "out.txt";
+        editor.mTarget = path.string();
+        editor.mTick = false;
+        pressKW();
+        CHECK(editor.mCalls == 1);
+        CHECK(editor.mShownAscii == false);
+        CHECK(editor.mShownLocked == false);
+        CHECK(ReadFileBytes(path) == wsBlock);
+    }
+
+    SUBCASE("the box ticked writes ASCII text")
+    {
+        auto path = dir / "out.ws";
+        editor.mTarget = path.string();
+        editor.mTick = true;
+        pressKW();
+        CHECK(editor.mCalls == 1);
+        CHECK(ReadFileBytes(path) == asciiBlock);
+    }
+
+    SUBCASE("the box starts unticked every time")
+    {
+        editor.mTarget = (dir / "first.ws").string();
+        editor.mTick = true;
+        pressKW();
+        editor.mTarget = (dir / "second.ws").string();
+        editor.mTick = false;
+        pressKW();
+        CHECK(editor.mCalls == 2);
+        CHECK(editor.mShownAscii == false);
+        CHECK(ReadFileBytes(dir / "second.ws") == wsBlock);
+    }
+
+    SUBCASE("a text document shows the box ticked and locked and writes text")
+    {
+        doc->SetTextFile(true);
+        auto path = dir / "out.ws";
+        editor.mTarget = path.string();
+        editor.mTick = false;
+        pressKW();
+        CHECK(editor.mCalls == 1);
+        CHECK(editor.mShownAscii == true);
+        CHECK(editor.mShownLocked == true);
+        CHECK(ReadFileBytes(path) == asciiBlock);
+    }
+
+    SUBCASE("cancelling the prompt writes nothing")
+    {
+        editor.mTarget = "";
+        editor.mTick = true;
+        pressKW();
+        CHECK(editor.mCalls == 1);
+        size_t files = 0;
+        for (const auto& entry : std::filesystem::directory_iterator(dir))
+        {
+            (void)entry;
+            ++files;
+        }
+        CHECK(files == 1);
     }
 
     std::error_code ec;
