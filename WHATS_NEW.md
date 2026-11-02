@@ -31,6 +31,7 @@ Release history for WordTsar, in reverse chronological order.
 - Fixed: ESC ESC is read as one Escape (#58).
 - Fixed: the arrow keys, Home and End work when the terminal is in application cursor mode (#58).
 - Fixed: printing and the printer lookup (lpstat) wait at most one second (#58).
+- Fixed: the Opening status box shows free disk space in decimal GB, matching Finder (#60).
 
 **Changes**
 
