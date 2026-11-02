@@ -2683,3 +2683,26 @@ TEST_CASE("cWordstarFile::InsertAtTextEnd - a file without a header and without 
     std::string target = "Old\x8D\x0Aline\r\n";
     CHECK(InsertedAtTextEnd(target, "new\r\n") == target + "new\r\n");
 }
+
+
+TEST_CASE("cWordstarFile::InsertAtTextEnd - a bogus style offset leaves the header alone")
+{
+    std::string text = "Old\r\n";
+    std::string target = WordStar7File(text);
+    auto setStyles = [](std::string &bytes, uint32_t styles)
+    {
+        memcpy(&bytes[4 + offsetof(sWSHeader, styles)], &styles, sizeof(styles));
+    };
+
+    SUBCASE("past the end of the file")
+    {
+        setStyles(target, static_cast<uint32_t>(target.size() + 1000));
+    }
+
+    SUBCASE("zero")
+    {
+        setStyles(target, 0);
+    }
+
+    CHECK(InsertedAtTextEnd(target, "new\r\n") == PadEof(target.substr(0, 128 + text.size()) + "new\r\n"));
+}
