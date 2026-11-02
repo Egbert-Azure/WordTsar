@@ -119,6 +119,7 @@ public:
     static bool IsWordStarData(const std::string &filename) ;
     static bool HasHeader(const std::string &filename) ;
     static bool InsertAtTextEnd(const std::string &filename, const std::string &bytes) ;
+    static std::string LineEndBeforeAppend(const std::string &text, const std::string &lineEnd) ;
     static bool ReplaceFileContent(const std::string &filename, const std::string &data) ;
 
     bool CanLoad(void) ;

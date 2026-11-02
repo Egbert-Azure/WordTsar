@@ -15868,6 +15868,66 @@ TEST_CASE("cEditorBase::WriteBlock - format, Overwrite and Append")
         CHECK(ReadFileBytes(path) == padded(text + "a    b\r\n"));
     }
 
+    SUBCASE("Append to a WordStar file whose text has no line end at its end adds CR LF before the block")
+    {
+        std::string target = wordStarTarget("Old", 256, library);
+        auto path = dir / "target.ws";
+        WriteFileBytes(path, target);
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
+
+        std::string expected = padded(target.substr(0, 128 + 3) + "\r\n" + wsBytes);
+        setStyles(expected, expected.size());
+        expected += library;
+        CHECK(ReadFileBytes(path) == expected);
+    }
+
+    SUBCASE("Append with the box ticked to a WordStar file whose text has no line end adds CR LF before the block")
+    {
+        std::string target = wordStarTarget("Old", 256, "");
+        auto path = dir / "target.ws";
+        WriteFileBytes(path, target);
+        REQUIRE(editor.WriteBlock(start, end, path.string(), true, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
+
+        CHECK(ReadFileBytes(path) == padded(target.substr(0, 128 + 3) + "\r\n" + "a    b\r\n"));
+    }
+
+    SUBCASE("Append to a WordStar file without a header whose text has no line end adds CR LF before the block")
+    {
+        std::string text = "Old\x8D\x0Aline";
+        auto path = dir / "target.ws";
+        WriteFileBytes(path, padded(text));
+        REQUIRE(cWordstarFile::IsWordStarData(path.string()));
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
+
+        CHECK(ReadFileBytes(path) == padded(text + "\r\n" + "a    b\r\n"));
+    }
+
+    SUBCASE("Append to a WordStar file with no text adds no line end")
+    {
+        std::string target = wordStarTarget("", 256, "");
+        auto path = dir / "target.ws";
+        WriteFileBytes(path, target);
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
+
+        CHECK(ReadFileBytes(path) == padded(target.substr(0, 128) + wsBytes));
+    }
+
+    SUBCASE("Append to an LF text file without a line end at its end adds LF before the block")
+    {
+        auto path = dir / "lf.txt";
+        WriteFileBytes(path, "x\ny");
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
+        CHECK(ReadFileBytes(path) == "x\ny\na    b\n");
+    }
+
+    SUBCASE("Append to a CRLF text file without a line end at its end adds CRLF before the block")
+    {
+        auto path = dir / "crlf.txt";
+        WriteFileBytes(path, "x\r\ny");
+        REQUIRE(editor.WriteBlock(start, end, path.string(), false, eChoice::Append) == cEditorBase::eWriteBlockResult::Written);
+        CHECK(ReadFileBytes(path) == "x\r\ny\r\na    b\r\n");
+    }
+
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }

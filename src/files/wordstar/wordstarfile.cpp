@@ -1635,7 +1635,8 @@ bool cWordstarFile::HasHeader(const std::string &filename)
 /// next multiple of 128 (at least one), then the library unchanged, and
 /// sets the style offset to the new library position. Without a library
 /// the header is not changed. A file without a header and without 0x1A
-/// gets the bytes after the text and no padding.
+/// gets the bytes after the text and no padding. Before the bytes comes
+/// LineEndBeforeAppend() of the text with CR LF.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::string &bytes)
@@ -1693,7 +1694,9 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
     }
 
     // the block goes at the end of the text, before the 0x1A padding and the style library
-    std::string out = data.substr(0, textEnd) + bytes ;
+    size_t textStart = std::min(header ? sizeof(sSeqIntro) + sizeof(sWSHeader) + sizeof(sSeqClose) : 0, textEnd) ;
+    std::string out = data.substr(0, textEnd) +
+                      LineEndBeforeAppend(data.substr(textStart, textEnd - textStart), "\r\n") + bytes ;
     if (header || textEnd < data.size())
     {
         out.append(128 - out.size() % 128, static_cast<char>(STYLE_EOF)) ;
@@ -1706,6 +1709,29 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
     }
 
     return ReplaceFileContent(filename, out) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  text    [in] - text a block is appended to
+/// @param  lineEnd [in] - line end of the file
+///
+/// @return lineEnd if text does not end with a line end, else nothing
+///
+/// @brief
+/// A text ends with a line end if its last byte is LF or CR; this covers
+/// CR LF, a WordStar soft return 0x8D LF, LF and CR. An empty text needs
+/// no line end.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cWordstarFile::LineEndBeforeAppend(const std::string &text, const std::string &lineEnd)
+{
+    if (text.empty() || text.back() == '\n' || text.back() == '\r')
+    {
+        return std::string() ;
+    }
+    return lineEnd ;
 }
 
 
