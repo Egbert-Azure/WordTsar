@@ -51,6 +51,7 @@ public:
     void Present(const std::vector<sCellRun>& runs) override;
     void SetCursor(int row, int col, bool visible) override;
     void SetCursorShape(eCursorShape shape) override;
+    bool LastReadTimedOut(void) const override;
     void Flush(void) override;
 
 private:
@@ -81,6 +82,7 @@ private:
     mutable sTerminalSize mSize;
     std::vector<uint8_t> mPendingBytes;
     bool mCursorVisible;
+    bool mLastReadTimedOut;                  // last ReadEvent() found no input
     eCursorShape mCursorShape;
 };
 

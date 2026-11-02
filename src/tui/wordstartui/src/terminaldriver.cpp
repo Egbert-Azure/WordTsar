@@ -60,4 +60,19 @@ void cTerminalDriver::SetCursorShape(eCursorShape shape)
     (void)shape;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true when the last ReadEvent() returned false because no input
+///         arrived within its timeout
+///
+/// @brief
+/// Default: every ReadEvent() that returns false timed out. Drivers that
+/// also return false for input they ignore override this.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cTerminalDriver::LastReadTimedOut(void) const
+{
+    return true;
+}
+
 }

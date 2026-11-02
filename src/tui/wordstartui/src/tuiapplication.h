@@ -53,7 +53,7 @@ protected:
     virtual bool HandleEvent(const sInputEvent& event) = 0;
     virtual void OnResize(int rows, int cols);
     virtual void OnAfterDraw(cTerminalDriver& driver);
-    // Called when a read of the terminal returned no event.
+    // Called when a read of the terminal found no input within its timeout.
     virtual void OnIdle(void);
 
     // Run a nested modal loop over the live screen/driver: repeatedly draw and

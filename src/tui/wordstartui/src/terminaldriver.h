@@ -48,6 +48,10 @@ public:
     // that cannot change the cursor shape leave this as the default no-op.
     virtual void SetCursorShape(eCursorShape shape);
 
+    // True when the last ReadEvent() returned false because no input arrived
+    // within its timeout; false when it read input and ignored it.
+    virtual bool LastReadTimedOut(void) const;
+
     virtual void Flush(void) = 0;
 };
 

@@ -75,6 +75,7 @@ cTerminalDriverPosix::cTerminalDriverPosix(void)
     mOpen = false;
     mHaveOriginalTermios = false;
     mCursorVisible = true;
+    mLastReadTimedOut = false;
     mCursorShape = CURSOR_SHAPE_DEFAULT;
     mSize.rows = 25;
     mSize.cols = 80;
@@ -311,6 +312,7 @@ sTerminalCapabilities cTerminalDriverPosix::GetCapabilities(void) const
 bool cTerminalDriverPosix::ReadEvent(sInputEvent& event, int timeoutMs)
 {
     InitializeEvent(event);
+    mLastReadTimedOut = false;
 
     if (gResizePending != 0)
     {
@@ -335,6 +337,7 @@ bool cTerminalDriverPosix::ReadEvent(sInputEvent& event, int timeoutMs)
 
         if (ReadByte(byte, timeoutMs) == false)
         {
+            mLastReadTimedOut = true;
             return false;
         }
 
@@ -419,6 +422,20 @@ bool cTerminalDriverPosix::ReadEvent(sInputEvent& event, int timeoutMs)
     }
 
     return DecodeBytes(event, bytes);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true when the last ReadEvent() found no input within its timeout
+///
+/// @brief
+/// Tell a timeout apart from input that ReadEvent() read and ignored, such as
+/// an unknown or malformed escape sequence.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cTerminalDriverPosix::LastReadTimedOut(void) const
+{
+    return mLastReadTimedOut;
 }
 
 /////////////////////////////////////////////////////////////////////////////

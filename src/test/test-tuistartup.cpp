@@ -1074,3 +1074,89 @@ TEST_CASE("TUI startup screen - without a file name the next key after the start
     CHECK(app.TestHandleEvent(Special(wordstartui::SPECIAL_KEY_ESCAPE)) == true);
     CHECK(app.TestOpeningBrowserFocus() == false);
 }
+
+
+namespace
+{
+
+// Standard input replaced by a pipe that stays open until destruction.
+class cStdinPipe
+{
+public:
+    cStdinPipe(void)
+    {
+        int fds[2];
+        REQUIRE(pipe(fds) == 0);
+        mWrite = fds[1];
+        mSavedStdin = dup(STDIN_FILENO);
+        REQUIRE(mSavedStdin >= 0);
+        REQUIRE(dup2(fds[0], STDIN_FILENO) == STDIN_FILENO);
+        close(fds[0]);
+    }
+
+    ~cStdinPipe(void)
+    {
+        close(mWrite);
+        dup2(mSavedStdin, STDIN_FILENO);
+        close(mSavedStdin);
+    }
+
+    void Write(const std::string& bytes)
+    {
+        REQUIRE(write(mWrite, bytes.data(), bytes.size()) == static_cast<ssize_t>(bytes.size()));
+    }
+
+private:
+    int mWrite = -1;
+    int mSavedStdin = -1;
+};
+
+}
+
+
+TEST_CASE("TUI startup screen - an ignored sequence in the dropped burst does not end the drop")
+{
+    struct sCase
+    {
+        const char* name;
+        const char* sequence;
+    };
+    const sCase cases[] = {
+        {"ESC [1;2A", "\x1b[1;2A"},
+        {"ESC [99~", "\x1b[99~"},
+        {"malformed SGR mouse", "\x1b[<0;5M"},
+        {"truncated ESC [", "\x1b["},
+    };
+
+    for (const sCase& item : cases)
+    {
+        std::string name = item.name;
+        CAPTURE(name);
+        cStartupTempDir dir;
+        cWSWordTsar app;
+        StartShowingWithFile(app, dir);
+        std::string text;
+        {
+            cStdinPipe input;
+            wordstartui::cTerminalDriverPosix driver;
+
+            input.Write(std::string("x") + item.sequence);
+            app.TestPumpEvent(driver, 10);
+            REQUIRE(app.TestInEditor() == true);
+            text = app.TestGetEditor()->GetDocument()->GetText();
+            app.TestPumpEvent(driver, 10);
+
+            input.Write("y");
+            app.TestPumpEvent(driver, 10);
+            CheckLetterUnchanged(app, text);
+
+            app.TestPumpEvent(driver, 10);
+            input.Write("z");
+            app.TestPumpEvent(driver, 10);
+        }
+        std::string after = app.TestGetEditor()->GetDocument()->GetText();
+        CHECK(after.find('y') == std::string::npos);
+        CHECK(after.find('z') != std::string::npos);
+        CHECK(app.TestGetEditor()->GetDocument()->IsModified() == true);
+    }
+}

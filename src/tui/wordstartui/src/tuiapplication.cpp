@@ -98,7 +98,8 @@ int cTuiApplication::Run(void)
 ///
 /// @brief
 /// Read one event and dispatch it: a resize resizes the screen, other events
-/// go to HandleEvent(). A read that returned no event calls OnIdle().
+/// go to HandleEvent(). A read that found no input within the timeout calls
+/// OnIdle(); input the driver read and ignored does not.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cTuiApplication::PumpEvent(cTerminalDriver& driver, int timeoutMs)
@@ -117,7 +118,7 @@ void cTuiApplication::PumpEvent(cTerminalDriver& driver, int timeoutMs)
             HandleEvent(event);
         }
     }
-    else
+    else if (driver.LastReadTimedOut() == true)
     {
         OnIdle();
     }
@@ -257,7 +258,7 @@ void cTuiApplication::OnAfterDraw(cTerminalDriver& driver)
 /// @return nothing
 ///
 /// @brief
-/// Hook called when a read of the terminal returned no event.
+/// Hook called when a read of the terminal found no input within its timeout.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cTuiApplication::OnIdle(void)
