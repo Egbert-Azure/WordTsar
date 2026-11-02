@@ -2706,3 +2706,14 @@ TEST_CASE("cWordstarFile::InsertAtTextEnd - a bogus style offset leaves the head
 
     CHECK(InsertedAtTextEnd(target, "new\r\n") == PadEof(target.substr(0, 128 + text.size()) + "new\r\n"));
 }
+
+
+TEST_CASE("cWordstarFile::InsertAtTextEnd - a 0x1A inside a malformed header is not the text end")
+{
+    std::string text = "Old\r\n";
+    std::string target = WordStar7File(text);
+    target[125] = '\x7C';
+    target[4 + offsetof(sWSHeader, driver) + 2] = '\x1A';
+
+    CHECK(InsertedAtTextEnd(target, "new\r\n") == PadEof(target.substr(0, 128 + text.size()) + "new\r\n"));
+}

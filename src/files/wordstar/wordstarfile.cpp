@@ -1625,7 +1625,8 @@ bool cWordstarFile::HasHeader(const std::string &filename)
 /// @return true if the file was written, false otherwise
 ///
 /// @brief
-/// A 0x1D sequence has its length repeated before the closing 0x1D. The
+/// A 0x1D sequence has its length repeated before the closing 0x1D. In a
+/// file with a WordStar 5+ header, the text starts after the header. The
 /// text ends at the first 0x1A outside a 0x1D sequence and an ESC x FS
 /// extended character, or at the end of the file. In a file with a
 /// WordStar 5+ header, a style offset at or after the text end and
@@ -1651,7 +1652,11 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
         data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()) ;
     }
 
-    size_t textEnd = 0 ;
+    const size_t headerSize = sizeof(sSeqIntro) + sizeof(sWSHeader) + sizeof(sSeqClose) ;
+    bool header = HasHeaderData(data) ;
+
+    // the text starts after the header, so a 0x1A in the header is not the text end
+    size_t textEnd = header ? headerSize : 0 ;
     while (textEnd < data.size())
     {
         unsigned char c = static_cast<unsigned char>(data[textEnd]) ;
@@ -1681,7 +1686,6 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
     textEnd = std::min(textEnd, data.size()) ;
 
     const size_t stylesAt = sizeof(sSeqIntro) + offsetof(sWSHeader, styles) ;
-    bool header = HasHeaderData(data) ;
     size_t library = data.size() ;
     if (header)
     {
@@ -1694,7 +1698,7 @@ bool cWordstarFile::InsertAtTextEnd(const std::string &filename, const std::stri
     }
 
     // the block goes at the end of the text, before the 0x1A padding and the style library
-    size_t textStart = std::min(header ? sizeof(sSeqIntro) + sizeof(sWSHeader) + sizeof(sSeqClose) : 0, textEnd) ;
+    size_t textStart = header ? headerSize : 0 ;
     std::string out = data.substr(0, textEnd) +
                       LineEndBeforeAppend(data.substr(textStart, textEnd - textStart), "\r\n") + bytes ;
     if (header || textEnd < data.size())
