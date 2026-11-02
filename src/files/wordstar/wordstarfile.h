@@ -111,6 +111,8 @@ public:
 
     bool LoadFile(std::string filename) ;
     bool SaveFile(std::string filename, POSITION_T size) ;
+    bool SaveRange(std::string filename, POSITION_T start, POSITION_T end) ;
+    std::string EncodeRange(POSITION_T start, POSITION_T end, uint32_t &stylecounter) ;
 
     bool CanLoad(void) ;
     bool CanSave(void) ;

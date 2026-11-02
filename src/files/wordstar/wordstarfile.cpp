@@ -946,6 +946,26 @@ bool cWordstarFile::LoadFile(std::string filename)
  */
 bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
 {
+    return SaveRange(filename, 0, length) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] - file to write
+/// @param  start    [in] - first position to write
+/// @param  end      [in] - position after the last one to write
+///
+/// @return true if the file was written, false otherwise
+///
+/// @brief
+/// Writes positions start..end as a WordStar 7 file: the header, the
+/// sequences EncodeRange() gives, then 0x1A up to the next multiple of 128
+/// bytes. The header's style offset is the size of the file.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::SaveRange(std::string filename, POSITION_T start, POSITION_T end)
+{
     bool retval = false ;
 
     // Scan for Unicode characters that cannot be saved in WordStar format.
@@ -953,7 +973,7 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
     size_t unmappableCount = 0 ;
     eCodePage scanCodePage = mEditor->GetCodePage() ;
 
-    for(POSITION_T scan = 0; scan < length; scan++)
+    for(POSITION_T scan = start; scan < end; scan++)
     {
         std::string str = mDocument->GetChar(scan) ;
         if(str.length() > 1 && str != NOBREAK_SPACE_UTF8)
@@ -1033,406 +1053,40 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
         }
     }
 
+    sSeqIntro intro ;
+    sSeqClose close ;
+    sWSHeader header ;
+    memset(&header, 0, sizeof(header)) ;
+
+    uint32_t stylecounter = sizeof(sWSHeader) + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
+    std::string body = EncodeRange(start, end, stylecounter) ;
+
+    long eofsize = 128 - (stylecounter % 128) ;         // buffer end of file to 128 byte marker
+    if(eofsize == 0)
+    {
+        eofsize = 128 ;
+    }
+    body.append(static_cast<size_t>(eofsize), static_cast<char>(STYLE_EOF)) ;
+    stylecounter += static_cast<uint32_t>(eofsize) ;
+
+    intro.start = 0x1d ;
+    intro.size = 125 ;
+    intro.type = 0 ;
+
+    close.size = 125 ;
+    close.finish = 0x1d ;
+
+    header.version = 0x70 ;
+    sprintf(header.driver, "LASERJET") ;
+    header.styles = stylecounter ;
+
     mFile = fopen(filename.c_str(), "wb") ;
     if(mFile)
     {
-        uint32_t stylecounter = 0 ;
-
-        // write the WordStar 7.0d header
-        sSeqIntro intro ;
-        sSeqClose close ;
-
-        sWSHeader header ;
-        memset(&header, 0, sizeof(header)) ;
-
-        intro.start = 0x1d ;
-        intro.size = 125 ;
-        intro.type = 0 ;
-
-        close.size = 125 ;
-        close.finish = 0x1d ;
-
-        header.version = 0x70 ;
-        sprintf(header.driver, "LASERJET") ;
-        header.styles = static_cast<unsigned int>(length) ;
-
         fwrite(&intro, sizeof(sSeqIntro), 1, mFile) ;
         fwrite(&header, sizeof(sWSHeader), 1, mFile) ;
         fwrite(&close, sizeof(sSeqClose), 1, mFile) ;
-
-        stylecounter += sizeof(sWSHeader) + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
-
-        // go through the buffer
-        for(POSITION_T loop = 0; loop < length; loop++)
-        {
-            // write out the standard character
-            std::string str = mDocument->GetChar(loop) ;
-            char ch1 = str[0] ;
-
-            if(str.length() == 1)
-            {
-                if(ch1 == MARKER_CHAR)
-                {
-                    ch1 = mDocument->GetControlChar(loop) ;
-                }
-
-                switch(ch1)
-                {
-                    case 13 :
-                        // convert hard returns to CR/LF pairs
-                        fputc(13, mFile) ;
-                        fputc(10, mFile) ;
-                        stylecounter += 2 ;
-                        break ;
-
-                    case STYLE_TAB :
-                        {
-                            sWSTab tab ;
-
-                            tab = mDocument->GetTab(loop) ;
-
-                            // a soft tab is written as such only at the start of a paragraph
-                            if(tab.type == TAB_SOFT)
-                            {
-                                POSITION_T start ;
-                                POSITION_T end ;
-                                mDocument->GetParagraphStartandEnd(mDocument->GetParagraphFromPosition(loop), start, end) ;
-                                if(loop != start)
-                                {
-                                    tab.type = TAB_TAB ;
-                                }
-                            }
-
-                            intro.size = 10 ;
-                            intro.type = eSequence::SEQ_TAB ;
-
-                            close.size = 10 ;
-
-                            fwrite(&intro, sizeof(sSeqIntro), 1, mFile) ;
-                            fwrite(&tab, sizeof(sWSTab), 1, mFile) ;
-                            fwrite(&close, sizeof(sSeqClose), 1, mFile) ;
-
-                            stylecounter += sizeof(sWSTab) + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
-                        }
-                        break ;
-
-                    case STYLE_INTERNAL_COLOR :
-                        {
-                            sSeqRGBColor rgbColor ;
-
-                            if(mDocument->GetColor(loop, rgbColor) == true)
-                            {
-                                // Convert RGB to nearest WordStar palette index for file format
-                                sWSColor wscolor ;
-                                wscolor.prevcolornumber = 0 ;
-
-                                if (rgbColor.IsDefault())
-                                {
-                                    // Default color is black (index 0) in WordStar format
-                                    wscolor.colornumber = 0 ;
-                                }
-                                else
-                                {
-                                    // Find nearest palette color by Euclidean distance
-                                    int bestIndex = 0 ;
-                                    int bestDistance = INT_MAX ;
-                                    for (int i = 0; i < WS_PALETTE_SIZE; ++i)
-                                    {
-                                        int dr = rgbColor.red - gBaseWSColors[i].red ;
-                                        int dg = rgbColor.green - gBaseWSColors[i].green ;
-                                        int db = rgbColor.blue - gBaseWSColors[i].blue ;
-                                        int distance = dr * dr + dg * dg + db * db ;
-                                        if (distance < bestDistance)
-                                        {
-                                            bestDistance = distance ;
-                                            bestIndex = i ;
-                                        }
-                                    }
-                                    wscolor.colornumber = static_cast<unsigned char>(bestIndex) ;
-                                }
-
-                                intro.size = sizeof(sWSColor) + sizeof(sSeqClose) + 1 ;
-                                intro.type = SEQ_COLOR ;
-
-                                close.size = intro.size ;
-
-                                fwrite(&intro, sizeof(sSeqIntro), 1, mFile) ;
-                                fwrite(&wscolor, sizeof(sWSColor), 1, mFile) ;
-                                fwrite(&close, sizeof(sSeqClose), 1, mFile) ;
-                            }
-                            stylecounter += sizeof(sWSColor) + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
-                        }
-                        break ;
-
-                    case STYLE_FONT1 :
-                        {
-                            sInternalFonts font ;
-
-                            sWSFont wsfont ;
-                            if(mDocument->GetFont(loop, font) == true)
-                            {
-                                intro.size = sizeof(sWSFont) + sizeof(sSeqClose) + 1 ;
-                                intro.type = eSequence::SEQ_FONT ;
-
-                                close.size = intro.size ;
-
-                                // If font was loaded from a WordStar file, preserve original bits
-                                if(font.haveWSFont)
-                                {
-                                    wsfont = font.wsfont ;
-                                }
-                                else
-                                {
-                                    // Classify font using OS/2 table, PANOSE, glyph metrics,
-                                    // and keyword fallback. Produces complete typestyle bitfield.
-                                    cWSFontClassifier classifier ;
-                                    sWSFontClassification classification =
-                                        classifier.Classify(font.name) ;
-
-                                    wsfont.style = classification.Assemble() ;
-                                    wsfont.height = static_cast<uint16_t>(font.size * 20) ;
-                                }
-                                fwrite(&intro, sizeof(sSeqIntro), 1, mFile) ;
-                                fwrite(&wsfont, sizeof(sWSFont), 1, mFile) ;
-                                fwrite(&close, sizeof(sSeqClose), 1, mFile) ;
-
-                                stylecounter += sizeof(sWSFont) + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
-                            }
-                        }
-                        break ;
-
-                    case STYLE_VARIABLE :
-                        {
-                            // Write variable as &X& sequence
-                            eVariableType varType = mDocument->GetVariable(loop);
-                            char varChar = '?';
-                            switch (varType)
-                            {
-                                case VAR_DATE:
-                                {
-                                    varChar = '@';
-                                    break;
-                                }
-                                case VAR_TIME:
-                                {
-                                    varChar = '!';
-                                    break;
-                                }
-                                case VAR_PAGE_NUMBER:
-                                {
-                                    varChar = '#';
-                                    break;
-                                }
-                                case VAR_LINE_NUMBER:
-                                {
-                                    varChar = '_';
-                                    break;
-                                }
-                                case VAR_FILENAME:
-                                {
-                                    varChar = '*';
-                                    break;
-                                }
-                                case VAR_DRIVE:
-                                {
-                                    varChar = ':';
-                                    break;
-                                }
-                                case VAR_DIRECTORY:
-                                {
-                                    varChar = '.';
-                                    break;
-                                }
-                                case VAR_FULLPATH:
-                                {
-                                    varChar = '\\';
-                                    break;
-                                }
-                                case VAR_WORD_COUNT:
-                                {
-                                    varChar = '?';
-                                    break;
-                                }
-                            }
-                            fputc('&', mFile);
-                            fputc(varChar, mFile);
-                            fputc('&', mFile);
-                            stylecounter += 3;
-                        }
-                        break;
-
-                    case STYLE_FOOTNOTE :
-                    case STYLE_ENDNOTE :
-                        {
-                            // a note loaded from a WordStar file is written back as its sequence;
-                            // any other marker of this code is written as the byte itself
-                            sNote note ;
-                            if(mDocument->GetNote(loop, note) == true && note.raw.empty() == false)
-                            {
-                                intro.size = static_cast<uint16_t>(note.raw.size() + 4) ;
-                                if(ch1 == STYLE_ENDNOTE)
-                                {
-                                    intro.type = eSequence::SEQ_ENDNOTE ;
-                                }
-                                else if(note.kind == NOTE_KIND_ANNOTATION)
-                                {
-                                    intro.type = eSequence::SEQ_ANNOTATION ;
-                                }
-                                else if(note.kind == NOTE_KIND_COMMENT)
-                                {
-                                    intro.type = eSequence::SEQ_COMMENT ;
-                                }
-                                else
-                                {
-                                    intro.type = eSequence::SEQ_FOOTNOTE ;
-                                }
-
-                                close.size = intro.size ;
-
-                                fwrite(&intro, sizeof(sSeqIntro), 1, mFile) ;
-                                fwrite(note.raw.data(), 1, note.raw.size(), mFile) ;
-                                fwrite(&close, sizeof(sSeqClose), 1, mFile) ;
-
-                                stylecounter += note.raw.size() + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
-                            }
-                            else
-                            {
-                                fputc(ch1, mFile) ;
-                                stylecounter++ ;
-                            }
-                        }
-                        break ;
-
-                    case STYLE_EOF :
-                        loop = length ;  // get out of for loop
-                        break ;
-
-                    default :
-                        fputc(ch1, mFile) ;
-                        stylecounter++ ;
-                        break ;
-                }    // switch
-            }  // if
-            else if(str == NOBREAK_SPACE_UTF8)
-            {
-                fputc(STYLE_CTRL_O, mFile) ;          // binding space
-                stylecounter++ ;
-            }
-            else            // this is a unicode (UTF-8 char)
-            {
-                // check if this is a extended char.
-                if(static_cast<unsigned long>(ch1) < 32 || static_cast<unsigned long>(ch1) > 126)
-                {
-                    std::u32string codepoints ;
-                    eCodePage codepage = mEditor->GetCodePage() ;
-
-                    size_t len = mDocument->GetCodePoints(str, codepoints) ;
-
-                    if(len > 0)
-                    {
-                        for(size_t loop = 0; loop < codepoints.length(); loop++)
-                        {
-                            switch(codepage)
-                            {
-                                case CP437 :
-                                {
-                                    cCodePage437 cp ;
-                                    unsigned char chws = cp.toChar(codepoints[loop]) ;
-                                    if(chws != 0)
-                                    {
-                                        ch1 = STYLE_EXTSTART ;
-                                        fputc(ch1, mFile) ;
-                                        fputc(chws, mFile) ;
-                                        ch1 = STYLE_EXTEND ;
-                                        fputc(ch1, mFile) ;
-                                        stylecounter += 3 ;
-                                    }
-                                    break ;
-                                }
-
-                                case CP737 :
-                                {
-                                    cCodePage737 cp ;
-                                    unsigned char chws = cp.toChar(codepoints[loop]) ;
-                                    if(chws != 0)
-                                    {
-                                        ch1 = STYLE_EXTSTART ;
-                                        fputc(ch1, mFile) ;
-                                        fputc(chws, mFile) ;
-                                        ch1 = STYLE_EXTEND ;
-                                        fputc(ch1, mFile) ;
-                                        stylecounter += 3 ;
-                                    }
-                                    break ;
-                                }
-
-                                case CP850 :
-                                {
-                                    cCodePage850 cp ;
-                                    unsigned char chws = cp.toChar(codepoints[loop]) ;
-                                    if(chws != 0)
-                                    {
-                                        ch1 = STYLE_EXTSTART ;
-                                        fputc(ch1, mFile) ;
-                                        fputc(chws, mFile) ;
-                                        ch1 = STYLE_EXTEND ;
-                                        fputc(ch1, mFile) ;
-                                        stylecounter += 3 ;
-                                    }
-                                    break ;
-                                }
-
-                                case CP1252 :
-                                {
-                                    cCodePageWin1252 cp ;
-                                    unsigned char chws = cp.toChar(codepoints[loop]) ;
-                                    if(chws != 0)
-                                    {
-                                        ch1 = STYLE_EXTSTART ;
-                                        fputc(ch1, mFile) ;
-                                        fputc(chws, mFile) ;
-                                        ch1 = STYLE_EXTEND ;
-                                        fputc(ch1, mFile) ;
-                                        stylecounter += 3 ;
-                                    }
-                                    break ;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        long eofsize = 128 - (stylecounter % 128) ;         // buffer end of file to 128 byte marker
-        if(eofsize == 0)
-        {
-            eofsize = 128 ;
-        }
-        char ch = STYLE_EOF ;
-        for(long eofloop = 0; eofloop < eofsize; eofloop++)
-        {
-            fputc(ch, mFile) ;
-            stylecounter++ ;
-        }
-
-        // rewrite header now that we know style table offset
-        fseek(mFile, 0, SEEK_SET) ;
-
-        intro.start = 0x1d ;
-        intro.size = 125 ;
-        intro.type = 0 ;
-
-        close.size = 125 ;
-        close.finish = 0x1d ;
-
-        header.version = 0x70 ;
-        sprintf(header.driver, "LASERJET") ;
-        header.styles = stylecounter ;
-
-        fwrite(&intro, sizeof(sSeqIntro), 1, mFile) ;
-        fwrite(&header, sizeof(sWSHeader), 1, mFile) ;
-        fwrite(&close, sizeof(sSeqClose), 1, mFile) ;
+        fwrite(body.data(), 1, body.size(), mFile) ;
 
         // success only when every write and the final flush succeeded
         retval = (ferror(mFile) == 0) ;
@@ -1442,6 +1096,375 @@ bool cWordstarFile::SaveFile(std::string filename, POSITION_T length)
         }
     }
     return retval ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  start        [in]     - first position to encode
+/// @param  end          [in]     - position after the last one to encode
+/// @param  stylecounter [in,out] - byte count, advanced by what is encoded
+///
+/// @return the WordStar bytes of positions start..end, without header and
+///         without the 0x1A end of file
+///
+/// @brief
+/// Encodes start..end as they are: codes open at start or end are neither
+/// added nor closed. Encoding stops at an end of file marker.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_t &stylecounter)
+{
+    std::string out ;
+    sSeqIntro intro ;
+    sSeqClose close ;
+
+    intro.start = 0x1d ;
+    close.finish = 0x1d ;
+
+    // go through the buffer
+    for(POSITION_T loop = start; loop < end; loop++)
+    {
+        // write out the standard character
+        std::string str = mDocument->GetChar(loop) ;
+        char ch1 = str[0] ;
+
+        if(str.length() == 1)
+        {
+            if(ch1 == MARKER_CHAR)
+            {
+                ch1 = mDocument->GetControlChar(loop) ;
+            }
+
+            switch(ch1)
+            {
+                case 13 :
+                    // convert hard returns to CR/LF pairs
+                    out += static_cast<char>(13) ;
+                    out += static_cast<char>(10) ;
+                    stylecounter += 2 ;
+                    break ;
+
+                case STYLE_TAB :
+                    {
+                        sWSTab tab ;
+
+                        tab = mDocument->GetTab(loop) ;
+
+                        // a soft tab is written as such only at the start of a paragraph
+                        if(tab.type == TAB_SOFT)
+                        {
+                            POSITION_T start ;
+                            POSITION_T end ;
+                            mDocument->GetParagraphStartandEnd(mDocument->GetParagraphFromPosition(loop), start, end) ;
+                            if(loop != start)
+                            {
+                                tab.type = TAB_TAB ;
+                            }
+                        }
+
+                        intro.size = 10 ;
+                        intro.type = eSequence::SEQ_TAB ;
+
+                        close.size = 10 ;
+
+                        out.append(reinterpret_cast<const char *>(&intro), sizeof(sSeqIntro)) ;
+                        out.append(reinterpret_cast<const char *>(&tab), sizeof(sWSTab)) ;
+                        out.append(reinterpret_cast<const char *>(&close), sizeof(sSeqClose)) ;
+
+                        stylecounter += sizeof(sWSTab) + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
+                    }
+                    break ;
+
+                case STYLE_INTERNAL_COLOR :
+                    {
+                        sSeqRGBColor rgbColor ;
+
+                        if(mDocument->GetColor(loop, rgbColor) == true)
+                        {
+                            // Convert RGB to nearest WordStar palette index for file format
+                            sWSColor wscolor ;
+                            wscolor.prevcolornumber = 0 ;
+
+                            if (rgbColor.IsDefault())
+                            {
+                                // Default color is black (index 0) in WordStar format
+                                wscolor.colornumber = 0 ;
+                            }
+                            else
+                            {
+                                // Find nearest palette color by Euclidean distance
+                                int bestIndex = 0 ;
+                                int bestDistance = INT_MAX ;
+                                for (int i = 0; i < WS_PALETTE_SIZE; ++i)
+                                {
+                                    int dr = rgbColor.red - gBaseWSColors[i].red ;
+                                    int dg = rgbColor.green - gBaseWSColors[i].green ;
+                                    int db = rgbColor.blue - gBaseWSColors[i].blue ;
+                                    int distance = dr * dr + dg * dg + db * db ;
+                                    if (distance < bestDistance)
+                                    {
+                                        bestDistance = distance ;
+                                        bestIndex = i ;
+                                    }
+                                }
+                                wscolor.colornumber = static_cast<unsigned char>(bestIndex) ;
+                            }
+
+                            intro.size = sizeof(sWSColor) + sizeof(sSeqClose) + 1 ;
+                            intro.type = SEQ_COLOR ;
+
+                            close.size = intro.size ;
+
+                            out.append(reinterpret_cast<const char *>(&intro), sizeof(sSeqIntro)) ;
+                            out.append(reinterpret_cast<const char *>(&wscolor), sizeof(sWSColor)) ;
+                            out.append(reinterpret_cast<const char *>(&close), sizeof(sSeqClose)) ;
+                        }
+                        stylecounter += sizeof(sWSColor) + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
+                    }
+                    break ;
+
+                case STYLE_FONT1 :
+                    {
+                        sInternalFonts font ;
+
+                        sWSFont wsfont ;
+                        if(mDocument->GetFont(loop, font) == true)
+                        {
+                            intro.size = sizeof(sWSFont) + sizeof(sSeqClose) + 1 ;
+                            intro.type = eSequence::SEQ_FONT ;
+
+                            close.size = intro.size ;
+
+                            // If font was loaded from a WordStar file, preserve original bits
+                            if(font.haveWSFont)
+                            {
+                                wsfont = font.wsfont ;
+                            }
+                            else
+                            {
+                                // Classify font using OS/2 table, PANOSE, glyph metrics,
+                                // and keyword fallback. Produces complete typestyle bitfield.
+                                cWSFontClassifier classifier ;
+                                sWSFontClassification classification =
+                                    classifier.Classify(font.name) ;
+
+                                wsfont.style = classification.Assemble() ;
+                                wsfont.height = static_cast<uint16_t>(font.size * 20) ;
+                            }
+                            out.append(reinterpret_cast<const char *>(&intro), sizeof(sSeqIntro)) ;
+                            out.append(reinterpret_cast<const char *>(&wsfont), sizeof(sWSFont)) ;
+                            out.append(reinterpret_cast<const char *>(&close), sizeof(sSeqClose)) ;
+
+                            stylecounter += sizeof(sWSFont) + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
+                        }
+                    }
+                    break ;
+
+                case STYLE_VARIABLE :
+                    {
+                        // Write variable as &X& sequence
+                        eVariableType varType = mDocument->GetVariable(loop);
+                        char varChar = '?';
+                        switch (varType)
+                        {
+                            case VAR_DATE:
+                            {
+                                varChar = '@';
+                                break;
+                            }
+                            case VAR_TIME:
+                            {
+                                varChar = '!';
+                                break;
+                            }
+                            case VAR_PAGE_NUMBER:
+                            {
+                                varChar = '#';
+                                break;
+                            }
+                            case VAR_LINE_NUMBER:
+                            {
+                                varChar = '_';
+                                break;
+                            }
+                            case VAR_FILENAME:
+                            {
+                                varChar = '*';
+                                break;
+                            }
+                            case VAR_DRIVE:
+                            {
+                                varChar = ':';
+                                break;
+                            }
+                            case VAR_DIRECTORY:
+                            {
+                                varChar = '.';
+                                break;
+                            }
+                            case VAR_FULLPATH:
+                            {
+                                varChar = '\\';
+                                break;
+                            }
+                            case VAR_WORD_COUNT:
+                            {
+                                varChar = '?';
+                                break;
+                            }
+                        }
+                        out += static_cast<char>('&');
+                        out += static_cast<char>(varChar);
+                        out += static_cast<char>('&');
+                        stylecounter += 3;
+                    }
+                    break;
+
+                case STYLE_FOOTNOTE :
+                case STYLE_ENDNOTE :
+                    {
+                        // a note loaded from a WordStar file is written back as its sequence;
+                        // any other marker of this code is written as the byte itself
+                        sNote note ;
+                        if(mDocument->GetNote(loop, note) == true && note.raw.empty() == false)
+                        {
+                            intro.size = static_cast<uint16_t>(note.raw.size() + 4) ;
+                            if(ch1 == STYLE_ENDNOTE)
+                            {
+                                intro.type = eSequence::SEQ_ENDNOTE ;
+                            }
+                            else if(note.kind == NOTE_KIND_ANNOTATION)
+                            {
+                                intro.type = eSequence::SEQ_ANNOTATION ;
+                            }
+                            else if(note.kind == NOTE_KIND_COMMENT)
+                            {
+                                intro.type = eSequence::SEQ_COMMENT ;
+                            }
+                            else
+                            {
+                                intro.type = eSequence::SEQ_FOOTNOTE ;
+                            }
+
+                            close.size = intro.size ;
+
+                            out.append(reinterpret_cast<const char *>(&intro), sizeof(sSeqIntro)) ;
+                            out.append(note.raw.data(), note.raw.size()) ;
+                            out.append(reinterpret_cast<const char *>(&close), sizeof(sSeqClose)) ;
+
+                            stylecounter += note.raw.size() + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
+                        }
+                        else
+                        {
+                            out += static_cast<char>(ch1) ;
+                            stylecounter++ ;
+                        }
+                    }
+                    break ;
+
+                case STYLE_EOF :
+                    loop = end ;  // get out of for loop
+                    break ;
+
+                default :
+                    out += static_cast<char>(ch1) ;
+                    stylecounter++ ;
+                    break ;
+            }    // switch
+        }  // if
+        else if(str == NOBREAK_SPACE_UTF8)
+        {
+            out += static_cast<char>(STYLE_CTRL_O) ;          // binding space
+            stylecounter++ ;
+        }
+        else            // this is a unicode (UTF-8 char)
+        {
+            // check if this is a extended char.
+            if(static_cast<unsigned long>(ch1) < 32 || static_cast<unsigned long>(ch1) > 126)
+            {
+                std::u32string codepoints ;
+                eCodePage codepage = mEditor->GetCodePage() ;
+
+                size_t len = mDocument->GetCodePoints(str, codepoints) ;
+
+                if(len > 0)
+                {
+                    for(size_t loop = 0; loop < codepoints.length(); loop++)
+                    {
+                        switch(codepage)
+                        {
+                            case CP437 :
+                            {
+                                cCodePage437 cp ;
+                                unsigned char chws = cp.toChar(codepoints[loop]) ;
+                                if(chws != 0)
+                                {
+                                    ch1 = STYLE_EXTSTART ;
+                                    out += static_cast<char>(ch1) ;
+                                    out += static_cast<char>(chws) ;
+                                    ch1 = STYLE_EXTEND ;
+                                    out += static_cast<char>(ch1) ;
+                                    stylecounter += 3 ;
+                                }
+                                break ;
+                            }
+
+                            case CP737 :
+                            {
+                                cCodePage737 cp ;
+                                unsigned char chws = cp.toChar(codepoints[loop]) ;
+                                if(chws != 0)
+                                {
+                                    ch1 = STYLE_EXTSTART ;
+                                    out += static_cast<char>(ch1) ;
+                                    out += static_cast<char>(chws) ;
+                                    ch1 = STYLE_EXTEND ;
+                                    out += static_cast<char>(ch1) ;
+                                    stylecounter += 3 ;
+                                }
+                                break ;
+                            }
+
+                            case CP850 :
+                            {
+                                cCodePage850 cp ;
+                                unsigned char chws = cp.toChar(codepoints[loop]) ;
+                                if(chws != 0)
+                                {
+                                    ch1 = STYLE_EXTSTART ;
+                                    out += static_cast<char>(ch1) ;
+                                    out += static_cast<char>(chws) ;
+                                    ch1 = STYLE_EXTEND ;
+                                    out += static_cast<char>(ch1) ;
+                                    stylecounter += 3 ;
+                                }
+                                break ;
+                            }
+
+                            case CP1252 :
+                            {
+                                cCodePageWin1252 cp ;
+                                unsigned char chws = cp.toChar(codepoints[loop]) ;
+                                if(chws != 0)
+                                {
+                                    ch1 = STYLE_EXTSTART ;
+                                    out += static_cast<char>(ch1) ;
+                                    out += static_cast<char>(chws) ;
+                                    ch1 = STYLE_EXTEND ;
+                                    out += static_cast<char>(ch1) ;
+                                    stylecounter += 3 ;
+                                }
+                                break ;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return out ;
 }
 
 

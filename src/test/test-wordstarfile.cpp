@@ -2440,3 +2440,188 @@ TEST_CASE("cWordstarFile - ESC FS without a closing FS loads the glyph of the st
         }
     }
 }
+
+
+namespace
+{
+
+// One character per document position: a marker as its control code, any
+// other position as the first byte of its text
+std::string PositionMap(cDocument* doc)
+{
+    std::string map;
+    for (POSITION_T pos = 0; pos < doc->GetTextSize(); pos++)
+    {
+        std::string ch = doc->GetCharNoAdvance(pos);
+        if (ch.length() == 1 && static_cast<unsigned char>(ch[0]) == MARKER_CHAR)
+        {
+            map += static_cast<char>(doc->GetControlChar(pos));
+        }
+        else
+        {
+            map += ch.empty() ? '\0' : ch[0];
+        }
+    }
+    return map;
+}
+
+// Writes positions start..end of the editor's document with SaveRange() and returns the bytes
+std::string SavedRange(cEditorCtrl &editor, POSITION_T start, POSITION_T end)
+{
+    cWordstarFile saver(&editor);
+    saver.mDocument = editor.GetDocument();
+    saver.SetSilent(true);
+    std::filesystem::path out = TempPath();
+    std::string saved;
+    if (saver.SaveRange(out.string(), start, end))
+    {
+        saved = ReadFileBytes(out);
+    }
+    std::filesystem::remove(out);
+    return saved;
+}
+
+// Writes the editor's whole document with SaveFile() and returns the bytes
+std::string SavedWhole(cEditorCtrl &editor)
+{
+    cWordstarFile saver(&editor);
+    saver.mDocument = editor.GetDocument();
+    saver.SetSilent(true);
+    std::filesystem::path out = TempPath();
+    std::string saved;
+    if (saver.SaveFile(out.string(), editor.GetDocument()->GetTextSize()))
+    {
+        saved = ReadFileBytes(out);
+    }
+    std::filesystem::remove(out);
+    return saved;
+}
+
+// Loads WordStar bytes into the editor's document
+bool LoadBytes(cEditorCtrl &editor, const std::string &bytes)
+{
+    cWordstarFile loader;
+    loader.mDocument = editor.GetDocument();
+    std::filesystem::path in = TempPath();
+    WriteFileBytes(in, bytes);
+    bool loaded = loader.LoadFile(in.string());
+    std::filesystem::remove(in);
+    return loaded;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("cWordstarFile::SaveRange - the whole document gives the bytes of a full save")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    std::string note = std::string("\x02\x00\x00\x00\x00", 5) + "note text";
+    std::string body = ".lm 5\x0D\x0A" "one \x02two\x02 Hi" + SequenceBytes(SEQ_FOOTNOTE, note) +
+                       "!\x0D\x0A" "a\x09" "b\x0D\x0A" "end\x0D\x0A";
+    REQUIRE(LoadBytes(editor, WordStar7File(body)));
+
+    std::string whole = SavedWhole(editor);
+    REQUIRE(whole.empty() == false);
+    CHECK(SavedRange(editor, 0, editor.GetDocument()->GetTextSize()) == whole);
+}
+
+
+TEST_CASE("cWordstarFile::SaveRange - a block is written as a full save of just the block")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    doc->Clear();
+
+    std::string note = std::string("\x02\x00\x00\x00\x00", 5) + "note text";
+    std::string footnote = SequenceBytes(SEQ_FOOTNOTE, note);
+    std::string body = ".lm 5\x0D\x0A" "one \x02two\x02 Hi" + footnote + "!\x0D\x0A" "end\x0D\x0A";
+    REQUIRE(LoadBytes(editor, WordStar7File(body)));
+
+    std::string map = PositionMap(doc);
+    size_t bold = map.find("\x02two");
+    size_t bang = map.find("!\x0D");
+    REQUIRE(bold != std::string::npos);
+    REQUIRE(bang != std::string::npos);
+
+    SUBCASE("no dot command from outside the block, the footnote with its text")
+    {
+        std::string saved = SavedRange(editor, static_cast<POSITION_T>(bold), static_cast<POSITION_T>(bang + 2));
+        CHECK(saved == WordStar7File("\x02two\x02 Hi" + footnote + "!\x0D\x0A"));
+
+        cEditorCtrl reader;
+        reader.GetDocument()->Clear();
+        REQUIRE(LoadBytes(reader, saved));
+        std::string loaded = PositionMap(reader.GetDocument());
+        CHECK(loaded.rfind(std::string("\x02two\x02 Hi") + static_cast<char>(STYLE_FOOTNOTE) + "!\x0D", 0) == 0);
+        sNote loadedNote{};
+        CHECK(reader.GetDocument()->GetNote(8, loadedNote));
+        CHECK(loadedNote.raw == note);
+    }
+
+    SUBCASE("a block that starts inside bold gets no opening bold")
+    {
+        std::string saved = SavedRange(editor, static_cast<POSITION_T>(bold + 1), static_cast<POSITION_T>(bold + 5));
+        CHECK(saved == WordStar7File("two\x02"));
+    }
+
+    SUBCASE("a block that ends inside bold gets no closing bold")
+    {
+        std::string saved = SavedRange(editor, static_cast<POSITION_T>(bold - 4), static_cast<POSITION_T>(bold + 4));
+        CHECK(saved == WordStar7File("one \x02two"));
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// For every .WS file under WORDTSAR_ARCHIVE_DIR (recursive) loaded through
+/// cEditorCtrl::LoadFile(), SaveRange() over the whole document gives the
+/// bytes SaveFile() gives. Without WORDTSAR_ARCHIVE_DIR the test does nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("cWordstarFile::SaveRange - every .WS file in WORDTSAR_ARCHIVE_DIR: the whole range equals a full save")
+{
+    const char* archiveEnv = std::getenv("WORDTSAR_ARCHIVE_DIR");
+    if (archiveEnv == nullptr || archiveEnv[0] == '\0')
+    {
+        MESSAGE("WORDTSAR_ARCHIVE_DIR is not set, archive range test skipped");
+        return;
+    }
+
+    const std::filesystem::path archiveDir(archiveEnv);
+    REQUIRE_MESSAGE(std::filesystem::is_directory(archiveDir),
+                    "WORDTSAR_ARCHIVE_DIR is not a directory: " << archiveDir.string());
+
+    std::vector<std::filesystem::path> files = FindFilesWithExtension(archiveDir, ".ws");
+    REQUIRE_MESSAGE(files.empty() == false, "no .WS files in " << archiveDir.string());
+
+    ensureQApplication();
+
+    std::vector<std::string> failures;
+    for (const std::filesystem::path& path : files)
+    {
+        cEditorCtrl editor;
+        if (editor.LoadFile(path.string()) == false)
+        {
+            continue;
+        }
+        std::string whole = SavedWhole(editor);
+        std::string range = SavedRange(editor, 0, editor.GetDocument()->GetTextSize());
+        if (whole.empty() || range != whole)
+        {
+            failures.push_back(path.string());
+        }
+    }
+
+    std::string report;
+    for (const std::string& failure : failures)
+    {
+        report += "\n  " + failure;
+    }
+    CHECK_MESSAGE(failures.empty(), failures.size() << " of " << files.size() << " .WS files differ" << report);
+}
