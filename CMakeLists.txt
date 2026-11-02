@@ -224,11 +224,12 @@ set(SOURCES
     src/third-party/chillout/src/chillout/posix/posixcrashhandler.cpp
     src/core/spellcheck/macspellcheck.mm
     src/core/hyphenation/hyphenator_mac.mm
-    # Native PDFKit print-preview window and ^QJ Thesaurus Look Up popover --
-    # both .mm, so not picked up by the WORDTSAR_GUI_SOURCES *.cpp/*.h glob
+    # Native PDFKit print-preview window, ^QJ Thesaurus Look Up popover and
+    # ^KW Write Block save panel -- all .mm, so not picked up by the WORDTSAR_GUI_SOURCES *.cpp/*.h glob
     # in cmake/sources.cmake.
     src/gui/print/pdfpreviewwindow.mm
     src/gui/utils/maclookup.mm
+    src/gui/utils/macwriteblock.mm
 )
 
 if(BUILD_GUI)

@@ -150,11 +150,13 @@ if (APPLE)
     # WORDTSAR_GUI_SOURCES *.cpp/*.h glob since this is a .mm file.
     ../src/core/hyphenation/hyphenator_mac.mm
     # cPrintout::PrintPreview() (part of WORDTSAR_ALL_SOURCES above) calls
-    # ShowPDFPrintPreview(), and cEditorCtrl::Thesaurus() calls
-    # ShowMacDefinitionPopover() -- both defined here, not picked up by the
+    # ShowPDFPrintPreview(), cEditorCtrl::Thesaurus() calls
+    # ShowMacDefinitionPopover() and cEditorCtrl::PromptForWriteBlockFile()
+    # calls ShowMacWriteBlockPanel() -- all defined here, not picked up by the
     # WORDTSAR_GUI_SOURCES *.cpp/*.h glob since these are .mm files.
     ../src/gui/print/pdfpreviewwindow.mm
     ../src/gui/utils/maclookup.mm
+    ../src/gui/utils/macwriteblock.mm
   )
 endif()
 

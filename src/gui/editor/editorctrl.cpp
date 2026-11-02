@@ -130,6 +130,7 @@
 #include "editorctrl.h"
 #include "src/gui/utils/fontutils.h"
 #include "src/gui/utils/maclookup.h"
+#include "src/gui/utils/macwriteblock.h"
 
 #include <filesystem>
 #include "src/input/wordtsarinput.h"
@@ -7492,14 +7493,19 @@ std::string cEditorCtrl::PromptForSaveFile(void)
 /// @return the chosen file name, empty if cancelled
 ///
 /// @brief
-/// ^KW file prompt.
+/// ^KW file prompt: the native save panel with the Copy in ASCII Format
+/// box. Returns empty under QT_TESTING=1.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cEditorCtrl::PromptForWriteBlockFile(bool& asciiFormat, bool asciiLocked)
 {
-    (void)asciiFormat ;
-    (void)asciiLocked ;
-    return PromptForSaveFile() ;
+    const char* qtTesting = std::getenv("QT_TESTING") ;
+    if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
+    {
+        return "" ;
+    }
+
+    return ShowMacWriteBlockPanel(mFileDir, asciiFormat, asciiLocked) ;
 }
 
 
