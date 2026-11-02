@@ -734,7 +734,8 @@ bool cTerminalDriverPosix::DecodeBytes(sInputEvent& event, const std::vector<uin
 /// @param  sInputEvent& event [out] decoded event
 /// @param  const std::vector<uint8_t>& bytes [in] escape sequence bytes
 ///
-/// @return true when the escape sequence was decoded
+/// @return true when the escape sequence was decoded, false for a sequence
+///         that is ignored
 ///
 /// @brief
 /// Decode escape and CSI sequences used by common terminals.
@@ -837,10 +838,17 @@ bool cTerminalDriverPosix::DecodeEscape(sInputEvent& event, const std::vector<ui
         return true;
     }
 
-    event.type = INPUT_TYPE_SPECIAL;
-    event.special = SPECIAL_KEY_ESCAPE;
+    // ESC ESC is one Escape.
+    if (bytes[1] == 0x1BU)
+    {
+        event.type = INPUT_TYPE_SPECIAL;
+        event.special = SPECIAL_KEY_ESCAPE;
+        return true;
+    }
 
-    return true;
+    // Any other sequence, such as ESC DEL or ESC followed by a UTF-8
+    // character: no event.
+    return false;
 }
 
 /////////////////////////////////////////////////////////////////////////////

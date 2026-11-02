@@ -1188,3 +1188,37 @@ TEST_CASE("TUI terminal driver - SS3 arrows, Home and End decode as the keys")
         CHECK(events[0].special == item.key);
     }
 }
+
+
+TEST_CASE("TUI terminal driver - Alt+Backspace and Alt with a UTF-8 character are ignored")
+{
+    SUBCASE("ESC DEL")
+    {
+        for (const wordstartui::sInputEvent& event : DriverEvents("\x1b\x7f"))
+        {
+            CHECK(IsEscapeEvent(event) == false);
+            CHECK(event.type == wordstartui::INPUT_TYPE_NONE);
+        }
+    }
+
+    SUBCASE("ESC followed by a UTF-8 character")
+    {
+        for (const wordstartui::sInputEvent& event : DriverEvents("\x1b\xc3\xa9"))
+        {
+            CHECK(IsEscapeEvent(event) == false);
+            CHECK(event.type == wordstartui::INPUT_TYPE_NONE);
+        }
+    }
+}
+
+
+TEST_CASE("TUI terminal driver - ESC ESC is one Escape and a lone Escape is Escape")
+{
+    std::vector<wordstartui::sInputEvent> twice = DriverEvents("\x1b\x1b");
+    REQUIRE(twice.size() == 1);
+    CHECK(IsEscapeEvent(twice[0]) == true);
+
+    std::vector<wordstartui::sInputEvent> lone = DriverEvents("\x1b");
+    REQUIRE(lone.size() == 1);
+    CHECK(IsEscapeEvent(lone[0]) == true);
+}
