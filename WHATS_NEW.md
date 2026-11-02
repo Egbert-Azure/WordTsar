@@ -58,7 +58,7 @@ Release history for WordTsar, in reverse chronological order.
 
 ## 0.14.2 (2026-10-30)
 
-WordTsar is no longer Beta. I think its a stable version even if there is a lot of work to do to reach 1.0 - which I would call the first release.
+WordTsar is still Beta, but I think it is a stable version even if there is a lot of work to do to reach 1.0 - which I would call the first release.
 
 **Fixes**
 
