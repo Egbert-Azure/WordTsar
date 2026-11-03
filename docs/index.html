@@ -1,0 +1,104 @@
+---
+layout: default
+---
+    <section class="hero" aria-labelledby="title">
+      <div class="wrap">
+        <div class="column">
+          <p class="ruler" aria-hidden="true" data-ruler>L----!----!----!----!----!----!----!----!----!----!----!----!----R</p>
+          <h1 id="title">A WordStar 7 clone for your Mac.<span class="cursor" aria-hidden="true"></span></h1>
+          <p class="lede">WordTsar opens your old WordStar files, answers to the same control-key commands, and leaves out everything that isn’t writing. Use it as a Mac app or in a terminal window.</p>
+          <div class="actions">
+            <a class="button" href="https://github.com/{{ site.repository }}/releases/latest/download/WordTsar.zip">Download for macOS</a>
+            <a class="plain" href="https://github.com/{{ site.repository }}/releases/latest">Release notes</a>
+          </div>
+          <p class="fine">Free and open source under the AGPL-3.0. Still Beta, and in daily use by its maintainer. <span data-version hidden></span></p>
+        </div>
+        <figure class="shot">
+          <img src="screenshots/ws-look-block-menu.png" width="1454" height="962" alt="WordTsar in a terminal window, styled like WordStar 7: a grey Block and Save menu listing commands such as save, copy and move, above blue text with a highlighted dot command.">
+          <figcaption>The terminal version in the WordStar 7 look. <kbd>^K</kbd> opens the Block &amp; Save menu.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section aria-labelledby="two-ways">
+      <div class="wrap">
+        <div class="column">
+          <h2 id="two-ways">Two ways to write</h2>
+          <p>Both versions are built from the same source, open and save the same files, and share one editing engine. Install whichever you prefer, or both.</p>
+        </div>
+        <div class="pair">
+          <figure class="shot">
+            <img src="screenshots/WordTsar-gui.png" width="1074" height="939" loading="lazy" alt="WordTsar as a Mac app: a window with the WordStar command panel, a ruler, and a document underneath.">
+            <figcaption>
+              <h3>WordTsar.app</h3>
+              <p>The Mac app. Mac shortcuts such as <kbd>⌘,</kbd> for Preferences work alongside the WordStar keys.</p>
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="screenshots/ws-look-edit-menu.png" width="1453" height="924" loading="lazy" alt="WordTsar in a terminal window with the WordStar 7 Edit menu: cursor, scroll and delete commands listed above a blue document area.">
+            <figcaption>
+              <h3>ws</h3>
+              <p>The terminal version, for writing with no window chrome at all. Pick the WordStar 7 colours under System Preferences.</p>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" aria-labelledby="features-title">
+      <div class="wrap">
+        <div class="column">
+          <h2 id="features-title">What it does</h2>
+          <dl class="facts">
+            <dt>Opens</dt>
+            <dd>WordStar 4 and WordStar 7 files, plus RTF and Word (.docx).</dd>
+            <dt>Saves</dt>
+            <dd>WordStar 7, RTF and Word (.docx).</dd>
+            <dt>Keys</dt>
+            <dd>The WordStar 7 commands you already know: <kbd>^KD</kbd> saves, <kbd>^KB</kbd> and <kbd>^KK</kbd> mark a block, <kbd>^QF</kbd> finds. Prefer copy, paste and undo the modern way? Switch to Modern mode in System Preferences.</dd>
+            <dt>Help</dt>
+            <dd>Press <kbd>F1</kbd>, then any command, for a one-line description of what it does. The one-page <a href="QUICKREF.WS">quick reference</a> is itself a WordStar document: open it in WordTsar.</dd>
+            <dt>Backups</dt>
+            <dd>A WordStar-format backup of your file every minute.</dd>
+            <dt>Spelling</dt>
+            <dd>Uses any dictionary installed in macOS, not just English.</dd>
+            <dt>Text</dt>
+            <dd>Unicode 16, stored as UTF-8.</dd>
+          </dl>
+          <p class="gap">Not there yet: Word import brings over text, character formatting and basic page setup, but not tables, numbered lists, images, headers or footers. The full list of changes is in the <a href="https://github.com/{{ site.repository }}/blob/main/WHATS_NEW.md">release history</a>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="install" aria-labelledby="install-title">
+      <div class="wrap">
+        <div class="column steps">
+          <h2 id="install-title">Install</h2>
+          {% capture install %}{% include install.md %}{% endcapture %}{{ install | markdownify }}
+        </div>
+      </div>
+    </section>
+
+    <section id="credits" aria-labelledby="credits-title">
+      <div class="wrap credit">
+        <div>
+          <h2 id="credits-title">Credit where it belongs</h2>
+          <p>WordTsar is Gerald Brandt’s. He designed it, wrote it and has maintained it for years: the editing engine, the layout and rendering, the WordStar 7 fidelity and the file formats. Nearly all the code here is his. He is also a novelist, and he writes his books in WordTsar.</p>
+          <p>This fork exists because I wanted that quiet place to write on one platform, with less to maintain. For Windows and Linux, use Gerald’s cross-platform project on <a href="https://sourceforge.net/p/wordtsar/mercurial/ci/default/tree/">SourceForge</a>. <a href="http://wordtsar.ca">wordtsar.ca</a> is the project’s original home, with its history and forums.</p>
+          <p class="aside">This macOS fork isn’t endorsed by or affiliated with the upstream WordTsar project.</p>
+        </div>
+        <figure class="shot">
+          <img src="screenshots/michael-shrayer-electric-pencil.png" width="400" height="316" loading="lazy" alt="Michael Shrayer at a TRS-80 running Electric Pencil.">
+          <figcaption>Michael Shrayer’s <em>Electric Pencil</em> (1976, TRS-80), generally credited as the first word processor for a microcomputer.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section aria-labelledby="feedback-title">
+      <div class="wrap">
+        <div class="column">
+          <h2 id="feedback-title">Report a problem</h2>
+          <p>Found a bug or a missing command? <a href="https://github.com/{{ site.repository }}/issues">Open an issue on GitHub</a> and describe what you expected to happen.</p>
+        </div>
+      </div>
+    </section>

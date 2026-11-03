@@ -1,0 +1,205 @@
+/* Layout: one left-aligned writing column whose width is drawn by a WordStar
+   ruler (L----!----R) at the top; screenshots run wider than the column.
+   Palette quotes WordStar 7 itself: menu-panel grey, hotkey blue,
+   black title and status bars. Dark mode swaps the grey for charcoal. */
+:root {
+  --paper: #e4e6ea;      /* WordStar 7 menu-panel grey, lightened */
+  --panel: #d3d7dd;      /* keycaps and quiet fills */
+  --ink: #15171b;
+  --muted: #4c525b;
+  --rule: #b3b8c1;
+  --hotkey: #1f3db3;     /* WordStar 7 hotkey blue */
+  --hotkey-ink: #ffffff;
+  --bar: #000000;        /* title and status bars */
+  --bar-ink: #c9cdd4;
+  --bar-hot: #9fb3ff;
+
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --serif: "IBM Plex Serif", Charter, "Iowan Old Style", Georgia, serif;
+
+  --measure: 40rem;
+  --wide: 70rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1f2328;
+    --panel: #2b3038;
+    --ink: #e5e7ea;
+    --muted: #a3a9b2;
+    --rule: #3b414a;
+    --hotkey: #93a9ff;
+    --hotkey-ink: #0c1640;
+    --bar: #000000;
+    --bar-ink: #b9bec7;
+    --bar-hot: #93a9ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1f2328;
+  --panel: #2b3038;
+  --ink: #e5e7ea;
+  --muted: #a3a9b2;
+  --rule: #3b414a;
+  --hotkey: #93a9ff;
+  --hotkey-ink: #0c1640;
+  --bar: #000000;
+  --bar-ink: #b9bec7;
+  --bar-hot: #93a9ff;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.125rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+img { max-width: 100%; height: auto; display: block; }
+
+a { color: var(--hotkey); text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--hotkey); outline-offset: 3px; border-radius: 2px; }
+
+code, kbd { font-family: var(--mono); font-size: 0.86em; }
+code { background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+kbd {
+  display: inline-block;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 0.35em;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+/* One wrapper per band carries the side gutter. */
+.wrap {
+  max-width: var(--wide);
+  margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.column { max-width: var(--measure); }
+
+/* Title bar */
+.titlebar { background: var(--bar); color: var(--bar-ink); font-family: var(--mono); font-size: 0.875rem; }
+.titlebar .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  padding-block: 0.6rem;
+}
+.titlebar .name { color: var(--bar-ink); text-decoration: none; font-weight: 600; }
+.titlebar nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
+.titlebar nav a { color: var(--bar-ink); text-decoration: none; }
+.titlebar nav a:hover { color: var(--bar-hot); }
+
+/* Hero */
+.hero { padding-block: 3.5rem 1rem; }
+.ruler {
+  margin: 0 0 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.9375rem;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--muted);
+  white-space: pre;
+  overflow: hidden;
+}
+h1 {
+  margin: 0;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: clamp(2rem, 1.25rem + 3.4vw, 3.25rem);
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 0.95em;
+  margin-left: 0.08em;
+  vertical-align: -0.1em;
+  background: var(--hotkey);
+  animation: blink 1.1s steps(1, end) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
+
+.lede { margin: 1.25rem 0 0; font-size: 1.25rem; line-height: 1.55; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; margin-top: 2rem; }
+.button {
+  display: inline-block;
+  background: var(--hotkey);
+  color: var(--hotkey-ink);
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  padding: 0.8rem 1.15rem;
+  border-radius: 4px;
+}
+.button:hover { text-decoration: underline; text-underline-offset: 0.2em; }
+.actions .plain { font-family: var(--mono); font-size: 1rem; }
+.fine { margin: 1rem 0 0; font-size: 0.9375rem; color: var(--muted); }
+
+/* Screenshots */
+.shot { margin: 0; }
+.shot img { border: 1px solid var(--rule); border-radius: 8px; }
+.shot figcaption { margin-top: 0.6rem; font-size: 0.9375rem; color: var(--muted); max-width: var(--measure); }
+.hero .shot { margin-top: 3rem; }
+
+/* Sections */
+section { padding-block: 3.5rem; }
+h2 {
+  margin: 0 0 1rem;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+section p { margin: 0 0 1rem; }
+section p:last-child { margin-bottom: 0; }
+
+.pair { display: grid; gap: 2rem; margin-top: 2rem; }
+@media (min-width: 52rem) { .pair { grid-template-columns: 1fr 1fr; align-items: start; } }
+.pair > * { min-width: 0; }
+.pair img { width: 100%; aspect-ratio: 1453 / 924; object-fit: cover; object-position: top left; }
+.pair h3 { margin: 1rem 0 0.25rem; font-family: var(--mono); font-size: 1.0625rem; font-weight: 600; }
+.pair p { font-size: 1rem; margin: 0; }
+
+.facts { margin: 1.5rem 0 0; display: grid; gap: 0.9rem 1.5rem; }
+@media (min-width: 40rem) { .facts { grid-template-columns: 7.5rem minmax(0, 1fr); } }
+.facts dt { font-family: var(--mono); font-weight: 600; font-size: 1rem; padding-top: 0.12rem; }
+.facts dd { margin: 0; min-width: 0; }
+.gap { margin-top: 1.5rem; font-size: 1rem; color: var(--muted); }
+
+.steps ol { margin: 1.25rem 0 1.25rem; padding-left: 1.6rem; display: grid; gap: 0.6rem; }
+.steps ol li::marker { font-family: var(--mono); font-weight: 600; color: var(--hotkey); }
+.steps p { margin: 0 0 0.75rem; }
+.steps code { font-size: 0.82em; }
+
+.credit { display: grid; gap: 2rem; }
+@media (min-width: 52rem) { .credit { grid-template-columns: minmax(0, var(--measure)) 15rem; align-items: start; } }
+.credit .shot img { border-radius: 6px; }
+.aside { font-size: 0.9375rem; color: var(--muted); }
+
+/* Status bar */
+.statusbar { background: var(--bar); color: var(--bar-ink); font-family: var(--mono); font-size: 0.8125rem; line-height: 1.6; margin-top: 2rem; }
+.statusbar .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; padding-block: 0.9rem; }
+.statusbar p { margin: 0; }
+.statusbar a { color: var(--bar-ink); }
+.statusbar a:hover { color: var(--bar-hot); }

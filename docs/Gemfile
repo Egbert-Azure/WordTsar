@@ -1,0 +1,7 @@
+# Only needed to preview the site on your Mac:
+#   cd docs && bundle install && bundle exec jekyll serve
+# then open http://localhost:4000. GitHub Pages ignores this file.
+source "https://rubygems.org"
+
+gem "github-pages", group: :jekyll_plugins
+gem "webrick"
