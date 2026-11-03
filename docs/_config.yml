@@ -1,7 +1,7 @@
 # Site for the WordTsar macOS fork, published by GitHub Pages from /docs.
 title: WordTsar for macOS
-description: A WordStar 7 clone for macOS, as a Mac app and in the terminal.
-author: Egbert Schroeer
+description: WordStar for the 21st century, on macOS.
+author: Egbert H. Schroeer
 repository: Egbert-Azure/WordTsar
 
 # The address the site lives at once the custom domain is set up.
