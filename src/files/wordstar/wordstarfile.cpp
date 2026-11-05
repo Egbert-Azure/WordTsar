@@ -1082,8 +1082,8 @@ bool cWordstarFile::AskCodePage(size_t unmappableCount)
 ///
 /// @brief
 /// Counts the characters of start..end the current code page cannot
-/// write. If there are any and the file is not silent, asks whether to
-/// write anyway.
+/// write and the raw byte markers EncodeRange() leaves out. If there are
+/// any and the file is not silent, asks whether to write anyway.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWordstarFile::ConfirmCodePage(POSITION_T start, POSITION_T end)
@@ -1091,7 +1091,14 @@ bool cWordstarFile::ConfirmCodePage(POSITION_T start, POSITION_T end)
     size_t unmappableCount = 0 ;
     for(POSITION_T scan = start; scan < end; scan++)
     {
-        unmappableCount += CountUnmappable(mDocument->GetChar(scan)) ;
+        std::string str = mDocument->GetChar(scan) ;
+        if(str.length() == 1 && str[0] == MARKER_CHAR &&
+           mDocument->GetControlChar(scan) == STYLE_RAW_BYTE)
+        {
+            unmappableCount++ ;
+            continue ;
+        }
+        unmappableCount += CountUnmappable(str) ;
     }
 
     return AskCodePage(unmappableCount) ;
@@ -1237,7 +1244,12 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
         {
             if(ch1 == MARKER_CHAR)
             {
-                ch1 = mDocument->GetControlChar(loop) ;
+                eModifiers control = mDocument->GetControlChar(loop) ;
+                if(control == STYLE_RAW_BYTE)
+                {
+                    continue ;      // a control byte from a text file is left out
+                }
+                ch1 = control ;
             }
 
             switch(ch1)

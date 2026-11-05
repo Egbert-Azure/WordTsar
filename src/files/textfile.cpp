@@ -49,6 +49,9 @@
  * - Line endings are normalized: LF and CR+LF are converted to CR only
  *   (WordTsar's internal paragraph delimiter). The first line ending in
  *   the file is kept for GetLineEnding(); LF if the file has none.
+ * - Control bytes for which IsRawTextByte() is true are inserted as raw
+ *   byte markers (cDocument::InsertRaw) and saved back unchanged, unless
+ *   SetRawBytes(false) was called.
  *
  * @section textfile_capabilities Format Capabilities
  * - CanLoad(): always returns true (accepts any file as plain text)
@@ -1034,6 +1037,17 @@ bool cTextFile::LoadFile(std::string filename)
     // Insert content into document
     // Process character by character to handle line breaks
     std::string currentLine;
+    auto InsertLine = [this](const std::string& line)
+    {
+        if (mRawBytes)
+        {
+            mDocument->InsertRaw(line);
+        }
+        else
+        {
+            mDocument->Insert(line);
+        }
+    };
 
     for (size_t i = 0; i < normalized.size(); i++)
     {
@@ -1042,7 +1056,7 @@ bool cTextFile::LoadFile(std::string filename)
             // Insert accumulated line content
             if (!currentLine.empty())
             {
-                mDocument->Insert(currentLine);
+                InsertLine(currentLine);
                 currentLine.clear();
             }
 
@@ -1053,7 +1067,7 @@ bool cTextFile::LoadFile(std::string filename)
         {
             if (!currentLine.empty())
             {
-                mDocument->Insert(currentLine);
+                InsertLine(currentLine);
                 currentLine.clear();
             }
 
@@ -1075,7 +1089,7 @@ bool cTextFile::LoadFile(std::string filename)
     // Insert final line if any
     if (!currentLine.empty())
     {
-        mDocument->Insert(currentLine);
+        InsertLine(currentLine);
     }
 
     return true;
@@ -1108,6 +1122,18 @@ bool cTextFile::SaveFile(std::string filename, POSITION_T length)
     // close() flushes; a failed write or flush sets failbit or badbit
     file.close();
     return file.good();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  rawBytes [in] - true: LoadFile() inserts IsRawTextByte() bytes
+///                         as raw bytes (default); false: as control codes
+///                         (cDocument::Insert)
+///
+/////////////////////////////////////////////////////////////////////////////
+void cTextFile::SetRawBytes(bool rawBytes)
+{
+    mRawBytes = rawBytes;
 }
 
 /////////////////////////////////////////////////////////////////////////////

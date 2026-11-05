@@ -5145,7 +5145,7 @@ void cEditorCtrl::ClipboardPaste(void)
 
         // Insert at current position
         // Visual update driven by listener (InsertText calls NotifyChanged calls OnDocumentChanged)
-        InsertText(utf8);
+        InsertPastedText(utf8);
 
         // Show feedback on status bar
         if (mWordTsar)
@@ -7077,7 +7077,9 @@ bool cEditorCtrl::InsertFileAtCursor(const std::string& filename)
     }
     else
     {
-        fileReader = new cTextFile(this);
+        cTextFile* textReader = new cTextFile(this);
+        textReader->SetRawBytes(mDocument->IsTextFile());
+        fileReader = textReader;
     }
 
     mDocument->SetLoading(true);

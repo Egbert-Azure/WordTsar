@@ -598,14 +598,15 @@ TEST_CASE("cWSEditorCtrl - Write Block to File writes plain text from a text doc
         tab.abstabsize = 0;
         tab.size = 0;
 
+        doc->SetTextFile(true);
         doc->Insert("A");
         doc->InsertTab(tab);
         doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
         doc->Insert("B");
         doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
         doc->InsertVariable(VAR_DATE);
-        doc->Insert("\rC\x7f" "D");
-        doc->SetTextFile(true);
+        editor.InsertPastedText("\rC\x7f" "D");       // 0x7F as a raw byte
+        doc->Insert(static_cast<CHAR_T>(MARKER_CHAR)); // a bare marker
         CHECK(writeWholeDocument() == "A\tB\nC\x7f" "D");
     }
 
@@ -643,7 +644,9 @@ TEST_CASE("cWSEditorCtrl - clipboard copy writes plain text with LF line endings
     doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
     doc->InsertFont(font);
     doc->InsertFootnote(footnote);
-    doc->Insert("\rC\x7f" "D\r");
+    doc->SetTextFile(true);
+    editor.InsertPastedText("\rC\x7f" "D\r");      // 0x7F as a raw byte
+    doc->Insert(static_cast<CHAR_T>(MARKER_CHAR));   // a bare marker
 
     doc->SetPosition(0);
     doc->SetBeginBlock();
@@ -922,7 +925,7 @@ TEST_CASE("cWSEditorCtrl - a tab inserted as text is stored as the Tab key store
 
         doc->SetPosition(1);
         editor.Tab();
-        editor.InsertText("a\tb");          // as ClipboardPaste inserts plain text
+        editor.InsertPastedText("a\tb");
         CHECK(doc->GetControlChar(3) == STYLE_TAB);
 
         REQUIRE(editor.SaveFile(path.string()));
@@ -938,11 +941,102 @@ TEST_CASE("cWSEditorCtrl - a tab inserted as text is stored as the Tab key store
         REQUIRE(typed.SaveFile((dir / "typed.ws").string()));
 
         cWSEditorCtrl pasted;
-        pasted.InsertText("a\tb");          // as ClipboardPaste inserts plain text
+        pasted.InsertPastedText("a\tb");
         REQUIRE(pasted.SaveFile((dir / "pasted.ws").string()));
 
         CHECK(pasted.GetDocument()->GetControlChar(1) == STYLE_TAB);
         CHECK(ReadFileBytes(dir / "pasted.ws") == ReadFileBytes(dir / "typed.ws"));
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+namespace
+{
+
+// "abc", byte, "def" and two long lines so the file loads as text
+std::string TuiOneByteFile(unsigned char byte)
+{
+    std::string filler = "a line of plain text, long enough to keep the file text";
+    std::string bytes = "abc";
+    bytes += static_cast<char>(byte);
+    bytes += "def\n" + filler + "\n" + filler + "\n";
+    return bytes;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("cWSEditorCtrl - ^KR and paste keep a control byte in a text document only")
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-tui-rawinsert-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    auto base = dir / "base.txt";
+    WriteFileBytes(base, "XY\n");
+    auto insert = dir / "insert.txt";
+    WriteFileBytes(insert, TuiOneByteFile(0x02));
+
+    auto wholeText = [&](void)
+    {
+        return doc->GetPlainText(0, doc->GetTextSize(), "\n");
+    };
+
+    SUBCASE("^KR of a text file into a text document")
+    {
+        REQUIRE(editor.LoadFile(base.string()));
+        REQUIRE(doc->IsTextFile());
+        doc->SetPosition(1);
+        REQUIRE(editor.InsertFileAtCursor(insert.string()));
+        CHECK(wholeText() == "X" + TuiOneByteFile(0x02) + "Y\n");
+        CHECK(doc->GetControlChar(4) != STYLE_BOLD);
+
+        REQUIRE(editor.SaveFile(base.string()));
+        CHECK(ReadFileBytes(base) == "X" + TuiOneByteFile(0x02) + "Y\n");
+    }
+
+    SUBCASE("^KR of a text file into a WordStar document")
+    {
+        REQUIRE(doc->IsTextFile() == false);
+        REQUIRE(editor.InsertFileAtCursor(insert.string()));
+        CHECK(doc->GetControlChar(3) == STYLE_BOLD);
+        CHECK(doc->GetPlainText(0, 8, "\n") == "abcdef\n");
+    }
+
+    SUBCASE("plain-text paste into a text document")
+    {
+        REQUIRE(editor.LoadFile(base.string()));
+        REQUIRE(doc->IsTextFile());
+        doc->SetPosition(1);
+        editor.InsertPastedText("a\x02" "b\x1B" "c\x7F");
+        CHECK(wholeText() == "Xa\x02" "b\x1B" "c\x7FY\n");
+        CHECK(doc->GetControlChar(2) != STYLE_BOLD);
+
+        doc->SetPosition(0);
+        doc->SetBeginBlock();
+        doc->SetPosition(doc->GetTextSize());
+        doc->SetEndBlock();
+        CHECK(editor.GetClipboardText() == "Xa\x02" "b\x1B" "c\x7FY\n");
+
+        REQUIRE(editor.SaveFile(base.string()));
+        CHECK(ReadFileBytes(base) == "Xa\x02" "b\x1B" "c\x7FY\n");
+    }
+
+    SUBCASE("plain-text paste into a WordStar document is unchanged")
+    {
+        REQUIRE(doc->IsTextFile() == false);
+        editor.InsertPastedText("a\x02" "b\x02" "c");
+        CHECK(doc->GetControlChar(1) == STYLE_BOLD);
+        CHECK(doc->GetControlChar(3) == STYLE_BOLD);
+        CHECK(wholeText() == "abc");
     }
 
     std::error_code ec;

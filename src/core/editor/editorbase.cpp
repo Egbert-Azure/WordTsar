@@ -2035,7 +2035,9 @@ void cEditorBase::GotoFontTag(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  text [in] text to insert at caret position
+/// @param  text     [in] text to insert at caret position
+/// @param  rawBytes [in] insert IsRawTextByte() bytes as raw bytes
+///                       (cDocument::InsertRaw) instead of control codes
 ///
 /// @return nothing
 ///
@@ -2049,7 +2051,7 @@ void cEditorBase::GotoFontTag(void)
 /// cDocument automatically adjusts block positions/sizes via IncrementAttributes().
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorBase::InsertText(const std::string& text)
+void cEditorBase::InsertText(const std::string& text, bool rawBytes)
 {
     // Guard: need document
     if (!mDocument)
@@ -2124,7 +2126,14 @@ void cEditorBase::InsertText(const std::string& text)
     UNUSED_ARGUMENT(posBeforeInsert);  // Reserved for future undo/redo tracking
 
     // Insert text at current caret position (BLACK BOX: document handles grapheme counting)
-    mDocument->Insert(text);
+    if (rawBytes)
+    {
+        mDocument->InsertRaw(text);
+    }
+    else
+    {
+        mDocument->Insert(text);
+    }
 
     // Check if just-typed character completes a &X& variable pattern
     CheckAndReplaceVariable();
@@ -2159,6 +2168,28 @@ void cEditorBase::InsertText(const std::string& text)
     mCaretStickyX = -1;
 
     // Visual updates removed - caller responsible for CalculateCaretPosition() + ScrollIntoView()
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  text [in] plain text from the system clipboard
+///
+/// @return nothing
+///
+/// @brief
+/// InsertText() for a plain-text paste: into a text document, control
+/// bytes are inserted as raw bytes (cDocument::InsertRaw).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::InsertPastedText(const std::string& text)
+{
+    if (!mDocument)
+    {
+        return;
+    }
+
+    InsertText(text, mDocument->IsTextFile());
 }
 
 

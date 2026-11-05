@@ -140,7 +140,26 @@ enum eType
     TYPE_ENDNOTE,
     TYPE_SAVED_POSITION,
     TYPE_VARIABLE,
+    TYPE_RAW_BYTE,              ///< a control byte from a text file, kept as content
 };
+
+
+///////////////////////////////////////////////////////////////////////
+///
+/// @param  ch [in] - code point
+///
+/// @return true if ch is stored as a raw byte when it comes from a text
+///         file: 0x01-0x1F except tab, LF, CR and 0x1A, and 0x7F
+///
+///////////////////////////////////////////////////////////////////////
+constexpr bool IsRawTextByte(CHAR_T ch)
+{
+    if (ch == 0x7F)
+    {
+        return true ;
+    }
+    return ch >= 0x01 && ch <= 0x1F && ch != 0x09 && ch != 0x0A && ch != 0x0D && ch != 0x1A ;
+}
 
 
 ///////////////////////////////////////////////////////////////////////
@@ -209,7 +228,8 @@ enum eModifiers
     STYLE_SEQUENCE,                     // PARTIAL - read ok, not written
     STYLE_FOOTNOTE,                     // done (WS uses this for - soft-hypen for where wordwrap can occur)
     STYLE_ENDNOTE,                      // done (WS uses this for - soft-hypen for where wordwrap has occurred)
-    STYLE_END_OF_STYLES
+    STYLE_END_OF_STYLES,
+    STYLE_RAW_BYTE                      // a TYPE_RAW_BYTE marker, see cDocument::GetRawByte()
 } ;
 
 

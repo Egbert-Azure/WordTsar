@@ -68,6 +68,9 @@ bool SavedPositionCompare(const SavedPositionPair &first, const SavedPositionPai
 using VariablePair = std::pair<POSITION_T, eVariableType> ;
 bool VariableCompare(const VariablePair &first, const VariablePair &second) ;
 
+using RawBytePair = std::pair<POSITION_T, unsigned char> ;
+bool RawByteCompare(const RawBytePair &first, const RawBytePair &second) ;
+
 struct sParagraphData ;
 bool ParagraphCompare(const sParagraphData &first, const sParagraphData &second) ;
 
@@ -132,6 +135,7 @@ struct sParagraphData
     std::vector<FootnotePair> footnote ;                 ///< footnotes
     std::vector<EndnotePair> endnote ;                   ///< endnotes
     std::vector<VariablePair> variable ;                 ///< variable expansions (&@&, &#&, etc.)
+    std::vector<RawBytePair> rawbyte ;                   ///< control bytes from a text file
 
     cGraphemeOffsets offsets;                              ///< compact grapheme boundary cache
     long words = -1 ;                                    ///< word count, -1 = not counted since the last text change
@@ -180,6 +184,7 @@ struct sUndoCharInfo
     std::optional<sNote> footnoteData ;
     std::optional<sNote> endnoteData ;
     std::optional<eVariableType> variableData ;
+    std::optional<unsigned char> rawByteData ;
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -295,6 +300,8 @@ public:
     void InsertFootnote(sNote &note) ;                      // insert a footnote
     void InsertEndnote(sNote &note) ;                       // insert an endnote
     void InsertVariable(eVariableType type) ;               // insert a variable (&@&, &#&, etc.)
+    void InsertRawByte(unsigned char byte) ;                // insert a control byte from a text file
+    void InsertRaw(const std::string &text) ;               // Insert(), with IsRawTextByte() bytes as raw bytes
 
     // --- Loading State ---
     void SetLoading(bool loading) ;
@@ -325,6 +332,7 @@ public:
     eVariableType GetVariable(POSITION_T position) ;
     bool GetNote(POSITION_T position, sNote &note) ;
     eModifiers GetControlChar(POSITION_T) ;
+    unsigned char GetRawByte(POSITION_T position) ;
 
     // --- Text Retrieval ---
     std::string GetParagraphText(PARAGRAPH_T para) ;
@@ -429,6 +437,7 @@ private:
     void DeleteColor(POSITION_T position) ;
     void DeleteFont(POSITION_T position) ;
     void DeleteVariable(POSITION_T position) ;
+    void DeleteRawByte(POSITION_T position) ;
     void DeleteControlChar(POSITION_T position) ;
 
     // --- Paragraph Management ---

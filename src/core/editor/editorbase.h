@@ -264,7 +264,8 @@ public:
     void GotoFontTag(void);
 
     // Text Editing
-    void InsertText(const std::string& text);
+    void InsertText(const std::string& text, bool rawBytes = false);
+    void InsertPastedText(const std::string& text);              // Plain-text clipboard paste
     void Delete(POSITION_T pos, POSITION_T length);
     void MarkDocumentSaved(void) ;                            // mark the document saved (closes the typing group, sets the save point)
     void DeleteChar(void);

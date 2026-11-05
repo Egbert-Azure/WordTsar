@@ -72,6 +72,7 @@ public:
     static bool IsAcceptableFileSize(long long fileSize);
 
     std::string GetLineEnding(void) const;
+    void SetRawBytes(bool rawBytes);
 
 protected:
 
@@ -89,6 +90,7 @@ private:
     std::string DetectLineEnding(const std::string& content);
 
     std::string mLineEnding = "\n";              ///< first line ending of the loaded file
+    bool mRawBytes = true;                       ///< LoadFile() inserts with cDocument::InsertRaw()
 };
 
 

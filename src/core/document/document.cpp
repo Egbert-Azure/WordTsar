@@ -262,6 +262,22 @@ bool VariableCompare(const VariablePair &first, const VariablePair &second)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  first  [in] left-hand RawBytePair element
+/// @param  second [in] right-hand RawBytePair element
+///
+/// @return bool - true if first's position is less than second's
+///
+/// @brief
+/// Comparator for sorted array of RawBytePair (position, byte) entries
+///
+/////////////////////////////////////////////////////////////////////////////
+bool RawByteCompare(const RawBytePair &first, const RawBytePair &second)
+{
+    return first.first < second.first;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  first  [in] left-hand sParagraphData element
 /// @param  second [in] right-hand sParagraphData element
 ///
@@ -548,6 +564,7 @@ void cDocument::ShrinkToFit(void)
         mParagraphData[loop].footnote.shrink_to_fit() ;
         mParagraphData[loop].endnote.shrink_to_fit() ;
         mParagraphData[loop].variable.shrink_to_fit() ;
+        mParagraphData[loop].rawbyte.shrink_to_fit() ;
         mParagraphData[loop].offsets.shrink_to_fit() ;
     }
 }
@@ -874,12 +891,17 @@ bool cDocument::Delete(POSITION_T position, POSITION_T length)
         // its STYLE_ code so the dispatch below removes the matching pairs/table
         // entry instead of orphaning it.
         CHAR_T code = static_cast<CHAR_T>(grapheme[0]);
-        if (grapheme.length() == 1 && code == MARKER_CHAR)
+        bool isMarker = (grapheme.length() == 1 && code == MARKER_CHAR);
+        if (isMarker)
         {
             code = static_cast<CHAR_T>(GetControlChar(position));
         }
 
-        if (code < STYLE_END_OF_STYLES && grapheme.length() == 1)
+        if (isMarker && code == STYLE_RAW_BYTE)
+        {
+            DeleteRawByte(position);
+        }
+        else if (code < STYLE_END_OF_STYLES && grapheme.length() == 1)
         {
             switch (code)
             {
@@ -1669,6 +1691,117 @@ void cDocument::InsertVariable(eVariableType type)
 
     // notify listeners (inner Insert was suppressed by mUndoDisabled)
     NotifyChanged(currentparagraphnumber) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  byte [in] control byte from a text file (IsRawTextByte())
+///
+/// @return nothing
+///
+/// @brief
+/// Inserts a raw byte marker at the current position. The byte is content:
+/// it has no formatting meaning and GetPlainText() writes it back.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::InsertRawByte(unsigned char byte)
+{
+    POSITION_T pos = GetPosition();
+    POSITION_T cursorBefore = mCurrentPosition ;
+    bool shouldRecord = !mUndoDisabled && !mIsLoading && !mSuppressUndo ;
+
+    PARAGRAPH_T currentparagraphnumber = GetParagraphFromPosition(pos);
+    auto paraiter = mParagraphData.begin() + currentparagraphnumber;
+    pos -= paraiter->index;
+
+    PairTable t = std::make_pair(pos, TYPE_RAW_BYTE);
+    RawBytePair t1 = std::make_pair(pos, byte);
+
+    // suppress undo recording from Insert(MARKER_CHAR) -- we record our own
+    bool oldDisabled = mUndoDisabled ;
+    mUndoDisabled = true ;
+    Insert(MARKER_CHAR);
+    mUndoDisabled = oldDisabled ;
+
+    auto iter = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), t, TableCompare);
+    auto iter1 = lower_bound(paraiter->rawbyte.begin(), paraiter->rawbyte.end(), t1, RawByteCompare);
+
+    size_t tpos = static_cast<size_t>(distance(paraiter->rawbyte.begin(), iter1));
+    paraiter->rawbyte.insert(paraiter->rawbyte.begin() + static_cast<ssize_t>(tpos), t1);
+
+    tpos = static_cast<size_t>(distance(paraiter->pairs.begin(), iter));
+    paraiter->pairs.insert(paraiter->pairs.begin() + static_cast<ssize_t>(tpos), t);
+
+    if (shouldRecord)
+    {
+        sUndoCharInfo charInfo ;
+        charInfo.codepoint = STYLE_RAW_BYTE ;
+        charInfo.rawByteData = byte ;
+        std::vector<sUndoCharInfo> chars ;
+        chars.push_back(charInfo) ;
+        RecordAction(UNDO_ACTION_INSERT, cursorBefore, 1, chars, cursorBefore) ;
+    }
+
+    NotifyChanged(currentparagraphnumber) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  text [in] UTF-8 text from a text file or the clipboard
+///
+/// @return nothing
+///
+/// @brief
+/// Insert(text), except that each byte for which IsRawTextByte() is true
+/// is inserted with InsertRawByte(). Records one undo action.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::InsertRaw(const std::string &text)
+{
+    bool shouldRecord = !mUndoDisabled && !mIsLoading && !mSuppressUndo ;
+    POSITION_T insertPosition = mCurrentPosition ;
+
+    bool oldSuppressUndo = mSuppressUndo ;
+    bool oldSuppressNotify = mSuppressNotify ;
+    mSuppressUndo = true ;
+    mSuppressNotify = true ;
+
+    std::string run ;
+    for (char c : text)
+    {
+        unsigned char byte = static_cast<unsigned char>(c) ;
+        if (IsRawTextByte(byte))
+        {
+            if (!run.empty())
+            {
+                Insert(run) ;
+                run.clear() ;
+            }
+            InsertRawByte(byte) ;
+        }
+        else
+        {
+            run += c ;
+        }
+    }
+    if (!run.empty())
+    {
+        Insert(run) ;
+    }
+
+    mSuppressUndo = oldSuppressUndo ;
+    mSuppressNotify = oldSuppressNotify ;
+
+    POSITION_T length = mCurrentPosition - insertPosition ;
+    if (shouldRecord && length > 0)
+    {
+        RecordAction(UNDO_ACTION_INSERT, insertPosition, length,
+                     CaptureCharacters(insertPosition, length), insertPosition) ;
+    }
+
+    NotifyChanged(GetParagraphFromPosition(mCurrentPosition)) ;
 }
 
 
@@ -3635,6 +3768,18 @@ std::vector<sUndoCharInfo> cDocument::CaptureCharacters(POSITION_T position, POS
                         break ;
                     }
 
+                    case TYPE_RAW_BYTE:
+                    {
+                        RawBytePair rcomp ;
+                        rcomp.first = relPos ;
+                        auto riter = lower_bound(paraData.rawbyte.begin(), paraData.rawbyte.end(), rcomp, RawByteCompare) ;
+                        if (riter != paraData.rawbyte.end() && riter->first == relPos)
+                        {
+                            charInfo.rawByteData = riter->second ;
+                        }
+                        break ;
+                    }
+
                     case TYPE_FORMAT:
                     case TYPE_INDEX:
                     case TYPE_SAVED_POSITION:
@@ -3721,6 +3866,10 @@ void cDocument::ReinsertCharacters(POSITION_T position, const std::vector<sUndoC
         else if (charInfo.variableData.has_value())
         {
             InsertVariable(charInfo.variableData.value()) ;
+        }
+        else if (charInfo.rawByteData.has_value())
+        {
+            InsertRawByte(charInfo.rawByteData.value()) ;
         }
         else
         {
@@ -4889,10 +5038,44 @@ eModifiers cDocument::GetControlChar(POSITION_T position)
                 ch = STYLE_VARIABLE;
                 break;
 
+            case TYPE_RAW_BYTE:
+                ch = STYLE_RAW_BYTE;
+                break;
+
         }
     }
 
     return ch ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  position [in] document position to query
+///
+/// @return the byte of the raw byte marker at position, 0 if there is none
+///
+/////////////////////////////////////////////////////////////////////////////
+unsigned char cDocument::GetRawByte(POSITION_T position)
+{
+    if (position < 0 || position >= GetTextSize())
+    {
+        return 0 ;
+    }
+
+    RawBytePair comp ;
+    PARAGRAPH_T currentparagraphnumber = GetParagraphFromPosition(position) ;
+    auto paraiter = mParagraphData.begin() + currentparagraphnumber ;
+    position -= paraiter->index ;
+    comp.first = position ;
+
+    auto iter = lower_bound(paraiter->rawbyte.begin(), paraiter->rawbyte.end(), comp, RawByteCompare) ;
+    if (iter != paraiter->rawbyte.end() && iter->first == position)
+    {
+        return iter->second ;
+    }
+
+    return 0 ;
 }
 
 
@@ -5056,10 +5239,10 @@ std::string cDocument::GetBlockText(POSITION_T start, POSITION_T end)
 /// @return the text with no internal markers
 ///
 /// @brief
-/// Plain-text form of a range: a tab marker becomes 0x09, every other
-/// marker (styles, fonts, colours, variables, notes, end of file) is
-/// dropped, and a hard return becomes lineEnding. A 0x7F byte that is
-/// not a marker is kept.
+/// Plain-text form of a range: a tab marker becomes 0x09, a raw byte
+/// marker becomes its byte, every other marker (styles, fonts, colours,
+/// variables, notes, end of file, a marker without a table entry) is
+/// dropped, and a hard return becomes lineEnding.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cDocument::GetPlainText(POSITION_T start, POSITION_T end, const std::string &lineEnding)
@@ -5076,9 +5259,9 @@ std::string cDocument::GetPlainText(POSITION_T start, POSITION_T end, const std:
             {
                 ret += '\t' ;
             }
-            else if (control == STYLE_END_OF_STYLES)
+            else if (control == STYLE_RAW_BYTE)
             {
-                ret += ch ;
+                ret += static_cast<char>(GetRawByte(loop)) ;
             }
         }
         else if (ch.length() == 1 && ch[0] == HARD_RETURN)
@@ -5525,6 +5708,44 @@ void cDocument::DeleteVariable(POSITION_T position)
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  position [in] document position of the raw byte marker
+///
+/// @return nothing
+///
+/// @brief
+/// Removes the entries of a raw byte marker from the rawbyte and pairs
+/// tables. Called only from Delete().
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::DeleteRawByte(POSITION_T position)
+{
+    MY_ASSERT(position >= 0)
+    MY_ASSERT(position <= GetTextSize())
+
+    PairTable pcomp;
+    PARAGRAPH_T currentparagraphnumber = GetParagraphFromPosition(position);
+    auto paraiter = mParagraphData.begin() + currentparagraphnumber;
+    position -= paraiter->index;
+    pcomp.first = position;
+
+    auto iter = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), pcomp, TableCompare);
+    if (iter != paraiter->pairs.end() && iter->first == position && iter->second == TYPE_RAW_BYTE)
+    {
+        RawBytePair t1;
+        t1.first = position;
+
+        auto iter1 = lower_bound(paraiter->rawbyte.begin(), paraiter->rawbyte.end(), t1, RawByteCompare);
+        if (iter1 != paraiter->rawbyte.end() && iter1->first == position)
+        {
+            paraiter->rawbyte.erase(iter1);
+            paraiter->pairs.erase(iter);
+        }
+    }
+}
+
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -5677,6 +5898,7 @@ void cDocument::DeleteParagraph(POSITION_T position)
             paraiter->footnote.insert(paraiter->footnote.end(), paraiternext->footnote.begin(), paraiternext->footnote.end()) ;
             paraiter->endnote.insert(paraiter->endnote.end(), paraiternext->endnote.begin(), paraiternext->endnote.end()) ;
             paraiter->variable.insert(paraiter->variable.end(), paraiternext->variable.begin(), paraiternext->variable.end()) ;
+            paraiter->rawbyte.insert(paraiter->rawbyte.end(), paraiternext->rawbyte.begin(), paraiternext->rawbyte.end()) ;
             paraiter->pairs.insert(paraiter->pairs.end(), paraiternext->pairs.begin(), paraiternext->pairs.end()) ;
 
             // delete the next paragraph
@@ -5944,6 +6166,13 @@ void cDocument::IncrementAttributes(POSITION_T position, POSITION_T length, bool
     auto iterVarend = paraiter->variable.end() ;
     for_each(iterVar, iterVarend, [&](VariablePair &x){x.first += glength ; return x;}) ;
 
+    // raw bytes
+    RawBytePair compRaw ;
+    compRaw.first = position ;
+    auto iterRaw = lower_bound(paraiter->rawbyte.begin(), paraiter->rawbyte.end(), compRaw, RawByteCompare) ;
+    auto iterRawend = paraiter->rawbyte.end() ;
+    for_each(iterRaw, iterRawend, [&](RawBytePair &x){x.first += glength ; return x;}) ;
+
     PairTable comp10 ;
     comp10.first = position ;
     auto iter10 = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), comp10, TableCompare) ;
@@ -6084,6 +6313,13 @@ void cDocument::DecrementAttributes(POSITION_T position, POSITION_T length, bool
     auto iterVarend = paraiter->variable.end() ;
     for_each(iterVar, iterVarend, [&](VariablePair &x){x.first -= glength ; return x;}) ;
 
+    // raw bytes
+    RawBytePair compRaw ;
+    compRaw.first = position ;
+    auto iterRaw = lower_bound(paraiter->rawbyte.begin(), paraiter->rawbyte.end(), compRaw, RawByteCompare) ;
+    auto iterRawend = paraiter->rawbyte.end() ;
+    for_each(iterRaw, iterRawend, [&](RawBytePair &x){x.first -= glength ; return x;}) ;
+
     PairTable comp10 ;
     comp10.first = position ;
     auto iter10 = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), comp10, TableCompare) ;
@@ -6166,7 +6402,7 @@ void cDocument::DecrementAttributes(POSITION_T position, POSITION_T length, bool
 /// Transfer all format/metadata table entries at positions >= splitRelPos
 /// from the source paragraph to the new paragraph data. Entries are erased
 /// from the source paragraph after copying. Tables transferred: color,
-/// font, format, tab, footnote, endnote, variable, pairs.
+/// font, format, tab, footnote, endnote, variable, rawbyte, pairs.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::TransferAttributesToNewParagraph(PARAGRAPH_T fromPara, sParagraphData &newData, POSITION_T splitRelPos)
@@ -6219,6 +6455,13 @@ void cDocument::TransferAttributesToNewParagraph(PARAGRAPH_T fromPara, sParagrap
     auto variter = lower_bound(mParagraphData[fromPara].variable.begin(), mParagraphData[fromPara].variable.end(), var1, VariableCompare) ;
     newData.variable.insert(newData.variable.begin(), variter, mParagraphData[fromPara].variable.end()) ;
     mParagraphData[fromPara].variable.erase(variter, mParagraphData[fromPara].variable.end()) ;
+
+    // raw bytes
+    RawBytePair raw1 ;
+    raw1.first = splitRelPos ;
+    auto rawiter = lower_bound(mParagraphData[fromPara].rawbyte.begin(), mParagraphData[fromPara].rawbyte.end(), raw1, RawByteCompare) ;
+    newData.rawbyte.insert(newData.rawbyte.begin(), rawiter, mParagraphData[fromPara].rawbyte.end()) ;
+    mParagraphData[fromPara].rawbyte.erase(rawiter, mParagraphData[fromPara].rawbyte.end()) ;
 
     // pairs (main lookup table)
     PairTable p1 ;

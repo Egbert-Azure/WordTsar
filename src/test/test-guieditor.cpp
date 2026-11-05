@@ -15548,14 +15548,15 @@ TEST_CASE("GUI editor - Write Block to File writes plain text from a text docume
         tab.abstabsize = 0;
         tab.size = 0;
 
+        doc->SetTextFile(true);
         doc->Insert("A");
         doc->InsertTab(tab);
         doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
         doc->Insert("B");
         doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
         doc->InsertVariable(VAR_DATE);
-        doc->Insert("\rC\x7f" "D");
-        doc->SetTextFile(true);
+        editor.InsertPastedText("\rC\x7f" "D");       // 0x7F as a raw byte
+        doc->Insert(static_cast<CHAR_T>(MARKER_CHAR)); // a bare marker
         CHECK(writeWholeDocument() == "A\tB\nC\x7f" "D");
     }
 
@@ -15595,7 +15596,9 @@ TEST_CASE("GUI editor - clipboard copy writes plain text with LF line endings")
     doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
     doc->InsertFont(font);
     doc->InsertFootnote(footnote);
-    doc->Insert("\rC\x7f" "D\r");
+    doc->SetTextFile(true);
+    editor.InsertPastedText("\rC\x7f" "D\r");      // 0x7F as a raw byte
+    doc->Insert(static_cast<CHAR_T>(MARKER_CHAR));   // a bare marker
 
     doc->SetPosition(0);
     doc->SetBeginBlock();
@@ -16925,7 +16928,7 @@ TEST_CASE("GUI editor - a tab inserted as text is stored as the Tab key stores i
 
         doc->SetPosition(1);
         editor.Tab();
-        editor.InsertText("a\tb");          // as ClipboardPaste inserts plain text
+        editor.InsertPastedText("a\tb");
         CHECK(doc->GetControlChar(3) == STYLE_TAB);
         CHECK(doc->GetTab(3).type == TAB_TAB);
 
@@ -16947,11 +16950,331 @@ TEST_CASE("GUI editor - a tab inserted as text is stored as the Tab key stores i
         REQUIRE(typed.SaveFile((dir / "typed.ws").string()));
 
         cEditorCtrl pasted;
-        pasted.InsertText("a\tb");          // as ClipboardPaste inserts plain text
+        pasted.InsertPastedText("a\tb");
         REQUIRE(pasted.SaveFile((dir / "pasted.ws").string()));
 
         CHECK(pasted.GetDocument()->GetControlChar(1) == STYLE_TAB);
         CHECK(ReadFileBytes(dir / "pasted.ws") == ReadFileBytes(dir / "typed.ws"));
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+namespace
+{
+
+// Every byte 0x01-0x1F except tab, LF, CR and 0x1A, plus 0x7F
+std::vector<unsigned char> RawControlBytes(void)
+{
+    std::vector<unsigned char> bytes;
+    for (int b = 0x01; b <= 0x1F; b++)
+    {
+        if (b != 0x09 && b != 0x0A && b != 0x0D && b != 0x1A)
+        {
+            bytes.push_back(static_cast<unsigned char>(b));
+        }
+    }
+    bytes.push_back(0x7F);
+    return bytes;
+}
+
+// A line of plain text long enough to keep the control bytes below 5%
+std::string FillerLine(int number)
+{
+    return "line " + std::to_string(number) + " of plain text, long enough to keep the file text";
+}
+
+// One line per byte: "<filler> <byte> <filler>" followed by lineEnding
+std::string ControlByteFile(const std::string& lineEnding)
+{
+    std::string bytes;
+    int number = 0;
+    for (unsigned char b : RawControlBytes())
+    {
+        bytes += FillerLine(number++) + " ";
+        bytes += static_cast<char>(b);
+        bytes += " " + FillerLine(number++) + lineEnding;
+    }
+    return bytes;
+}
+
+// "abc", byte, "def" and a long filler line so the file loads as text
+std::string OneByteFile(unsigned char byte)
+{
+    std::string bytes = "abc";
+    bytes += static_cast<char>(byte);
+    bytes += "def\n" + FillerLine(1) + "\n" + FillerLine(2) + "\n";
+    return bytes;
+}
+
+std::string WholePlainText(cDocument* doc)
+{
+    return doc->GetPlainText(0, doc->GetTextSize(), "\n");
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("Text file control bytes - a text file with every control byte saves byte-identical")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-rawbytes-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cEditorCtrl editor;
+
+    auto roundTrip = [&](const std::string& name, const std::string& bytes)
+    {
+        auto path = dir / name;
+        WriteFileBytes(path, bytes);
+        REQUIRE(editor.LoadFile(path.string()));
+        REQUIRE(editor.GetDocument()->IsTextFile());
+        REQUIRE(editor.SaveFile(path.string()));
+        return ReadFileBytes(path);
+    };
+
+    SUBCASE("LF")
+    {
+        std::string bytes = ControlByteFile("\n");
+        CHECK(roundTrip("lf.txt", bytes) == bytes);
+    }
+
+    SUBCASE("CRLF")
+    {
+        std::string bytes = ControlByteFile("\r\n");
+        CHECK(roundTrip("crlf.txt", bytes) == bytes);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("Text file control bytes - a control byte is one character for delete, undo, redo and blocks")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-rawdelete-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    for (unsigned char byte : RawControlBytes())
+    {
+        CAPTURE(static_cast<int>(byte));
+
+        cEditorCtrl editor;
+        auto path = dir / "one.txt";
+        std::string bytes = OneByteFile(byte);
+        WriteFileBytes(path, bytes);
+        REQUIRE(editor.LoadFile(path.string()));
+        cDocument* doc = editor.GetDocument();
+
+        std::string withByte = bytes;
+        std::string withoutByte = bytes;
+        withoutByte.erase(3, 1);
+
+        POSITION_T size = doc->GetTextSize();
+        CHECK(WholePlainText(doc) == withByte);
+        CHECK(doc->GetPlainText(3, 4, "\n") == std::string(1, static_cast<char>(byte)));
+
+        // delete, undo, redo
+        doc->SetPosition(3);
+        CHECK(doc->Delete(3, 1));
+        CHECK(doc->GetTextSize() == size - 1);
+        CHECK(WholePlainText(doc) == withoutByte);
+
+        CHECK(doc->Undo());
+        CHECK(doc->GetTextSize() == size);
+        CHECK(WholePlainText(doc) == withByte);
+
+        CHECK(doc->Redo());
+        CHECK(WholePlainText(doc) == withoutByte);
+
+        CHECK(doc->Undo());
+        CHECK(WholePlainText(doc) == withByte);
+
+        // a block copy of "c<byte>d" keeps the byte
+        doc->SetPosition(2);
+        doc->SetBeginBlock();
+        doc->SetPosition(5);
+        doc->SetEndBlock();
+        doc->SetPosition(0);
+        doc->CopyBlock();
+        CHECK(doc->GetTextSize() == size + 3);
+        CHECK(WholePlainText(doc) == bytes.substr(2, 3) + withByte);
+
+        CHECK(doc->Undo());
+        CHECK(WholePlainText(doc) == withByte);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("Text file control bytes - a bare marker writes nothing")
+{
+    cDocument doc;
+    doc.Clear();
+    doc.Insert("a");
+    doc.Insert(static_cast<CHAR_T>(MARKER_CHAR));
+    doc.Insert("b");
+    CHECK(WholePlainText(&doc) == "ab");
+}
+
+
+TEST_CASE("Text file control bytes - ^KW text and clipboard copy contain the byte")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-rawwrite-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cBlockTargetEditor editor;
+    auto path = dir / "in.txt";
+    std::string bytes = ControlByteFile("\n");
+    WriteFileBytes(path, bytes);
+    REQUIRE(editor.LoadFile(path.string()));
+    cDocument* doc = editor.GetDocument();
+
+    doc->SetPosition(0);
+    doc->SetBeginBlock();
+    doc->SetPosition(doc->GetTextSize());
+    doc->SetEndBlock();
+
+    SUBCASE("^KW")
+    {
+        editor.mTarget = (dir / "block.txt").string();
+        editor.WriteBlockToFile();
+        CHECK(ReadFileBytes(dir / "block.txt") == bytes);
+    }
+
+    SUBCASE("clipboard copy")
+    {
+        CHECK(editor.GetClipboardText() == bytes);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("Text file control bytes - save as WordStar leaves the byte out and warns")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-rawws-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    class cAskingEditor : public cBlockTargetEditor
+    {
+    public:
+        int mAsks = 0;
+        std::string mQuestion;
+
+        bool AskYesNo(const std::string& title, const std::string& question) override
+        {
+            (void)title;
+            ++mAsks;
+            mQuestion = question;
+            return true;
+        }
+    };
+
+    cAskingEditor editor;
+    auto path = dir / "in.txt";
+    std::string bytes = "abc\x02" "def ghi\x7F" "jkl\n" + FillerLine(1) + "\n" + FillerLine(2) + "\n";
+    WriteFileBytes(path, bytes);
+    REQUIRE(editor.LoadFile(path.string()));
+    cDocument* doc = editor.GetDocument();
+
+    auto save = dir / "out.ws";
+    cWordstarFile writer(&editor);
+    writer.mDocument = doc;
+    REQUIRE(writer.SaveRange(save.string(), 0, doc->GetTextSize()));
+
+    std::string written = ReadFileBytes(save);
+    CHECK(written.find("abcdef ghijkl\r\n") != std::string::npos);
+    CHECK(editor.mAsks == 1);
+    CHECK(editor.mQuestion.find("contains 2 character(s)") != std::string::npos);
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("Text file control bytes - ^KR and clipboard paste keep the byte in a text document only")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-rawinsert-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+
+    auto base = dir / "base.txt";
+    WriteFileBytes(base, "XY\n");
+    auto insert = dir / "insert.txt";
+    WriteFileBytes(insert, OneByteFile(0x02));
+
+    SUBCASE("^KR of a text file into a text document")
+    {
+        REQUIRE(editor.LoadFile(base.string()));
+        REQUIRE(doc->IsTextFile());
+        doc->SetPosition(1);
+        REQUIRE(editor.InsertFileAtCursor(insert.string()));
+        CHECK(WholePlainText(doc) == "X" + OneByteFile(0x02) + "Y\n");
+        CHECK(doc->GetControlChar(4) != STYLE_BOLD);
+    }
+
+    SUBCASE("^KR of a text file into a WordStar document")
+    {
+        REQUIRE(doc->IsTextFile() == false);
+        REQUIRE(editor.InsertFileAtCursor(insert.string()));
+        CHECK(doc->GetControlChar(3) == STYLE_BOLD);
+        CHECK(doc->GetPlainText(0, 8, "\n") == "abcdef\n");
+    }
+
+    SUBCASE("plain-text paste into a text document")
+    {
+        REQUIRE(editor.LoadFile(base.string()));
+        REQUIRE(doc->IsTextFile());
+        doc->SetPosition(1);
+        editor.InsertPastedText("a\x02" "b\x1B" "c\t\x7F");
+        CHECK(WholePlainText(doc) == "Xa\x02" "b\x1B" "c\t\x7FY\n");
+        CHECK(doc->GetControlChar(2) != STYLE_BOLD);
+        CHECK(doc->GetControlChar(6) == STYLE_TAB);
+        CHECK(doc->GetTextSize() == 11);
+
+        editor.Undo();
+        CHECK(WholePlainText(doc) == "XY\n");
+        editor.Redo();
+        CHECK(WholePlainText(doc) == "Xa\x02" "b\x1B" "c\t\x7FY\n");
+
+        REQUIRE(editor.SaveFile(base.string()));
+        CHECK(ReadFileBytes(base) == "Xa\x02" "b\x1B" "c\t\x7FY\n");
+    }
+
+    SUBCASE("plain-text paste into a WordStar document is unchanged")
+    {
+        REQUIRE(doc->IsTextFile() == false);
+        editor.InsertPastedText("a\x02" "b\x02" "c");
+        CHECK(doc->GetControlChar(1) == STYLE_BOLD);
+        CHECK(doc->GetControlChar(3) == STYLE_BOLD);
+        CHECK(WholePlainText(doc) == "abc");
     }
 
     std::error_code ec;

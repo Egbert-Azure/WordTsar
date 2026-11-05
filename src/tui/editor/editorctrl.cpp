@@ -1209,7 +1209,9 @@ bool cWSEditorCtrl::InsertFileAtCursor(const std::string& filename)
     }
     else
     {
-        fileReader = new cTextFile(this);
+        cTextFile* textReader = new cTextFile(this);
+        textReader->SetRawBytes(mDocument->IsTextFile());
+        fileReader = textReader;
     }
 
     mDocument->SetLoading(true);
@@ -2070,7 +2072,7 @@ void cWSEditorCtrl::ClipboardPaste(void)
 
         if (!text.empty())
         {
-            InsertText(text);
+            InsertPastedText(text);
         }
     }
 }
