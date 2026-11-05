@@ -902,3 +902,49 @@ TEST_CASE("cWSEditorCtrl - spell check Replace with a suggestion that ends in th
     CHECK(host.mModals >= 1);
     CHECK(text == "evtl.");
 }
+
+
+TEST_CASE("cWSEditorCtrl - a tab inserted as text is stored as the Tab key stores it")
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-tui-texttab-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    SUBCASE("text document: typed and pasted tabs save as 0x09")
+    {
+        cWSEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        auto path = dir / "tabs.txt";
+        WriteFileBytes(path, "XY\n");
+        REQUIRE(editor.LoadFile(path.string()));
+        REQUIRE(doc->IsTextFile());
+
+        doc->SetPosition(1);
+        editor.Tab();
+        editor.InsertText("a\tb");          // as ClipboardPaste inserts plain text
+        CHECK(doc->GetControlChar(3) == STYLE_TAB);
+
+        REQUIRE(editor.SaveFile(path.string()));
+        CHECK(ReadFileBytes(path) == "X\ta\tbY\n");
+    }
+
+    SUBCASE("WordStar document: a pasted tab saves the same as a typed one")
+    {
+        cWSEditorCtrl typed;
+        typed.InsertText("a");
+        typed.Tab();
+        typed.InsertText("b");
+        REQUIRE(typed.SaveFile((dir / "typed.ws").string()));
+
+        cWSEditorCtrl pasted;
+        pasted.InsertText("a\tb");          // as ClipboardPaste inserts plain text
+        REQUIRE(pasted.SaveFile((dir / "pasted.ws").string()));
+
+        CHECK(pasted.GetDocument()->GetControlChar(1) == STYLE_TAB);
+        CHECK(ReadFileBytes(dir / "pasted.ws") == ReadFileBytes(dir / "typed.ws"));
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}

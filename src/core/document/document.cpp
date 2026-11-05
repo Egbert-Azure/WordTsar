@@ -574,6 +574,25 @@ void cDocument::Insert(CHAR_T ch)
         return ;
     }
 
+    // a tab is a TAB_TAB tab marker, as cEditorBase::Tab() inserts it
+    if(ch == STYLE_TAB)
+    {
+        sWSTab tab ;
+        tab.type = TAB_TAB ;
+        tab.tabsize = 0 ;
+        tab.abstabsize = 0 ;
+        tab.size = 0 ;
+
+        bool oldDisabled = mUndoDisabled ;
+        if (mSuppressUndo)
+        {
+            mUndoDisabled = true ;
+        }
+        InsertTab(tab) ;
+        mUndoDisabled = oldDisabled ;
+        return ;
+    }
+
     // loading records no undo, so the change is tracked here
     if (mIsLoading)
     {

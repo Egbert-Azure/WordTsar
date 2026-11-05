@@ -16903,3 +16903,57 @@ TEST_CASE("GUI editor - an export format leaves the save format unchanged")
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }
+
+
+TEST_CASE("GUI editor - a tab inserted as text is stored as the Tab key stores it")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-texttab-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    SUBCASE("text document: typed and pasted tabs save as 0x09")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        auto path = dir / "tabs.txt";
+        WriteFileBytes(path, "XY\n");
+        REQUIRE(editor.LoadFile(path.string()));
+        REQUIRE(doc->IsTextFile());
+
+        doc->SetPosition(1);
+        editor.Tab();
+        editor.InsertText("a\tb");          // as ClipboardPaste inserts plain text
+        CHECK(doc->GetControlChar(3) == STYLE_TAB);
+        CHECK(doc->GetTab(3).type == TAB_TAB);
+
+        editor.Undo();
+        CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n") == "X\tY\n");
+        editor.Redo();
+        CHECK(doc->GetControlChar(3) == STYLE_TAB);
+
+        REQUIRE(editor.SaveFile(path.string()));
+        CHECK(ReadFileBytes(path) == "X\ta\tbY\n");
+    }
+
+    SUBCASE("WordStar document: a pasted tab saves the same as a typed one")
+    {
+        cEditorCtrl typed;
+        typed.InsertText("a");
+        typed.Tab();
+        typed.InsertText("b");
+        REQUIRE(typed.SaveFile((dir / "typed.ws").string()));
+
+        cEditorCtrl pasted;
+        pasted.InsertText("a\tb");          // as ClipboardPaste inserts plain text
+        REQUIRE(pasted.SaveFile((dir / "pasted.ws").string()));
+
+        CHECK(pasted.GetDocument()->GetControlChar(1) == STYLE_TAB);
+        CHECK(ReadFileBytes(dir / "pasted.ws") == ReadFileBytes(dir / "typed.ws"));
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
