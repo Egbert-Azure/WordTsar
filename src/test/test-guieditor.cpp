@@ -16261,6 +16261,104 @@ TEST_CASE("cEditorBase::WriteBlock - text into a WordStar target is written in t
 }
 
 
+TEST_CASE("cWordstarFile - a letter with combining marks the code page cannot hold keeps the letter")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-combining-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    class cAskingEditor : public cBlockTargetEditor
+    {
+    public:
+        int mAsks = 0;
+        std::string mQuestion;
+
+        bool AskYesNo(const std::string& title, const std::string& question) override
+        {
+            (void)title;
+            ++mAsks;
+            mQuestion = question;
+            return true;
+        }
+    };
+
+    cAskingEditor editor;
+    editor.SetCodePage(CP437);
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    cBlockTargetEditor other;
+    other.GetDocument()->Insert("Old\r");
+    REQUIRE(other.SaveFile((dir / "target.ws").string()));
+
+    using eChoice = cEditorBase::eFileExistsChoice;
+    using eResult = cEditorBase::eWriteBlockResult;
+
+    struct sCase
+    {
+        const char* name;
+        std::string text;
+        std::string bytes;
+        size_t lost;
+    };
+
+    const sCase cases[] =
+    {
+        { "q with U+0301 writes q", "xq\xCC\x81y\r", "xqy\r\n", 1 },
+        { "e with U+0301 writes the code page e acute", "xe\xCC\x81y\r", "x\x1B\x82\x1Cy\r\n", 0 },
+        { "q with U+0301 and U+0308 writes q", "xq\xCC\x81\xCC\x88y\r", "xqy\r\n", 2 },
+    };
+
+    for (const sCase& c : cases)
+    {
+        SUBCASE(c.name)
+        {
+            doc->Insert(c.text);
+            editor.GetLayout()->LayoutDocument(doc);
+            POSITION_T end = doc->GetTextSize();
+
+            auto checkAsked = [&](void)
+            {
+                if (c.lost == 0)
+                {
+                    CHECK(editor.mAsks == 0);
+                }
+                else
+                {
+                    CHECK(editor.mAsks == 1);
+                    CHECK(editor.mQuestion.find("contains " + std::to_string(c.lost) + " character(s)") != std::string::npos);
+                }
+                editor.mAsks = 0;
+                editor.mQuestion.clear();
+            };
+
+            auto save = dir / "save.ws";
+            cWordstarFile writer(&editor);
+            writer.mDocument = doc;
+            REQUIRE(writer.SaveRange(save.string(), 0, end));
+            CHECK(ReadFileBytes(save).find(c.bytes) != std::string::npos);
+            checkAsked();
+
+            auto fresh = dir / "new.ws";
+            REQUIRE(editor.WriteBlock(0, end, fresh.string(), false, eChoice::Overwrite) == eResult::Written);
+            CHECK(ReadFileBytes(fresh).find(c.bytes) != std::string::npos);
+            checkAsked();
+
+            auto target = dir / "target.ws";
+            REQUIRE(editor.WriteBlock(0, end, target.string(), false, eChoice::Append) == eResult::Written);
+            CHECK(ReadFileBytes(target).find("Old\r\n" + c.bytes) != std::string::npos);
+            checkAsked();
+        }
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
 TEST_CASE("cEditorBase::WriteBlock - text into a WordStar target reloads as written, a second append follows it")
 {
     ensureQApplication();

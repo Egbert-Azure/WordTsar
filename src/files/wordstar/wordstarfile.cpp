@@ -1494,9 +1494,9 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
 /// @param  stylecounter [in,out] - byte count, advanced by what is appended
 ///
 /// @brief
-/// NBSP becomes ^O. Any other character becomes ESC x FS for each of its
-/// code points, x being the byte of the current code page; a code point
-/// the code page cannot hold is left out.
+/// NBSP becomes ^O. A first code point in 0x20..0x7E is written as its
+/// byte. Every other code point becomes ESC x FS, x being the byte of the
+/// current code page; a code point the code page cannot hold is left out.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, uint32_t &stylecounter)
@@ -1508,17 +1508,24 @@ void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, ui
         out += static_cast<char>(STYLE_CTRL_O) ;          // binding space
         stylecounter++ ;
     }
-    else if(static_cast<unsigned long>(ch1) < 32 || static_cast<unsigned long>(ch1) > 126)
+    else
     {
+        bool printable = (static_cast<unsigned long>(ch1) >= 32 && static_cast<unsigned long>(ch1) <= 126) ;
         std::u32string codepoints ;
         eCodePage codepage = mEditor->GetCodePage() ;
 
         mDocument->GetCodePoints(str, codepoints) ;
 
-        for(char32_t cp : codepoints)
+        for(size_t index = 0; index < codepoints.size(); index++)
         {
+            char32_t cp = codepoints[index] ;
             unsigned char chws = CodePageByte(codepage, cp) ;
-            if(chws != 0)
+            if(index == 0 && printable)
+            {
+                out += ch1 ;
+                stylecounter++ ;
+            }
+            else if(chws != 0)
             {
                 out += static_cast<char>(STYLE_EXTSTART) ;
                 out += static_cast<char>(chws) ;
