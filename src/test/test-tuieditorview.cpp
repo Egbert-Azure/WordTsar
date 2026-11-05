@@ -28,8 +28,16 @@
 #include "src/core/layout/layoutbase.h"
 #include "src/core/include/config.h"
 #include "src/input/wordtsarinput.h"
+#include "src/core/spellcheck/spellcheck.h"
+#include "src/tui/dialogs/dialoghost.h"
+#include "src/tui/wordstartui/src/dialog.h"
+#include "src/tui/wordstartui/src/theme.h"
+#include "src/tui/wordstartui/src/tuidefs.h"
 
+#include <algorithm>
+#include <deque>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <string>
 
@@ -771,4 +779,126 @@ TEST_CASE("cWSEditorView - cursor up moves past every automatic page-break line"
             }
         }
     }
+}
+
+
+namespace
+{
+
+// Dialog host that feeds queued key events to modal dialogs; an empty queue
+// cancels the dialog.
+class cSpellScriptHost : public iWSDialogHost
+{
+public:
+    void QueueSpecial(wordstartui::eSpecialKey key)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_SPECIAL;
+        event.special = key;
+        mEvents.push_back(event);
+    }
+
+    void HostRunModal(wordstartui::cDialog& dialog) override
+    {
+        mModals = mModals + 1;
+        dialog.FocusFirst();
+        while (dialog.GetResult() == wordstartui::DIALOG_RESULT_NONE)
+        {
+            if (mEvents.empty() == true)
+            {
+                dialog.SetResult(wordstartui::DIALOG_RESULT_CANCEL);
+                break;
+            }
+            dialog.HandleEvent(mEvents.front());
+            mEvents.pop_front();
+        }
+    }
+
+    void HostRunModalRaw(
+        const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
+        const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
+    {
+        (void)draw;
+        wordstartui::sInputEvent escape{};
+        escape.type = wordstartui::INPUT_TYPE_SPECIAL;
+        escape.special = wordstartui::SPECIAL_KEY_ESCAPE;
+        while (handle(escape) == true)
+        {
+        }
+    }
+
+    const wordstartui::cTheme& HostTheme(void) override
+    {
+        return mTheme;
+    }
+
+    wordstartui::sTerminalSize HostScreenSize(void) override
+    {
+        wordstartui::sTerminalSize size;
+        size.rows = 40;
+        size.cols = 120;
+        return size;
+    }
+
+    wordstartui::sTerminalCapabilities HostCapabilities(void) override
+    {
+        wordstartui::sTerminalCapabilities caps{};
+        return caps;
+    }
+
+    void HostShowLoadProgress(const std::string& message, int percent) override
+    {
+        (void)message;
+        (void)percent;
+    }
+
+    void HostHideLoadProgress(void) override
+    {
+    }
+
+    int mModals = 0;
+
+private:
+    std::deque<wordstartui::sInputEvent> mEvents;
+    wordstartui::cTheme mTheme;
+};
+
+}
+
+
+TEST_CASE("cWSEditorCtrl - spell check Replace with a suggestion that ends in the following period")
+{
+    const std::string language = "de_DE";
+    cSpellChecker checker(language);
+    REQUIRE(checker.CheckWord("evtl") == false);
+    std::vector<std::string> suggestions = checker.suggestions("evtl");
+    auto found = std::find(suggestions.begin(), suggestions.end(), "evtl.");
+    INFO("suggestions: ", doctest::toString(suggestions.size()));
+    REQUIRE(found != suggestions.end());
+    size_t index = static_cast<size_t>(found - suggestions.begin());
+
+    cWSEditorCtrl editor;
+    cSpellScriptHost host;
+    editor.SetDialogHost(&host);
+    editor.mSpellCheckLanguage = language;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("evtl.");
+    editor.LayoutDocument(true);
+
+    // List has focus: move to the suggestion, Tab past Ignore to Replace.
+    for (size_t step = 0; step < index; ++step)
+    {
+        host.QueueSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN);
+    }
+    host.QueueSpecial(wordstartui::SPECIAL_KEY_TAB);
+    host.QueueSpecial(wordstartui::SPECIAL_KEY_TAB);
+    host.QueueSpecial(wordstartui::SPECIAL_KEY_ENTER);
+
+    editor.SpellCheckDocument();
+
+    std::string text = doc->GetText();
+    text = text.substr(0, text.find('\x1A'));
+    text = text.substr(0, text.find('\x7F'));
+    CHECK(host.mModals >= 1);
+    CHECK(text == "evtl.");
 }
