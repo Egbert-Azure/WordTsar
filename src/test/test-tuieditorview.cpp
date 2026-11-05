@@ -688,3 +688,87 @@ TEST_CASE("cWSEditorCtrl - an export format leaves the save format unchanged")
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }
+
+
+TEST_CASE("cWSEditorView - cursor up moves past every automatic page-break line")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 30, 120});
+    cWordStarInput input(&editor);
+
+    for (int para = 0; para < 60; ++para)
+    {
+        doc->Insert("Absatz " + std::to_string(para) +
+                    ": Die Größe der Übung wird später geprüft, und zwar "
+                    "für alle Seiten des Dokuments gleichermaßen.\r");
+    }
+    editor.LayoutDocument(true);
+
+    LINE_T total = layout->GetNumberOfLines();
+    int pageBreaks = 0;
+    int splitParagraphs = 0;
+    for (LINE_T ln = 1; ln < total; ++ln)
+    {
+        if (layout->GetLineByRawLineNumber(ln)->pagenumber !=
+            layout->GetLineByRawLineNumber(ln - 1)->pagenumber)
+        {
+            pageBreaks++;
+            if (doc->GetParagraphFromPosition(layout->GetLineByRawLineNumber(ln)->documentPosition) ==
+                doc->GetParagraphFromPosition(layout->GetLineByRawLineNumber(ln - 1)->documentPosition))
+            {
+                splitParagraphs++;
+            }
+        }
+    }
+    REQUIRE(pageBreaks >= 2);
+    REQUIRE(splitParagraphs >= 1);
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        layout->SetShowControl(mode);
+        editor.LayoutDocument(true);
+
+        // Walk to the top from column 0 of the last line and from column 30 of
+        // the line above it; every Up must land one line higher.
+        total = layout->GetNumberOfLines();
+        REQUIRE(total >= 2);
+        for (POSITION_T column : { POSITION_T(0), POSITION_T(30) })
+        {
+            CAPTURE(column);
+            LINE_T startLine = (column == 0) ? total - 1 : total - 2;
+            const sLineLayout* first = layout->GetLineByRawLineNumber(startLine);
+            REQUIRE(first != nullptr);
+            if (column == 0)
+            {
+                editor.MoveCaretToDocEnd();
+            }
+            else
+            {
+                doc->SetPosition(first->documentPosition + column + 1);
+                editor.MoveCaretLeft();
+            }
+            REQUIRE(layout->GetLineFromPosition(doc->GetPosition()) == startLine);
+            wordstartui::cScreen screen;
+            screen.Resize(30, 120);
+            view.Draw(screen);
+
+            for (LINE_T expected = startLine - 1; expected >= 0; --expected)
+            {
+                CAPTURE(expected);
+                input.HandleSpecialKey(SPECIAL_UP);
+                view.Draw(screen);
+                CHECK(layout->GetLineFromPosition(doc->GetPosition()) == expected);
+                if (layout->GetLineFromPosition(doc->GetPosition()) != expected)
+                {
+                    break;
+                }
+            }
+        }
+    }
+}
