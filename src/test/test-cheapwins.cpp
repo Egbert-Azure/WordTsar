@@ -124,7 +124,7 @@ TEST_CASE("SortBlock sorts marked paragraphs ascending")
     CHECK(StartsWith(doc->GetParagraphText(3), "zzz"));
 }
 
-TEST_CASE("SortBlock sorts marked paragraphs descending" * doctest::may_fail())
+TEST_CASE("SortBlock sorts marked paragraphs descending")
 {
     ensureQApplication();
 
@@ -154,6 +154,56 @@ TEST_CASE("SortBlock sorts marked paragraphs descending" * doctest::may_fail())
     CHECK(StartsWith(doc->GetParagraphText(1), "banana"));
     CHECK(StartsWith(doc->GetParagraphText(2), "apple"));
     CHECK(StartsWith(doc->GetParagraphText(3), "zzz"));
+}
+
+TEST_CASE("SortBlock descending with text directly before and after the block, same line")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    doc->Insert("prebanana\rapple\rcherrypost");
+    layout->LayoutDocument(doc);
+
+    // Block is "banana\rapple\rcherry": positions 3 to 22 (exclusive).
+    doc->SetPosition(3);
+    doc->SetBeginBlock();
+    doc->SetPosition(22);
+    doc->SetEndBlock();
+
+    editor.SortBlock(false);
+
+    std::string text = doc->GetText();
+    INFO("actual: [", Escape(text), "]");
+    CHECK(text.substr(0, text.find('\x7F')) == "precherry\rbanana\rapplepost");
+}
+
+TEST_CASE("SortBlock descending with paragraphs directly before and after the block")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    doc->Insert("head\rbanana\rapple\rcherry\rtail");
+    layout->LayoutDocument(doc);
+
+    // Block is "banana\rapple\rcherry": positions 5 to 24 (exclusive).
+    doc->SetPosition(5);
+    doc->SetBeginBlock();
+    doc->SetPosition(24);
+    doc->SetEndBlock();
+
+    editor.SortBlock(false);
+
+    std::string text = doc->GetText();
+    INFO("actual: [", Escape(text), "]");
+    CHECK(text.substr(0, text.find('\x7F')) == "head\rcherry\rbanana\rapple\rtail");
 }
 
 TEST_CASE("SortBlock sorts a whole-document block ascending, exact paragraph bytes")
