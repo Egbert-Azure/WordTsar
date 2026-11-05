@@ -17280,3 +17280,40 @@ TEST_CASE("Text file control bytes - ^KR and clipboard paste keep the byte in a 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }
+
+
+TEST_CASE("GUI editor - a raw byte is one character for the caret with ^OD on and off")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    // A0 ^B1 B2 \r3
+    doc->Insert("A");
+    doc->InsertRawByte(0x02);
+    doc->Insert("B\r");
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        layout->SetShowControl(mode);
+        editor.LayoutDocument(true);
+
+        doc->SetPosition(0);
+        editor.MoveCaretRight();
+        CHECK(doc->GetPosition() == 1);
+        editor.MoveCaretRight();
+        CHECK(doc->GetPosition() == 2);
+        editor.MoveCaretLeft();
+        CHECK(doc->GetPosition() == 1);
+
+        doc->SetPosition(2);
+        editor.CalculateCaretPosition();
+        sStatus status;
+        editor.GetStatus(status);
+        CHECK(status.column == 3);
+    }
+}

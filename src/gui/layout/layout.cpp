@@ -611,6 +611,19 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 continue;
             }
 
+            // Raw byte from a text file - always visible, one grapheme
+            if (controlType == STYLE_RAW_BYTE)
+            {
+                AddSegmentMarker(currentSegment, pendingMarker);
+                currentSegment.position.push_back(currentX);
+                currentSegment.length++;
+                currentSegment.hasControlCodes = true;
+                currentSegment.controlCodeIndices.push_back(currentSegment.length - 1);
+                currentX += GetTextWidth(GetDisplayCharacter(documentPos, grapheme));
+
+                continue;
+            }
+
             // Apply formatting control code using helper
             ApplyFormattingControlCode(controlType, documentPos);
 

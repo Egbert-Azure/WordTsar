@@ -1399,3 +1399,63 @@ TEST_CASE("FontFromDescriptor uses installed families that macOS does not list")
     CHECK(missing.family() != "No Such Font Family");
 }
 #endif
+
+
+TEST_CASE("BuildParagraphSegments() - a raw byte shows in caret notation and is not a format code")
+{
+    ensureQApplication();
+
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+
+    // A0 ^B1 B2 \r3
+    doc.Insert("A");
+    doc.InsertRawByte(0x02);
+    doc.Insert("B\r");
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        layout.SetShowControl(mode);
+
+        CHECK(layout.GetDisplayCharacter(1, "\x7F") == "^B");
+
+        std::vector<sSegmentLayout> segments = layout.BuildParagraphSegments(0);
+
+        // one font for A and B, the byte is one visible grapheme with no badge
+        REQUIRE(segments.size() == 1);
+        CHECK(segments[0].length == 4);
+        CHECK(segments[0].markers.empty());
+        REQUIRE(segments[0].position.size() == 4);
+        CHECK(segments[0].hasControlCodes == true);
+        CHECK(std::find(segments[0].controlCodeIndices.begin(), segments[0].controlCodeIndices.end(), 1u)
+              != segments[0].controlCodeIndices.end());
+        CHECK(segments[0].position[2] - segments[0].position[1] ==
+              doctest::Approx(layout.GetTextWidth("^B")).epsilon(0.001));
+    }
+}
+
+
+TEST_CASE("GetDisplayCharacter() - caret notation for every raw byte")
+{
+    ensureQApplication();
+
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+
+    const struct { unsigned char byte; const char* shown; } cases[] =
+    {
+        { 0x01, "^A" }, { 0x02, "^B" }, { 0x08, "^H" }, { 0x0B, "^K" }, { 0x0C, "^L" },
+        { 0x13, "^S" }, { 0x1B, "^[" }, { 0x1C, "^\\" }, { 0x1F, "^_" }, { 0x7F, "^?" },
+    };
+
+    for (const auto& c : cases)
+    {
+        CAPTURE(static_cast<int>(c.byte));
+        doc.Clear();
+        doc.InsertRawByte(c.byte);
+        CHECK(layout.GetDisplayCharacter(0, "\x7F") == c.shown);
+    }
+}

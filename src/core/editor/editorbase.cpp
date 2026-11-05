@@ -5184,7 +5184,7 @@ void cEditorBase::GetStatus(sStatus& status)
         for (POSITION_T pos = mCaretLineDocPosition; pos < mCaretDocumentPosition; ++pos)
         {
             eModifiers ctrl = mDocument->GetControlChar(pos);
-            if (ctrl == STYLE_END_OF_STYLES || ctrl == STYLE_TAB)
+            if (ctrl == STYLE_END_OF_STYLES || ctrl == STYLE_TAB || ctrl == STYLE_RAW_BYTE)
             {
                 visualCol++;
             }
@@ -6660,7 +6660,7 @@ POSITION_T cEditorBase::SkipHiddenParagraphs(POSITION_T pos, int direction)
 /// until reaching a visible character. HARD_RETURN and BOF/EOF are
 /// natural boundaries that stop the walk.
 ///
-/// Functional control codes (TAB, VARIABLE, EOF) are not skipped -- the
+/// Functional control codes (TAB, VARIABLE, raw byte, EOF) are not skipped -- the
 /// caret can land on them because they have visible effects.
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -6678,10 +6678,10 @@ POSITION_T cEditorBase::SkipHiddenControlCodes(POSITION_T pos, int direction)
         }
 
         // MARKER_CHAR -- check if this control code is functional
-        // TABs and VARIABLEs have visible effects even in SHOW_NONE mode
+        // TABs, VARIABLEs and raw bytes are visible even in SHOW_NONE mode
         // EOF: caret lands ON the EOF marker (insert goes before it)
         eModifiers ctrl = mDocument->GetControlChar(pos);
-        if (ctrl == STYLE_TAB || ctrl == STYLE_VARIABLE || ctrl == STYLE_EOF)
+        if (ctrl == STYLE_TAB || ctrl == STYLE_VARIABLE || ctrl == STYLE_RAW_BYTE || ctrl == STYLE_EOF)
         {
             break;  // Functional control codes -- caret can land here
         }
@@ -6699,7 +6699,7 @@ POSITION_T cEditorBase::SkipHiddenControlCodes(POSITION_T pos, int direction)
         if (!ch.empty() && ch[0] == MARKER_CHAR)
         {
             eModifiers ctrl = mDocument->GetControlChar(pos);
-            if (ctrl != STYLE_TAB && ctrl != STYLE_VARIABLE && ctrl != STYLE_EOF)
+            if (ctrl != STYLE_TAB && ctrl != STYLE_VARIABLE && ctrl != STYLE_RAW_BYTE && ctrl != STYLE_EOF)
             {
                 // Position 0 is hidden -- walk forward
                 while (pos < textSize)
@@ -6711,7 +6711,7 @@ POSITION_T cEditorBase::SkipHiddenControlCodes(POSITION_T pos, int direction)
                         break;
                     }
                     ctrl = mDocument->GetControlChar(pos);
-                    if (ctrl == STYLE_TAB || ctrl == STYLE_VARIABLE || ctrl == STYLE_EOF)
+                    if (ctrl == STYLE_TAB || ctrl == STYLE_VARIABLE || ctrl == STYLE_RAW_BYTE || ctrl == STYLE_EOF)
                     {
                         break;
                     }

@@ -1042,3 +1042,53 @@ TEST_CASE("cWSEditorCtrl - ^KR and paste keep a control byte in a text document 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }
+
+
+TEST_CASE("cWSEditorView - a raw byte shows as ^B in the control code colours with ^OD on and off")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 60, 200});
+
+    // A0 ^B1 B2 \r3
+    doc->Insert("A");
+    doc->InsertRawByte(0x02);
+    doc->Insert("B\r");
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        layout->SetShowControl(mode);
+        editor.LayoutDocument(true);
+
+        int colA = CaretColumnAt(editor, view, 0);
+        int colByte = CaretColumnAt(editor, view, 1);
+        int colB = CaretColumnAt(editor, view, 2);
+        CHECK(colByte == colA + 1);
+        CHECK(colB == colByte + 2);
+
+        doc->SetPosition(0);
+        wordstartui::cScreen screen;
+        screen.Resize(60, 200);
+        view.Draw(screen);
+        int row = view.GetCaretRow();
+
+        const wordstartui::sCell* caret = screen.GetCell(row, colByte);
+        const wordstartui::sCell* letter = screen.GetCell(row, colByte + 1);
+        const wordstartui::sCell* b = screen.GetCell(row, colB);
+        REQUIRE(caret != nullptr);
+        REQUIRE(letter != nullptr);
+        REQUIRE(b != nullptr);
+        CHECK(caret->textUtf8 == "^");
+        CHECK(letter->textUtf8 == "B");
+        CHECK(caret->style.fg == editor.mHighlightFgColour);
+        CHECK(caret->style.bg == editor.mHighlightColour);
+        CHECK(letter->style.bg == editor.mHighlightColour);
+        CHECK(b->textUtf8 == "B");
+        CHECK((b->style.attrs & wordstartui::CELL_ATTR_BOLD) == 0);
+    }
+}

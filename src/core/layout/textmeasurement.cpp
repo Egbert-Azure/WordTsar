@@ -80,6 +80,7 @@
 /// - Control codes (< 32) display as ^X format (e.g., ^B for bold)
 /// - STYLE_TAB displays as >, !, [, or # based on tab type
 /// - STYLE_FONT1 displays as <fontname size>
+/// - STYLE_RAW_BYTE displays as ^ plus the byte + 0x40, ^? for 0x7F
 /// - All other graphemes are returned unchanged
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -188,6 +189,14 @@ std::string cTextMeasurement::GetDisplayCharacter(POSITION_T documentPos,
             {
                 return "<Unknown>";
             }
+        }
+
+        // Raw byte from a text file: caret notation, ^? for 0x7F
+        if (controlType == STYLE_RAW_BYTE)
+        {
+            unsigned char byte = doc->GetRawByte(documentPos);
+            char shown = (byte == 0x7F) ? '?' : static_cast<char>(byte + '@');
+            return std::string("^") + shown;
         }
 
         // Generic handling for other control codes (bold, italic, etc.)
