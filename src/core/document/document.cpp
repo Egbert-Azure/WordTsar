@@ -5027,9 +5027,12 @@ std::string cDocument::SentenceCase(const std::string &str)
         {
             if (capitalizeNext == true)
             {
+                // title case, all of it: sharp s becomes Ss
                 std::u32string single(1, ch) ;
-                single = unicode::to_uppercase(single) ;
-                str32[i] = single[0] ;
+                single = unicode::to_titlecase(single) ;
+                str32.replace(i, 1, single) ;
+                i += single.size() - 1 ;
+                len = str32.size() ;
                 capitalizeNext = false ;
             }
             continue ;

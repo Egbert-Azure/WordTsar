@@ -1325,3 +1325,11 @@ TEST_CASE("A combining mark inserted at the start of the document is a character
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }
+
+TEST_CASE("SentenceCase capitalizes a sentence-start sharp s as Ss")
+{
+    cDocument doc;
+    std::string sharp = std::string("\xC3\x9F");
+    CHECK(CodePoints(doc.SentenceCase("x. " + sharp + " zed")) == CodePoints("x. Ss zed"));
+    CHECK(CodePoints(doc.SentenceCase("x. " + sharp + sharp + " zed")) == CodePoints("x. Ss" + sharp + " zed"));
+}
