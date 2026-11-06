@@ -106,6 +106,7 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     ../src/test/test-wordstarinput.cpp
     ../src/test/test-isolation.cpp
     ../src/test/test-terminatesignal.cpp
+    ../src/test/test-templates.cpp
 
     # Shared sources (from cmake/sources.cmake)
     ${WORDTSAR_ALL_SOURCES}
