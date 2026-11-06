@@ -2,6 +2,18 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## Unreleased
+
+**Fixes**
+
+- Fixed: the WordStar index-item and paragraph-number codes are now kept when you open and save a file. They show as <Index> and <Para#> tags when command tags are on (^OD) (#74).
+- Fixed: a .tc or .ix line that starts with a dot is now written to the generated file as a dot command. Index ones go at the top (#72).
+
+**Changes**
+
+- Changed: ^PK now marks text for the index. Strikethrough is on ^PX only, and the generator reads the marks. Mark for Index is in the Insert menu in the GUI and ws (#73).
+- Changed: the GUI Utilities menu has Generate Table of Contents and Generate Index. The files are written next to the source, as in ws (#77).
+
 ## 0.15.0 (2026-11-05)
 
 **Fixes**
@@ -194,7 +206,6 @@ The terminal UI's Opening Menu **I** (index) and **T** (table of contents) comma
 
 - Table of contents entries support a `#` placeholder that's replaced with the real page number, and leading-space indentation.
 - Index entries support `+` (bold page number), `-` (cross-reference, no page number), and `,` (sub-entry).
-- Not yet supported: marking an index entry by selecting text (`^PK`) rather than typing a `.ix` line, "Index Every Word" auto-indexing, and page-range/odd-even filters.
 
 ## 0.9.0 Beta (2026-09-01)
 
