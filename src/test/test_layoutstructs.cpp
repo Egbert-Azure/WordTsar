@@ -1186,7 +1186,7 @@ TEST_CASE("ParseDotCommand parses .POE")
 ///
 /// @brief
 /// Test ParseDotCommand bare number behavior
-/// Bare 0 is valid (turns off), bare non-zero is an error
+/// A bare number for .lm is columns; bare 0 resets the margin
 ///
 /////////////////////////////////////////////////////////////////////////////
 TEST_CASE("ParseDotCommand bare number handling")
@@ -1195,9 +1195,9 @@ TEST_CASE("ParseDotCommand bare number handling")
     cDocument doc;
     layout.SetDocument(&doc);
 
-    // Bare non-zero is an error (no unit specified)
+    // Bare non-zero is columns
     bool result = layout.ParseDotCommand(".lm 2");
-    CHECK(result == false);
+    CHECK(result == true);
 
     // Bare 0 is valid -- resets left margin to 0
     result = layout.ParseDotCommand(".lm 0");

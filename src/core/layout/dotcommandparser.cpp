@@ -69,6 +69,14 @@
 #include <cstdlib>
 #include <cstring>
 
+// Default units for measurements written without a unit
+namespace
+{
+constexpr double TWIPS_PER_COLUMN = TWIPSPERINCH / 10.0 ;   // one character at 10 cpi, as in .rr
+constexpr double TWIPS_PER_LINE   = TWIPSPERINCH / 6.0 ;    // 6 lines per inch
+constexpr double TWIPS_PER_48TH   = TWIPSPERINCH / 48.0 ;   // .lh unit
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION NOTES:
 //
@@ -588,35 +596,16 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
 eDotCommandStatus cDotCommandParser::ParseLeftMargin(const std::string& command)
 {
     bool incdec;
-    bool hasUnits;
-    std::string valueStr = command.substr(3);
-    double value = mDocument->EvaluateExpression(valueStr, incdec, hasUnits);
+    double twips;
 
-    if (value < 0.0 && !incdec)
+    // bare number is columns
+    if (!mDocument->EvaluateMeasurement(command.substr(3), TWIPS_PER_COLUMN, twips, incdec) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
 
-    COORD_T newMargin;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        newMargin = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // bare number: 0 resets left margin, non-zero is an error
-        if (value == 0.0)
-        {
-            mLayoutState->SetLeftMargin(0);
-            return DOT_GOOD;
-        }
-        else
-        {
-            return DOT_ERROR;
-        }
-    }
+    COORD_T newMargin = static_cast<COORD_T>(twips);
 
     if (incdec)
     {
@@ -647,26 +636,16 @@ eDotCommandStatus cDotCommandParser::ParseLeftMargin(const std::string& command)
 eDotCommandStatus cDotCommandParser::ParseRightMargin(const std::string& command)
 {
     bool incdec;
-    bool hasUnits;
-    double value = mDocument->EvaluateExpression(command.substr(3), incdec, hasUnits);
+    double twips;
 
-    if (value < 0.0 && !incdec)
+    // bare number is columns
+    if (!mDocument->EvaluateMeasurement(command.substr(3), TWIPS_PER_COLUMN, twips, incdec) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
 
-    COORD_T newMargin;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        newMargin = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // bare number -- treat as inches (WS7 default)
-        newMargin = mDocument->ConvertToTwips(value, 'I', 0);
-    }
+    COORD_T newMargin = static_cast<COORD_T>(twips);
 
     if (incdec)
     {
@@ -694,10 +673,10 @@ eDotCommandStatus cDotCommandParser::ParseParagraphMargin(const std::string& com
 {
     bool incdec;
     bool hasUnits;
-    std::string valueStr = command.substr(3);
-    double value = mDocument->EvaluateExpression(valueStr, incdec, hasUnits);
+    double twips;
 
-    if (value < 0.0 && !incdec)
+    if (!mDocument->EvaluateMeasurement(command.substr(3), 1.0, twips, incdec, &hasUnits) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
@@ -706,13 +685,12 @@ eDotCommandStatus cDotCommandParser::ParseParagraphMargin(const std::string& com
 
     if (hasUnits)
     {
-        // value is already in twips from EvaluateExpression
-        newMargin = static_cast<COORD_T>(value);
+        newMargin = static_cast<COORD_T>(twips);
     }
     else
     {
         // bare number: 0 disables paragraph margin, non-zero is an error
-        if (value == 0.0)
+        if (twips == 0.0)
         {
             mLayoutState->SetValidParagraphMargin(false);
             return DOT_GOOD;
@@ -759,26 +737,16 @@ eDotCommandStatus cDotCommandParser::ParsePageOffset(const std::string& command)
     }
 
     bool incdec;
-    bool hasUnits;
-    double value = mDocument->EvaluateExpression(command.substr(startPos), incdec, hasUnits);
+    double twips;
 
-    if (value < 0.0 && !incdec)
+    // bare number is columns
+    if (!mDocument->EvaluateMeasurement(command.substr(startPos), TWIPS_PER_COLUMN, twips, incdec) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
 
-    COORD_T newOffset;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        newOffset = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // bare number -- treat as inches (WS7 default)
-        newOffset = mDocument->ConvertToTwips(value, 'I', 0);
-    }
+    COORD_T newOffset = static_cast<COORD_T>(twips);
 
     if (thirdChar == 'O')
     {
@@ -837,26 +805,16 @@ eDotCommandStatus cDotCommandParser::ParsePageOffset(const std::string& command)
 eDotCommandStatus cDotCommandParser::ParsePageNumberColumn(const std::string& command)
 {
     bool incdec;
-    bool hasUnits;
-    double value = mDocument->EvaluateExpression(command.substr(3), incdec, hasUnits);
+    double twips;
 
-    if (value < 0.0 && !incdec)
+    // bare number is inches
+    if (!mDocument->EvaluateMeasurement(command.substr(3), TWIPSPERINCH, twips, incdec) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
 
-    COORD_T newColumn;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        newColumn = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // bare number -- treat as inches (WS7 default)
-        newColumn = mDocument->ConvertToTwips(value, 'I', 0);
-    }
+    COORD_T newColumn = static_cast<COORD_T>(twips);
 
     if (incdec)
     {
@@ -893,28 +851,16 @@ eDotCommandStatus cDotCommandParser::ParsePageLength(const std::string& command)
 {
     bool incdec;
     bool hasUnits;
-    std::string valueStr = command.substr(3);
-    double value = mDocument->EvaluateExpression(valueStr, incdec, hasUnits);
+    double value;
 
-    if (value < 1.0 && !incdec)
+    // bare number is lines; less than one line (or one twip with a unit) is an error
+    if (!mDocument->EvaluateMeasurement(command.substr(3), TWIPS_PER_LINE, value, incdec, &hasUnits) ||
+        (value < (hasUnits ? 1.0 : TWIPS_PER_LINE) && !incdec))
     {
         return DOT_ERROR;
     }
 
-    // .PL values: with units, value is already in twips; without units, treat as lines
-    COORD_T twips;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        twips = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // No unit specified -- treat as lines (WordStar default: 6 lines per inch)
-        const double TWIPS_PER_LINE = (8.0 / 48.0) * TWIPSPERINCH;  // 240 twips
-        twips = static_cast<COORD_T>(value * TWIPS_PER_LINE);
-    }
+    COORD_T twips = static_cast<COORD_T>(value);
 
     if (incdec)
     {
@@ -971,23 +917,23 @@ eDotCommandStatus cDotCommandParser::ParseLineHeight(const std::string& command)
     }
 
     bool incdec;
-    double height = mDocument->GetValue(param, incdec);
+    bool hasUnits;
+    double height;
 
-    if (height < 1.0 && !incdec)
+    // bare number is 1/48 inch; less than 1/48 inch (or one twip with a unit) is an error
+    if (!mDocument->EvaluateMeasurement(param, TWIPS_PER_48TH, height, incdec, &hasUnits) ||
+        (height < (hasUnits ? 1.0 : TWIPS_PER_48TH) && !incdec))
     {
         return DOT_ERROR;
     }
 
-    // Convert from 1/48 inch to twips
-    const double TWIPS_PER_48TH = TWIPSPERINCH / 48.0;
-
     if (incdec)
     {
-        mLayoutState->SetLineHeight(mLayoutState->GetLineHeight() + height * TWIPS_PER_48TH);
+        mLayoutState->SetLineHeight(mLayoutState->GetLineHeight() + height);
     }
     else
     {
-        mLayoutState->SetLineHeight(height * TWIPS_PER_48TH);
+        mLayoutState->SetLineHeight(height);
     }
 
     // Ensure reasonable bounds
@@ -1477,28 +1423,16 @@ eDotCommandStatus cDotCommandParser::ParseMarginTop(const std::string& command)
     }
 
     bool incdec;
-    bool hasUnits;
-    std::string valueStr = command.substr(3);
-    double value = mDocument->EvaluateExpression(valueStr, incdec, hasUnits);
+    double twips;
 
-    if (value < 0.0 && !incdec)
+    // bare number is lines of 1/6 inch
+    if (!mDocument->EvaluateMeasurement(command.substr(3), TWIPS_PER_LINE, twips, incdec) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
 
-    // .MT values: with units, value is already in twips; without units, treat as lines
-    COORD_T newMargin;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        newMargin = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // No unit specified -- treat as lines
-        newMargin = static_cast<COORD_T>(value * GetLineHeight());
-    }
+    COORD_T newMargin = static_cast<COORD_T>(twips);
 
     if (incdec)
     {
@@ -1536,28 +1470,16 @@ eDotCommandStatus cDotCommandParser::ParseMarginBottom(const std::string& comman
     }
 
     bool incdec;
-    bool hasUnits;
-    std::string valueStr = command.substr(3);
-    double value = mDocument->EvaluateExpression(valueStr, incdec, hasUnits);
+    double twips;
 
-    if (value < 0.0 && !incdec)
+    // bare number is lines of 1/6 inch
+    if (!mDocument->EvaluateMeasurement(command.substr(3), TWIPS_PER_LINE, twips, incdec) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
 
-    // .MB values: with units, value is already in twips; without units, treat as lines
-    COORD_T newMargin;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        newMargin = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // No unit specified -- treat as lines
-        newMargin = static_cast<COORD_T>(value * GetLineHeight());
-    }
+    COORD_T newMargin = static_cast<COORD_T>(twips);
 
     if (incdec)
     {
@@ -1595,28 +1517,16 @@ eDotCommandStatus cDotCommandParser::ParseHeaderMargin(const std::string& comman
     }
 
     bool incdec;
-    bool hasUnits;
-    std::string valueStr = command.substr(3);
-    double value = mDocument->EvaluateExpression(valueStr, incdec, hasUnits);
+    double twips;
 
-    if (value < 0.0 && !incdec)
+    // bare number is lines of the current line height
+    if (!mDocument->EvaluateMeasurement(command.substr(3), GetLineHeight(), twips, incdec) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
 
-    // .HM values: with units, value is already in twips; without units, treat as lines
-    COORD_T newMargin;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        newMargin = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // No unit specified -- treat as lines
-        newMargin = static_cast<COORD_T>(value * GetLineHeight());
-    }
+    COORD_T newMargin = static_cast<COORD_T>(twips);
 
     if (incdec)
     {
@@ -1654,28 +1564,16 @@ eDotCommandStatus cDotCommandParser::ParseFooterMargin(const std::string& comman
     }
 
     bool incdec;
-    bool hasUnits;
-    std::string valueStr = command.substr(3);
-    double value = mDocument->EvaluateExpression(valueStr, incdec, hasUnits);
+    double twips;
 
-    if (value < 0.0 && !incdec)
+    // bare number is lines of the current line height
+    if (!mDocument->EvaluateMeasurement(command.substr(3), GetLineHeight(), twips, incdec) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
 
-    // .FM values: with units, value is already in twips; without units, treat as lines
-    COORD_T newMargin;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        newMargin = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // No unit specified -- treat as lines
-        newMargin = static_cast<COORD_T>(value * GetLineHeight());
-    }
+    COORD_T newMargin = static_cast<COORD_T>(twips);
 
     if (incdec)
     {
@@ -1928,30 +1826,16 @@ eDotCommandStatus cDotCommandParser::ParseParagraphSpacing(const std::string& co
     char type = std::tolower(str[0]);
     std::string valueStr = str.substr(1);
 
-    // Parse value and unit via math expression evaluator
+    // bare number is inches; negative absolute values are invalid
     bool incdec;
-    bool hasUnits;
-    double value = mDocument->EvaluateExpression(valueStr, incdec, hasUnits);
-
-    // Negative absolute values are invalid
-    if (value < 0.0 && !incdec)
+    double twips;
+    if (!mDocument->EvaluateMeasurement(valueStr, TWIPSPERINCH, twips, incdec) ||
+        (twips < 0.0 && !incdec))
     {
         return DOT_ERROR;
     }
 
-    // Convert to twips
-    COORD_T spacing;
-
-    if (hasUnits)
-    {
-        // value is already in twips from EvaluateExpression
-        spacing = static_cast<COORD_T>(value);
-    }
-    else
-    {
-        // bare number -- treat as inches (WS7 default for .PS)
-        spacing = mDocument->ConvertToTwips(value, 'I', 0);
-    }
+    COORD_T spacing = static_cast<COORD_T>(twips);
 
     // Apply to appropriate variable
     if (type == 'a')

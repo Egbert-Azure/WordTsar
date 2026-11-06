@@ -2675,9 +2675,9 @@ TEST_CASE("PA parsing - immediate page creation")
         const sBoxes* box = layout.GetBoxByIndex(page2Boxes[0]);
         REQUIRE(box != nullptr);
 
-        // box.top should use .mt 10 from page 2 with .lh 10 (300 twips)
-        // Expected: 10 * 300 = 3000 (header margin positions header, not text)
-        CHECK(box->top == 3000);
+        // box.top should use .mt 10 from page 2: 10 lines of 1/6 inch,
+        // independent of .lh (header margin positions header, not text)
+        CHECK(box->top == 2400);
     }
 
     SUBCASE("Multiple PA commands create multiple pages")
@@ -3483,6 +3483,32 @@ TEST_CASE("RR parsing - state preserved on invalid ruler")
         CHECK(CoordsEqual(f.state.GetRightMargin(), 6 * 144));
         CHECK(f.state.GetTabs().size() == 2);  // 1 explicit tab + right margin
     }
+}
+
+TEST_CASE("Dot-command measurements read units brackets and default units")
+{
+    sParserFixture f;
+
+    // 24 points = 480 twips
+    CHECK(f.parser.ParseDotCommand(".lh 24pt") == DOT_GOOD);
+    CHECK(CoordsEqual(f.state.GetLineHeight(), 480));
+
+    // 1 inch = 1440 twips
+    CHECK(f.parser.ParseDotCommand(".mt 1in") == DOT_GOOD);
+    CHECK(CoordsEqual(f.state.GetTopMargin(), 1440));
+
+    // bare number for .lm is columns of 144 twips
+    CHECK(f.parser.ParseDotCommand(".lm 5") == DOT_GOOD);
+    CHECK(CoordsEqual(f.state.GetLeftMargin(), 5 * 144));
+
+    // unit after a closing bracket applies to the bracket: 0.35 inch = 504 twips
+    CHECK(f.parser.ParseDotCommand(".po ((8.5-7.8)/2)i") == DOT_GOOD);
+    CHECK(CoordsEqual(f.state.GetPageOffsetOdd(), 504));
+    CHECK(CoordsEqual(f.state.GetPageOffsetEven(), 504));
+
+    // unknown unit is an error and keeps the previous value
+    CHECK(f.parser.ParseDotCommand(".mt 2xyz") == DOT_ERROR);
+    CHECK(CoordsEqual(f.state.GetTopMargin(), 1440));
 }
 
 TEST_CASE("RR parsing - ruler clears previous tabs")

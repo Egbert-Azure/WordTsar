@@ -2768,290 +2768,269 @@ char cDocument::GetType(std::string text)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  text     [in]  - the expression string (e.g. "4c + 2i", "80 - 5")
-/// @param  incdec   [out] - true if leading +/- (increment/decrement)
-/// @param  hasUnits [out] - true if any unit chars found (result is twips)
+/// @param  unit         [in]  - unit text, any case (e.g. "in", "pt", "\"")
+/// @param  twipsPerUnit [out] - size of one unit in twips
 ///
-/// @return double - evaluated result (in twips if hasUnits, raw number otherwise)
+/// @return bool - true if the unit is known
 ///
 /// @brief
-/// Evaluate a math expression with optional mixed unit annotations.
-/// Uses two strategies based on operators present:
+/// Units: i, in, " (inch), c, cm (centimetre), m, mm (millimetre),
+/// p, pt (point), r (row of 240 twips).
 ///
-/// Strategy 1 (add/sub only): Convert each unit-annotated number to
-/// centimeters, evaluate, convert result to twips. Handles mixed units
-/// like "4c + 2i" correctly.
+/////////////////////////////////////////////////////////////////////////////
+static bool UnitToTwips(std::string unit, double &twipsPerUnit)
+{
+    for (size_t i = 0 ; i < unit.length() ; i++)
+    {
+        unit[i] = static_cast<char>(toupper(static_cast<unsigned char>(unit[i]))) ;
+    }
+
+    if (unit == "I" || unit == "IN" || unit == "\"")
+    {
+        twipsPerUnit = TWIPSPERINCH ;
+    }
+    else if (unit == "C" || unit == "CM")
+    {
+        twipsPerUnit = TWIPSPERCM ;
+    }
+    else if (unit == "M" || unit == "MM")
+    {
+        twipsPerUnit = TWIPSPERMM ;
+    }
+    else if (unit == "P" || unit == "PT")
+    {
+        twipsPerUnit = POINTSTOTWIPS ;
+    }
+    else if (unit == "R")
+    {
+        twipsPerUnit = 240.0 ;
+    }
+    else
+    {
+        return false ;
+    }
+
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
 ///
-/// Strategy 2 (has * or /): All unit-annotated numbers must use the same
-/// unit. Strip units, evaluate raw numbers, convert result to twips.
-/// Mixed units in multiply/divide are an error. This avoids the
-/// squared-units problem (".5i * .5i" = 0.25 inches, not 1.6129 cm).
+/// @param  text     [in]  - the expression string (e.g. "4c + 2i", "80 - 5")
+/// @param  incdec   [out] - true if leading +/- (increment/decrement)
+/// @param  hasUnits [out] - true if any unit found (result is twips)
 ///
-/// Supported units: i/" (inches), c (cm), m (mm), p (points), r (rows)
+/// @return double - evaluated result (in twips if hasUnits, raw number
+///                  otherwise), -32768.0 on error
+///
+/// @brief
+/// EvaluateMeasurement with a default unit of one, so a unitless
+/// expression returns its plain number.
 ///
 /////////////////////////////////////////////////////////////////////////////
 double cDocument::EvaluateExpression(const std::string &text, bool &incdec, bool &hasUnits)
 {
-    double value = -32768.0 ;
-    incdec = false ;
-    hasUnits = false ;
+    double twips = 0.0 ;
 
-    // trim trailing whitespace
-    const std::string WHITESPACE = " \n\r\t\f\v\177" ;
-    size_t end = text.find_last_not_of(WHITESPACE) ;
-    size_t start = text.find_first_not_of(" ") ;
-    std::string trimmed = (end == std::string::npos) ? "" : text.substr(start, end - start + 1) ;
-
-    if (trimmed.empty())
+    if (!EvaluateMeasurement(text, 1.0, twips, incdec, &hasUnits))
     {
-        return value ;
+        return -32768.0 ;
     }
 
-    // check for increment/decrement
+    return twips ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  text         [in]  - measurement: a number or a bracketed
+///                              expression, then an optional unit
+/// @param  defaultTwips [in]  - twips per unit for numbers without a unit
+/// @param  twips        [out] - result in twips
+/// @param  incdec       [out] - true if leading +/- (increment/decrement)
+/// @param  hasUnits     [out] - optional, true if any unit was given
+///
+/// @return bool - false for an empty, malformed or unknown-unit measurement
+///
+/// @brief
+/// A unit follows a number or a closing bracket directly. See UnitToTwips
+/// for the units.
+///
+/// Add/sub only, no unit after a bracket: each number is converted with
+/// its own unit (or the default) and the results are summed, so mixed
+/// units like "4c + 2i" work.
+///
+/// With * or /, or a unit after a bracket: all units must be the same.
+/// The expression is evaluated on the plain numbers and the result is
+/// converted with that unit (or the default). ".5i * .5i" is 0.25 inch.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDocument::EvaluateMeasurement(const std::string &text, double defaultTwips, double &twips,
+                                    bool &incdec, bool *hasUnits)
+{
+    incdec = false ;
+    twips = 0.0 ;
+    if (hasUnits != nullptr)
+    {
+        *hasUnits = false ;
+    }
+
+    const std::string WHITESPACE = " \n\r\t\f\v\177" ;         // \177 is ^Z - end of file
+    size_t start = text.find_first_not_of(WHITESPACE) ;
+    if (start == std::string::npos)
+    {
+        return false ;
+    }
+    size_t end = text.find_last_not_of(WHITESPACE) ;
+    std::string trimmed = text.substr(start, end - start + 1) ;
+
     if (trimmed[0] == '+' || trimmed[0] == '-')
     {
         if (trimmed.length() == 1)
         {
-            return value ;
+            return false ;
         }
         incdec = true ;
     }
 
-    // pre-scan: check for * or / operators and collect distinct unit types
+    // tokens: numbers carry the unit written after them; ')' may carry one too
+    struct sToken
+    {
+        std::string text ;
+        bool isNumber = false ;
+        bool hasUnit = false ;
+        double unitTwips = 0.0 ;
+    } ;
+
+    std::vector<sToken> tokens ;
     bool hasMulDiv = false ;
-    char foundUnitChar = 0 ;      // normalized unit char for strategy 2
+    bool parenUnit = false ;
+    bool anyUnit = false ;
     bool mixedUnits = false ;
-    bool anyUnitsFound = false ;
+    double commonUnit = 0.0 ;
 
-    for (size_t scan = 0 ; scan < trimmed.length() ; scan++)
-    {
-        char ch = trimmed[scan] ;
-
-        // skip leading +/- (those are incdec, not operators)
-        if (scan == 0 && (ch == '+' || ch == '-'))
-        {
-            continue ;
-        }
-
-        if (ch == '*' || ch == '/')
-        {
-            hasMulDiv = true ;
-        }
-
-        // check if this char is a unit suffix (must follow a digit)
-        if (scan > 0 && isdigit(trimmed[scan - 1]))
-        {
-            char upper = toupper(ch) ;
-            char normalized = 0 ;
-
-            if (upper == 'I' || ch == '"')
-            {
-                normalized = 'I' ;
-            }
-            else if (upper == 'C')
-            {
-                normalized = 'C' ;
-            }
-            else if (upper == 'M')
-            {
-                normalized = 'M' ;
-            }
-            else if (upper == 'P')
-            {
-                normalized = 'P' ;
-            }
-            else if (upper == 'R')
-            {
-                normalized = 'R' ;
-            }
-
-            if (normalized != 0)
-            {
-                anyUnitsFound = true ;
-                if (foundUnitChar == 0)
-                {
-                    foundUnitChar = normalized ;
-                }
-                else if (foundUnitChar != normalized)
-                {
-                    mixedUnits = true ;
-                }
-            }
-            else if (isalpha(ch))
-            {
-                // alphabetic char after a digit that is not a valid unit is an error
-                return -32768.0 ;
-            }
-        }
-    }
-
-    // strategy 2: has multiply or divide
-    if (hasMulDiv)
-    {
-        // mixed units in multiply/divide expressions are an error
-        if (mixedUnits)
-        {
-            return -32768.0 ;
-        }
-
-        // strip unit chars, evaluate raw numbers, convert result
-        std::string processed ;
-        size_t i = 0 ;
-        size_t len = trimmed.length() ;
-
-        while (i < len)
-        {
-            char ch = trimmed[i] ;
-
-            // consume numbers (digits and decimal points)
-            if (isdigit(ch) || (ch == '.' && i + 1 < len && isdigit(trimmed[i + 1])))
-            {
-                while (i < len && (isdigit(trimmed[i]) || trimmed[i] == '.'))
-                {
-                    processed += trimmed[i] ;
-                    i++ ;
-                }
-
-                // skip the unit character if present
-                if (i < len)
-                {
-                    char upper = toupper(trimmed[i]) ;
-                    if (upper == 'I' || upper == 'C' || upper == 'M' ||
-                        upper == 'P' || upper == 'R' || trimmed[i] == '"')
-                    {
-                        i++ ;  // skip the unit char
-                    }
-                }
-            }
-            else
-            {
-                // copy operators, whitespace, parentheses, signs as-is
-                processed += ch ;
-                i++ ;
-            }
-        }
-
-        // evaluate the stripped expression
-        value = mMath.DoMath(processed) ;
-
-        // convert result to twips using the single unit found
-        if (anyUnitsFound)
-        {
-            hasUnits = true ;
-            // use the " char for inches since ConvertToTwips expects it
-            char convChar = foundUnitChar ;
-            if (convChar == 'I')
-            {
-                convChar = '"' ;
-            }
-            value = static_cast<double>(ConvertToTwips(value, convChar, 0)) ;
-        }
-
-        return value ;
-    }
-
-    // strategy 1: addition/subtraction only -- convert to centimeters first
-    // unit-to-centimeter conversion factors (derived from config.h constants)
-    constexpr double INCHES_TO_CM = TWIPSPERINCH / TWIPSPERCM ;
-    constexpr double CM_TO_CM     = 1.0 ;
-    constexpr double MM_TO_CM     = TWIPSPERMM / TWIPSPERCM ;
-    constexpr double POINTS_TO_CM = POINTSTOTWIPS / TWIPSPERCM ;
-    constexpr double ROWS_TO_CM   = 240.0 / TWIPSPERCM ;
-
-    std::string processed ;
     size_t i = 0 ;
     size_t len = trimmed.length() ;
-
     while (i < len)
     {
         char ch = trimmed[i] ;
+        sToken tok ;
 
-        // check if we are at the start of a number (digit or decimal point)
-        if (isdigit(ch) || (ch == '.' && i + 1 < len && isdigit(trimmed[i + 1])))
+        if (isdigit(static_cast<unsigned char>(ch)) || ch == '.')
         {
-            // consume the number
             size_t numStart = i ;
-            while (i < len && (isdigit(trimmed[i]) || trimmed[i] == '.'))
+            while (i < len && (isdigit(static_cast<unsigned char>(trimmed[i])) || trimmed[i] == '.'))
             {
                 i++ ;
             }
-            std::string numStr = trimmed.substr(numStart, i - numStart) ;
-
-            // check for a unit character following the number
-            if (i < len)
+            tok.text = trimmed.substr(numStart, i - numStart) ;
+            tok.isNumber = true ;
+        }
+        else if (ch == ')')
+        {
+            tok.text = ")" ;
+            i++ ;
+        }
+        else if (ch == '(' || ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == ' ' || ch == '\t')
+        {
+            if (ch == '*' || ch == '/')
             {
-                char unitChar = trimmed[i] ;
-                char upperUnit = toupper(unitChar) ;
-                double cmFactor = 0.0 ;
-                bool foundUnit = false ;
-
-                if (upperUnit == 'I' || unitChar == '"')
-                {
-                    cmFactor = INCHES_TO_CM ;
-                    foundUnit = true ;
-                }
-                else if (upperUnit == 'C')
-                {
-                    cmFactor = CM_TO_CM ;
-                    foundUnit = true ;
-                }
-                else if (upperUnit == 'M')
-                {
-                    cmFactor = MM_TO_CM ;
-                    foundUnit = true ;
-                }
-                else if (upperUnit == 'P')
-                {
-                    cmFactor = POINTS_TO_CM ;
-                    foundUnit = true ;
-                }
-                else if (upperUnit == 'R')
-                {
-                    cmFactor = ROWS_TO_CM ;
-                    foundUnit = true ;
-                }
-
-                if (foundUnit)
-                {
-                    // convert the number to centimeters with full double precision
-                    double numVal = atof(numStr.c_str()) ;
-                    double cmVal = numVal * cmFactor ;
-                    char buf[32] ;
-                    snprintf(buf, sizeof(buf), "%.17g", cmVal) ;
-                    processed += buf ;
-                    hasUnits = true ;
-                    i++ ;  // skip the unit character
-                }
-                else
-                {
-                    // no unit, copy number as-is
-                    processed += numStr ;
-                }
+                hasMulDiv = true ;
             }
-            else
-            {
-                // end of string, no unit, copy number as-is
-                processed += numStr ;
-            }
+            tok.text = std::string(1, ch) ;
+            tokens.push_back(tok) ;
+            i++ ;
+            continue ;
         }
         else
         {
-            // copy operators, whitespace, parentheses, +/- signs as-is
-            processed += ch ;
+            return false ;
+        }
+
+        // unit directly after a number or a closing bracket
+        size_t unitStart = i ;
+        if (i < len && trimmed[i] == '"')
+        {
             i++ ;
         }
+        else
+        {
+            while (i < len && isalpha(static_cast<unsigned char>(trimmed[i])))
+            {
+                i++ ;
+            }
+        }
+
+        if (i > unitStart)
+        {
+            if (!UnitToTwips(trimmed.substr(unitStart, i - unitStart), tok.unitTwips))
+            {
+                return false ;
+            }
+            tok.hasUnit = true ;
+            if (!tok.isNumber)
+            {
+                parenUnit = true ;
+            }
+            if (!anyUnit)
+            {
+                commonUnit = tok.unitTwips ;
+            }
+            else if (commonUnit != tok.unitTwips)
+            {
+                mixedUnits = true ;
+            }
+            anyUnit = true ;
+        }
+
+        tokens.push_back(tok) ;
     }
 
-    // evaluate the processed expression via PicoMath
-    value = mMath.DoMath(processed) ;
+    std::string processed ;
+    char buf[32] ;
+    double value = 0.0 ;
 
-    // if units were found, result is in centimeters -- convert to twips
-    if (hasUnits)
+    if (hasMulDiv || parenUnit)
     {
-        value = value * TWIPSPERCM ;
+        if (mixedUnits)
+        {
+            return false ;
+        }
+
+        for (const auto &tok : tokens)
+        {
+            processed += tok.text ;
+        }
+
+        value = mMath.DoMath(processed) ;
+        twips = value * (anyUnit ? commonUnit : defaultTwips) ;
+    }
+    else
+    {
+        for (const auto &tok : tokens)
+        {
+            if (tok.isNumber)
+            {
+                double factor = tok.hasUnit ? tok.unitTwips : (anyUnit ? defaultTwips : 1.0) ;
+                snprintf(buf, sizeof(buf), "%.17g", atof(tok.text.c_str()) * factor) ;
+                processed += buf ;
+            }
+            else
+            {
+                processed += tok.text ;
+            }
+        }
+
+        value = mMath.DoMath(processed) ;
+        twips = anyUnit ? value : value * defaultTwips ;
     }
 
-    return value ;
+    if (hasUnits != nullptr)
+    {
+        *hasUnits = anyUnit ;
+    }
+
+    return true ;
 }
 
 

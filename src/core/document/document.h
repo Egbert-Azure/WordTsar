@@ -399,6 +399,8 @@ public:
     double GetValue(std::string txt, bool &incdec) ;
     char GetType(std::string text) ;
     double EvaluateExpression(const std::string &text, bool &incdec, bool &hasUnits) ;
+    bool EvaluateMeasurement(const std::string &text, double defaultTwips, double &twips,
+                             bool &incdec, bool *hasUnits = nullptr) ;
 
     // --- Display Control ---
     void SetShowControl(eShowControl show) ;
