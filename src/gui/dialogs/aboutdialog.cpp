@@ -29,8 +29,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
-
-#include <string>
+#include <QtGlobal>
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -82,26 +81,13 @@ cAboutDialog::cAboutDialog(QWidget *parent)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return abouttext::AboutText() followed by every abouttext::LegalLines()
-///         line it does not already contain
+/// @return abouttext::AboutText() followed by a line with the Qt runtime
+///         version
 ///
 /////////////////////////////////////////////////////////////////////////////
 QString cAboutDialog::Text(void)
 {
-    std::string text = abouttext::AboutText() ;
-    std::string missing ;
-    for (const std::string &line : abouttext::LegalLines())
-    {
-        if (text.find(line) == std::string::npos)
-        {
-            missing += "\n" + line ;
-        }
-    }
-    if (missing.empty() == false)
-    {
-        text += "\n" + missing ;
-    }
-    return QString::fromStdString(text) ;
+    return QString::fromStdString(abouttext::AboutText()) + "\nQt " + QString::fromLatin1(qVersion()) ;
 }
 
 QPlainTextEdit *cAboutDialog::TextView(void) const

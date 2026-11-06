@@ -39,12 +39,11 @@ class cAboutDialog : public QDialog
 {
 public:
     // Logical width of the logo in pixels.
-    static const int kLogoWidth = 160 ;
+    static const int kLogoWidth = 140 ;
 
     explicit cAboutDialog(QWidget *parent = nullptr) ;
 
-    // abouttext::AboutText() followed by every abouttext::LegalLines()
-    // line it does not already contain.
+    // abouttext::AboutText() followed by "Qt " and the Qt runtime version.
     static QString Text(void) ;
 
     QPlainTextEdit *TextView(void) const ;

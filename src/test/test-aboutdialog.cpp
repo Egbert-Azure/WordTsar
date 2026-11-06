@@ -28,6 +28,7 @@
 #include <QLabel>
 #include <QPixmap>
 #include <QPlainTextEdit>
+#include <QtGlobal>
 
 #include <string>
 #include <vector>
@@ -46,6 +47,17 @@ void EnsureQApplication(void)
     }
 }
 
+// Number of non-overlapping occurrences of part in text.
+int Count(const std::string &text, const std::string &part)
+{
+    int count = 0 ;
+    for (size_t at = text.find(part) ; at != std::string::npos ; at = text.find(part, at + part.size()))
+    {
+        ++count ;
+    }
+    return count ;
+}
+
 // Sends a key press and release to widget.
 void PressKey(QWidget *widget, int key)
 {
@@ -57,7 +69,7 @@ void PressKey(QWidget *widget, int key)
 
 }
 
-TEST_CASE("About dialog shows the shared About text and the legal lines")
+TEST_CASE("About dialog shows the shared About text and each notice once")
 {
     EnsureQApplication() ;
     cAboutDialog dialog ;
@@ -70,19 +82,42 @@ TEST_CASE("About dialog shows the shared About text and the legal lines")
     CHECK(view->isReadOnly() == true) ;
 
     std::string shown = view->toPlainText().toStdString() ;
+    std::string shared = abouttext::AboutText() ;
     CHECK(view->toPlainText() == cAboutDialog::Text()) ;
-    CHECK(shown.rfind(abouttext::AboutText(), 0) == 0) ;
+    CHECK(shown.rfind(shared, 0) == 0) ;
     for (const std::string &line : abouttext::LegalLines())
     {
-        CHECK(shown.find(line) != std::string::npos) ;
+        INFO(line) ;
+        CHECK(Count(shown, line) == Count(shared, line)) ;
+        CHECK(Count(shown, line) <= 1) ;
     }
     for (const std::string &line : abouttext::ProductLines())
     {
-        CHECK(shown.find(line) != std::string::npos) ;
+        INFO(line) ;
+        CHECK(Count(shown, line) == 1) ;
     }
+    CHECK(Count(shown, "This program comes with ABSOLUTELY NO WARRANTY.") == 1) ;
+    CHECK(Count(shown, "GNU Affero General Public License v3.0") == 1) ;
+    CHECK(Count(shown, "GNU AGPL") == 0) ;
+    CHECK(Count(shown, "github.com/Egbert-Azure/WordTsar") == 1) ;
+    CHECK(Count(shown, abouttext::TrademarkText()) == 1) ;
 }
 
-TEST_CASE("About dialog shows the WordTsar logo 160 pixels wide")
+TEST_CASE("About dialog ends with the Qt runtime version")
+{
+    EnsureQApplication() ;
+    cAboutDialog dialog ;
+
+    std::string shown = dialog.TextView()->toPlainText().toStdString() ;
+    std::string qt = std::string("Qt ") + qVersion() ;
+    std::string last = "\n" + qt ;
+    REQUIRE(shown.size() >= last.size()) ;
+    CHECK(shown.compare(shown.size() - last.size(), last.size(), last) == 0) ;
+    CHECK(Count(shown, qt) == 1) ;
+    CHECK(Count(abouttext::AboutText(), "Qt ") == 0) ;
+}
+
+TEST_CASE("About dialog shows the WordTsar logo 140 pixels wide")
 {
     EnsureQApplication() ;
     cAboutDialog dialog ;
@@ -93,8 +128,8 @@ TEST_CASE("About dialog shows the WordTsar logo 160 pixels wide")
 
     QPixmap pixmap = logo->pixmap() ;
     REQUIRE(pixmap.isNull() == false) ;
-    CHECK(pixmap.deviceIndependentSize().width() == doctest::Approx(160.0)) ;
-    CHECK(pixmap.width() == qRound(160.0 * pixmap.devicePixelRatio())) ;
+    CHECK(pixmap.deviceIndependentSize().width() == doctest::Approx(140.0)) ;
+    CHECK(pixmap.width() == qRound(140.0 * pixmap.devicePixelRatio())) ;
 }
 
 TEST_CASE("About dialog closes on Return and on Escape")
