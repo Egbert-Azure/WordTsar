@@ -23,20 +23,19 @@
  *
  * @brief GUI application entry point for WordTsar.
  *
- * Initializes the Qt application, installs crash handlers, displays a splash
- * screen, and creates the main application window.
+ * Initializes the Qt application, installs crash handlers and creates the
+ * main application window.
  *
  * @section main_startup Startup Sequence
  * 1. Creates cWordTsarApplication (a QApplication subclass that also catches
  *    QEvent::FileOpen -- how Finder/Launch Services-routed opens actually
  *    arrive, as opposed to a direct command-line invocation's argv)
  * 2. Installs crash handlers via the chillout library for crash reporting
- * 3. Displays a timed splash screen with the WordTsar logo and version info
- * 4. Creates the main cWordTsar window (QMainWindow) and registers it with
+ * 3. Creates the main cWordTsar window (QMainWindow) and registers it with
  *    the application object so a FileOpen event has somewhere to deliver to
- * 5. If a filename is passed on the command line, loads it after the window
+ * 4. If a filename is passed on the command line, loads it after the window
  *    is shown
- * 6. Enters the Qt event loop (QApplication::exec())
+ * 5. Enters the Qt event loop (QApplication::exec())
  *
  * @section main_crash Crash Handling
  * The chillout crash callback is invoked on unhandled exceptions and signals.
@@ -52,9 +51,6 @@
  */
 
 #include <QApplication>
-#include <QSplashScreen>
-#include <QPixmap>
-#include <QTimer>
 #include <QMessageBox>
 #include <QDialog>
 #include <QFileOpenEvent>
@@ -158,8 +154,7 @@ private:
 ///
 /// @brief
 /// Application entry point. Initializes Qt, installs crash handlers,
-/// shows splash screen, creates the main WordTsar window, and enters
-/// the event loop. Loads a file from the command line if provided.
+/// creates the main WordTsar window, and enters the event loop. Loads a file from the command line if provided.
 ///
 /////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
@@ -203,29 +198,10 @@ int main(int argc, char *argv[])
 #endif
 
 
-    QScreen *screen = QApplication::primaryScreen() ;
-
-    QPixmap pixmap(":/gui/images/splash.png") ;
-    QSplashScreen splash(screen, pixmap) ;
-    splash.setWindowFlag(Qt::WindowStaysOnTopHint, true) ;
-    QString vers = FULLVERSION_STRING ;
-    splash.showMessage(vers, Qt::AlignBottom | Qt::AlignCenter, QColor(152, 114, 14)) ;
-    splash.show() ;
-    app.processEvents();
-
     cWordTsar w(argc, argv);
 
-    // Centering the window (on the same screen the splash is centered on)
-    // happens inside cWordTsar::ReadConfig()'s own deferred resize callback
-    // now, not here -- w.width()/w.height() at this point are still the
-    // pre-resize construction-time size (that resize is itself deferred to
-    // the same 0ms singleShot, for the same "Qt's first layout pass
-    // overrides anything set before show()" reason), so centering against
-    // them here used the wrong size and made the window visibly jump after
-    // show(). Doing both together, once, after the real size is applied,
-    // keeps them in sync.
-
-    QTimer::singleShot(5000, &splash, SLOT(close())) ;
+    // Window size and centering on the primary screen are applied in
+    // cWordTsar::ReadConfig()'s deferred callback, after the first layout.
 
     w.show();
     app.processEvents();

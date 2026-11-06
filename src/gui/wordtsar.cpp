@@ -1194,15 +1194,8 @@ void cWordTsar::ReadConfig(void)
     // what was requested. Deferring until the event loop actually starts
     // (after that initial layout has already settled) makes it stick.
     //
-    // Re-centers in the same callback rather than leaving that to main.cpp's
-    // own move() call: that call runs synchronously right after this
-    // constructor returns, using width()/height() as they are *then* --
-    // still the old pre-resize size, since this deferred callback hasn't
-    // run yet -- so it centered for the wrong size and the window visibly
-    // jumped after show(). Doing both together here, after the real size is
-    // actually applied, keeps them in sync. Uses the primary screen to
-    // match main.cpp's splash centering, which isn't multi-monitor-aware
-    // either.
+    // Centers the window on the primary screen in the same callback, after
+    // the saved size is applied, so position and size stay in sync.
     {
         int savedWidth = config.mWindowWidth ;
         int savedHeight = config.mWindowHeight ;
