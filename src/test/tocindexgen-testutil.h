@@ -98,6 +98,75 @@ inline void SetSource(cEditorBase &editor, const std::vector<std::string> &lines
 
 
 /////////////////////////////////////////////////////////////////////////////
+/// Inserts `line` at the document position, with tokens inserted as
+/// markers: {K} index mark, {B} bold, {T} tab, {S:body} kept 0Eh index
+/// item sequence with that body.
+/////////////////////////////////////////////////////////////////////////////
+inline void InsertMarkedLine(cDocument *doc, const std::string &line)
+{
+    size_t pos = 0 ;
+    while (pos < line.size())
+    {
+        size_t open = line.find('{', pos) ;
+        size_t close = (open == std::string::npos) ? std::string::npos : line.find('}', open) ;
+        if (open == std::string::npos || close == std::string::npos)
+        {
+            doc->Insert(line.substr(pos)) ;
+            return ;
+        }
+        if (open > pos)
+        {
+            doc->Insert(line.substr(pos, open - pos)) ;
+        }
+
+        std::string token = line.substr(open + 1, close - open - 1) ;
+        if (token == "K")
+        {
+            doc->BeginIndex() ;
+        }
+        else if (token == "B")
+        {
+            doc->BeginBold() ;
+        }
+        else if (token == "T")
+        {
+            sWSTab tab ;
+            tab.type = TAB_TAB ;
+            doc->InsertTab(tab) ;
+        }
+        else if (token.compare(0, 2, "S:") == 0)
+        {
+            sRawSequence sequence ;
+            sequence.type = 0x0E ;
+            sequence.body = token.substr(2) ;
+            doc->InsertRawSequence(sequence) ;
+        }
+        else
+        {
+            doc->Insert(line.substr(open, close - open + 1)) ;
+        }
+        pos = close + 1 ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// SetSource() with InsertMarkedLine() tokens in the lines.
+/////////////////////////////////////////////////////////////////////////////
+inline void SetMarkedSource(cEditorBase &editor, const std::vector<std::string> &lines)
+{
+    cDocument *doc = editor.GetDocument() ;
+    doc->Clear() ;
+    for (const std::string &line : lines)
+    {
+        InsertMarkedLine(doc, line) ;
+        doc->Insert(HARD_RETURN) ;
+    }
+    editor.GetLayout()->LayoutDocument(doc) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
 /// Paragraph text without marker bytes and without its terminator.
 /////////////////////////////////////////////////////////////////////////////
 inline std::string VisibleText(cDocument *doc, PARAGRAPH_T paragraph)
@@ -533,6 +602,44 @@ void CheckIndexOnlyDotEntries(void)
     CHECK(Join(LoadGenerated(reader, indexPath)) == ".pm 0|.lm 0.5i") ;
     CheckWorkingDotCommand(reader, ".pm 0") ;
     CheckWorkingDotCommand(reader, ".lm 0.5i") ;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+/// GenerateIndex() on a source built by SetMarkedSource(); returns the
+/// written path.
+/////////////////////////////////////////////////////////////////////////////
+inline std::string GenerateMarkedIndexFile(cEditorBase &editor, const std::vector<std::string> &source,
+                                           const std::string &sourcePath)
+{
+    SetMarkedSource(editor, source) ;
+    std::string outputFile ;
+    REQUIRE(cTOCIndexGenerator::GenerateIndex(&editor, sourcePath, outputFile)) ;
+    return outputFile ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// A kept sequence inside .tc and .ix entry text is left out of the
+/// generated files without leaving a space.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckSequenceInEntryText(void)
+{
+    cScratchDir dir("seqentry") ;
+    REQUIRE(dir.IsValid()) ;
+
+    EDITOR editor ;
+    SetMarkedSource(editor, { ".tc Chapter {S:x}One #", ".tc .lm {S:x}0" }) ;
+    std::vector<std::string> outputFiles ;
+    REQUIRE(cTOCIndexGenerator::GenerateTOC(&editor, dir.File("source.ws"), outputFiles)) ;
+    REQUIRE(outputFiles.size() == 1) ;
+
+    EDITOR reader ;
+    CHECK(Join(LoadGenerated(reader, outputFiles[0])) == "Chapter One 1|.lm 0") ;
+
+    std::string indexPath = GenerateMarkedIndexFile(editor, { ".ix .lm {S:x}0", ".ix Al{S:x}pha" },
+                                                    dir.File("source.ws")) ;
+    CHECK(Join(LoadGenerated(reader, indexPath)) == ".lm 0|Alpha, 1") ;
 }
 
 } // namespace tocindextest

@@ -52,6 +52,40 @@ std::string TrimTerminator(const std::string &text)
     return result ;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+// Paragraph text without its terminator and without kept sequence markers.
+/////////////////////////////////////////////////////////////////////////////
+std::string EntryParagraphText(cDocument *doc, PARAGRAPH_T paragraph)
+{
+    std::string raw = doc->GetParagraphText(paragraph) ;
+    if (raw.find(static_cast<char>(MARKER_CHAR)) == std::string::npos)
+    {
+        return TrimTerminator(raw) ;
+    }
+
+    POSITION_T start = 0 ;
+    POSITION_T end = 0 ;
+    doc->GetParagraphStartandEnd(paragraph, start, end) ;
+
+    std::vector<std::string> graphemes ;
+    std::vector<POSITION_T> offsets ;
+    doc->GetParagraphGraphemes(paragraph, graphemes, offsets) ;
+
+    std::string text ;
+    sRawSequence sequence ;
+    for (size_t loop = 0 ; loop < graphemes.size() ; loop++)
+    {
+        if (graphemes[loop].size() == 1 && graphemes[loop][0] == static_cast<char>(MARKER_CHAR) &&
+            doc->GetRawSequence(start + static_cast<POSITION_T>(loop), sequence) == true)
+        {
+            continue ;
+        }
+        text += graphemes[loop] ;
+    }
+    return TrimTerminator(text) ;
+}
+
+
 bool StartsWithNoCase(const std::string &text, const std::string &prefix)
 {
     if (text.size() < prefix.size())
@@ -187,7 +221,7 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
     PARAGRAPH_T count = sourceDoc->GetNumberofParagraphs() ;
     for (PARAGRAPH_T loop = 0 ; loop < count ; loop++)
     {
-        std::string text = TrimTerminator(sourceDoc->GetParagraphText(loop)) ;
+        std::string text = EntryParagraphText(sourceDoc, loop) ;
         if (StartsWithNoCase(text, ".tc") == false)
         {
             continue ;
@@ -281,7 +315,7 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
     PARAGRAPH_T count = sourceDoc->GetNumberofParagraphs() ;
     for (PARAGRAPH_T loop = 0 ; loop < count ; loop++)
     {
-        std::string text = TrimTerminator(sourceDoc->GetParagraphText(loop)) ;
+        std::string text = EntryParagraphText(sourceDoc, loop) ;
         if (StartsWithNoCase(text, ".ix") == false)
         {
             continue ;

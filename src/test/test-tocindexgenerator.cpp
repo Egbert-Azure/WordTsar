@@ -274,3 +274,10 @@ TEST_CASE("TOC/Index generator - .tc .po 1i and .ix .lm 5 are written as dot com
     ensureQApplication() ;
     tocindextest::CheckDotEntrySource<cEditorCtrl>() ;
 }
+
+
+TEST_CASE("TOC/Index generator - a kept sequence in .tc and .ix entry text leaves no space")
+{
+    ensureQApplication() ;
+    tocindextest::CheckSequenceInEntryText<cEditorCtrl>() ;
+}

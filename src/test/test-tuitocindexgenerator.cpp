@@ -64,3 +64,9 @@ TEST_CASE("TUI TOC/Index generator - .tc .po 1i and .ix .lm 5 are written as dot
 {
     tocindextest::CheckDotEntrySource<cWSEditorCtrl>() ;
 }
+
+
+TEST_CASE("TUI TOC/Index generator - a kept sequence in .tc and .ix entry text leaves no space")
+{
+    tocindextest::CheckSequenceInEntryText<cWSEditorCtrl>() ;
+}
