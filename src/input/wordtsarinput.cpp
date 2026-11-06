@@ -510,9 +510,11 @@ const char *LookupPChordHelp(char lower)
             return "^PT - Toggle superscript\n\n"
                    "Superscripts text typed from here, until used again." ;
         case 'x' :
-        case 'k' :
             return "^PX - Toggle strikethrough\n\n"
                    "Strikes through text typed from here, until used again." ;
+        case 'k' :
+            return "^PK - Mark for Index\n\n"
+                   "Marks the start and end of a word or phrase for the index." ;
         case '=' :
         case '+' :
             return "^P= - Select font\n\n"
@@ -2019,7 +2021,7 @@ void cWordStarInput::OnControlPChar(char ch)
         case 'k' :
             if (mEditor->GetDocument())
             {
-                mEditor->GetDocument()->BeginStrikeThrough() ;
+                mEditor->GetDocument()->BeginIndex() ;
             }
             break ;
             

@@ -1883,7 +1883,7 @@ std::string cWSWordTsar::GetHelpText(eHelpDisplay help) const
                    "    \001B\001 bold         \001X\001 strike out         \001H\001 overprint char   \001O\001 binding space\n"
                    "    \001S\001 underline    \001D\001 double strike    \001RET\001 overprint line   \001C\001 print pause\n"
                    "    \001V\001 subscript    \001Y\001 italics            \001F\001 phantom space    \001I\001 8-column tab\n"
-                   "    \001T\001 superscript  \001K\001 indexing           \001G\001 phantom rubout   \001.\001 dot leader\n"
+                   "    \001T\001 superscript  \001K\001 mark for index     \001G\001 phantom rubout   \001.\001 dot leader\n"
                    "                                        \001*\001 graphics tag     \0010\001 extended characters\n"
                    "               STYLE                    \001&\001 start Inset\n"
                    "    \001=/+\001 select font \001N\001 Normal Font\n"

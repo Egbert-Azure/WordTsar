@@ -980,6 +980,11 @@ QString cModernMenuProvider::GetInsertIndexEntryLabel(void) const
     return "&Index Entry...";
 }
 
+QString cModernMenuProvider::GetInsertIndexMarkLabel(void) const
+{
+    return "&Mark for Index\tAlt+P, K";
+}
+
 QString cModernMenuProvider::GetInsertDotLeaderLabel(void) const
 {
     return "&Dot Leader to Tab";

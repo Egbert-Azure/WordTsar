@@ -44,7 +44,7 @@
  * - Alt+K (block/marker): B=begin, K=end, C=copy, V=move, Y=delete, 0-9=markers
  * - Alt+Q (navigation): E=top, X=bottom, B/K=block start/end, 0-9=goto marker
  * - Alt+O (onscreen): C=center tab, ]=right tab, D=show control, T=page mode
- * - Alt+P (style): V=subscript, T=superscript, X=strikethrough
+ * - Alt+P (style): V=subscript, T=superscript, X=strikethrough, K=index mark
  *
  * @author Gerald Brandt
  * @copyright GNU Affero General Public License v3.0
@@ -1160,7 +1160,7 @@ void cModernInput::OnAltOChar(char key)
 ///
 /// @brief
 /// Dispatch follow-up key for the Alt+P (style/print) prefix chord.
-/// Handles: V (subscript), T (superscript), X/K (strikethrough),
+/// Handles: V (subscript), T (superscript), X (strikethrough), K (index mark),
 /// - (color dialog).
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -1201,12 +1201,21 @@ void cModernInput::OnAltPChar(char key)
         }
 
         case 'x' :
-        case 'k' :
         {
             cDocument* doc = mEditor->GetDocument() ;
             if (doc)
             {
                 doc->BeginStrikeThrough() ;
+            }
+            break ;
+        }
+
+        case 'k' :
+        {
+            cDocument* doc = mEditor->GetDocument() ;
+            if (doc)
+            {
+                doc->BeginIndex() ;
             }
             break ;
         }

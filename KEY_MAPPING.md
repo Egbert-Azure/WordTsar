@@ -260,7 +260,8 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | Y | ^P,Y | -- | Toggle italic (WS only; Modern uses Ctrl+I) |
 | V | ^P,V | Alt+P,V | Toggle subscript |
 | T | ^P,T | Alt+P,T | Toggle superscript |
-| X/K | ^P,X | Alt+P,X | Toggle strikethrough |
+| X | ^P,X | Alt+P,X | Toggle strikethrough |
+| K | ^P,K | Alt+P,K | Mark for Index |
 | =/+ | ^P,= | -- | Open font selection dialog (WS only; Modern uses Ctrl+D) |
 | - | ^P,- | Alt+P,- | Open color selection dialog |
 
@@ -404,6 +405,8 @@ yet done.
 | **Variable submenu** | | | |
 | -- Date/Time/Page/etc. | &&@&&, &&!&&, etc. | -- | Insert variable placeholders |
 | File | ^KR | -- | Insert file at cursor |
+| **Index/TOC Entry submenu** | | | |
+| -- Mark for Index | ^PK | Alt+P,K | Insert an index mark (GUI menu) |
 
 ### Style Menu
 
@@ -752,7 +755,7 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^PV | Subscript | Toggle subscript | Yes |
 | ^PT | Superscript | Toggle superscript | Yes |
 | ^PX | Strikethrough | Toggle strikethrough | Yes |
-| ^PK | Strikethrough (alt) | Toggle strikethrough | Yes |
+| ^PK | Mark for Index | Insert an index mark | Yes |
 | ^P= | Select font | Select font | Yes |
 | ^P+ | Select font (alt) | Select font | Yes |
 | ^P- | Select color | Select color | Yes |
@@ -923,5 +926,5 @@ Same as WordStar mode, plus F3 = Find Again.
 | Alt+P, V | Toggle subscript | Yes |
 | Alt+P, T | Toggle superscript | Yes |
 | Alt+P, X | Toggle strikethrough | Yes |
-| Alt+P, K | Toggle strikethrough | Yes |
+| Alt+P, K | Mark for Index | Yes |
 | Alt+P, - | Select color | Yes |

@@ -169,6 +169,7 @@ public:
     // Insert Menu - Index/TOC
     QString GetInsertTOCEntryLabel(void) const override;
     QString GetInsertIndexEntryLabel(void) const override;
+    QString GetInsertIndexMarkLabel(void) const override;
     QString GetInsertDotLeaderLabel(void) const override;
     QString GetInsertParOutlineNumberLabel(void) const override;
 

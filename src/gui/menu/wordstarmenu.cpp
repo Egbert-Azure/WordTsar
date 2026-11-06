@@ -620,6 +620,11 @@ QString cWordStarMenuProvider::GetInsertIndexEntryLabel(void) const
     return "&Index Entry...\t^ONI";
 }
 
+QString cWordStarMenuProvider::GetInsertIndexMarkLabel(void) const
+{
+    return "&Mark for Index\t^PK";
+}
+
 QString cWordStarMenuProvider::GetInsertDotLeaderLabel(void) const
 {
     return "&Dot Leader to Tab\t^P.";

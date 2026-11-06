@@ -198,6 +198,7 @@ private slots :
     void NoteAnnotation(void) ;
     void TOCEntry(void) ;
     void IndexEntry(void) ;
+    void IndexMark(void) ;
     void DotLeader(void) ;
     void ParOutlineNumber(void) ;
 

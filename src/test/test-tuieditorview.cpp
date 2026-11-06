@@ -1310,3 +1310,38 @@ TEST_CASE("cWSEditorView - a kept sequence takes no column with ^OD on and off")
     view.Draw(screen);
     CHECK(ScreenText(screen, view.GetCaretRow(), colDot, 15) == ".tc Chapter One");
 }
+
+
+TEST_CASE("cWSEditorCtrl - ^PK inserts the index mark and ^PX strikethrough")
+{
+    for (eInputMode mode : { INPUT_WORDSTAR, INPUT_MODERN })
+    {
+        for (char key : { 'K', 'X', 'k', 'x', static_cast<char>(11), static_cast<char>(24) })
+        {
+            CAPTURE(static_cast<int>(mode));
+            CAPTURE(static_cast<int>(key));
+
+            cWSEditorCtrl editor;
+            cDocument* doc = editor.GetDocument();
+            editor.SetInputMode(mode);
+            doc->Insert("Hello World\r");
+            editor.LayoutDocument(true);
+            doc->SetPosition(5);
+
+            if (mode == INPUT_WORDSTAR)
+            {
+                editor.mInput->HandleKey(CTRL_P, false);
+            }
+            else
+            {
+                editor.mInput->HandleKey('p', false, true);
+            }
+            editor.mInput->HandleKey(key, false);
+
+            CHECK(editor.mInput->CheckControlMode() == false);
+            CHECK(doc->GetParagraphText(0) == "Hello\x7F World\r");
+            bool index = (key == 'K' || key == 'k' || key == 11);
+            CHECK(doc->GetControlChar(5) == (index ? STYLE_INDEX : STYLE_STRIKETHROUGH));
+        }
+    }
+}

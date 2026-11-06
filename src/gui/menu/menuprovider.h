@@ -172,6 +172,7 @@ public:
     // Insert Menu - Index/TOC
     virtual QString GetInsertTOCEntryLabel(void) const = 0;
     virtual QString GetInsertIndexEntryLabel(void) const = 0;
+    virtual QString GetInsertIndexMarkLabel(void) const = 0;
     virtual QString GetInsertDotLeaderLabel(void) const = 0;
     virtual QString GetInsertParOutlineNumberLabel(void) const = 0;
 

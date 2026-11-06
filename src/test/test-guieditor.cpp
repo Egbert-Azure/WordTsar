@@ -30,6 +30,8 @@
 #include <QCheckBox>
 #include "src/input/wordtsarinput.h"  // For CTRL_* constants and eSpecialChars
 #include "src/input/moderninput.h"   // For Modern/CUA input handler tests
+#include "src/gui/menu/wordstarmenu.h"
+#include "src/gui/menu/modernmenu.h"
 #include <QApplication>
 #include <QClipboard>
 #include <QTimer>
@@ -11833,7 +11835,7 @@ TEST_CASE("WordStar Input - Ctrl+P Formatting Sequences")
         CHECK(text.length() > lenBefore);
     }
 
-    SUBCASE("Ctrl+P,K toggles strikethrough (alternate)")
+    SUBCASE("Ctrl+P,K inserts the index mark")
     {
         doc->SetPosition(5);
         size_t lenBefore = doc->GetParagraphText(0).length();
@@ -17851,4 +17853,62 @@ TEST_CASE("Kept WordStar sequences - RTF and DOCX export write nothing for them,
 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// ^PK and Alt+P,K insert the index mark; ^PX and Alt+P,X insert
+/// strikethrough.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Input - ^PK inserts the index mark and ^PX strikethrough")
+{
+    ensureQApplication();
+
+    for (eInputMode mode : { INPUT_WORDSTAR, INPUT_MODERN })
+    {
+        for (char key : { 'K', 'X', 'k', 'x', static_cast<char>(11), static_cast<char>(24) })
+        {
+            CAPTURE(static_cast<int>(mode));
+            CAPTURE(static_cast<int>(key));
+
+            cEditorCtrl editor;
+            cDocument* doc = editor.GetDocument();
+            cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+            layout->SetDocument(doc);
+            editor.SetInputMode(mode);
+            doc->Insert("Hello World\r");
+            layout->LayoutDocument(doc);
+            doc->SetPosition(5);
+
+            if (mode == INPUT_WORDSTAR)
+            {
+                editor.mInput->HandleKey(CTRL_P, false);
+            }
+            else
+            {
+                editor.mInput->HandleKey('p', false, true);
+            }
+            editor.mInput->HandleKey(key, false);
+
+            CHECK(editor.mInput->CheckControlMode() == false);
+            CHECK(doc->GetParagraphText(0) == "Hello\x7F World\r");
+            bool index = (key == 'K' || key == 'k' || key == 11);
+            CHECK(doc->GetControlChar(5) == (index ? STYLE_INDEX : STYLE_STRIKETHROUGH));
+        }
+    }
+}
+
+
+
+TEST_CASE("Menu providers - Insert has Mark for Index with its key")
+{
+    cWordStarMenuProvider wordstar;
+    cModernMenuProvider modern;
+    CHECK(wordstar.GetInsertIndexMarkLabel() == QString("&Mark for Index\t^PK"));
+    CHECK(modern.GetInsertIndexMarkLabel() == QString("&Mark for Index\tAlt+P, K"));
+    CHECK(wordstar.GetStyleStrikeoutLabel() == QString("&Strikeout\t^PX"));
+    CHECK(modern.GetStyleStrikeoutLabel() == QString("&Strikeout\tAlt+P, X"));
 }

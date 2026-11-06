@@ -275,7 +275,7 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
         "    <b>B</b> bold         <b>X</b> strike out         <i>H overprint char</i>   <i>O binding space</i>\n"
         "    <b>S</b> underline    <i>D double strike</i>    <i>RET overprint line</i>   <i>C print pause</i>\n"
         "    <b>V</b> subscript    <b>Y</b> italics            <i>F phantom space</i>    <i>I 8-column tab</i>\n"
-        "    <b>T</b> superscript  <i>K indexing</i>           <i>G phantom rubout</i>   <i>. dot leader</i>\n"
+        "    <b>T</b> superscript  <b>K</b> mark for index     <i>G phantom rubout</i>   <i>. dot leader</i>\n"
         "                                        <i>* graphics tag</i>     <i>0 extended characters</i>\n"
         "               <u>STYLE</u>                    <i>&amp; start Inset</i>\n"
         "    <b>=/+</b> select font <i>N Normal Font</i>\n"
@@ -1862,6 +1862,7 @@ NoteAnnotationAction->setEnabled(false) ;
 
     QAction *TOCEntryAction = new QAction(mMenuProvider->GetInsertTOCEntryLabel(), mMenuBar) ;
     QAction *IndexEntryAction = new QAction(mMenuProvider->GetInsertIndexEntryLabel(), mMenuBar) ;
+    QAction *IndexMarkAction = new QAction(mMenuProvider->GetInsertIndexMarkLabel(), mMenuBar) ;
     QAction *DotLeaderAction = new QAction(mMenuProvider->GetInsertDotLeaderLabel(), mMenuBar) ;
 DotLeaderAction->setEnabled(false) ;
 
@@ -1911,6 +1912,7 @@ ParOutlineNumberAction->setEnabled(false) ;
     QMenu *IndexMenu = insertmenu->addMenu("&Index/TOC Entry") ;
     IndexMenu->addAction(TOCEntryAction) ;
     IndexMenu->addAction(IndexEntryAction) ;
+    IndexMenu->addAction(IndexMarkAction) ;
     IndexMenu->addAction(DotLeaderAction) ;
 
     insertmenu->addAction(ParOutlineNumberAction) ;
@@ -1942,6 +1944,7 @@ ParOutlineNumberAction->setEnabled(false) ;
     connect(NoteAnnotationAction, &QAction::triggered, this, &cWordTsar::NoteAnnotation) ;
     connect(TOCEntryAction, &QAction::triggered, this, &cWordTsar::TOCEntry) ;
     connect(IndexEntryAction, &QAction::triggered, this, &cWordTsar::IndexEntry) ;
+    connect(IndexMarkAction, &QAction::triggered, this, &cWordTsar::IndexMark) ;
     connect(DotLeaderAction, &QAction::triggered, this, &cWordTsar::DotLeader) ;
     connect(ParOutlineNumberAction, &QAction::triggered, this, &cWordTsar::ParOutlineNumber) ;
 
@@ -3085,6 +3088,13 @@ void cWordTsar::IndexEntry(void)
     }
 
     mEditor->InsertDotCommandEntry(".ix", text.toStdString()) ;
+}
+
+
+void cWordTsar::IndexMark(void)
+{
+    mMenuInput->HandleKey(CTRL_P) ;
+    mMenuInput->HandleKey('k') ;
 }
 
 
