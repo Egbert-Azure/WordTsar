@@ -20,7 +20,8 @@ Release history for WordTsar, in reverse chronological order.
 - Changed: ^KW gives the code page warning for every WordStar-format write. If you decline, nothing is written (#56).
 - Changed: ^KW append writes a temporary file and renames it over the target, so a failed write leaves the target as it was. The target keeps its ACL and extended attributes (#56).
 - Changed: the GUI no longer shows a splash screen at startup. The About box now shows the WordTsar logo beside the same About text as ws, and ends with the Qt version (#64).
-- Changed: the app bundle now carries the version and the minimum macOS version. The minimum is taken from the Qt frameworks (#23).
+- Changed: the app now states the oldest macOS it runs on. That version is taken from Qt (#23).
+- Changed: the download now contains Qt, so WordTsar runs on a Mac without Homebrew. The terminal version, ws, is in the zip too.
 
 ## 0.14.3 (2026-11-01)
 
