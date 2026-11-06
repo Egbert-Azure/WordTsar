@@ -42,6 +42,8 @@
  * It generates a cDebugReport (system info, backtrace, core dump) and writes
  * a dump file before exiting. The crash handler runs outside the normal event
  * loop to maximize the chance of successful report generation.
+ * SIGTERM is not a crash: cTerminateSignal takes it over, saves unsaved
+ * changes to an emergency file and exits without a report or dialog.
  *
  * @author Gerald Brandt
  * @copyright GNU Affero General Public License v3.0
@@ -63,6 +65,7 @@
 #include "src/gui/wordtsar.h"
 #include "src/core/include/version.h"
 #include "src/gui/debugreport/debugreport.h"
+#include "src/gui/utils/terminatesignal.h"
 
 
 #include "chillout/chillout.h"
@@ -197,6 +200,15 @@ int main(int argc, char *argv[])
 
 
     cWordTsar w(argc, argv);
+
+    // SIGTERM (kill, logout) is a request to quit, not a crash: replaces
+    // chillout's SIGTERM action. The emergency save runs in the event loop,
+    // then the loop exits without the close prompt.
+    cTerminateSignal terminateSignal([&w]()
+    {
+        EmergencySaveOnTerminate(w.GetEditorCtrl());
+        QCoreApplication::exit(0);
+    });
 
     // Window size and centering on the primary screen are applied in
     // cWordTsar::ReadConfig()'s deferred callback, after the first layout.
