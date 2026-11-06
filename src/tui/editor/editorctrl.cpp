@@ -1354,8 +1354,8 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
             mDocument->SetTextFile(savesAsText);
         }
 
-        // Only a text save keeps the text tail
-        if (savesAsText == false)
+        // A text save or an export keeps the text tail
+        if (savesAsText == false && isExport == false)
         {
             mDocument->SetTextTail("");
         }

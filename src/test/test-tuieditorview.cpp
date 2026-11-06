@@ -621,14 +621,17 @@ TEST_CASE("cWSEditorCtrl - a text file ends at the first 0x1A, the rest is saved
         CHECK(ReadFileBytes(dir / "ws-again.txt") == "one\ntwo\n");
     }
 
-    SUBCASE("an RTF save drops the tail")
+    SUBCASE("an RTF export keeps the tail for the next text save")
     {
         WriteFileBytes(dir / "rtf.txt", "one\n" + tail);
         REQUIRE(editor.LoadFile((dir / "rtf.txt").string()));
         REQUIRE(editor.SaveFile((dir / "rtf.rtf").string()));
         CHECK(ReadFileBytes(dir / "rtf.rtf").find("TAILMARK") == std::string::npos);
         REQUIRE(editor.SaveFile((dir / "rtf-again.txt").string()));
-        CHECK(ReadFileBytes(dir / "rtf-again.txt") == "one\n");
+        CHECK(ReadFileBytes(dir / "rtf-again.txt") == "one\n" + tail);
+        REQUIRE(editor.SaveFile((dir / "rtf.ws").string()));
+        REQUIRE(editor.SaveFile((dir / "rtf-ws.txt").string()));
+        CHECK(ReadFileBytes(dir / "rtf-ws.txt") == "one\n");
     }
 
     SUBCASE("abandoning the document clears the tail")
