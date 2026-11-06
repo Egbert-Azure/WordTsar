@@ -3254,7 +3254,8 @@ void cEditorBase::SortBlock(bool ascending)
     mDocument->GetBlock(start, end) ;
 
     // the block's lines: start and length of each, without its hard return.
-    // A partial first or last line is a line of its own.
+    // A partial first or last line is a line of its own; a block ending
+    // after a hard return has no line after it.
     std::vector<POSITION_T> lineStarts ;
     std::vector<POSITION_T> lineLengths ;
     POSITION_T lineStart = start ;
@@ -3268,8 +3269,11 @@ void cEditorBase::SortBlock(bool ascending)
             lineStart = pos + 1 ;
         }
     }
-    lineStarts.push_back(lineStart) ;
-    lineLengths.push_back(end - lineStart) ;
+    if (lineStart < end || lineStarts.empty())
+    {
+        lineStarts.push_back(lineStart) ;
+        lineLengths.push_back(end - lineStart) ;
+    }
 
     // lines are compared by their plain text
     std::vector<std::string> keys ;

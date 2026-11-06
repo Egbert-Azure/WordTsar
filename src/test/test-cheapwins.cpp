@@ -236,6 +236,86 @@ TEST_CASE("SortBlock keeps tabs, bold and raw bytes with their lines, one undo r
     CHECK(Join(Cells(doc)) == Join(expected));
 }
 
+TEST_CASE("SortBlock over whole lines leaves the line after the block separate")
+{
+    ensureQApplication();
+
+    // 18: block ends at the start of the following line
+    // 17: block ends at the end of its last line
+    for (POSITION_T blockEnd : { 18, 17 })
+    {
+        for (bool ascending : { true, false })
+        {
+            CAPTURE(blockEnd);
+            CAPTURE(ascending);
+
+            cEditorCtrl editor;
+            cDocument* doc = editor.GetDocument();
+            cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+            layout->SetDocument(doc);
+
+            InsertSortLines(doc);
+            layout->LayoutDocument(doc);
+
+            std::vector<std::string> before = Cells(doc);
+            std::vector<std::string> expected = ascending
+                ? SortLinesCells({ LINE_A, LINE_B, LINE_C })
+                : SortLinesCells({ LINE_C, LINE_B, LINE_A });
+
+            doc->mStartBlock = 5;
+            doc->mEndBlock = blockEnd;
+            doc->mBlockSet = true;
+
+            editor.SortBlock(ascending);
+
+            CHECK(Join(Cells(doc)) == Join(expected));
+            CHECK(doc->GetNumberofParagraphs() == 5);
+            CHECK(doc->GetPlainText(18, 22, "\n") == "tail");
+            CHECK(doc->mStartBlock == 5);
+            CHECK(doc->mEndBlock == blockEnd);
+
+            REQUIRE(editor.Undo());
+            CHECK(Join(Cells(doc)) == Join(before));
+        }
+    }
+}
+
+TEST_CASE("SortBlock of plain whole lines ending at the start of the next line")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    doc->Insert("banana\rapple\rcherry\rzzz");
+    layout->LayoutDocument(doc);
+
+    // block is "banana\rapple\rcherry\r", up to the start of "zzz"
+    doc->SetPosition(0);
+    doc->SetBeginBlock();
+    doc->SetPosition(20);
+    doc->SetEndBlock();
+
+    std::string expected;
+    SUBCASE("ascending")
+    {
+        editor.SortBlock(true);
+        expected = "apple\rbanana\rcherry\rzzz";
+    }
+    SUBCASE("descending")
+    {
+        editor.SortBlock(false);
+        expected = "cherry\rbanana\rapple\rzzz";
+    }
+
+    std::string text = doc->GetText();
+    INFO("actual: [", Escape(text), "]");
+    CHECK(text.substr(0, text.find('\x7F')) == expected);
+    CHECK(doc->GetNumberofParagraphs() == 4);
+}
+
 TEST_CASE("UpperCaseBlock keeps tabs, bold and raw bytes in place, one undo restores")
 {
     ensureQApplication();
