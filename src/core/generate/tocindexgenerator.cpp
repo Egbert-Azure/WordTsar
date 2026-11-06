@@ -215,8 +215,14 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
         const sParagraphLayout *paraLayout = layout->GetParagraphLayout(loop) ;
         PAGE_T page = (paraLayout != nullptr) ? paraLayout->endPage : 1 ;
 
+        // an entry starting with '.' is a dot command for the generated
+        // file and is written unchanged
         sTOCEntry entry ;
-        entry.text = SubstitutePageNumber(text.substr(prefixLen), page) ;
+        entry.text = text.substr(prefixLen) ;
+        if (entry.text[0] != '.')
+        {
+            entry.text = SubstitutePageNumber(entry.text, page) ;
+        }
         tables[table].push_back(entry) ;
     }
 

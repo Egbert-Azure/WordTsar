@@ -32,6 +32,7 @@
 #include "src/core/include/config.h"
 #include "src/core/layout/layoutbase.h"
 #include "src/gui/editor/editorctrl.h"
+#include "src/test/tocindexgen-testutil.h"
 #include <QApplication>
 
 /////////////////////////////////////////////////////////////////////////////
@@ -223,4 +224,25 @@ TEST_CASE("TOC/Index generator - index sorts, merges duplicates, bolds, and skip
         }
     }
     CHECK(sawMarkerNearBold) ;
+}
+
+
+TEST_CASE("TOC/Index generator - .tc dot entries are written verbatim in document order as working dot commands")
+{
+    ensureQApplication() ;
+    tocindextest::CheckTOCDotEntries<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - .tc comment, bare, indented, arithmetic and numbered-table dot entries")
+{
+    ensureQApplication() ;
+    tocindextest::CheckTOCDotEntryEdgeCases<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - a TOC holding only dot entries is written")
+{
+    ensureQApplication() ;
+    tocindextest::CheckTOCOnlyDotEntries<cEditorCtrl>() ;
 }

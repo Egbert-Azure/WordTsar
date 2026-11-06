@@ -74,7 +74,10 @@ public:
     /// to its real printed page number, substitutes that number for any
     /// unescaped '#' in the entry's own text (a literal '#' is written
     /// \# in the source, matching the real Insert->TOC Entry dialog), and
-    /// writes each non-empty table to its own file.
+    /// writes each non-empty table to its own file. An entry whose text
+    /// starts with '.' right after the one separator space is a dot command
+    /// for the generated file: it is written unchanged, in document order,
+    /// with no '#' replaced.
     ///
     /////////////////////////////////////////////////////////////////////////
     static bool GenerateTOC(cEditorBase *editor, const std::string &sourcePath, std::vector<std::string> &outputFiles) ;

@@ -483,6 +483,7 @@ if(BUILD_TUI)
         src/test/test-tuieditorview.cpp
         src/test/test-tuifinddialog.cpp
         src/test/test-tuistartup.cpp
+        src/test/test-tuitocindexgenerator.cpp
         src/test/test-isolation.cpp
         src/tui/print/tuiprintout.cpp
         ${WORDTSAR_WSTUI_SOURCES_NO_MAIN}
