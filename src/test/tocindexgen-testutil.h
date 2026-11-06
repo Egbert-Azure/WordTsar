@@ -744,6 +744,52 @@ void CheckIndexMarkPageOfLine(void)
           "end, " + std::to_string(last) + "|start, " + std::to_string(first)) ;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+/// A kept 0Eh index item gives the same index line as .ix with its body,
+/// on the page of its line, and merges with that .ix entry.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckIndexItemSequence(void)
+{
+    std::string item = MarkedIndex<EDITOR>("itemseq", { "Page one", ".pa", "Text {S:Alpha\\, Beta}here" }) ;
+    std::string ix = MarkedIndex<EDITOR>("itemix", { "Page one", ".pa", ".ix Alpha\\, Beta" }) ;
+    CHECK(item == ix) ;
+    CHECK(item == "Alpha, Beta, 2") ;
+
+    CHECK(MarkedIndex<EDITOR>("itemmerge", { ".ix Alpha\\, Beta", ".pa", "Text {S:Alpha\\, Beta}here" })
+          == "Alpha, Beta, 1, 2") ;
+
+    CHECK(MarkedIndex<EDITOR>("itemflags", { "a {S:+Bold}b", "c {S:-See, other}d", "e {S:Sawyer\\, Robert J.}f" })
+          == "Bold, 1|Sawyer, Robert J., 1|See, other") ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// An empty body or one holding control bytes gives no entry; high bytes
+/// are read through the editor's code page.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckIndexItemSequenceBody(void)
+{
+    CHECK(MarkedIndex<EDITOR>("itembody", { "a {S:}b", "c {S:X\x01Y}d", "e {S:Real}f" }) == "Real, 1") ;
+
+    for (eCodePage page : { CP437, CP1252 })
+    {
+        CAPTURE(static_cast<int>(page)) ;
+        cScratchDir dir("itemcp") ;
+        REQUIRE(dir.IsValid()) ;
+
+        EDITOR editor ;
+        editor.SetCodePage(page) ;
+        std::string body = (page == CP437) ? "M\x81ller" : "M\xFCller" ;
+        std::string indexPath = GenerateMarkedIndexFile(editor, { "a {S:" + body + "}b" }, dir.File("source.ws")) ;
+
+        EDITOR reader ;
+        reader.SetCodePage(page) ;
+        CHECK(Join(LoadGenerated(reader, indexPath)) == "M\xC3\xBCller, 1") ;
+    }
+}
+
 } // namespace tocindextest
 
 #endif // TOCINDEXGEN_TESTUTIL_H

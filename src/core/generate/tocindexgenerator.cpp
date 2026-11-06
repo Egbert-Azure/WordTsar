@@ -28,7 +28,14 @@
 #include <set>
 #include <utility>
 
+#include "unicodelib.h"
+#include "unicodelib_encodings.h"
+
 #include "src/core/include/config.h"
+#include "src/core/codepage/cp1252.h"
+#include "src/core/codepage/cp437.h"
+#include "src/core/codepage/cp737.h"
+#include "src/core/codepage/cp850.h"
 #include "src/core/document/document.h"
 #include "src/core/editor/editorbase.h"
 #include "src/core/layout/layoutbase.h"
@@ -229,13 +236,61 @@ PAGE_T PageOfIndex(const sParagraphLayout *paraLayout, POSITION_T index)
 
 
 /////////////////////////////////////////////////////////////////////////////
-// Index entries from ^K index mark pairs in one paragraph. Marks pair up
-// in order; a mark left without a partner is ignored. The text between a
-// pair, without markers, is the entry as it stands. A pair holding no
-// visible text gives no entry. The page is the page of the first mark.
+// A kept index item body in UTF-8, bytes from 0x80 read through the code
+// page. False for a body that is empty, holds a control byte or a byte
+// the code page does not map.
+/////////////////////////////////////////////////////////////////////////////
+bool DecodeIndexItemBody(const std::string &body, eCodePage codepage, std::string &text)
+{
+    text.clear() ;
+    if (body.empty())
+    {
+        return false ;
+    }
+
+    cCodePage437 cp437 ;
+    cCodePage737 cp737 ;
+    cCodePage850 cp850 ;
+    cCodePageWin1252 cp1252 ;
+    for (char c : body)
+    {
+        unsigned char byte = static_cast<unsigned char>(c) ;
+        if (byte < 0x20 || byte == 0x7F)
+        {
+            return false ;
+        }
+
+        unsigned long cp = byte ;
+        if (byte >= 0x80)
+        {
+            switch (codepage)
+            {
+                case CP437 :  cp = cp437.toUTF8(byte) ;  break ;
+                case CP737 :  cp = cp737.toUTF8(byte) ;  break ;
+                case CP850 :  cp = cp850.toUTF8(byte) ;  break ;
+                case CP1252 : cp = cp1252.toUTF8(byte) ; break ;
+            }
+            if (cp == UINT32_MAX)
+            {
+                return false ;
+            }
+        }
+        unicode::utf8::encode_codepoint(static_cast<char32_t>(cp), text) ;
+    }
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Index entries from one paragraph: ^K index mark pairs and kept 0Eh index
+// items. Marks pair up in order; a mark left without a partner is ignored.
+// The text between a pair, without markers, is the entry as it stands. A
+// pair holding no visible text gives no entry. An index item's body is
+// read as a .ix entry. The page is the page of the line holding the first
+// mark or the index item.
 /////////////////////////////////////////////////////////////////////////////
 void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAGRAPH_T paragraph,
-                       std::vector<sIndexEntry> &entries)
+                       eCodePage codepage, std::vector<sIndexEntry> &entries)
 {
     std::string raw = doc->GetParagraphText(paragraph) ;
     if (raw.find(static_cast<char>(MARKER_CHAR)) == std::string::npos)
@@ -260,6 +315,24 @@ void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAG
         bool isMarker = graphemes[loop].size() == 1 && graphemes[loop][0] == static_cast<char>(MARKER_CHAR) ;
         if (isMarker == true)
         {
+            sRawSequence sequence ;
+            if (doc->GetRawSequence(start + index, sequence) == true && sequence.type == 0x0E)
+            {
+                std::string body ;
+                if (DecodeIndexItemBody(sequence.body, codepage, body) == true)
+                {
+                    sIndexEntry entry = ParseIndexEntry(body) ;
+                    if (entry.main.empty() == false)
+                    {
+                        if (entry.crossref == false)
+                        {
+                            entry.page = PageOfIndex(paraLayout, index) ;
+                        }
+                        entries.push_back(entry) ;
+                    }
+                }
+                continue ;
+            }
             if (doc->GetControlChar(start + index) != STYLE_INDEX)
             {
                 continue ;
@@ -415,7 +488,7 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
                            (paraLayout != nullptr && (paraLayout->isCommand || paraLayout->isComment)) ;
             if (dotLine == false)
             {
-                CollectIndexMarks(sourceDoc, paraLayout, loop, entries) ;
+                CollectIndexMarks(sourceDoc, paraLayout, loop, editor->GetCodePage(), entries) ;
             }
             continue ;
         }

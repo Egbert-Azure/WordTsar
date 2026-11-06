@@ -316,3 +316,17 @@ TEST_CASE("TOC/Index generator - an index mark gets the page of its line")
     ensureQApplication() ;
     tocindextest::CheckIndexMarkPageOfLine<cEditorCtrl>() ;
 }
+
+
+TEST_CASE("TOC/Index generator - a kept 0Eh index item is an index entry like .ix with its body")
+{
+    ensureQApplication() ;
+    tocindextest::CheckIndexItemSequence<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - a kept 0Eh index item body: empty or control bytes give no entry, high bytes use the code page")
+{
+    ensureQApplication() ;
+    tocindextest::CheckIndexItemSequenceBody<cEditorCtrl>() ;
+}

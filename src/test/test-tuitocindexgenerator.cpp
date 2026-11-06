@@ -100,3 +100,15 @@ TEST_CASE("TUI TOC/Index generator - an index mark gets the page of its line")
 {
     tocindextest::CheckIndexMarkPageOfLine<cWSEditorCtrl>() ;
 }
+
+
+TEST_CASE("TUI TOC/Index generator - a kept 0Eh index item is an index entry like .ix with its body")
+{
+    tocindextest::CheckIndexItemSequence<cWSEditorCtrl>() ;
+}
+
+
+TEST_CASE("TUI TOC/Index generator - a kept 0Eh index item body: empty or control bytes give no entry, high bytes use the code page")
+{
+    tocindextest::CheckIndexItemSequenceBody<cWSEditorCtrl>() ;
+}
