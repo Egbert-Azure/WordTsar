@@ -1262,53 +1262,106 @@ std::string ScreenText(wordstartui::cScreen& screen, int row, int col, int count
 }   // anonymous namespace
 
 
-TEST_CASE("cWSEditorView - a kept sequence takes no column with ^OD on and off")
+TEST_CASE("cWSEditorView - a kept index item shows, moves the caret and deletes as a bold marker does")
 {
-    cWSEditorCtrl editor;
-    cDocument* doc = editor.GetDocument();
-    cLayoutBase* layout = editor.GetLayout();
-    REQUIRE(layout != nullptr);
-
-    cWSEditorView view(&editor);
-    view.SetBounds({0, 0, 60, 200});
-
-    // A0 <seq>1 B2 \r3, then a .tc line with one inside it
-    sRawSequence sequence;
-    sequence.type = 0x0E;
-    sequence.body = "Alpha\\, Beta";
-    doc->Insert("A");
-    doc->InsertRawSequence(sequence);
-    doc->Insert("B\r.tc Chapter ");
-    doc->InsertRawSequence(sequence);
-    doc->Insert("One\r");
-
-    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    // A0 B1 <code>2 C3 D4 \r5, the code a kept index item or a bold marker
+    auto build = [](cWSEditorCtrl& editor, bool kept)
     {
-        CAPTURE(static_cast<int>(mode));
-        layout->SetShowControl(mode);
+        cDocument* doc = editor.GetDocument();
+        doc->Insert("AB");
+        if (kept)
+        {
+            sRawSequence sequence;
+            sequence.type = 0x0E;
+            sequence.body = "Alpha";
+            doc->InsertRawSequence(sequence);
+        }
+        else
+        {
+            doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        }
+        doc->Insert("CD\r");
+    };
+
+    auto plainText = [](cDocument* doc)
+    {
+        return doc->GetPlainText(0, doc->GetTextSize(), "\n") + std::to_string(doc->GetTextSize()) +
+               std::to_string(doc->GetPosition());
+    };
+
+    // the caret stops on Right and Left presses, and the text and caret after
+    // Backspace behind the code and Delete on it; the line as drawn, whether
+    // the code cell has the control code colours, and whether every Right
+    // press moved the caret to a new column
+    auto run = [&](bool kept, eShowControl mode, std::string& line, bool& coloured, bool& advances)
+    {
+        std::vector<std::string> result;
+        cWSEditorCtrl editor;
+        build(editor, kept);
+        editor.GetLayout()->SetShowControl(mode);
         editor.LayoutDocument(true);
+        cDocument* doc = editor.GetDocument();
+        cWSEditorView view(&editor);
+        view.SetBounds({0, 0, 60, 200});
 
         int colA = CaretColumnAt(editor, view, 0);
-        int colB = CaretColumnAt(editor, view, 2);
-        CHECK(colB == colA + 1);
-
+        int colCode = colA + 2;
         doc->SetPosition(0);
         wordstartui::cScreen screen;
         screen.Resize(60, 200);
         view.Draw(screen);
-        int row = view.GetCaretRow();
-        CHECK(ScreenText(screen, row, colA, 2) == "AB");
-    }
+        line = ScreenText(screen, view.GetCaretRow(), colA, 12);
+        const wordstartui::sCell* cell = screen.GetCell(view.GetCaretRow(), colCode);
+        REQUIRE(cell != nullptr);
+        coloured = (cell->style.bg == editor.mHighlightColour);
 
-    // the .tc line shows with ^OD on
-    layout->SetShowControl(SHOW_ALL);
-    editor.LayoutDocument(true);
-    int colDot = CaretColumnAt(editor, view, 4);
-    doc->SetPosition(4);
-    wordstartui::cScreen screen;
-    screen.Resize(60, 200);
-    view.Draw(screen);
-    CHECK(ScreenText(screen, view.GetCaretRow(), colDot, 15) == ".tc Chapter One");
+        std::string stops;
+        advances = true;
+        int lastCol = colA;
+        for (int i = 0; i < 4; i++)
+        {
+            editor.MoveCaretRight();
+            int col = CaretColumnAt(editor, view, doc->GetPosition());
+            advances = advances && (col > lastCol);
+            lastCol = col;
+            stops += std::to_string(doc->GetPosition());
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            editor.MoveCaretLeft();
+            stops += std::to_string(doc->GetPosition());
+        }
+        result.push_back(stops);
+
+        doc->SetPosition(3);
+        editor.Backspace();
+        result.push_back(plainText(doc));
+
+        cWSEditorCtrl other;
+        build(other, kept);
+        other.GetLayout()->SetShowControl(mode);
+        other.LayoutDocument(true);
+        other.GetDocument()->SetPosition(2);
+        other.DeleteKey();
+        result.push_back(plainText(other.GetDocument()));
+        return result;
+    };
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        std::string line;
+        std::string boldLine;
+        bool coloured = false;
+        bool boldColoured = false;
+        bool advances = false;
+        bool boldAdvances = false;
+        CHECK(run(true, mode, line, coloured, advances) == run(false, mode, boldLine, boldColoured, boldAdvances));
+        CHECK(coloured == boldColoured);
+        CHECK(advances == boldAdvances);
+        CHECK(line == std::string((mode == SHOW_ALL) ? "AB<Index>CD " : "ABCD        "));
+        CHECK(boldLine == std::string((mode == SHOW_ALL) ? "ABBCD       " : "ABCD        "));
+    }
 }
 
 

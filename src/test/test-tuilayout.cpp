@@ -632,53 +632,6 @@ COORD_T SegmentsWidth(const std::vector<sSegmentLayout>& segments, bool& decorat
 }   // anonymous namespace
 
 
-TEST_CASE("TUI layout - a kept sequence is invisible and has no width")
-{
-    // A0 <seq>1 B2 \r3, and the same line without it
-    cDocument doc;
-    cLayout layout;
-    REQUIRE(layout.InitializeFontSystem());
-    layout.SetDocument(&doc);
-    doc.Insert("A");
-    doc.InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
-    doc.Insert("B\r");
-
-    cDocument plain;
-    cLayout plainLayout;
-    REQUIRE(plainLayout.InitializeFontSystem());
-    plainLayout.SetDocument(&plain);
-    plain.Insert("AB\r");
-
-    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
-    {
-        for (bool markersVisible : { true, false })
-        {
-            CAPTURE(static_cast<int>(mode));
-            CAPTURE(markersVisible);
-            layout.SetShowControl(mode);
-            layout.SetMarkersVisible(markersVisible);
-            plainLayout.SetShowControl(mode);
-            plainLayout.SetMarkersVisible(markersVisible);
-
-            CHECK(layout.GetDisplayCharacter(1, "\x7F") == "<Index>");
-
-            bool decorated = false;
-            bool plainDecorated = false;
-            COORD_T width = SegmentsWidth(layout.BuildParagraphSegments(0), decorated);
-            COORD_T plainWidth = SegmentsWidth(plainLayout.BuildParagraphSegments(0), plainDecorated);
-
-            CHECK(width == doctest::Approx(plainWidth));
-            CHECK(width > 0);
-            CHECK(decorated == false);
-        }
-    }
-
-    layout.SetMarkersVisible(true);
-    layout.ShutdownFontSystem();
-    plainLayout.ShutdownFontSystem();
-}
-
-
 TEST_CASE("TUI layout - a kept sequence in a header is hidden on screen and in print")
 {
     cDocument doc;
