@@ -2,6 +2,26 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.15.0 (2026-11-05)
+
+**Fixes**
+
+- Fixed: Write Block to File (^KW) from a WordStar document now writes a WordStar file. Before, it always wrote plain text (#56).
+- Fixed: a letter followed by a combining mark that the code page can't hold now saves as the letter, not lost. Only the mark is dropped, as in ^KW (#61).
+- Fixed: control bytes in a text file now survive open and save unchanged. They show as ^B, ^[ and so on instead of formatting. A tab pasted into a document is now a real tab (#59).
+- Fixed: a text file now ends at its first 0x1A. Anything after it is hidden and written back unchanged when you save as text (#50).
+- Fixed: spell check Replace no longer doubles punctuation that already follows the word. "evtl.." becomes "evtl." (#17).
+
+**Changes**
+
+- Changed: ^KW has a Copy in ASCII Format check box. Ticked, it strips the formatting and writes plain text with tabs as spaces. The GUI uses the macOS save panel with the box. The TUI has its own dialog with a file name field and the box (#56).
+- Changed: ^KW from a text document writes text, with tabs and dot lines as they are. The box shows ticked and cannot be changed (#56).
+- Changed: ^KW in append mode to a WordStar file adds the block at the end of the text, without a second header. Appending to another file adds text (#56).
+- Changed: ^KW gives the code page warning for every WordStar-format write. If you decline, nothing is written (#56).
+- Changed: ^KW append writes a temporary file and renames it over the target, so a failed write leaves the target as it was. The target keeps its ACL and extended attributes (#56).
+- Changed: the GUI no longer shows a splash screen at startup. The About box now shows the WordTsar logo beside the same About text as ws, and ends with the Qt version (#64).
+- Changed: the app bundle now carries the version and the minimum macOS version. The minimum is taken from the Qt frameworks (#23).
+
 ## 0.14.3 (2026-11-01)
 
 **Fixes**
