@@ -1,7 +1,70 @@
 cmake_minimum_required(VERSION 3.16)
 
-# Minimum macOS version; matches the minos of the linked Qt frameworks.
-set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
+# Minimum macOS version. A non-empty CMAKE_OSX_DEPLOYMENT_TARGET from the
+# command line or a preset is kept. Otherwise it is the highest minos of the
+# Qt frameworks and plugins the app links or bundles, read with otool from
+# the first prefix that holds QtCore.framework; 14.0 if none is found.
+function(wordtsar_qt_minos out_var)
+    set(prefixes)
+    if(Qt6_DIR)
+        get_filename_component(qt_dir_prefix "${Qt6_DIR}/../../.." ABSOLUTE)
+        list(APPEND prefixes "${qt_dir_prefix}")
+    endif()
+    list(APPEND prefixes ${CMAKE_PREFIX_PATH} $ENV{CMAKE_PREFIX_PATH}
+        "$ENV{HOME}/Qt/6.8.2/macos" "$ENV{HOME}/Qt/6.7.0/macos" "$ENV{HOME}/Qt/6.6.0/macos"
+        "/opt/homebrew/opt/qt@6" "/usr/local/opt/qt@6" "/opt/homebrew" "/usr/local")
+    set(qt_prefix "")
+    foreach(p IN LISTS prefixes)
+        if(EXISTS "${p}/lib/QtCore.framework/QtCore")
+            set(qt_prefix "${p}")
+            break()
+        endif()
+    endforeach()
+    if(qt_prefix STREQUAL "")
+        set(${out_var} "" PARENT_SCOPE)
+        return()
+    endif()
+    set(binaries)
+    foreach(fw Core Gui Widgets PrintSupport DBus)
+        list(APPEND binaries "${qt_prefix}/lib/Qt${fw}.framework/Qt${fw}")
+    endforeach()
+    foreach(plugin_dir "${qt_prefix}/share/qt/plugins" "${qt_prefix}/plugins")
+        list(APPEND binaries "${plugin_dir}/platforms/libqcocoa.dylib"
+                             "${plugin_dir}/styles/libqmacstyle.dylib")
+    endforeach()
+    set(highest "")
+    foreach(bin IN LISTS binaries)
+        if(NOT EXISTS "${bin}")
+            continue()
+        endif()
+        execute_process(COMMAND otool -l "${bin}"
+            OUTPUT_VARIABLE load_cmds ERROR_QUIET RESULT_VARIABLE rc)
+        if(NOT rc EQUAL 0)
+            continue()
+        endif()
+        if(load_cmds MATCHES "LC_BUILD_VERSION[^\n]*\n[^\n]*\n[^\n]*\n[ ]*minos ([0-9.]+)")
+            set(minos "${CMAKE_MATCH_1}")
+            message(STATUS "minos ${minos}: ${bin}")
+            if(highest STREQUAL "" OR minos VERSION_GREATER highest)
+                set(highest "${minos}")
+            endif()
+        endif()
+    endforeach()
+    set(${out_var} "${highest}" PARENT_SCOPE)
+endfunction()
+
+if(CMAKE_HOST_APPLE)
+    if("$CACHE{CMAKE_OSX_DEPLOYMENT_TARGET}" STREQUAL "")
+        wordtsar_qt_minos(WORDTSAR_QT_MINOS)
+        if(WORDTSAR_QT_MINOS)
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "${WORDTSAR_QT_MINOS}")
+        else()
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
+            message(STATUS "Qt frameworks not found; deployment target falls back to 14.0")
+        endif()
+    endif()
+    message(STATUS "macOS deployment target: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
+endif()
 
 project(WordTsar)
 
