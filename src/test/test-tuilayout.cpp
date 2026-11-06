@@ -761,3 +761,43 @@ TEST_CASE("TUI layout - a soft tab at the start of a paragraph lays out like a n
     CHECK(tabX > 0);
     CHECK(softX == doctest::Approx(tabX));
 }
+
+
+TEST_CASE("TUI layout - an index mark has no width in the print layout")
+{
+    cDocument doc;
+    cLayout layout;
+    REQUIRE(layout.InitializeFontSystem());
+    layout.SetDocument(&doc);
+    doc.Insert("A");
+    doc.BeginIndex();
+    doc.Insert("word");
+    doc.BeginIndex();
+    doc.Insert("B\r");
+
+    cDocument plain;
+    cLayout plainLayout;
+    REQUIRE(plainLayout.InitializeFontSystem());
+    plainLayout.SetDocument(&plain);
+    plain.Insert("AwordB\r");
+
+    layout.SetShowControl(SHOW_NONE);
+    layout.SetMarkersVisible(false);
+    plainLayout.SetShowControl(SHOW_NONE);
+    plainLayout.SetMarkersVisible(false);
+
+    CHECK(layout.GetDisplayCharacter(1, "\x7F") == "K");
+
+    bool decorated = false;
+    bool plainDecorated = false;
+    COORD_T width = SegmentsWidth(layout.BuildParagraphSegments(0), decorated);
+    COORD_T plainWidth = SegmentsWidth(plainLayout.BuildParagraphSegments(0), plainDecorated);
+    CHECK(width == doctest::Approx(plainWidth));
+    CHECK(width > 0);
+    CHECK(decorated == false);
+
+    layout.SetMarkersVisible(true);
+    plainLayout.SetMarkersVisible(true);
+    layout.ShutdownFontSystem();
+    plainLayout.ShutdownFontSystem();
+}

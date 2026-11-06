@@ -1722,3 +1722,78 @@ TEST_CASE("GetDisplayCharacter() - caret notation for every raw byte")
         CHECK(layout.GetDisplayCharacter(0, "\x7F") == c.shown);
     }
 }
+
+
+TEST_CASE("BuildParagraphSegments() - an index mark shows K with ^OD on, nothing with it off, no width in print")
+{
+    ensureQApplication();
+
+    // A0 ^K1 w2 o3 r4 d5 ^K6 B7 \r8, and the same line without the marks
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    doc.Insert("A");
+    doc.BeginIndex();
+    doc.Insert("word");
+    doc.BeginIndex();
+    doc.Insert("B\r");
+
+    cDocument plain;
+    cLayout plainLayout;
+    plainLayout.SetDocument(&plain);
+    plain.Insert("AwordB\r");
+
+    auto tags = [](const std::vector<sSegmentLayout>& segments, size_t& controlCodes)
+    {
+        std::vector<std::string> texts;
+        controlCodes = 0;
+        for (const auto& segment : segments)
+        {
+            controlCodes += segment.controlCodeIndices.size();
+            for (const auto& decoration : segment.markers)
+            {
+                if (decoration.kind == DECORATION_TAG)
+                {
+                    texts.push_back(decoration.text);
+                }
+            }
+        }
+        return texts;
+    };
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+    {
+        for (bool markersVisible : { true, false })
+        {
+            CAPTURE(static_cast<int>(mode));
+            CAPTURE(markersVisible);
+            layout.SetShowControl(mode);
+            layout.SetMarkersVisible(markersVisible);
+            plainLayout.SetShowControl(mode);
+            plainLayout.SetMarkersVisible(markersVisible);
+
+            CHECK(layout.GetDisplayCharacter(1, "\x7F") == "K");
+
+            std::vector<sSegmentLayout> segments = layout.BuildParagraphSegments(0);
+            size_t controlCodes = 0;
+            std::vector<std::string> shown = tags(segments, controlCodes);
+            if (mode == SHOW_ALL)
+            {
+                CHECK(shown == std::vector<std::string>{ "K", "K" });
+                CHECK(controlCodes == 2);
+            }
+            else
+            {
+                CHECK(shown.empty());
+                CHECK(controlCodes == 0);
+            }
+
+            bool decorated = false;
+            bool plainDecorated = false;
+            COORD_T width = SegmentsWidth(segments, decorated);
+            COORD_T plainWidth = SegmentsWidth(plainLayout.BuildParagraphSegments(0), plainDecorated);
+            CHECK(width == doctest::Approx(plainWidth).epsilon(0.001));
+        }
+    }
+    layout.SetMarkersVisible(true);
+}

@@ -757,6 +757,29 @@ TEST_CASE("cWordstarFile - an index item sequence loads as a marker and saves ba
 }
 
 
+TEST_CASE("cWordstarFile - index marks load as markers and save back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    // a pair, an unpaired mark, and a pair inside a bold run
+    std::string input = WordStar7File("See \x0Bword\x0B here, \x0Blone mark.\x0D\x0A"
+                                      "\x02" "Bold \x0Bphrase\x0B text\x02.\x0D\x0A");
+    std::string saved = RoundTrip(editor, input);
+
+    cDocument* doc = editor.GetDocument();
+    for (POSITION_T position : { 4, 9, 17 })
+    {
+        CAPTURE(position);
+        CHECK(doc->GetCharNoAdvance(position)[0] == static_cast<char>(MARKER_CHAR));
+        CHECK(doc->GetControlChar(position) == STYLE_INDEX);
+    }
+    CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n") == "See word here, lone mark.\nBold phrase text.\n");
+    CHECK(saved == input);
+}
+
+
 TEST_CASE("cWordstarFile - a paragraph number sequence loads as a marker and saves back byte for byte")
 {
     ensureQApplication();

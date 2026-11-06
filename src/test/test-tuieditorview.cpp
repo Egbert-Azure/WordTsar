@@ -1345,3 +1345,56 @@ TEST_CASE("cWSEditorCtrl - ^PK inserts the index mark and ^PX strikethrough")
         }
     }
 }
+
+
+TEST_CASE("cWSEditorView - an index mark shows K in the control code colours with ^OD on, nothing with it off")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 60, 200});
+
+    // A0 ^K1 w2 o3 r4 d5 ^K6 B7 \r8
+    doc->Insert("A");
+    doc->BeginIndex();
+    doc->Insert("word");
+    doc->BeginIndex();
+    doc->Insert("B\r");
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        layout->SetShowControl(mode);
+        editor.LayoutDocument(true);
+
+        doc->SetPosition(0);
+        wordstartui::cScreen screen;
+        screen.Resize(60, 200);
+        view.Draw(screen);
+        int row = view.GetCaretRow();
+        int colA = CaretColumnAt(editor, view, 0);
+
+        if (mode == SHOW_ALL)
+        {
+            CHECK(ScreenText(screen, row, colA, 8) == "AKwordKB");
+            for (int col : { colA + 1, colA + 6 })
+            {
+                CAPTURE(col);
+                const wordstartui::sCell* tag = screen.GetCell(row, col);
+                REQUIRE(tag != nullptr);
+                CHECK(tag->style.fg == editor.mHighlightFgColour);
+                CHECK(tag->style.bg == editor.mHighlightColour);
+            }
+            const wordstartui::sCell* letter = screen.GetCell(row, colA + 2);
+            REQUIRE(letter != nullptr);
+            CHECK(letter->style.bg != editor.mHighlightColour);
+        }
+        else
+        {
+            CHECK(ScreenText(screen, row, colA, 7) == "AwordB ");
+        }
+    }
+}
