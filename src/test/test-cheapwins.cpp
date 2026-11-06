@@ -1070,3 +1070,63 @@ TEST_CASE("Undo and redo of SortBlock leave the block unmarked")
     CHECK(text() == "pre\rcc\raa\rbb\rpost");
     CHECK(unmarked());
 }
+
+TEST_CASE("Undo and redo of case conversion leave the block unmarked")
+{
+    ensureQApplication();
+
+    for (int which = 0; which < 3; which++)
+    {
+        CAPTURE(which);
+
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+        layout->SetDocument(doc);
+
+        // the last letter of the block changes case
+        doc->Insert(which == 0 ? "abc\rtail" : which == 1 ? "ABc\rtail" : "x. aB\rtail");
+        layout->LayoutDocument(doc);
+        doc->ClearUndoHistory();
+
+        POSITION_T end = (which == 2) ? 5 : 3;
+        doc->mStartBlock = 0;
+        doc->mEndBlock = end;
+        doc->mBlockSet = true;
+
+        if (which == 0)
+        {
+            editor.UpperCaseBlock();
+        }
+        else if (which == 1)
+        {
+            editor.LowerCaseBlock();
+        }
+        else
+        {
+            editor.SentenceCaseBlock();
+        }
+
+        std::string converted = doc->GetPlainText(0, doc->GetTextSize() - 1, "\n");
+        CHECK(doc->mBlockSet == true);
+        CHECK(doc->mStartBlock == 0);
+        CHECK(doc->mEndBlock == end);
+
+        auto unmarked = [&]()
+        {
+            return doc->mBlockSet == false && doc->mStartBlock == NOT_SET && doc->mEndBlock == NOT_SET;
+        };
+
+        REQUIRE(editor.Undo());
+        CAPTURE(doc->mStartBlock);
+        CAPTURE(doc->mEndBlock);
+        CHECK(unmarked());
+
+        REQUIRE(editor.Redo());
+        CHECK(doc->GetPlainText(0, doc->GetTextSize() - 1, "\n") == converted);
+        CHECK(unmarked());
+
+        REQUIRE(editor.Undo());
+        CHECK(unmarked());
+    }
+}

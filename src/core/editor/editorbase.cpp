@@ -2985,7 +2985,7 @@ void cEditorBase::SentenceCaseBlock(void)
 /// full text. Only the characters whose text changes are replaced;
 /// markers, tabs, raw bytes and hard returns stay where they are. The
 /// block stays marked, its end moved by any change in length. One undo
-/// group.
+/// group; its undo and redo unmark the block.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::ConvertBlockCase(std::string (cDocument::*convert)(const std::string &))
@@ -3130,6 +3130,7 @@ void cEditorBase::ConvertBlockCase(std::string (cDocument::*convert)(const std::
     mDocument->mEndBlock = end + delta ;
     mDocument->mBlockSet = true ;
     mDocument->SetPosition(end + delta) ;
+    mDocument->UnmarkBlockOnUndo() ;
 
     EndBatchUpdate() ;
 
