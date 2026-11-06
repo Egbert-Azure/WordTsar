@@ -230,6 +230,7 @@ struct sUndoGroup
     POSITION_T cursorBefore ;                           ///< cursor before first action in group
     POSITION_T cursorAfter ;                            ///< cursor after last action in group
     uint64_t id = 0 ;                                   ///< unique id, assigned when the group is committed
+    bool unmarksBlock = false ;                         ///< undo and redo of the group unmark the block
 };
 
 
@@ -404,6 +405,7 @@ public:
     void BeginUndoGroup(void) ;
     void EndUndoGroup(void) ;
     void ClearUndoHistory(void) ;
+    void UnmarkBlockOnUndo(void) ;
 
     // --- Modified State (save point in the undo history) ---
     void MarkSaved(void) ;

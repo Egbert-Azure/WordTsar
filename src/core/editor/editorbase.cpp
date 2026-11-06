@@ -3333,6 +3333,7 @@ void cEditorBase::SortBlock(bool ascending)
     mDocument->mEndBlock = end ;
     mDocument->mBlockSet = true ;
     mDocument->SetPosition(end) ;
+    mDocument->UnmarkBlockOnUndo() ;
 
     EndBatchUpdate() ;
     mDocument->EndUndoGroup() ;

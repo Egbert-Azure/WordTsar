@@ -1021,3 +1021,52 @@ TEST_CASE("SentenceCaseBlock keeps sentence context when a marker splits a chara
     REQUIRE(editor.Undo());
     CHECK(Join(Cells(doc)) == Join(before));
 }
+
+TEST_CASE("Undo and redo of SortBlock leave the block unmarked")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    doc->Insert("pre\rcc\raa\rbb\rpost");
+    layout->LayoutDocument(doc);
+    doc->ClearUndoHistory();
+
+    // block is "cc\raa\rbb": positions 4 to 12
+    doc->mStartBlock = 4;
+    doc->mEndBlock = 12;
+    doc->mBlockSet = true;
+
+    auto text = [&]()
+    {
+        std::string t = doc->GetText();
+        return t.substr(0, t.find('\x7F'));
+    };
+    auto unmarked = [&]()
+    {
+        return doc->mBlockSet == false && doc->mStartBlock == NOT_SET && doc->mEndBlock == NOT_SET;
+    };
+
+    editor.SortBlock(true);
+    CHECK(text() == "pre\raa\rbb\rcc\rpost");
+    CHECK(doc->mBlockSet == true);
+    CHECK(doc->mStartBlock == 4);
+    CHECK(doc->mEndBlock == 12);
+
+    REQUIRE(editor.Undo());
+    CHECK(text() == "pre\rcc\raa\rbb\rpost");
+    CAPTURE(doc->mStartBlock);
+    CAPTURE(doc->mEndBlock);
+    CHECK(unmarked());
+
+    REQUIRE(editor.Redo());
+    CHECK(text() == "pre\raa\rbb\rcc\rpost");
+    CHECK(unmarked());
+
+    REQUIRE(editor.Undo());
+    CHECK(text() == "pre\rcc\raa\rbb\rpost");
+    CHECK(unmarked());
+}

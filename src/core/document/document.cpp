@@ -3948,6 +3948,11 @@ bool cDocument::Undo(void)
     // restore cursor to position before the group
     SetPosition(group.cursorBefore) ;
 
+    if (group.unmarksBlock)
+    {
+        UnsetBlock() ;
+    }
+
     // push the same group to redo stack (redo replays forward)
     mRedoStack.push_back(group) ;
 
@@ -3998,6 +4003,11 @@ bool cDocument::Redo(void)
 
     // restore cursor to position after the group
     SetPosition(group.cursorAfter) ;
+
+    if (group.unmarksBlock)
+    {
+        UnsetBlock() ;
+    }
 
     // push the same group back to undo stack
     mUndoStack.push_back(group) ;
@@ -4088,6 +4098,24 @@ void cDocument::EndUndoGroup(void)
     if (mUndoGroupNesting == 0)
     {
         CommitOpenUndoGroup() ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Undo and redo of the open undo group unmark the block. No effect
+/// without an open group.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::UnmarkBlockOnUndo(void)
+{
+    if (mUndoGroupOpen)
+    {
+        mCurrentGroup.unmarksBlock = true ;
     }
 }
 
