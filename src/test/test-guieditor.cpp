@@ -17924,3 +17924,104 @@ TEST_CASE("Menu providers - Utilities has Generate Table of Contents and Generat
         CHECK(provider->GetUtilGenerateIndexLabel() == QString("Generate Inde&x..."));
     }
 }
+
+
+TEST_CASE("GUI editor - a kept index item shows, moves the caret and deletes as a bold marker does")
+{
+    ensureQApplication();
+
+    // A0 B1 <code>2 C3 D4 \r5, the code a kept index item or a bold marker
+    auto build = [](cEditorCtrl& editor, bool kept)
+    {
+        cDocument* doc = editor.GetDocument();
+        doc->Insert("AB");
+        if (kept)
+        {
+            doc->InsertRawSequence(KeptIndexItem("Alpha"));
+        }
+        else
+        {
+            doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+        }
+        doc->Insert("CD\r");
+    };
+
+    // what a front end shows at position 2: "-" when no line holds it, else its tag text
+    auto shown = [](cEditorCtrl& editor)
+    {
+        const sParagraphLayout* para = editor.GetLayout()->GetParagraphLayout(0);
+        REQUIRE(para != nullptr);
+        for (const auto& line : para->lines)
+        {
+            for (const auto& segment : line.segments)
+            {
+                if (segment.isTab || 2 < segment.startPosition || 2 >= segment.startPosition + segment.length)
+                {
+                    continue;
+                }
+                std::string tag;
+                for (const auto& marker : segment.markers)
+                {
+                    if (marker.kind == DECORATION_TAG &&
+                        marker.index == static_cast<size_t>(2 - segment.startPosition))
+                    {
+                        tag += marker.text;
+                    }
+                }
+                return tag;
+            }
+        }
+        return std::string("-");
+    };
+
+    // the tag, the caret stops on Right and Left presses, and the text and
+    // caret after Backspace behind the code and Delete on it
+    auto run = [&](bool kept, eShowControl mode, std::string& tag)
+    {
+        std::vector<std::string> result;
+        cEditorCtrl editor;
+        build(editor, kept);
+        editor.GetLayout()->SetShowControl(mode);
+        editor.LayoutDocument(true);
+        cDocument* doc = editor.GetDocument();
+        tag = shown(editor);
+
+        std::string stops;
+        doc->SetPosition(0);
+        for (int i = 0; i < 4; i++)
+        {
+            editor.MoveCaretRight();
+            stops += std::to_string(doc->GetPosition());
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            editor.MoveCaretLeft();
+            stops += std::to_string(doc->GetPosition());
+        }
+        result.push_back(stops);
+
+        doc->SetPosition(3);
+        editor.Backspace();
+        result.push_back(WholePlainText(doc) + std::to_string(doc->GetTextSize()) + std::to_string(doc->GetPosition()));
+
+        cEditorCtrl other;
+        build(other, kept);
+        other.GetLayout()->SetShowControl(mode);
+        other.LayoutDocument(true);
+        other.GetDocument()->SetPosition(2);
+        other.DeleteKey();
+        result.push_back(WholePlainText(other.GetDocument()) + std::to_string(other.GetDocument()->GetTextSize()) +
+                         std::to_string(other.GetDocument()->GetPosition()));
+        return result;
+    };
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        std::string tag;
+        std::string boldTag;
+        CHECK(run(true, mode, tag) == run(false, mode, boldTag));
+        CHECK(tag == std::string((mode == SHOW_ALL) ? "<Index>" : "-"));
+        CHECK(boldTag == std::string((mode == SHOW_ALL) ? "B" : "-"));
+    }
+}

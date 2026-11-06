@@ -1592,47 +1592,6 @@ TEST_CASE("GetDisplayCharacter() - a kept index item shows <Index> and a paragra
 }
 
 
-TEST_CASE("BuildParagraphSegments() - a kept sequence is invisible and has no width")
-{
-    ensureQApplication();
-
-    // A0 <seq>1 B2 \r3, and the same line without it
-    cDocument doc;
-    cLayout layout;
-    layout.SetDocument(&doc);
-    doc.Insert("A");
-    doc.InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
-    doc.Insert("B\r");
-
-    cDocument plain;
-    cLayout plainLayout;
-    plainLayout.SetDocument(&plain);
-    plain.Insert("AB\r");
-
-    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
-    {
-        for (bool markersVisible : { true, false })
-        {
-            CAPTURE(static_cast<int>(mode));
-            CAPTURE(markersVisible);
-            layout.SetShowControl(mode);
-            layout.SetMarkersVisible(markersVisible);
-            plainLayout.SetShowControl(mode);
-            plainLayout.SetMarkersVisible(markersVisible);
-
-            bool decorated = false;
-            bool plainDecorated = false;
-            COORD_T width = SegmentsWidth(layout.BuildParagraphSegments(0), decorated);
-            COORD_T plainWidth = SegmentsWidth(plainLayout.BuildParagraphSegments(0), plainDecorated);
-
-            CHECK(width == doctest::Approx(plainWidth).epsilon(0.001));
-            CHECK(decorated == false);
-        }
-    }
-    layout.SetMarkersVisible(true);
-}
-
-
 TEST_CASE("BuildHeaderFooterSegments() - a kept sequence in a header is hidden on screen and in print")
 {
     ensureQApplication();
