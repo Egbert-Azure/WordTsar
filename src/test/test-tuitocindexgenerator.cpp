@@ -112,3 +112,9 @@ TEST_CASE("TUI TOC/Index generator - a kept 0Eh index item body: empty or contro
 {
     tocindextest::CheckIndexItemSequenceBody<cWSEditorCtrl>() ;
 }
+
+
+TEST_CASE("TUI TOC/Index generator - files that cannot be written are reported")
+{
+    tocindextest::CheckUnwritableOutput<cWSEditorCtrl>() ;
+}

@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <sys/stat.h>
 #include <system_error>
 #include <unistd.h>
 #include <vector>
@@ -788,6 +789,72 @@ void CheckIndexItemSequenceBody(void)
         reader.SetCodePage(page) ;
         CHECK(Join(LoadGenerated(reader, indexPath)) == "M\xC3\xBCller, 1") ;
     }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Directory with write permission removed; permission is restored by the
+/// destructor so the scratch directory can be removed.
+/////////////////////////////////////////////////////////////////////////////
+class cLockedDir
+{
+public:
+    explicit cLockedDir(const std::string &path) : mPath(path)
+    {
+        mValid = (mkdir(mPath.c_str(), 0555) == 0) ;
+    }
+
+    ~cLockedDir()
+    {
+        chmod(mPath.c_str(), 0755) ;
+    }
+
+    bool IsValid(void) const { return mValid ; }
+    std::string File(const std::string &name) const { return (std::filesystem::path(mPath) / name).string() ; }
+
+private:
+    std::string mPath ;
+    bool mValid = false ;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// GenerateTOC() and GenerateIndex() next to a source in a directory that
+/// cannot be written report the paths they could not write; a source
+/// without entries reports none.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckUnwritableOutput(void)
+{
+    cScratchDir dir("unwritable") ;
+    REQUIRE(dir.IsValid()) ;
+    cLockedDir locked(dir.File("locked")) ;
+    REQUIRE(locked.IsValid()) ;
+    std::string sourcePath = locked.File("source.ws") ;
+
+    EDITOR editor ;
+    SetSource(editor, { ".tc Chapter #", ".tc1 Figure #", ".ix Apple" }) ;
+    std::vector<std::string> outputFiles ;
+    std::vector<std::string> failedFiles ;
+    CHECK_FALSE(cTOCIndexGenerator::GenerateTOC(&editor, sourcePath, outputFiles, &failedFiles)) ;
+    CHECK(outputFiles.empty()) ;
+    CHECK(Join(failedFiles) == locked.File("source.TOC") + "|" + locked.File("source.T01")) ;
+
+    SetSource(editor, { ".tc Chapter #", ".tc1 Figure #", ".ix Apple" }) ;
+    std::string outputFile ;
+    std::string failedFile ;
+    CHECK_FALSE(cTOCIndexGenerator::GenerateIndex(&editor, sourcePath, outputFile, &failedFile)) ;
+    CHECK(failedFile == locked.File("source.IDX")) ;
+
+    CHECK(std::filesystem::is_empty(dir.File("locked"))) ;
+
+    SetSource(editor, { "No entries" }) ;
+    failedFiles.push_back("stale") ;
+    CHECK_FALSE(cTOCIndexGenerator::GenerateTOC(&editor, sourcePath, outputFiles, &failedFiles)) ;
+    CHECK(failedFiles.empty()) ;
+    failedFile = "stale" ;
+    CHECK_FALSE(cTOCIndexGenerator::GenerateIndex(&editor, sourcePath, outputFile, &failedFile)) ;
+    CHECK(failedFile.empty()) ;
 }
 
 } // namespace tocindextest

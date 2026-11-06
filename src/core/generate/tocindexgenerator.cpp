@@ -373,9 +373,14 @@ void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAG
 
 
 /////////////////////////////////////////////////////////////////////////////
-bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sourcePath, std::vector<std::string> &outputFiles)
+bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sourcePath, std::vector<std::string> &outputFiles,
+                                     std::vector<std::string> *failedFiles)
 {
     outputFiles.clear() ;
+    if (failedFiles != nullptr)
+    {
+        failedFiles->clear() ;
+    }
 
     cDocument *sourceDoc = editor->GetDocument() ;
     cLayoutBase *layout = editor->GetLayout() ;
@@ -459,6 +464,10 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
             outputFiles.push_back(outputPath) ;
             wroteAny = true ;
         }
+        else if (failedFiles != nullptr)
+        {
+            failedFiles->push_back(outputPath) ;
+        }
     }
 
     return wroteAny ;
@@ -466,9 +475,14 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
 
 
 /////////////////////////////////////////////////////////////////////////////
-bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &sourcePath, std::string &outputFile)
+bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &sourcePath, std::string &outputFile,
+                                       std::string *failedFile)
 {
     outputFile.clear() ;
+    if (failedFile != nullptr)
+    {
+        failedFile->clear() ;
+    }
 
     cDocument *sourceDoc = editor->GetDocument() ;
     cLayoutBase *layout = editor->GetLayout() ;
@@ -650,5 +664,10 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
     outputFile = stem.string() + ".IDX" ;
 
     cWordstarFile writer(editor) ;
-    return writer.SaveFile(outputFile, sourceDoc->GetTextSize()) ;
+    bool written = writer.SaveFile(outputFile, sourceDoc->GetTextSize()) ;
+    if (written == false && failedFile != nullptr)
+    {
+        *failedFile = outputFile ;
+    }
+    return written ;
 }

@@ -66,6 +66,8 @@ public:
     /// @param  outputFiles [out] paths actually written, one per non-empty
     ///                 table: plain .tc entries go to "name.TOC",
     ///                 .tc1-.tc9 entries go to "name.T01".."name.T09"
+    /// @param  failedFiles [out] optional: paths of non-empty tables that
+    ///                 could not be written
     ///
     /// @return true if at least one table had entries and was written
     ///
@@ -80,7 +82,8 @@ public:
     /// with no '#' replaced.
     ///
     /////////////////////////////////////////////////////////////////////////
-    static bool GenerateTOC(cEditorBase *editor, const std::string &sourcePath, std::vector<std::string> &outputFiles) ;
+    static bool GenerateTOC(cEditorBase *editor, const std::string &sourcePath, std::vector<std::string> &outputFiles,
+                            std::vector<std::string> *failedFiles = nullptr) ;
 
     /////////////////////////////////////////////////////////////////////////
     ///
@@ -90,9 +93,11 @@ public:
     ///                 effect of building it
     /// @param  sourcePath [in] the path the source document was loaded from
     /// @param  outputFile [out] the path written ("name.IDX")
+    /// @param  failedFile [out] optional: the index path if there were
+    ///                 entries and it could not be written, else empty
     ///
-    /// @return true if there was at least one index entry or dot entry to
-    ///         write
+    /// @return true if there was at least one index entry or dot entry and
+    ///         the index was written
     ///
     /// @brief
     /// Collects every .ix entry, resolves +bold/-cross-reference/,subentry
@@ -107,7 +112,8 @@ public:
     /// sorted entries in document order.
     ///
     /////////////////////////////////////////////////////////////////////////
-    static bool GenerateIndex(cEditorBase *editor, const std::string &sourcePath, std::string &outputFile) ;
+    static bool GenerateIndex(cEditorBase *editor, const std::string &sourcePath, std::string &outputFile,
+                              std::string *failedFile = nullptr) ;
 };
 
 /// @}

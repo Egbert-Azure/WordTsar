@@ -330,3 +330,10 @@ TEST_CASE("TOC/Index generator - a kept 0Eh index item body: empty or control by
     ensureQApplication() ;
     tocindextest::CheckIndexItemSequenceBody<cEditorCtrl>() ;
 }
+
+
+TEST_CASE("TOC/Index generator - files that cannot be written are reported")
+{
+    ensureQApplication() ;
+    tocindextest::CheckUnwritableOutput<cEditorCtrl>() ;
+}
