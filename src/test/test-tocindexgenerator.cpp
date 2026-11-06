@@ -375,6 +375,67 @@ TEST_CASE("TOC/Index generator - a .tc1 entry goes to name.TO1")
 }
 
 
+TEST_CASE("TOC/Index generator - page numbers come from the print layout whatever ^OD shows")
+{
+    ensureQApplication() ;
+    tocindextest::cScratchDir dir("tocprint") ;
+    REQUIRE(dir.IsValid()) ;
+
+    // raw bytes take width on screen and none in print, so the screen
+    // layout puts the heading on a later page than print does
+    auto fill = [](cEditorBase &editor)
+    {
+        cDocument *doc = editor.GetDocument() ;
+        doc->Clear() ;
+        for (int line = 0 ; line < 30 ; line++)
+        {
+            doc->Insert("Text") ;
+            for (int loop = 0 ; loop < 60 ; loop++)
+            {
+                doc->InsertRawByte(0x01) ;
+            }
+            doc->Insert(HARD_RETURN) ;
+        }
+        doc->Insert(".tc Heading #") ;
+        doc->Insert(HARD_RETURN) ;
+        doc->Insert("Body text") ;
+        doc->Insert(HARD_RETURN) ;
+        editor.GetLayout()->LayoutDocument(doc) ;
+    } ;
+    const PARAGRAPH_T heading = 30 ;
+
+    cEditorCtrl print ;
+    fill(print) ;
+    print.GetLayout()->SetShowControl(SHOW_NONE) ;
+    print.GetLayout()->SetActiveParagraph(-1) ;
+    print.GetLayout()->SetMarkersVisible(false) ;
+    print.GetLayout()->LayoutDocument(print.GetDocument()) ;
+    const sParagraphLayout *printPara = print.GetLayout()->GetParagraphLayout(heading) ;
+    REQUIRE(printPara != nullptr) ;
+    PAGE_T printPage = printPara->endPage ;
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode)) ;
+        cEditorCtrl editor ;
+        editor.SetShowControls(mode) ;
+        fill(editor) ;
+        const sParagraphLayout *shown = editor.GetLayout()->GetParagraphLayout(heading) ;
+        REQUIRE(shown != nullptr) ;
+        REQUIRE(shown->endPage != printPage) ;
+
+        std::vector<std::string> outputFiles ;
+        REQUIRE(cTOCIndexGenerator::GenerateTOC(&editor, dir.File("source.ws"), outputFiles)) ;
+        CHECK(editor.GetLayout()->GetShowControl() == mode) ;
+        CHECK(editor.GetLayout()->GetMarkersVisible() == true) ;
+
+        cEditorCtrl reader ;
+        CHECK(tocindextest::Join(tocindextest::LoadGenerated(reader, outputFiles[0])) ==
+              "Heading " + std::to_string(printPage)) ;
+    }
+}
+
+
 namespace {
 
 /////////////////////////////////////////////////////////////////////////////

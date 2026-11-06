@@ -460,6 +460,57 @@ void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAG
     }
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+// Lays the document out as print does: dot commands and markers hidden,
+// no active paragraph. Restore() puts the layout's own settings back and
+// lays the document out again; the destructor restores if still needed.
+/////////////////////////////////////////////////////////////////////////////
+class cPrintLayout
+{
+public:
+    cPrintLayout(cLayoutBase *layout, cDocument *doc) : mLayout(layout), mDocument(doc)
+    {
+        mShowControl = mLayout->GetShowControl() ;
+        mActiveParagraph = mLayout->GetActiveParagraph() ;
+        mMarkersVisible = mLayout->GetMarkersVisible() ;
+
+        mLayout->SetShowControl(SHOW_NONE) ;
+        mLayout->SetActiveParagraph(-1) ;
+        mLayout->SetMarkersVisible(false) ;
+        mLayout->LayoutDocument(mDocument) ;
+    }
+
+    ~cPrintLayout()
+    {
+        Restore() ;
+    }
+
+    cPrintLayout(const cPrintLayout &) = delete ;
+    cPrintLayout &operator=(const cPrintLayout &) = delete ;
+
+    void Restore(void)
+    {
+        if (mRestored == true)
+        {
+            return ;
+        }
+        mRestored = true ;
+        mLayout->SetShowControl(mShowControl) ;
+        mLayout->SetActiveParagraph(mActiveParagraph) ;
+        mLayout->SetMarkersVisible(mMarkersVisible) ;
+        mLayout->LayoutDocument(mDocument) ;
+    }
+
+private:
+    cLayoutBase *mLayout ;
+    cDocument *mDocument ;
+    eShowControl mShowControl ;
+    PARAGRAPH_T mActiveParagraph ;
+    bool mMarkersVisible ;
+    bool mRestored = false ;
+};
+
 } // namespace
 
 
@@ -475,6 +526,7 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
 
     cDocument *sourceDoc = editor->GetDocument() ;
     cLayoutBase *layout = editor->GetLayout() ;
+    cPrintLayout printLayout(layout, sourceDoc) ;
 
     std::vector<sTOCEntry> tables[10] ;    // [0] = plain .tc, [1-9] = .tc1-.tc9
 
@@ -520,6 +572,7 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
         }
         tables[table].push_back(entry) ;
     }
+    printLayout.Restore() ;
 
     std::filesystem::path source(sourcePath) ;
     std::filesystem::path stem = source.parent_path() / source.stem() ;
@@ -578,6 +631,7 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
 
     cDocument *sourceDoc = editor->GetDocument() ;
     cLayoutBase *layout = editor->GetLayout() ;
+    cPrintLayout printLayout(layout, sourceDoc) ;
 
     std::vector<sIndexEntry> entries ;
     std::vector<tEntryText> dotCommands ;
@@ -632,6 +686,7 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
 
         entries.push_back(entry) ;
     }
+    printLayout.Restore() ;
 
     if (entries.empty() && dotCommands.empty())
     {

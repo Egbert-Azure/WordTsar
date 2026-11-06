@@ -68,14 +68,16 @@ public:
     /// @return true if at least one table had entries and was written
     ///
     /// @brief
-    /// Collects every .tc/.tc1-.tc9 entry in document order, resolves each
-    /// to its real printed page number, substitutes that number for any
-    /// unescaped '#' in the entry's own text (a literal '#' is written
-    /// \# in the source, matching the real Insert->TOC Entry dialog), and
-    /// writes each non-empty table to its own file. An entry whose text
-    /// starts with '.' right after the one separator space is a dot command
-    /// for the generated file: it is written unchanged, in document order,
-    /// with no '#' replaced.
+    /// Lays the source out as print does, collects every .tc/.tc1-.tc9
+    /// entry in document order, resolves each to its printed page number,
+    /// substitutes that number for any unescaped '#' in the entry's own
+    /// text (a literal '#' is written \# in the source, matching the real
+    /// Insert->TOC Entry dialog), and writes each non-empty table to its
+    /// own file. The layout's show control, marker visibility and active
+    /// paragraph are restored. An entry whose text starts with '.' right
+    /// after the one separator space is a dot command for the generated
+    /// file: it is written unchanged, in document order, with no '#'
+    /// replaced.
     ///
     /////////////////////////////////////////////////////////////////////////
     static bool GenerateTOC(cEditorBase *editor, const std::string &sourcePath, std::vector<std::string> &outputFiles,
@@ -96,8 +98,9 @@ public:
     ///         the index was written
     ///
     /// @brief
-    /// Collects every .ix entry, resolves +bold/-cross-reference/,subentry
-    /// markup and \-escapes per the real Index Entry dialog's rules, sorts
+    /// Lays the source out as print does, collects every .ix entry,
+    /// resolves +bold/-cross-reference/,subentry markup and \-escapes per
+    /// the real Index Entry dialog's rules, sorts
     /// alphabetically, merges duplicate entries into one comma-separated
     /// page list (bold pages win over non-bold when the same page appears
     /// both ways), and writes the result to "name.IDX". Cross-reference
