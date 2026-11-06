@@ -17794,3 +17794,61 @@ TEST_CASE("Kept WordStar sequences - ^KR of a WordStar file keeps them as marker
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }
+
+
+TEST_CASE("Kept WordStar sequences - RTF and DOCX export write nothing for them, with no space")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-keptseqexport-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    // ".h1 hd<seq>hd", "abc<seq>def ghi", "<seq>xyz"
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert(".h1 hd");
+    doc->InsertRawSequence(KeptIndexItem("Alpha"));
+    doc->Insert("hd\rabc");
+    doc->InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
+    doc->Insert("def ghi\r");
+    doc->InsertRawSequence(KeptIndexItem(""));
+    doc->Insert("xyz\r");
+    editor.LayoutDocument(true);
+
+    auto reloaded = [&](const std::filesystem::path& file)
+    {
+        cEditorCtrl reader;
+        REQUIRE(reader.LoadFile(file.string()));
+        return reader.GetDocument()->GetPlainText(0, reader.GetDocument()->GetTextSize(), "\n");
+    };
+
+    SUBCASE("RTF")
+    {
+        auto out = dir / "out.rtf";
+        REQUIRE(editor.SaveFile(out.string()));
+        std::string rtf = ReadFileBytes(out);
+        CHECK(rtf.find('\x7F') == std::string::npos);
+        CHECK(rtf.find("Alpha") == std::string::npos);
+        CHECK(rtf.find("abcdef ghi") != std::string::npos);
+        CHECK(rtf.find("hdhd") != std::string::npos);
+        std::string text = reloaded(out);
+        CHECK(text.find("abcdef ghi\n") != std::string::npos);
+        CHECK(text.find("\nxyz\n") != std::string::npos);
+    }
+
+    SUBCASE("DOCX")
+    {
+        auto out = dir / "out.docx";
+        REQUIRE(editor.SaveFile(out.string()));
+        std::string text = reloaded(out);
+        CHECK(text.find('\x7F') == std::string::npos);
+        CHECK(text.find("Alpha") == std::string::npos);
+        CHECK(text.find("abcdef ghi\n") != std::string::npos);
+        CHECK(text.find("\nxyz\n") != std::string::npos);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}

@@ -842,16 +842,17 @@ void cRTFWriter::CreateText(std::string &text)
 
      // go through a character at a time (byte-level iteration with UTF-8 decoding)
     size_t pos = 0 ;
-    size_t textStart = 0 ;              // first byte after leading raw bytes
+    size_t textStart = 0 ;              // first byte after leading raw bytes and kept sequences
     while (pos < text.size())
     {
         unsigned char byte = static_cast<unsigned char>(text[pos]) ;
 
 //        if(text.at(pos) < STYLE_END_OF_STYLES)
         if (byte == static_cast<unsigned char>(MARKER_CHAR) &&
-            mDocument->GetControlChar(mCurrentPosition) == STYLE_RAW_BYTE)
+            (mDocument->GetControlChar(mCurrentPosition) == STYLE_RAW_BYTE ||
+             mDocument->GetControlChar(mCurrentPosition) == STYLE_RAW_SEQUENCE))
         {
-            // a raw byte writes nothing
+            // a raw byte or a kept WordStar sequence writes nothing
             if (pos == textStart)
             {
                 textStart = pos + 1 ;

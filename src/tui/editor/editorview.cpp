@@ -528,9 +528,10 @@ int cWSEditorView::GraphemeColumns(POSITION_T docPos, const std::string& graphem
         return isSoftHyphen ? 0 : 1;
     }
 
-    // The end-of-file marker is never displayed
+    // The end-of-file marker and a kept WordStar sequence are never displayed
     cDocument* eofDoc = mEditor->GetDocument();
-    if ((isMarker == true) && (eofDoc != nullptr) && (eofDoc->GetControlChar(docPos) == STYLE_EOF))
+    if ((isMarker == true) && (eofDoc != nullptr) &&
+        ((eofDoc->GetControlChar(docPos) == STYLE_EOF) || (eofDoc->GetControlChar(docPos) == STYLE_RAW_SEQUENCE)))
     {
         return 0;
     }
@@ -1405,8 +1406,9 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
                 bool isMarker = (c == MARKER);
                 bool isTerminator = (c == HARDCR) || (c == EOFCH);
 
-                // The end-of-file marker is never drawn
-                if ((isMarker == true) && (doc->GetControlChar(docPos) == STYLE_EOF))
+                // The end-of-file marker and a kept WordStar sequence are never drawn
+                if ((isMarker == true) &&
+                    ((doc->GetControlChar(docPos) == STYLE_EOF) || (doc->GetControlChar(docPos) == STYLE_RAW_SEQUENCE)))
                 {
                     docPos++;
                     continue;

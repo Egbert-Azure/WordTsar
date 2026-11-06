@@ -683,6 +683,16 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 continue;
             }
 
+            // Kept WordStar sequence - one grapheme, no width, nothing drawn
+            if (controlType == STYLE_RAW_SEQUENCE)
+            {
+                AddSegmentMarker(currentSegment, pendingMarker);
+                currentSegment.position.push_back(currentX);
+                currentSegment.length++;
+
+                continue;
+            }
+
             // Raw byte from a text file - one grapheme, visible on screen,
             // no width in the print layout (markers hidden)
             if (controlType == STYLE_RAW_BYTE)

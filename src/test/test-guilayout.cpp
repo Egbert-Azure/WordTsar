@@ -1525,6 +1525,181 @@ TEST_CASE("BuildHeaderFooterSegments() - a raw byte in a header is hidden on scr
 }
 
 
+namespace
+{
+
+sRawSequence KeptIndexItem(const std::string& body)
+{
+    sRawSequence sequence;
+    sequence.type = 0x0E;
+    sequence.body = body;
+    return sequence;
+}
+
+// width of all segments, and whether any has a tag, marker or control code index
+COORD_T SegmentsWidth(const std::vector<sSegmentLayout>& segments, bool& decorated)
+{
+    COORD_T width = 0;
+    for (const auto& segment : segments)
+    {
+        width += segment.totalWidth;
+        if (!segment.markers.empty() || !segment.controlCodeIndices.empty())
+        {
+            decorated = true;
+        }
+    }
+    return width;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("GetDisplayCharacter() - a kept sequence shows nothing with ^OD on and off")
+{
+    ensureQApplication();
+
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+
+    doc.Insert("A");
+    doc.InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
+    doc.Insert("B\r");
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        layout.SetShowControl(mode);
+        CHECK(layout.GetDisplayCharacter(1, "\x7F") == "");
+    }
+}
+
+
+TEST_CASE("BuildParagraphSegments() - a kept sequence is invisible and has no width")
+{
+    ensureQApplication();
+
+    // A0 <seq>1 B2 \r3, and the same line without it
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    doc.Insert("A");
+    doc.InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
+    doc.Insert("B\r");
+
+    cDocument plain;
+    cLayout plainLayout;
+    plainLayout.SetDocument(&plain);
+    plain.Insert("AB\r");
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        for (bool markersVisible : { true, false })
+        {
+            CAPTURE(static_cast<int>(mode));
+            CAPTURE(markersVisible);
+            layout.SetShowControl(mode);
+            layout.SetMarkersVisible(markersVisible);
+            plainLayout.SetShowControl(mode);
+            plainLayout.SetMarkersVisible(markersVisible);
+
+            bool decorated = false;
+            bool plainDecorated = false;
+            COORD_T width = SegmentsWidth(layout.BuildParagraphSegments(0), decorated);
+            COORD_T plainWidth = SegmentsWidth(plainLayout.BuildParagraphSegments(0), plainDecorated);
+
+            CHECK(width == doctest::Approx(plainWidth).epsilon(0.001));
+            CHECK(decorated == false);
+        }
+    }
+    layout.SetMarkersVisible(true);
+}
+
+
+TEST_CASE("BuildHeaderFooterSegments() - a kept sequence in a header is hidden on screen and in print")
+{
+    ensureQApplication();
+
+    cDocument doc;
+    doc.Insert(".h1 a");
+    doc.InsertRawSequence(KeptIndexItem("Alpha"));
+    doc.Insert("b\r");
+    doc.Insert("text\r");
+
+    cDocument plain;
+    plain.Insert(".h1 ab\r");
+    plain.Insert("text\r");
+
+    auto headerWidth = [&](cDocument& source, bool markersVisible, std::vector<std::string>& graphemes)
+    {
+        cLayout layout;
+        layout.SetDocument(&source);
+        layout.SetShowControl(markersVisible ? SHOW_ALL : SHOW_NONE);
+        layout.SetMarkersVisible(markersVisible);
+        layout.LayoutDocument(&source);
+
+        COORD_T width = 0;
+        for (const auto& segment : layout.BuildHeaderFooterSegments(0, 4, 1, graphemes))
+        {
+            width += segment.totalWidth;
+        }
+        return width;
+    };
+
+    for (bool markersVisible : { true, false })
+    {
+        CAPTURE(markersVisible);
+        std::vector<std::string> graphemes;
+        std::vector<std::string> plainGraphemes;
+        COORD_T width = headerWidth(doc, markersVisible, graphemes);
+        COORD_T plainWidth = headerWidth(plain, markersVisible, plainGraphemes);
+
+        CHECK(graphemes == plainGraphemes);
+        CHECK(width == doctest::Approx(plainWidth).epsilon(0.001));
+    }
+}
+
+
+TEST_CASE("Layout - a kept sequence in a .tc line keeps the dot command and takes no width")
+{
+    ensureQApplication();
+
+    cDocument doc;
+    doc.Insert(".tc Chapter ");
+    doc.InsertRawSequence(KeptIndexItem("Alpha"));
+    doc.Insert("One\rBody\r");
+
+    cDocument plain;
+    plain.Insert(".tc Chapter One\rBody\r");
+
+    auto dotLine = [](cDocument& source, bool& isCommand, bool& decorated)
+    {
+        cLayout layout;
+        layout.SetDocument(&source);
+        layout.SetShowControl(SHOW_ALL);
+        layout.LayoutDocument(&source);
+        isCommand = layout.ParagraphIsCommand(0);
+        const sParagraphLayout* para = layout.GetParagraphLayout(0);
+        REQUIRE(para != nullptr);
+        REQUIRE(para->lines.size() == 1);
+        std::vector<sSegmentLayout> segments(para->lines[0].segments.begin(), para->lines[0].segments.end());
+        return SegmentsWidth(segments, decorated);
+    };
+
+    bool isCommand = false;
+    bool plainIsCommand = false;
+    bool decorated = false;
+    bool plainDecorated = false;
+    COORD_T width = dotLine(doc, isCommand, decorated);
+    COORD_T plainWidth = dotLine(plain, plainIsCommand, plainDecorated);
+
+    CHECK(isCommand);
+    CHECK(plainIsCommand);
+    CHECK(width == doctest::Approx(plainWidth).epsilon(0.001));
+    CHECK(decorated == plainDecorated);
+}
+
+
 TEST_CASE("GetDisplayCharacter() - caret notation for every raw byte")
 {
     ensureQApplication();

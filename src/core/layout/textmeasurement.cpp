@@ -81,6 +81,7 @@
 /// - STYLE_TAB displays as >, !, [, or # based on tab type
 /// - STYLE_FONT1 displays as <fontname size>
 /// - STYLE_RAW_BYTE displays as ^ plus the byte + 0x40, ^? for 0x7F
+/// - STYLE_RAW_SEQUENCE displays as nothing
 /// - All other graphemes are returned unchanged
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -189,6 +190,12 @@ std::string cTextMeasurement::GetDisplayCharacter(POSITION_T documentPos,
             {
                 return "<Unknown>";
             }
+        }
+
+        // Kept WordStar sequence: nothing
+        if (controlType == STYLE_RAW_SEQUENCE)
+        {
+            return std::string();
         }
 
         // Raw byte from a text file: caret notation, ^? for 0x7F

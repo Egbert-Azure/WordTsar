@@ -1242,3 +1242,71 @@ TEST_CASE("cWSEditorView - a raw byte shows as ^B in the control code colours wi
         CHECK((b->style.attrs & wordstartui::CELL_ATTR_BOLD) == 0);
     }
 }
+
+
+namespace
+{
+
+// text of screen columns col..col+count-1 of row
+std::string ScreenText(wordstartui::cScreen& screen, int row, int col, int count)
+{
+    std::string text;
+    for (int c = col; c < col + count; c++)
+    {
+        const wordstartui::sCell* cell = screen.GetCell(row, c);
+        text += (cell != nullptr) ? cell->textUtf8 : std::string("?");
+    }
+    return text;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("cWSEditorView - a kept sequence takes no column with ^OD on and off")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 60, 200});
+
+    // A0 <seq>1 B2 \r3, then a .tc line with one inside it
+    sRawSequence sequence;
+    sequence.type = 0x0E;
+    sequence.body = "Alpha\\, Beta";
+    doc->Insert("A");
+    doc->InsertRawSequence(sequence);
+    doc->Insert("B\r.tc Chapter ");
+    doc->InsertRawSequence(sequence);
+    doc->Insert("One\r");
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        layout->SetShowControl(mode);
+        editor.LayoutDocument(true);
+
+        int colA = CaretColumnAt(editor, view, 0);
+        int colB = CaretColumnAt(editor, view, 2);
+        CHECK(colB == colA + 1);
+
+        doc->SetPosition(0);
+        wordstartui::cScreen screen;
+        screen.Resize(60, 200);
+        view.Draw(screen);
+        int row = view.GetCaretRow();
+        CHECK(ScreenText(screen, row, colA, 2) == "AB");
+    }
+
+    // the .tc line shows with ^OD on
+    layout->SetShowControl(SHOW_ALL);
+    editor.LayoutDocument(true);
+    int colDot = CaretColumnAt(editor, view, 4);
+    doc->SetPosition(4);
+    wordstartui::cScreen screen;
+    screen.Resize(60, 200);
+    view.Draw(screen);
+    CHECK(ScreenText(screen, view.GetCaretRow(), colDot, 15) == ".tc Chapter One");
+}

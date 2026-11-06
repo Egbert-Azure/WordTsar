@@ -603,6 +603,127 @@ TEST_CASE("TUI layout - a raw byte in a header is hidden on screen and in print"
 }
 
 
+namespace
+{
+
+sRawSequence KeptIndexItem(const std::string& body)
+{
+    sRawSequence sequence;
+    sequence.type = 0x0E;
+    sequence.body = body;
+    return sequence;
+}
+
+// width of all segments, and whether any has a tag, marker or control code index
+COORD_T SegmentsWidth(const std::vector<sSegmentLayout>& segments, bool& decorated)
+{
+    COORD_T width = 0;
+    for (const auto& segment : segments)
+    {
+        width += segment.totalWidth;
+        if (!segment.markers.empty() || !segment.controlCodeIndices.empty())
+        {
+            decorated = true;
+        }
+    }
+    return width;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("TUI layout - a kept sequence is invisible and has no width")
+{
+    // A0 <seq>1 B2 \r3, and the same line without it
+    cDocument doc;
+    cLayout layout;
+    REQUIRE(layout.InitializeFontSystem());
+    layout.SetDocument(&doc);
+    doc.Insert("A");
+    doc.InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
+    doc.Insert("B\r");
+
+    cDocument plain;
+    cLayout plainLayout;
+    REQUIRE(plainLayout.InitializeFontSystem());
+    plainLayout.SetDocument(&plain);
+    plain.Insert("AB\r");
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        for (bool markersVisible : { true, false })
+        {
+            CAPTURE(static_cast<int>(mode));
+            CAPTURE(markersVisible);
+            layout.SetShowControl(mode);
+            layout.SetMarkersVisible(markersVisible);
+            plainLayout.SetShowControl(mode);
+            plainLayout.SetMarkersVisible(markersVisible);
+
+            CHECK(layout.GetDisplayCharacter(1, "\x7F") == "");
+
+            bool decorated = false;
+            bool plainDecorated = false;
+            COORD_T width = SegmentsWidth(layout.BuildParagraphSegments(0), decorated);
+            COORD_T plainWidth = SegmentsWidth(plainLayout.BuildParagraphSegments(0), plainDecorated);
+
+            CHECK(width == doctest::Approx(plainWidth));
+            CHECK(width > 0);
+            CHECK(decorated == false);
+        }
+    }
+
+    layout.SetMarkersVisible(true);
+    layout.ShutdownFontSystem();
+    plainLayout.ShutdownFontSystem();
+}
+
+
+TEST_CASE("TUI layout - a kept sequence in a header is hidden on screen and in print")
+{
+    cDocument doc;
+    doc.Insert(".h1 a");
+    doc.InsertRawSequence(KeptIndexItem("Alpha"));
+    doc.Insert("b\r");
+    doc.Insert("text\r");
+
+    cDocument plain;
+    plain.Insert(".h1 ab\r");
+    plain.Insert("text\r");
+
+    auto headerWidth = [&](cDocument& source, bool markersVisible, std::vector<std::string>& graphemes)
+    {
+        cLayout layout;
+        REQUIRE(layout.InitializeFontSystem());
+        layout.SetDocument(&source);
+        layout.SetShowControl(markersVisible ? SHOW_ALL : SHOW_NONE);
+        layout.SetMarkersVisible(markersVisible);
+        layout.LayoutDocument(&source);
+
+        COORD_T width = 0;
+        for (const auto& segment : layout.BuildHeaderFooterSegments(0, 4, 1, graphemes))
+        {
+            width += segment.totalWidth;
+        }
+        layout.ShutdownFontSystem();
+        return width;
+    };
+
+    for (bool markersVisible : { true, false })
+    {
+        CAPTURE(markersVisible);
+        std::vector<std::string> graphemes;
+        std::vector<std::string> plainGraphemes;
+        COORD_T width = headerWidth(doc, markersVisible, graphemes);
+        COORD_T plainWidth = headerWidth(plain, markersVisible, plainGraphemes);
+
+        CHECK(graphemes == plainGraphemes);
+        CHECK(width == doctest::Approx(plainWidth));
+        CHECK(width > 0);
+    }
+}
+
+
 TEST_CASE("TUI layout - a soft tab at the start of a paragraph lays out like a normal tab")
 {
     // x of the period after a tab of the given type at the start of ".xx text"
