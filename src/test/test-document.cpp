@@ -7670,6 +7670,29 @@ TEST_CASE("cGraphemeOffsets - integration with cDocument UTF-8 paragraph")
 }
 
 
+TEST_CASE("cDocument::GetMemoryUsage - counts the raw byte table")
+{
+    cDocument doc ;
+    doc.Clear() ;
+
+    const size_t count = 40 ;
+    for (size_t i = 0 ; i < count ; ++i)
+    {
+        doc.Insert("a") ;
+        doc.InsertRawByte(0x02) ;
+    }
+    doc.Insert("\r") ;
+
+    sDocumentMemoryUsage mem = doc.GetMemoryUsage() ;
+    size_t breakdown = mem.attrPairsBytes + mem.attrFormatBytes + mem.attrFontBytes +
+                       mem.attrTabBytes + mem.attrColorBytes + mem.attrFootnoteBytes +
+                       mem.attrEndnoteBytes + mem.attrVariableBytes + mem.attrOffsetsBytes ;
+
+    CHECK(mem.attributeBytes >= breakdown + count * sizeof(RawBytePair)) ;
+    CHECK(mem.attributeUsedBytes >= count * (sizeof(PairTable) + sizeof(RawBytePair))) ;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 //
 // Document Listener Tests

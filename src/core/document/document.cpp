@@ -6709,6 +6709,7 @@ sDocumentMemoryUsage cDocument::GetMemoryUsage(void) const
         size_t endnote = para.endnote.capacity() * sizeof(EndnotePair) ;
         size_t variable = para.variable.capacity() * sizeof(VariablePair) ;
         size_t offsets = para.offsets.memoryAllocated() ;
+        size_t rawbyte = para.rawbyte.capacity() * sizeof(RawBytePair) ;
 
         usage.attrPairsBytes += pairs ;
         usage.attrFormatBytes += format ;
@@ -6720,7 +6721,7 @@ sDocumentMemoryUsage cDocument::GetMemoryUsage(void) const
         usage.attrVariableBytes += variable ;
         usage.attrOffsetsBytes += offsets ;
 
-        usage.attributeBytes += pairs + format + font + tab + color + footnote + endnote + variable + offsets ;
+        usage.attributeBytes += pairs + format + font + tab + color + footnote + endnote + variable + offsets + rawbyte ;
 
         // attributes: size (in use)
         usage.attributeUsedBytes += para.pairs.size() * sizeof(PairTable) ;
@@ -6732,6 +6733,7 @@ sDocumentMemoryUsage cDocument::GetMemoryUsage(void) const
         usage.attributeUsedBytes += para.endnote.size() * sizeof(EndnotePair) ;
         usage.attributeUsedBytes += para.variable.size() * sizeof(VariablePair) ;
         usage.attributeUsedBytes += para.offsets.memoryUsed() ;
+        usage.attributeUsedBytes += para.rawbyte.size() * sizeof(RawBytePair) ;
     }
 
     // Undo stack
