@@ -191,7 +191,7 @@ TEST_CASE("Book template - every dot command is one WordTsar carries out")
     REQUIRE(dots.size() >= 10);
 
     // Page setup: Letter, 1 inch margins, no automatic page number
-    std::vector<std::string> setup = {".op", ".pl 11\"", ".mt 1\"", ".mb 1\"", ".po 1\"", ".lm 0", ".rm 6.5\""};
+    std::vector<std::string> setup = {".op", ".pl 11i", ".mt 1i", ".mb 1i", ".po 1i", ".lm 0i", ".rm 6.5i"};
     CHECK(std::vector<std::string>(dots.begin(), dots.begin() + static_cast<long>(setup.size())) == setup);
 
     // Line heights: single spaced contact block, double spaced body, chapter drop
