@@ -15627,6 +15627,16 @@ TEST_CASE("GUI editor - a text file ends at the first 0x1A, the rest is saved ba
         CHECK(ReadFileBytes(dir / "both-ws.txt") == "one\n");
     }
 
+    SUBCASE("a failed WordStar save keeps the tail")
+    {
+        WriteFileBytes(dir / "fail.txt", "one\n" + tail);
+        REQUIRE(editor.LoadFile((dir / "fail.txt").string()));
+        CHECK(editor.SaveFile((dir / "no-such-dir" / "fail.ws").string()) == false);
+        CHECK(doc->IsTextFile());
+        REQUIRE(editor.SaveFile((dir / "fail-again.txt").string()));
+        CHECK(ReadFileBytes(dir / "fail-again.txt") == "one\n" + tail);
+    }
+
     SUBCASE("abandoning the document clears the tail")
     {
         WriteFileBytes(dir / "quit.txt", "one\n" + tail);

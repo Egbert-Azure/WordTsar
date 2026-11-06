@@ -474,6 +474,56 @@ TEST_CASE("cTextFile::LoadFile - the text ends at the first 0x1A")
     std::filesystem::remove_all(dir, ec);
 }
 
+TEST_CASE("cTextFile::LoadFile - a UTF-16 or UTF-32 file is not cut at a 0x1A byte")
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path path = dir / "in.txt";
+
+    cDocument doc;
+    doc.Clear();
+    cTextFile file;
+    file.mDocument = &doc;
+
+    // "a", U+011A, "b", LF: U+011A has a 0x1A byte in every UTF-16 and UTF-32 form
+    const std::string expected = "a\xC4\x9A" "b";
+
+    SUBCASE("UTF-16LE")
+    {
+        WriteFileBytes(path, std::string("\xFF\xFE" "a\0\x1A\x01" "b\0\n\0", 10));
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n").find(expected) != std::string::npos);
+        CHECK(file.GetTextTail() == "");
+    }
+
+    SUBCASE("UTF-16BE")
+    {
+        WriteFileBytes(path, std::string("\xFE\xFF" "\0a\x01\x1A" "\0b\0\n", 10));
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n").find(expected) != std::string::npos);
+        CHECK(file.GetTextTail() == "");
+    }
+
+    SUBCASE("UTF-32LE")
+    {
+        WriteFileBytes(path, std::string("\xFF\xFE\0\0" "a\0\0\0" "\x1A\x01\0\0" "b\0\0\0" "\n\0\0\0", 20));
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n").find(expected) != std::string::npos);
+        CHECK(file.GetTextTail() == "");
+    }
+
+    SUBCASE("UTF-32BE")
+    {
+        WriteFileBytes(path, std::string("\0\0\xFE\xFF" "\0\0\0a" "\0\0\x01\x1A" "\0\0\0b" "\0\0\0\n", 20));
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n").find(expected) != std::string::npos);
+        CHECK(file.GetTextTail() == "");
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
 TEST_CASE("cTextFile::LoadFile - control bytes after the first 0x1A do not make a file binary")
 {
     std::filesystem::path dir = MakeTempDir();
