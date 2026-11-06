@@ -1,6 +1,6 @@
 # BOOK.WS
 
-BOOK.WS is a manuscript template for a novel. It has a title page, a running header with the page number, two sample chapters with table of contents entries, and one index entry. The text is placeholder text.
+BOOK.WS is a manuscript template for a novel. It has a title page, a running header with the page number, a contents page layout block, two sample chapters with table of contents entries, one index mark and one index entry. The text is placeholder text.
 
 ## Use
 
@@ -8,36 +8,45 @@ BOOK.WS is a manuscript template for a novel. It has a title page, a running hea
 2. Replace the placeholder text: your name, address, title, the surname in the header, the chapter headings and the body text.
 3. Save the file under your own name.
 
-To add a chapter, copy a chapter from its first dot command (`.lh 36`) to its page break (`.pa`) and paste it after the last chapter.
+## Other templates
+
+- CHAPTER.WS is one new chapter: a 54 pt drop, a `.tc` entry, a centred heading, three placeholder paragraphs and `.pa`.
+- SCENE.WS is a scene break: `.cp 4` and a centred `#`.
+
+Put the caret at the start of a line in your book. Press ^KR (Block > Read, Alt+K,R in Modern mode) and choose the file. The file is read into the document at the caret.
 
 ### Table of contents and index
 
-The `.tc` and `.ix` lines only mark entries. They do not print. The GUI inserts them. ws also generates the files.
+The `.tc` and `.ix` lines and the index marks do not print.
 
-- GUI: Insert > Index/TOC Entry > TOC Entry or Index Entry adds a `.tc` or `.ix` line. The GUI has no command that generates the table of contents or the index.
-- ws: on the Opening screen, the key T (Utilities > TOC) and the key I (Utilities > Index) ask for a file. The Utilities menu is shown at help level 4 only. The keys work at every help level. T writes `name.TOC` and I writes `name.IDX` next to it. ws then opens the new file. ws can also insert the entries from its Insert menu.
+- `.tc` lines make the table of contents. A `.tc` line that starts with a dot command (`.tc .po 1in`) is written to the table as that command. The contents page layout block in BOOK.WS uses this. A blank `.tc` line does nothing.
+- ^PK (Alt+P,K in Modern mode; Insert > Index/TOC Entry > Mark for Index in the GUI and ws) puts index marks around a word. BOOK.WS has one, around `story` in chapter one.
+- Entries from marks, `.ix` lines and index items merge into one line with all the pages.
+- GUI: Utilities > Generate Table of Contents... and Generate Index... ask for the source file. The open document is the default. They write `name.TOC`, `name.TO1` to `name.TO9` and `name.IDX` next to it, then show a message.
+- ws: on the Opening screen, the key T (Utilities > TOC) and the key I (Utilities > Index) ask for a file. The Utilities menu is shown at help level 4 only. The keys work at every help level.
 
 ## Dot commands in this template
 
 | Command | What it does here |
 |---------|-------------------|
 | `.op` | Leaves out the automatic page number. The page number is in the header. |
-| `.pl 11i` | Page length 11 inches. |
-| `.mt 1i` | Top margin 1 inch. |
-| `.mb 1i` | Bottom margin 1 inch. |
-| `.po 1i` | Page offset 1 inch: the left edge of the text, because `.lm 0i` adds nothing. |
-| `.lm 0i` | Left margin 0 inches. |
-| `.rm 6.5i` | Text width 6.5 inches, measured from the page offset. With the 1 inch offset the right margin is 1 inch. |
-| `.lh 8` | Line height 8/48 inch (12 pt, single spacing). Used for the address block. |
-| `.lh 16` | Line height 16/48 inch (24 pt, double spacing). Used for the title and the body text. |
-| `.lh 36` | Line height 36/48 inch (54 pt). The blank line before a chapter heading drops it down the page. |
+| `.pl 11in` | Page length 11 inches. |
+| `.mt 1in` | Top margin 1 inch. |
+| `.mb 1in` | Bottom margin 1 inch. |
+| `.po 1in` | Page offset 1 inch. |
+| `.lm 0` | Left margin 0 columns. |
+| `.rm 6.5in` | Right margin 6.5 inches from the page offset. |
+| `.lh 12pt` | Line height 12 pt (single spacing). Address block. |
+| `.lh 24pt` | Line height 24 pt (double spacing). Title and body text. |
+| `.lh 54pt` | Line height 54 pt. The blank line before a chapter heading drops it down the page. |
 | `.pa` | Page break. Ends the title page and each chapter. |
 | `.h1 Surname / TITLE / #` | Header text on every page. The `#` prints the page number. |
-| `.tc Chapter One . . . #` | Table of contents entry. It does not print. When ws generates the table, it copies the text as written and replaces `#` with the page number. The `. . .` is plain text, not a leader. |
-| `.cp 4` | If less than four lines (at the current line height) remain on the page, the next paragraph starts on a new page. It keeps the scene break with the text after it. |
-| `.ix Placeholder Topic` | Index entry. It does not print. ws writes it to the `.IDX` file with its page number. |
+| `.tc Chapter One . . . #` | Table of contents entry. The generator copies the text and replaces `#` with the page number. The `. . .` is plain text. |
+| `.tc .po 1in`, `.tc .rm 6.5in`, `.tc .lh 24pt`, `.tc .pf on` | Dot commands for the generated table, used in the contents page layout block. `.pf on` is accepted. Text always reflows, so it changes nothing. |
+| `.cp 4` | If less than four lines remain on the page, the next paragraph starts on a new page. |
+| `.ix Placeholder Topic` | Index entry. The generator writes it to `name.IDX` with its page number. |
 
-Units: any of `i`, `in`, `"`, `c`, `cm`, `mm`, `p` and `pt` works (`1i`, `2.5cm`, `24pt`). A number without a unit means columns for `.lm`, `.rm` and `.po`, lines for `.mt`, `.mb` and `.pl`, and 1/48 inch for `.lh`.
+Units: any of `i`, `in`, `"`, `c`, `cm`, `mm`, `p` and `pt` works after a number or a bracketed expression (`1in`, `2.5cm`, `24pt`). With no unit, `.lm`, `.rm` and `.po` count columns (1/10 inch), `.mt`, `.mb` and `.pl` count lines (1/6 inch) and `.lh` counts 1/48 inch. An unknown unit is an error and the command is ignored.
 
 ## Notes
 
