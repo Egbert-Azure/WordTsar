@@ -801,36 +801,14 @@ void cDocument::Insert(const std::string &text)
     mSuppressUndo = oldSuppressUndo ;
     mSuppressNotify = oldSuppressNotify ;
 
-    // record one combined undo action for the entire string insert.
-    // Must mirror the collapsing the insert loop above did (CRLF -> one
-    // HARD_RETURN), or Undo()'s Delete(position, length) removes one
-    // character too many and Redo()'s ReinsertCharacters() re-inserts an
-    // extra HARD_RETURN, reintroducing the stray-empty-paragraph bug.
-    if (shouldRecord && !codepoints.empty())
+    // record one combined undo action for the characters the insert
+    // added: a CRLF is one hard return, and a character of several code
+    // points is one character
+    POSITION_T length = mCurrentPosition - insertPosition ;
+    if (shouldRecord && length > 0)
     {
-        std::vector<sUndoCharInfo> chars ;
-        for (size_t loop = 0 ; loop < codepoints.size() ; ++loop)
-        {
-            sUndoCharInfo charInfo ;
-            if(codepoints[loop] == 13 && loop + 1 < codepoints.size() && codepoints[loop + 1] == 10)
-            {
-                charInfo.codepoint = HARD_RETURN ;
-                chars.push_back(charInfo) ;
-                ++loop ;
-                continue ;
-            }
-            if (codepoints[loop] == 10)
-            {
-                charInfo.codepoint = HARD_RETURN ;
-            }
-            else
-            {
-                charInfo.codepoint = codepoints[loop] ;
-            }
-            chars.push_back(charInfo) ;
-        }
-        RecordAction(UNDO_ACTION_INSERT, insertPosition,
-                     static_cast<POSITION_T>(chars.size()), chars, cursorBefore) ;
+        RecordAction(UNDO_ACTION_INSERT, insertPosition, length,
+                     CaptureCharacters(insertPosition, length), cursorBefore) ;
     }
 
     // notify listeners of document content change

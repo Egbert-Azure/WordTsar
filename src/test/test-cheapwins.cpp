@@ -807,7 +807,7 @@ std::string ReadBytes(const std::filesystem::path& path)
     return std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
 }
 
-const std::string FAMILY = "\U0001F468‍\U0001F469‍\U0001F467";
+const std::string FAMILY = "\U0001F468\u200D\U0001F469\u200D\U0001F467";
 const std::string FLAG = "\U0001F1E9\U0001F1EA";
 
 // Document "text\rtail" with text marked as the block. Runs op, checks the
@@ -904,10 +904,10 @@ TEST_CASE("SortBlock keeps every code point of multi-code-point characters")
     ensureQApplication();
 
     const std::string l1 = "1 " + FLAG;
-    const std::string l2 = "2 ß́ x";
-    const std::string l3 = "3 q́";
-    const std::string l4 = "4 é";
-    const std::string l5 = "5 ạ́";
+    const std::string l2 = "2 \u00DF\u0301 x";
+    const std::string l3 = "3 q\u0301";
+    const std::string l4 = "4 e\u0301";
+    const std::string l5 = "5 a\u0323\u0301";
     const std::string l6 = "6 " + FAMILY;
     std::string text = JoinLines({ l3, l6, l1, l5, l2, l4 });
 
@@ -927,7 +927,7 @@ TEST_CASE("Block copy and delete undo keep every code point of multi-code-point 
 {
     ensureQApplication();
 
-    const std::string text = "q́ " + FAMILY + " " + FLAG + " ạ́ ß́ é";
+    const std::string text = "q\u0301 " + FAMILY + " " + FLAG + " a\u0323\u0301 \u00DF\u0301 e\u0301";
 
     SUBCASE("^KC copies the block after itself")
     {
@@ -946,5 +946,48 @@ TEST_CASE("Block copy and delete undo keep every code point of multi-code-point 
             POSITION_T length = doc->mEndBlock - doc->mStartBlock;
             doc->Delete(0, length);
         }, "");
+    }
+}
+
+TEST_CASE("Case conversion keeps every other code point of multi-code-point characters")
+{
+    ensureQApplication();
+
+    auto upper = [](cEditorCtrl& e) { e.UpperCaseBlock(); };
+    auto lower = [](cEditorCtrl& e) { e.LowerCaseBlock(); };
+    auto sentence = [](cEditorCtrl& e) { e.SentenceCaseBlock(); };
+
+    SUBCASE("^K\" upper case")
+    {
+        CheckBlockOp("q\u0301", upper, "Q\u0301");
+        CheckBlockOp(FAMILY, upper, FAMILY);
+        CheckBlockOp(FLAG, upper, FLAG);
+        CheckBlockOp("a\u0323\u0301", upper, "\u1EA0\u0301");
+        CheckBlockOp("\u00DF\u0301 x", upper, "SS\u0301 X");
+        CheckBlockOp("e\u0301", upper, "\u00C9");
+        CheckBlockOp("q\u0301 " + FAMILY + " " + FLAG + " a\u0323\u0301 \u00DF\u0301 e\u0301", upper,
+                     "Q\u0301 " + FAMILY + " " + FLAG + " \u1EA0\u0301 SS\u0301 \u00C9");
+    }
+    SUBCASE("^K' lower case")
+    {
+        CheckBlockOp("Q\u0301", lower, "q\u0301");
+        CheckBlockOp(FAMILY, lower, FAMILY);
+        CheckBlockOp(FLAG, lower, FLAG);
+        CheckBlockOp("A\u0323\u0301", lower, "\u1EA1\u0301");
+        CheckBlockOp("\u00DF\u0301 X", lower, "\u00DF\u0301 x");
+        CheckBlockOp("E\u0301", lower, "\u00E9");
+        CheckBlockOp("Q\u0301 " + FAMILY + " " + FLAG + " A\u0323\u0301 \u00DF\u0301 E\u0301", lower,
+                     "q\u0301 " + FAMILY + " " + FLAG + " \u1EA1\u0301 \u00DF\u0301 \u00E9");
+    }
+    SUBCASE("^K. sentence case")
+    {
+        CheckBlockOp("x. q\u0301", sentence, "x. Q\u0301");
+        CheckBlockOp("X " + FAMILY, sentence, "x " + FAMILY);
+        CheckBlockOp("X " + FLAG, sentence, "x " + FLAG);
+        CheckBlockOp("x. a\u0323\u0301", sentence, "x. \u1EA0\u0301");
+        CheckBlockOp("\u00DF\u0301 X", sentence, "\u00DF\u0301 x");
+        CheckBlockOp("x! e\u0301", sentence, "x! \u00C9");
+        CheckBlockOp("Q\u0301Q. " + FAMILY + " " + FLAG + " a\u0323\u0301 \u00DF\u0301X! e\u0301 i", sentence,
+                     "q\u0301q. " + FAMILY + " " + FLAG + " \u1EA0\u0301 \u00DF\u0301x! \u00C9 I");
     }
 }
