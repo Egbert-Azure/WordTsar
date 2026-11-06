@@ -4303,7 +4303,7 @@ size_t cDocument::GraphemeCount(const std::string &text, std::vector<POSITION_T>
     for(size_t loop = 0; loop < length32; loop++)
     {
         if(unicode::is_grapheme_boundary(text32.data(), text32.length(), loop)
-            && !unicode::is_combining_character(text32[loop]))
+            && (loop == 0 || !unicode::is_combining_character(text32[loop])))
         {
             len = unicode::utf8::encode_codepoint(text32[loop], str) ;
             offsets.push_back(cumalativelen) ;

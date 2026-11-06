@@ -1130,3 +1130,83 @@ TEST_CASE("Undo and redo of case conversion leave the block unmarked")
         CHECK(unmarked());
     }
 }
+
+namespace {
+// Every character of the document as stored, one entry each.
+std::vector<std::string> Characters(cDocument* doc)
+{
+    std::vector<std::string> chars;
+    for (POSITION_T pos = 0; pos < doc->GetTextSize() - 1; pos++)
+    {
+        chars.push_back(doc->GetCharNoAdvance(pos));
+    }
+    return chars;
+}
+
+std::string CharacterList(const std::vector<std::string>& chars)
+{
+    std::string out;
+    for (const auto& c : chars)
+    {
+        out += "[" + CodePoints(c) + "]";
+    }
+    return out;
+}
+
+// The modified flag and the undo history agree: the document is modified
+// exactly when its text differs from the saved text, and a modified
+// document has an undo step.
+void CheckFlagAndHistory(cDocument* doc, const std::string& savedText)
+{
+    std::string text = StoredText(doc);
+    INFO("text: ", CodePoints(text), " saved: ", CodePoints(savedText));
+    CHECK(doc->IsModified() == (text != savedText));
+    if (doc->IsModified())
+    {
+        CHECK(doc->CanUndo());
+    }
+}
+
+const std::string ACUTE = "\u0301";
+}
+
+TEST_CASE("A combining mark inserted at the start of the document is a character of its own")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-markstart-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("ab" + FAMILY);
+    doc->ClearUndoHistory();
+    doc->MarkSaved();
+    std::vector<std::string> before = Characters(doc);
+    REQUIRE(CharacterList(before) == CharacterList({ "a", "b", FAMILY }));
+
+    doc->SetPosition(0);
+    doc->Insert(ACUTE);
+
+    std::vector<std::string> expected = { ACUTE, "a", "b", FAMILY };
+    CHECK(CharacterList(Characters(doc)) == CharacterList(expected));
+    CHECK(CodePoints(doc->GetPlainText(0, doc->GetTextSize() - 1, "\n")) == CodePoints(ACUTE + "ab" + FAMILY));
+    CHECK(CodePoints(doc->GetText().substr(0, doc->GetText().find('\x7F'))) == CodePoints(ACUTE + "ab" + FAMILY));
+    REQUIRE(editor.SaveFile((dir / "mark.txt").string()));
+    CHECK(CodePoints(ReadBytes(dir / "mark.txt")).find(CodePoints(ACUTE + "ab" + FAMILY)) == 0);
+    CHECK(doc->IsModified());
+    CheckFlagAndHistory(doc, "ab" + FAMILY);
+
+    REQUIRE(editor.Undo());
+    CHECK(CharacterList(Characters(doc)) == CharacterList(before));
+    CheckFlagAndHistory(doc, "ab" + FAMILY);
+
+    REQUIRE(editor.Redo());
+    CHECK(CharacterList(Characters(doc)) == CharacterList(expected));
+    CheckFlagAndHistory(doc, "ab" + FAMILY);
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
