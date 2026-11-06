@@ -152,6 +152,90 @@ const std::string BOLD = "<bold>";
 const std::string RAW2 = "<raw:2>";
 }
 
+namespace {
+// head\r0-4 | b TAB 2 \r5-8 | a B x B \r9-13 | c RAW 3 \r14-17 | tail18
+void InsertSortLines(cDocument* doc)
+{
+    doc->Insert("head\rb");
+    InsertTabMarker(doc);
+    doc->Insert("2\ra");
+    InsertBoldMarker(doc);
+    doc->Insert("x");
+    InsertBoldMarker(doc);
+    doc->Insert("\rc");
+    doc->InsertRawByte(0x02);
+    doc->Insert("3\rtail");
+}
+
+const std::vector<std::string> LINE_A = { "a", BOLD, "x", BOLD };
+const std::vector<std::string> LINE_B = { "b", TAB, "2" };
+const std::vector<std::string> LINE_C = { "c", RAW2, "3" };
+
+std::vector<std::string> SortLinesCells(const std::vector<std::vector<std::string>>& lines)
+{
+    std::vector<std::string> cells = { "h", "e", "a", "d", "\\r" };
+    for (const auto& line : lines)
+    {
+        cells.insert(cells.end(), line.begin(), line.end());
+        cells.push_back("\\r");
+    }
+    for (const char* c : { "t", "a", "i", "l" })
+    {
+        cells.push_back(c);
+    }
+    return cells;
+}
+}
+
+TEST_CASE("SortBlock keeps tabs, bold and raw bytes with their lines, one undo restores")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    InsertSortLines(doc);
+    layout->LayoutDocument(doc);
+
+    // block ends at the end of the last sorted line, before its \r
+    doc->SetPosition(5);
+    doc->SetBeginBlock();
+    doc->SetPosition(17);
+    doc->SetEndBlock();
+
+    std::vector<std::string> before = Cells(doc);
+    REQUIRE(Join(before) == Join(SortLinesCells({ LINE_B, LINE_A, LINE_C })));
+
+    bool ascending = true;
+    std::vector<std::string> expected;
+    SUBCASE("ascending")
+    {
+        ascending = true;
+        expected = SortLinesCells({ LINE_A, LINE_B, LINE_C });
+    }
+    SUBCASE("descending")
+    {
+        ascending = false;
+        expected = SortLinesCells({ LINE_C, LINE_B, LINE_A });
+    }
+
+    editor.SortBlock(ascending);
+
+    CHECK(Join(Cells(doc)) == Join(expected));
+    CHECK(doc->GetNumberofParagraphs() == 5);
+    CHECK(doc->mBlockSet == true);
+    CHECK(doc->mStartBlock == 5);
+    CHECK(doc->mEndBlock == 17);
+
+    REQUIRE(editor.Undo());
+    CHECK(Join(Cells(doc)) == Join(before));
+
+    REQUIRE(editor.Redo());
+    CHECK(Join(Cells(doc)) == Join(expected));
+}
+
 TEST_CASE("UpperCaseBlock keeps tabs, bold and raw bytes in place, one undo restores")
 {
     ensureQApplication();

@@ -359,6 +359,10 @@ public:
     void ClearMarkers(void) ;
     void GetDisplayMarkers(POSITION_T start, POSITION_T end, std::vector<sDisplayMarker> &markers) ;
 
+    // --- Characters with their marker data ---
+    std::vector<sUndoCharInfo> CaptureCharacters(POSITION_T position, POSITION_T length) ;
+    void ReinsertCharacters(POSITION_T position, const std::vector<sUndoCharInfo> &chars) ;
+
     // --- Find ---
     POSITION_T FindNext(const std::string &needle, const POSITION_T &start, bool wildcard = false, bool casecmp = false, bool wholeword = false) ;
     POSITION_T FindPrev(const std::string &needle, const POSITION_T &start, bool wildcard = false, bool casecmp = false, bool wholeword = false) ;
@@ -470,8 +474,6 @@ private:
     // --- Undo Helpers ---
     void RecordAction(eUndoActionType type, POSITION_T position, POSITION_T length,
                       const std::vector<sUndoCharInfo> &chars, POSITION_T cursorBefore) ;
-    std::vector<sUndoCharInfo> CaptureCharacters(POSITION_T position, POSITION_T length) ;
-    void ReinsertCharacters(POSITION_T position, const std::vector<sUndoCharInfo> &chars) ;
     void CommitOpenUndoGroup(void) ;
     void PushUndoGroup(sUndoGroup &group) ;
     uint64_t TopUndoGroupId(void) const ;

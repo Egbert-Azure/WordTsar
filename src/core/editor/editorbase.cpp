@@ -3253,54 +3253,66 @@ void cEditorBase::SortBlock(bool ascending)
     POSITION_T start = 0, end = 0 ;
     mDocument->GetBlock(start, end) ;
 
-    // GetBlock() returns an exclusive end; GetBlockText() takes it as is.
-    std::string str = mDocument->GetBlockText(start, end) ;
-
-    // Split on the paragraph separator (\r), sort the lines, rejoin with
-    // the same separator. A trailing partial line (block doesn't end on a
-    // paragraph boundary) sorts in place along with the rest.
-    std::vector<std::string> lines ;
-    std::string current ;
-    for (char ch : str)
+    // the block's lines: start and length of each, without its hard return.
+    // A partial first or last line is a line of its own.
+    std::vector<POSITION_T> lineStarts ;
+    std::vector<POSITION_T> lineLengths ;
+    POSITION_T lineStart = start ;
+    for (POSITION_T pos = start ; pos < end ; pos++)
     {
-        if (ch == '\r')
+        std::string grapheme = mDocument->GetCharNoAdvance(pos) ;
+        if (grapheme.size() == 1 && grapheme[0] == HARD_RETURN)
         {
-            lines.push_back(current) ;
-            current.clear() ;
-        }
-        else
-        {
-            current += ch ;
+            lineStarts.push_back(lineStart) ;
+            lineLengths.push_back(pos - lineStart) ;
+            lineStart = pos + 1 ;
         }
     }
-    lines.push_back(current) ;
+    lineStarts.push_back(lineStart) ;
+    lineLengths.push_back(end - lineStart) ;
 
-    if (ascending)
+    // lines are compared by their plain text
+    std::vector<std::string> keys ;
+    std::vector<std::vector<sUndoCharInfo>> lines ;
+    for (size_t i = 0 ; i < lineStarts.size() ; i++)
     {
-        std::sort(lines.begin(), lines.end()) ;
-    }
-    else
-    {
-        std::sort(lines.begin(), lines.end(),
-                   [](const std::string& a, const std::string& b) { return a > b ; }) ;
+        keys.push_back(mDocument->GetPlainText(lineStarts[i], lineStarts[i] + lineLengths[i], "")) ;
+        lines.push_back(mDocument->CaptureCharacters(lineStarts[i], lineLengths[i])) ;
     }
 
-    std::string sorted ;
-    for (size_t i = 0 ; i < lines.size() ; i++)
+    std::vector<size_t> order(lineStarts.size()) ;
+    for (size_t i = 0 ; i < order.size() ; i++)
     {
-        sorted += lines[i] ;
-        if (i + 1 < lines.size())
-        {
-            sorted += '\r' ;
-        }
+        order[i] = i ;
     }
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b)
+    {
+        return ascending ? keys[a] < keys[b] : keys[a] > keys[b] ;
+    }) ;
 
     BeginBatchUpdate() ;
 
-    mDocument->DeleteBlock() ;
-    mDocument->SetPosition(start) ;
-    InsertWordStarString(sorted) ;
-    CloseTypingGroup() ;
+    // replace the text of each line that moves, last line first so the
+    // positions of earlier lines stay valid; hard returns are not touched
+    for (size_t i = order.size() ; i > 0 ; i--)
+    {
+        size_t slot = i - 1 ;
+        if (order[slot] == slot)
+        {
+            continue ;
+        }
+
+        if (lineLengths[slot] > 0)
+        {
+            mDocument->Delete(lineStarts[slot], lineLengths[slot]) ;
+        }
+        mDocument->ReinsertCharacters(lineStarts[slot], lines[order[slot]]) ;
+    }
+
+    mDocument->mStartBlock = start ;
+    mDocument->mEndBlock = end ;
+    mDocument->mBlockSet = true ;
+    mDocument->SetPosition(end) ;
 
     EndBatchUpdate() ;
     mDocument->EndUndoGroup() ;
