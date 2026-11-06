@@ -10347,9 +10347,8 @@ TEST_CASE("Layout R2-1c: DOT_NOTIMPLEMENTED commands - group M-X")
     // Unknown 'O' command (to cover the break at line 421)
     CHECK(f.parser.ParseDotCommand(".OX on") == DOT_UNKNOWN);
 
-    // 'P' commands (PE, PF, P# -- PA/PC/PL/PO/PN already tested)
+    // 'P' commands (PE, P# -- PA/PC/PF/PL/PO/PN already tested)
     CHECK(f.parser.ParseDotCommand(".PE ") == DOT_NOTIMPLEMENTED);
-    CHECK(f.parser.ParseDotCommand(".PF on") == DOT_NOTIMPLEMENTED);
     CHECK(f.parser.ParseDotCommand(".P# 1") == DOT_NOTIMPLEMENTED);
 
     // 'R' commands (RP, RV -- RM/RR already tested)
@@ -10375,6 +10374,16 @@ TEST_CASE("Layout R2-1c: DOT_NOTIMPLEMENTED commands - group M-X")
     CHECK(f.parser.ParseDotCommand(".XW entry") == DOT_NOTIMPLEMENTED);
     CHECK(f.parser.ParseDotCommand(".XL ") == DOT_NOTIMPLEMENTED);
     CHECK(f.parser.ParseDotCommand(".XX -") == DOT_NOTIMPLEMENTED);
+}
+
+TEST_CASE("Paragraph realignment .pf accepts on off and dis")
+{
+    sParserFixture f;
+
+    CHECK(f.parser.ParseDotCommand(".pf on") == DOT_GOOD);
+    CHECK(f.parser.ParseDotCommand(".pf off") == DOT_GOOD);
+    CHECK(f.parser.ParseDotCommand(".PF DIS") == DOT_GOOD);
+    CHECK(f.parser.ParseDotCommand(".pf maybe") == DOT_ERROR);
 }
 
 // =========================================================================

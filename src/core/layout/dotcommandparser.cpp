@@ -482,9 +482,15 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
             {
                 return DOT_NOTIMPLEMENTED;
             }
-            if (cmdCode == "PF")  // Paragraph Realignment
+            if (cmdCode == "PF")  // Paragraph Realignment: layout and print always reflow
             {
-                return DOT_NOTIMPLEMENTED;
+                std::string param = upperCmd.substr(3);
+                param.erase(0, param.find_first_not_of(" \t\r\n"));
+                if (!param.empty())
+                {
+                    param.erase(param.find_last_not_of(" \t\r\n") + 1);
+                }
+                return (param == "ON" || param == "OFF" || param == "DIS") ? DOT_GOOD : DOT_ERROR;
             }
             if (cmdCode[0] == 'P' && cmdCode[1] == '#')  // Paragraph Number (.P#)
             {
