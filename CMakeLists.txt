@@ -3,27 +3,65 @@ cmake_minimum_required(VERSION 3.16)
 # Minimum macOS version. A non-empty CMAKE_OSX_DEPLOYMENT_TARGET from the
 # command line or a preset is kept. Otherwise it is the highest minos of the
 # Qt frameworks and plugins the app links or bundles, read with otool from
-# the first prefix that holds QtCore.framework; 14.0 if none is found.
-function(wordtsar_qt_minos out_var)
-    set(prefixes)
+# the Qt that find_package(Qt6) below resolves to; 14.0 if no Qt is found.
+# The target must be set before project(), so the Qt6Config.cmake location
+# is probed here in find_package order and checked against Qt6_DIR after
+# find_package(Qt6).
+set(WORDTSAR_QT_FALLBACK_PREFIXES
+    "$ENV{HOME}/Qt/6.8.2/macos" "$ENV{HOME}/Qt/6.7.0/macos" "$ENV{HOME}/Qt/6.6.0/macos"
+    "/opt/homebrew/opt/qt@6" "/usr/local/opt/qt@6")
+
+# Directory holding Qt6Config.cmake, searched in find_package order:
+# Qt6_DIR, Qt6_ROOT, CMAKE_PREFIX_PATH, the Qt6_DIR and CMAKE_PREFIX_PATH
+# environment variables, PATH, the CMake system prefixes, then
+# WORDTSAR_QT_FALLBACK_PREFIXES.
+function(wordtsar_qt_cmake_dir out_var)
+    set(${out_var} "" PARENT_SCOPE)
+    set(dirs)
     if(Qt6_DIR)
-        get_filename_component(qt_dir_prefix "${Qt6_DIR}/../../.." ABSOLUTE)
-        list(APPEND prefixes "${qt_dir_prefix}")
+        list(APPEND dirs "${Qt6_DIR}")
     endif()
-    list(APPEND prefixes ${CMAKE_PREFIX_PATH} $ENV{CMAKE_PREFIX_PATH}
-        "$ENV{HOME}/Qt/6.8.2/macos" "$ENV{HOME}/Qt/6.7.0/macos" "$ENV{HOME}/Qt/6.6.0/macos"
-        "/opt/homebrew/opt/qt@6" "/usr/local/opt/qt@6" "/opt/homebrew" "/usr/local")
-    set(qt_prefix "")
+    string(REPLACE ":" ";" env_root "$ENV{Qt6_ROOT}")
+    set(prefixes ${Qt6_ROOT} ${env_root} ${CMAKE_PREFIX_PATH})
     foreach(p IN LISTS prefixes)
-        if(EXISTS "${p}/lib/QtCore.framework/QtCore")
-            set(qt_prefix "${p}")
-            break()
+        list(APPEND dirs "${p}/lib/cmake/Qt6")
+    endforeach()
+    if(NOT "$ENV{Qt6_DIR}" STREQUAL "")
+        list(APPEND dirs "$ENV{Qt6_DIR}")
+    endif()
+    string(REPLACE ":" ";" prefixes "$ENV{CMAKE_PREFIX_PATH}")
+    string(REPLACE ":" ";" env_path "$ENV{PATH}")
+    foreach(p IN LISTS env_path)
+        if(p MATCHES "^(.*)/s?bin/?$")
+            list(APPEND prefixes "${CMAKE_MATCH_1}")
+        elseif(NOT p STREQUAL "")
+            list(APPEND prefixes "${p}")
         endif()
     endforeach()
-    if(qt_prefix STREQUAL "")
-        set(${out_var} "" PARENT_SCOPE)
-        return()
+    execute_process(COMMAND brew --prefix OUTPUT_VARIABLE brew_prefix
+        RESULT_VARIABLE brew_rc OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(brew_rc EQUAL 0 AND IS_DIRECTORY "${brew_prefix}")
+        list(APPEND prefixes "${brew_prefix}")
+    else()
+        list(APPEND prefixes "/opt/homebrew")
     endif()
+    list(APPEND prefixes "/sw" "/opt/local" "/usr/local" "/usr" "" "/usr/X11R6" "/usr/pkg" "/opt"
+        ${WORDTSAR_QT_FALLBACK_PREFIXES})
+    foreach(p IN LISTS prefixes)
+        list(APPEND dirs "${p}/lib/cmake/Qt6")
+    endforeach()
+    foreach(d IN LISTS dirs)
+        if(EXISTS "${d}/Qt6Config.cmake")
+            get_filename_component(d "${d}" ABSOLUTE)
+            set(${out_var} "${d}" PARENT_SCOPE)
+            return()
+        endif()
+    endforeach()
+endfunction()
+
+# Highest minos of the Qt binaries under the prefix of qt_cmake_dir.
+function(wordtsar_qt_minos out_var qt_cmake_dir)
+    get_filename_component(qt_prefix "${qt_cmake_dir}/../../.." ABSOLUTE)
     set(binaries)
     foreach(fw Core Gui Widgets PrintSupport DBus)
         list(APPEND binaries "${qt_prefix}/lib/Qt${fw}.framework/Qt${fw}")
@@ -55,7 +93,12 @@ endfunction()
 
 if(CMAKE_HOST_APPLE)
     if("$CACHE{CMAKE_OSX_DEPLOYMENT_TARGET}" STREQUAL "")
-        wordtsar_qt_minos(WORDTSAR_QT_MINOS)
+        wordtsar_qt_cmake_dir(WORDTSAR_QT_PROBE_DIR)
+        set(WORDTSAR_QT_MINOS "")
+        if(WORDTSAR_QT_PROBE_DIR)
+            message(STATUS "Qt for deployment target: ${WORDTSAR_QT_PROBE_DIR}")
+            wordtsar_qt_minos(WORDTSAR_QT_MINOS "${WORDTSAR_QT_PROBE_DIR}")
+        endif()
         if(WORDTSAR_QT_MINOS)
             set(CMAKE_OSX_DEPLOYMENT_TARGET "${WORDTSAR_QT_MINOS}")
         else()
@@ -93,9 +136,20 @@ option(BUILD_GUI "Build the Qt GUI (WordTsar)" ON)
 if(BUILD_GUI)
 find_package(Qt6 QUIET COMPONENTS Core)
 if(NOT Qt6_FOUND)
-    set(CMAKE_PREFIX_PATH "$ENV{HOME}/Qt/6.8.2/macos" "$ENV{HOME}/Qt/6.7.0/macos" "$ENV{HOME}/Qt/6.6.0/macos" "/opt/homebrew/opt/qt@6" "/usr/local/opt/qt@6")
+    set(CMAKE_PREFIX_PATH ${WORDTSAR_QT_FALLBACK_PREFIXES})
 endif()
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets PrintSupport)
+if(DEFINED WORDTSAR_QT_PROBE_DIR)
+    get_filename_component(qt_found_real "${Qt6_DIR}" REALPATH)
+    get_filename_component(qt_probe_real "${WORDTSAR_QT_PROBE_DIR}" REALPATH)
+    if(WORDTSAR_QT_PROBE_DIR STREQUAL "" OR NOT qt_found_real STREQUAL qt_probe_real)
+        message(FATAL_ERROR
+            "The macOS deployment target was derived from the Qt in "
+            "'${WORDTSAR_QT_PROBE_DIR}', but find_package(Qt6) found '${Qt6_DIR}'. "
+            "Pass -DQt6_DIR=<dir>, a CMAKE_PREFIX_PATH that selects one Qt, or "
+            "-DCMAKE_OSX_DEPLOYMENT_TARGET=<version>.")
+    endif()
+endif()
 endif()
 
 # TUI Build Options (off by default; the terminal UI is a separate, opt-in target)
