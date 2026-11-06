@@ -767,3 +767,77 @@ TEST_CASE("GUI Generate - the editor that runs the generator is gone before the 
     CHECK(QApplication::activeWindow() == active) ;
     CHECK(editor.isVisible() == false) ;
 }
+
+
+namespace {
+
+/////////////////////////////////////////////////////////////////////////////
+/// Runs the core generator on an editor with `font` that loads
+/// `sourcePath`; returns the TOC and index lines read back.
+/////////////////////////////////////////////////////////////////////////////
+std::string CoreOutputWithFont(const std::string &sourcePath, const std::string &font)
+{
+    std::string stem = (std::filesystem::path(sourcePath).parent_path() / std::filesystem::path(sourcePath).stem()).string() ;
+    {
+        cEditorCtrl editor ;
+        editor.SetFont(font) ;
+        REQUIRE(editor.LoadFile(sourcePath)) ;
+        std::vector<std::string> outputFiles ;
+        REQUIRE(cTOCIndexGenerator::GenerateTOC(&editor, sourcePath, outputFiles)) ;
+    }
+    {
+        cEditorCtrl editor ;
+        editor.SetFont(font) ;
+        REQUIRE(editor.LoadFile(sourcePath)) ;
+        std::string outputFile ;
+        REQUIRE(cTOCIndexGenerator::GenerateIndex(&editor, sourcePath, outputFile)) ;
+    }
+    cEditorCtrl reader ;
+    std::string toc = tocindextest::Join(tocindextest::LoadGenerated(reader, stem + ".TOC")) ;
+    return toc + " / " + tocindextest::Join(tocindextest::LoadGenerated(reader, stem + ".IDX")) ;
+}
+
+} // namespace
+
+
+TEST_CASE("GUI Generate - page numbers come from the open editor's font")
+{
+    ensureQApplication() ;
+
+    tocindextest::cScratchDir dir("guifont") ;
+    REQUIRE(dir.IsValid()) ;
+    std::string sourcePath = dir.File("long.ws") ;
+    {
+        std::vector<std::string> lines ;
+        for (int loop = 1 ; loop <= 150 ; loop++)
+        {
+            lines.push_back("Line " + std::to_string(loop)) ;
+        }
+        lines.push_back(".tc End #") ;
+        lines.push_back(".ix Last") ;
+        cEditorCtrl writer ;
+        tocindextest::SetSource(writer, lines) ;
+        cWordstarFile file(&writer) ;
+        REQUIRE(file.SaveFile(sourcePath, writer.GetDocument()->GetTextSize())) ;
+    }
+
+    const std::string bigFont = "Monospace|18.0|0|0|0|0|0" ;
+    std::string defaultRun = CoreOutputWithFont(sourcePath, "Monospace|12.0|0|0|0|0|0") ;
+    std::string bigRun = CoreOutputWithFont(sourcePath, bigFont) ;
+    MESSAGE("12pt: " << defaultRun << "  18pt: " << bigRun) ;
+    REQUIRE(defaultRun != bigRun) ;
+
+    cGenerateTestEditor editor ;
+    editor.SetFont(bigFont) ;
+    editor.mChooserAnswer = sourcePath ;
+    editor.GenerateTOCFromFile() ;
+    editor.GenerateIndexFromFile() ;
+    REQUIRE(editor.mMessages.size() == 2) ;
+
+    cEditorCtrl reader ;
+    std::string stem = dir.File("long") ;
+    std::string guiRun = tocindextest::Join(tocindextest::LoadGenerated(reader, stem + ".TOC")) + " / " +
+                         tocindextest::Join(tocindextest::LoadGenerated(reader, stem + ".IDX")) ;
+    CHECK(guiRun == bigRun) ;
+    CHECK(guiRun != defaultRun) ;
+}

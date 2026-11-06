@@ -43,12 +43,8 @@ class cEditorBase ;
 /// Insert->Index/TOC Entry, or typing the dot command directly); this
 /// class is what actually reads them and produces output.
 ///
-/// Real WordStar also supports marking an index entry inline over a span
-/// of existing text (Insert->Mark Text for Index, the classic ^PK command)
-/// rather than as its own .ix dot-command line. That mechanism is a
-/// separate, pre-existing gap -- WordTsar's native .ws reader already
-/// discards it entirely on load (SEQ_INDEXENTRY is skipped, unimplemented)
-/// -- and is not addressed here; only freestanding .ix lines are read.
+/// Index entries also come from text between a pair of index marks
+/// (Insert->Mark for Index, ^PK) and from kept 0Eh index items.
 ///
 /////////////////////////////////////////////////////////////////////////////
 class cTOCIndexGenerator

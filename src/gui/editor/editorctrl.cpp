@@ -8167,6 +8167,7 @@ void cEditorCtrl::GenerateFromFile(bool index)
     {
         cEditorCtrl generator;
         generator.mAutoSaveTimer->stop();
+        generator.SetFont(GetFont());
         generator.SetCodePage(GetCodePage());
         generator.mSpellCheckLanguage = mSpellCheckLanguage;
         generator.GetLayout()->SetHyphenationLanguage(mSpellCheckLanguage);
