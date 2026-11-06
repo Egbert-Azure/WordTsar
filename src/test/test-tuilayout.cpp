@@ -660,7 +660,7 @@ TEST_CASE("TUI layout - a kept sequence is invisible and has no width")
             plainLayout.SetShowControl(mode);
             plainLayout.SetMarkersVisible(markersVisible);
 
-            CHECK(layout.GetDisplayCharacter(1, "\x7F") == "");
+            CHECK(layout.GetDisplayCharacter(1, "\x7F") == "<Index>");
 
             bool decorated = false;
             bool plainDecorated = false;

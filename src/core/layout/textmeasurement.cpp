@@ -81,7 +81,7 @@
 /// - STYLE_TAB displays as >, !, [, or # based on tab type
 /// - STYLE_FONT1 displays as <fontname size>
 /// - STYLE_RAW_BYTE displays as ^ plus the byte + 0x40, ^? for 0x7F
-/// - STYLE_RAW_SEQUENCE displays as nothing
+/// - STYLE_RAW_SEQUENCE displays as <Para#> (0Dh) or <Index> (0Eh)
 /// - All other graphemes are returned unchanged
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -192,10 +192,16 @@ std::string cTextMeasurement::GetDisplayCharacter(POSITION_T documentPos,
             }
         }
 
-        // Kept WordStar sequence: nothing
+        // Kept WordStar sequence: <Index> for an index item, <Para#> for a
+        // paragraph number
         if (controlType == STYLE_RAW_SEQUENCE)
         {
-            return std::string();
+            sRawSequence sequence;
+            if (doc->GetRawSequence(documentPos, sequence) && sequence.type == 0x0D)
+            {
+                return "<Para#>";
+            }
+            return "<Index>";
         }
 
         // Raw byte from a text file: caret notation, ^? for 0x7F

@@ -4247,23 +4247,14 @@ void cLayoutBase::MarkControlCodesInSegment(sSegmentLayout& segment,
         segmentEnd = static_cast<POSITION_T>(graphemes.size());
     }
 
-    POSITION_T paragraphStart = 0;
-    POSITION_T paragraphEnd = 0;
-    if (mDocument)
-    {
-        mDocument->GetParagraphStartandEnd(segment.paragraph, paragraphStart, paragraphEnd);
-    }
-
     // Scan segment's grapheme range for control codes
     size_t segmentIndex = 0;
     for (POSITION_T i = segmentStart; i < segmentEnd; ++i)
     {
         const std::string& glyph = graphemes[i];
 
-        // Check if this is a control code (starts with MARKER_CHAR); a kept
-        // WordStar sequence is not shown
-        if (!glyph.empty() && glyph[0] == MARKER_CHAR &&
-            !(mDocument && mDocument->GetControlChar(paragraphStart + i) == STYLE_RAW_SEQUENCE))
+        // Check if this is a control code (starts with MARKER_CHAR)
+        if (!glyph.empty() && glyph[0] == MARKER_CHAR)
         {
             segment.hasControlCodes = true;
             segment.controlCodeIndices.push_back(segmentIndex);

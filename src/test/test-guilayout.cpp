@@ -1536,6 +1536,16 @@ sRawSequence KeptIndexItem(const std::string& body)
     return sequence;
 }
 
+// a paragraph number body: 3 level bytes, 8 level words, 31 format bytes
+sRawSequence KeptParagraphNumber()
+{
+    sRawSequence sequence;
+    sequence.type = 0x0D;
+    sequence.body = std::string(3 + 16, '\0') + std::string("9.9.9.9.9.9.9.9") + std::string(16, '\0');
+    sequence.body[2] = 1;
+    return sequence;
+}
+
 // width of all segments, and whether any has a tag, marker or control code index
 COORD_T SegmentsWidth(const std::vector<sSegmentLayout>& segments, bool& decorated)
 {
@@ -1554,7 +1564,7 @@ COORD_T SegmentsWidth(const std::vector<sSegmentLayout>& segments, bool& decorat
 }   // anonymous namespace
 
 
-TEST_CASE("GetDisplayCharacter() - a kept sequence shows nothing with ^OD on and off")
+TEST_CASE("GetDisplayCharacter() - a kept index item shows <Index> and a paragraph number <Para#> as bold shows B")
 {
     ensureQApplication();
 
@@ -1562,15 +1572,22 @@ TEST_CASE("GetDisplayCharacter() - a kept sequence shows nothing with ^OD on and
     cLayout layout;
     layout.SetDocument(&doc);
 
+    // A0 <0Eh>1 B2 <0Dh>3 C4 ^B5 D6 \r7
     doc.Insert("A");
     doc.InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
-    doc.Insert("B\r");
+    doc.Insert("B");
+    doc.InsertRawSequence(KeptParagraphNumber());
+    doc.Insert("C");
+    doc.Insert(std::string(1, static_cast<char>(STYLE_BOLD)));
+    doc.Insert("D\r");
 
     for (eShowControl mode : { SHOW_ALL, SHOW_DOT, SHOW_NONE })
     {
         CAPTURE(static_cast<int>(mode));
         layout.SetShowControl(mode);
-        CHECK(layout.GetDisplayCharacter(1, "\x7F") == "");
+        CHECK(layout.GetDisplayCharacter(5, "\x7F") == "B");
+        CHECK(layout.GetDisplayCharacter(1, "\x7F") == "<Index>");
+        CHECK(layout.GetDisplayCharacter(3, "\x7F") == "<Para#>");
     }
 }
 
@@ -1660,7 +1677,7 @@ TEST_CASE("BuildHeaderFooterSegments() - a kept sequence in a header is hidden o
 }
 
 
-TEST_CASE("Layout - a kept sequence in a .tc line keeps the dot command and takes no width")
+TEST_CASE("Layout - a kept sequence in a .tc line keeps the dot command and shows its tag as bold does")
 {
     ensureQApplication();
 
@@ -1669,34 +1686,64 @@ TEST_CASE("Layout - a kept sequence in a .tc line keeps the dot command and take
     doc.InsertRawSequence(KeptIndexItem("Alpha"));
     doc.Insert("One\rBody\r");
 
+    cDocument bold;
+    bold.Insert(".tc Chapter ");
+    bold.Insert(std::string(1, static_cast<char>(STYLE_BOLD)));
+    bold.Insert("One\rBody\r");
+
     cDocument plain;
     plain.Insert(".tc Chapter One\rBody\r");
 
-    auto dotLine = [](cDocument& source, bool& isCommand, bool& decorated)
+    // width of the dot line, whether it is a command, and the text of its control codes
+    auto dotLine = [](cDocument& source, eShowControl mode, bool& isCommand, std::string& codes)
     {
         cLayout layout;
         layout.SetDocument(&source);
-        layout.SetShowControl(SHOW_ALL);
+        layout.SetShowControl(mode);
         layout.LayoutDocument(&source);
         isCommand = layout.ParagraphIsCommand(0);
         const sParagraphLayout* para = layout.GetParagraphLayout(0);
         REQUIRE(para != nullptr);
         REQUIRE(para->lines.size() == 1);
         std::vector<sSegmentLayout> segments(para->lines[0].segments.begin(), para->lines[0].segments.end());
+        codes.clear();
+        for (const auto& segment : segments)
+        {
+            for (size_t index : segment.controlCodeIndices)
+            {
+                POSITION_T pos = segment.startPosition + static_cast<POSITION_T>(index);
+                codes += layout.GetDisplayCharacter(pos, source.GetCharNoAdvance(pos));
+            }
+        }
+        bool decorated = false;
         return SegmentsWidth(segments, decorated);
     };
 
-    bool isCommand = false;
-    bool plainIsCommand = false;
-    bool decorated = false;
-    bool plainDecorated = false;
-    COORD_T width = dotLine(doc, isCommand, decorated);
-    COORD_T plainWidth = dotLine(plain, plainIsCommand, plainDecorated);
+    for (eShowControl mode : { SHOW_ALL, SHOW_DOT })
+    {
+        CAPTURE(static_cast<int>(mode));
+        bool isCommand = false;
+        bool boldIsCommand = false;
+        bool plainIsCommand = false;
+        std::string codes;
+        std::string boldCodes;
+        std::string plainCodes;
+        COORD_T width = dotLine(doc, mode, isCommand, codes);
+        COORD_T boldWidth = dotLine(bold, mode, boldIsCommand, boldCodes);
+        COORD_T plainWidth = dotLine(plain, mode, plainIsCommand, plainCodes);
 
-    CHECK(isCommand);
-    CHECK(plainIsCommand);
-    CHECK(width == doctest::Approx(plainWidth).epsilon(0.001));
-    CHECK(decorated == plainDecorated);
+        CHECK(isCommand);
+        CHECK(boldIsCommand);
+        CHECK(plainIsCommand);
+        CHECK(plainCodes.empty());
+        CHECK((width > plainWidth) == (boldWidth > plainWidth));
+        CHECK(codes.empty() == boldCodes.empty());
+        if (!boldCodes.empty())
+        {
+            CHECK(boldCodes == "B");
+            CHECK(codes == "<Index>");
+        }
+    }
 }
 
 
