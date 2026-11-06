@@ -1437,6 +1437,94 @@ TEST_CASE("BuildParagraphSegments() - a raw byte shows in caret notation and is 
 }
 
 
+TEST_CASE("BuildParagraphSegments() - a raw byte has no width in the print layout")
+{
+    ensureQApplication();
+
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+
+    // A0 ^B1 B2 \r3
+    doc.Insert("A");
+    doc.InsertRawByte(0x02);
+    doc.Insert("B\r");
+
+    auto byteWidth = [&](void)
+    {
+        std::vector<sSegmentLayout> segments = layout.BuildParagraphSegments(0);
+        REQUIRE(segments.size() == 1);
+        REQUIRE(segments[0].position.size() == 4);
+        CHECK(segments[0].length == 4);
+        return segments[0].position[2] - segments[0].position[1];
+    };
+
+    SUBCASE("screen: the width of the caret notation")
+    {
+        for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+        {
+            CAPTURE(static_cast<int>(mode));
+            layout.SetShowControl(mode);
+            layout.SetMarkersVisible(true);
+            CHECK(byteWidth() == doctest::Approx(layout.GetTextWidth("^B")).epsilon(0.001));
+        }
+    }
+
+    SUBCASE("print: no width")
+    {
+        layout.SetShowControl(SHOW_NONE);
+        layout.SetMarkersVisible(false);
+        CHECK(byteWidth() == doctest::Approx(0.0));
+        layout.SetMarkersVisible(true);
+    }
+}
+
+
+TEST_CASE("BuildHeaderFooterSegments() - a raw byte in a header is hidden on screen and in print")
+{
+    ensureQApplication();
+
+    // .h1 a^Bb and the same header without the byte
+    cDocument doc;
+    doc.Insert(".h1 a");
+    doc.InsertRawByte(0x02);
+    doc.Insert("b\r");
+    doc.Insert("text\r");
+
+    cDocument plain;
+    plain.Insert(".h1 ab\r");
+    plain.Insert("text\r");
+
+    auto headerWidth = [&](cDocument& source, bool markersVisible, std::vector<std::string>& graphemes)
+    {
+        cLayout layout;
+        layout.SetDocument(&source);
+        layout.SetShowControl(markersVisible ? SHOW_ALL : SHOW_NONE);
+        layout.SetMarkersVisible(markersVisible);
+        layout.LayoutDocument(&source);
+
+        COORD_T width = 0;
+        for (const auto& segment : layout.BuildHeaderFooterSegments(0, 4, 1, graphemes))
+        {
+            width += segment.totalWidth;
+        }
+        return width;
+    };
+
+    for (bool markersVisible : { true, false })
+    {
+        CAPTURE(markersVisible);
+        std::vector<std::string> graphemes;
+        std::vector<std::string> plainGraphemes;
+        COORD_T width = headerWidth(doc, markersVisible, graphemes);
+        COORD_T plainWidth = headerWidth(plain, markersVisible, plainGraphemes);
+
+        CHECK(graphemes == plainGraphemes);
+        CHECK(width == doctest::Approx(plainWidth).epsilon(0.001));
+    }
+}
+
+
 TEST_CASE("GetDisplayCharacter() - caret notation for every raw byte")
 {
     ensureQApplication();

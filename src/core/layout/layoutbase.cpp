@@ -7082,7 +7082,8 @@ void sDisplayList::Build(const sViewport& viewport, const cLayoutBase* layout)
 ///
 /// @brief
 /// Show or hide the inline block and place markers. Print layouts hide
-/// them so markers never change the printed page.
+/// them so markers never change the printed page. While they are hidden a
+/// raw byte has no width.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cLayoutBase::SetMarkersVisible(bool visible)
