@@ -71,6 +71,24 @@ bool VariableCompare(const VariablePair &first, const VariablePair &second) ;
 using RawBytePair = std::pair<POSITION_T, unsigned char> ;
 bool RawByteCompare(const RawBytePair &first, const RawBytePair &second) ;
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @struct sRawSequence
+///
+/// @brief
+/// A WordStar sequence kept as it was read: its type byte and its body,
+/// the bytes between the type byte and the closing count.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sRawSequence
+{
+    unsigned char type = 0 ;
+    std::string body ;
+} ;
+
+using RawSequencePair = std::pair<POSITION_T, sRawSequence> ;
+bool RawSequenceCompare(const RawSequencePair &first, const RawSequencePair &second) ;
+
 struct sParagraphData ;
 bool ParagraphCompare(const sParagraphData &first, const sParagraphData &second) ;
 
@@ -136,6 +154,7 @@ struct sParagraphData
     std::vector<EndnotePair> endnote ;                   ///< endnotes
     std::vector<VariablePair> variable ;                 ///< variable expansions (&@&, &#&, etc.)
     std::vector<RawBytePair> rawbyte ;                   ///< control bytes from a text file
+    std::vector<RawSequencePair> rawsequence ;           ///< WordStar sequences kept as read
 
     cGraphemeOffsets offsets;                              ///< compact grapheme boundary cache
     long words = -1 ;                                    ///< word count, -1 = not counted since the last text change
@@ -186,6 +205,7 @@ struct sUndoCharInfo
     std::optional<sNote> endnoteData ;
     std::optional<eVariableType> variableData ;
     std::optional<unsigned char> rawByteData ;
+    std::optional<sRawSequence> rawSequenceData ;
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -303,6 +323,7 @@ public:
     void InsertEndnote(sNote &note) ;                       // insert an endnote
     void InsertVariable(eVariableType type) ;               // insert a variable (&@&, &#&, etc.)
     void InsertRawByte(unsigned char byte) ;                // insert a control byte from a text file
+    void InsertRawSequence(const sRawSequence &sequence) ;  // insert a WordStar sequence kept as read
     void InsertRaw(const std::string &text) ;               // Insert(), with IsRawTextByte() bytes as raw bytes
 
     // --- Loading State ---
@@ -337,6 +358,7 @@ public:
     bool GetNote(POSITION_T position, sNote &note) ;
     eModifiers GetControlChar(POSITION_T) ;
     unsigned char GetRawByte(POSITION_T position) ;
+    bool GetRawSequence(POSITION_T position, sRawSequence &sequence) ;
 
     // --- Text Retrieval ---
     std::string GetParagraphText(PARAGRAPH_T para) ;
@@ -447,6 +469,7 @@ private:
     void DeleteFont(POSITION_T position) ;
     void DeleteVariable(POSITION_T position) ;
     void DeleteRawByte(POSITION_T position) ;
+    void DeleteRawSequence(POSITION_T position) ;
     void DeleteControlChar(POSITION_T position) ;
 
     // --- Paragraph Management ---

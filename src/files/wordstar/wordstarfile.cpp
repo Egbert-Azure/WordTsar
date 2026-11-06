@@ -1249,6 +1249,24 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
                 {
                     continue ;      // a control byte from a text file is left out
                 }
+                if(control == STYLE_RAW_SEQUENCE)
+                {
+                    // a kept sequence is written back as read
+                    sRawSequence sequence ;
+                    if(mDocument->GetRawSequence(loop, sequence) == true)
+                    {
+                        intro.size = static_cast<uint16_t>(sequence.body.size() + 4) ;
+                        intro.type = static_cast<char>(sequence.type) ;
+                        close.size = intro.size ;
+
+                        out.append(reinterpret_cast<const char *>(&intro), sizeof(sSeqIntro)) ;
+                        out.append(sequence.body.data(), sequence.body.size()) ;
+                        out.append(reinterpret_cast<const char *>(&close), sizeof(sSeqClose)) ;
+
+                        stylecounter += sequence.body.size() + sizeof(sSeqIntro) + sizeof(sSeqClose) ;
+                    }
+                    continue ;
+                }
                 ch1 = control ;
             }
 
@@ -2203,10 +2221,10 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
  * - SEQ_NEWFONT: New font definitions
  * - SEQ_TAB: Tab settings
  * - SEQ_FOOTNOTE/SEQ_ENDNOTE/SEQ_ANNOTATION/SEQ_COMMENT: note content
+ * - SEQ_PARAGRAPHNUMBER/SEQ_INDEXENTRY: kept as read (cDocument::InsertRawSequence)
  * 
- * Unimplemented sequence types (SEQ_ENDOFPAGE, SEQ_PAGEOFFSET, SEQ_PARAGRAPHNUMBER,
- * SEQ_INDEXENTRY, SEQ_PRINTERCONTROL, SEQ_GRAPHICS, SEQ_PARAGRAPHSTYLE, SEQ_ALTFONT)
- * are skipped entirely.
+ * Unimplemented sequence types (SEQ_ENDOFPAGE, SEQ_PAGEOFFSET, SEQ_PRINTERCONTROL,
+ * SEQ_GRAPHICS, SEQ_PARAGRAPHSTYLE, SEQ_ALTFONT) are skipped entirely.
  * 
  * @note The method always skips 3 trailing bytes at the end of each sequence
  * 
@@ -2275,11 +2293,23 @@ void cWordstarFile::HandleSequence(void)
             }
             break ;
 
+        case eSequence::SEQ_PARAGRAPHNUMBER :
+        case eSequence::SEQ_INDEXENTRY :
+            {
+                sRawSequence sequence ;
+                sequence.type = static_cast<unsigned char>(intro.type) ;
+                if(ReadBytes(bodySize, sequence.body) == false)
+                {
+                    return ;
+                }
+
+                mDocument->InsertRawSequence(sequence) ;
+            }
+            break ;
+
         // not implemented
         case eSequence::SEQ_ENDOFPAGE :
         case eSequence::SEQ_PAGEOFFSET :
-        case eSequence::SEQ_PARAGRAPHNUMBER :
-        case eSequence::SEQ_INDEXENTRY :
         case eSequence::SEQ_PRINTERCONTROL :
         case eSequence::SEQ_GRAPHICS :
         case eSequence::SEQ_PARAGRAPHSTYLE :

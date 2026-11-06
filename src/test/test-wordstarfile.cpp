@@ -693,6 +693,214 @@ TEST_CASE("cWordstarFile - a comment sequence loads as a marker and saves back b
 }
 
 
+namespace
+{
+
+// 0Dh body: forward 1, back 0, level 2, the eight level numbers as words
+// (level 2 is 3), then the format string padded with NUL to 31 bytes
+std::string ParagraphNumberBody(void)
+{
+    std::string body("\x01\x00\x02", 3);
+    for (int level = 1; level <= 8; level++)
+    {
+        body += static_cast<char>(level == 2 ? 3 : 0);
+        body += '\0';
+    }
+    std::string format = "1.1.1.1.1.1.1.1";
+    format.resize(31, '\0');
+    body += format;
+    return body;
+}
+
+const std::string kIndexItemBody = "Alpha\\, Beta";
+
+// true if position holds a kept sequence with this type and body
+bool HasRawSequence(cDocument* doc, POSITION_T position, unsigned char type, const std::string& body)
+{
+    sRawSequence sequence;
+    return doc->GetCharNoAdvance(position) == std::string(1, static_cast<char>(MARKER_CHAR)) &&
+           doc->GetControlChar(position) == STYLE_RAW_SEQUENCE &&
+           doc->GetRawSequence(position, sequence) &&
+           sequence.type == type && sequence.body == body;
+}
+
+size_t CountRawSequences(cDocument* doc)
+{
+    size_t count = 0;
+    for (POSITION_T pos = 0; pos < doc->GetTextSize(); pos++)
+    {
+        if (doc->GetCharNoAdvance(pos) == std::string(1, static_cast<char>(MARKER_CHAR)) &&
+            doc->GetControlChar(pos) == STYLE_RAW_SEQUENCE)
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("cWordstarFile - an index item sequence loads as a marker and saves back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    std::string input = WordStar7File("Hi " + SequenceBytes(SEQ_INDEXENTRY, kIndexItemBody) + "there\x0D\x0A");
+    std::string saved = RoundTrip(editor, input);
+
+    cDocument* doc = editor.GetDocument();
+    CHECK(HasRawSequence(doc, 3, SEQ_INDEXENTRY, kIndexItemBody));
+    CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n") == "Hi there\n");
+    CHECK(saved == input);
+}
+
+
+TEST_CASE("cWordstarFile - a paragraph number sequence loads as a marker and saves back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    std::string body = ParagraphNumberBody();
+    REQUIRE(body.size() == 50);
+    std::string sequence = SequenceBytes(SEQ_PARAGRAPHNUMBER, body);
+    REQUIRE(sequence.substr(1, 2) == std::string("\x36\x00", 2));
+
+    std::string input = WordStar7File(sequence + "Text\x0D\x0A");
+    std::string saved = RoundTrip(editor, input);
+
+    cDocument* doc = editor.GetDocument();
+    CHECK(HasRawSequence(doc, 0, SEQ_PARAGRAPHNUMBER, body));
+    CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n") == "Text\n");
+    CHECK(saved == input);
+}
+
+
+TEST_CASE("cWordstarFile - a paragraph number and an index item in one paragraph save back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    std::string body = ParagraphNumberBody();
+    std::string input = WordStar7File(SequenceBytes(SEQ_PARAGRAPHNUMBER, body) + "Intro " +
+                                      SequenceBytes(SEQ_INDEXENTRY, kIndexItemBody) + "word.\x0D\x0A" +
+                                      "Next\x0D\x0A");
+    std::string saved = RoundTrip(editor, input);
+
+    cDocument* doc = editor.GetDocument();
+    CHECK(HasRawSequence(doc, 0, SEQ_PARAGRAPHNUMBER, body));
+    CHECK(HasRawSequence(doc, 7, SEQ_INDEXENTRY, kIndexItemBody));
+    CHECK(CountRawSequences(doc) == 2);
+    CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n") == "Intro word.\nNext\n");
+    CHECK(saved == input);
+}
+
+
+TEST_CASE("cWordstarFile - an index item inside a .tc line stays in the dot command and saves back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    std::string input = WordStar7File(".tc Chapter " + SequenceBytes(SEQ_INDEXENTRY, "Alpha") + "One\x0D\x0A" +
+                                      "Body\x0D\x0A");
+    std::string saved = RoundTrip(editor, input);
+
+    cDocument* doc = editor.GetDocument();
+    CHECK(HasRawSequence(doc, 12, SEQ_INDEXENTRY, "Alpha"));
+    CHECK(doc->GetNumberofParagraphs() >= 2);
+    CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n") == ".tc Chapter One\nBody\n");
+
+    cLayoutBase* layout = editor.GetLayout();
+    layout->LayoutDocument(doc);
+    CHECK(layout->ParagraphIsCommand(0));
+    CHECK_FALSE(layout->ParagraphIsCommand(1));
+
+    CHECK(saved == input);
+}
+
+
+TEST_CASE("cWordstarFile - an empty index item body and a body with high-bit bytes save back byte for byte")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    editor.GetDocument()->Clear();
+
+    SUBCASE("empty body")
+    {
+        std::string input = WordStar7File("a" + SequenceBytes(SEQ_INDEXENTRY, "") + "b\x0D\x0A");
+        std::string saved = RoundTrip(editor, input);
+        CHECK(HasRawSequence(editor.GetDocument(), 1, SEQ_INDEXENTRY, ""));
+        CHECK(saved == input);
+    }
+
+    SUBCASE("high-bit and control bytes")
+    {
+        std::string body("M\x81ller \x80\xFF\x1A\x1D\x0D\x0A\x7F\x00\x1B\xE9", 18);
+        std::string input = WordStar7File("a" + SequenceBytes(SEQ_INDEXENTRY, body) + "b\x0D\x0A");
+        std::string saved = RoundTrip(editor, input);
+        CHECK(HasRawSequence(editor.GetDocument(), 1, SEQ_INDEXENTRY, body));
+        CHECK(saved == input);
+    }
+}
+
+
+TEST_CASE("cWordstarFile - a kept sequence with a bad trailer loads like one with a good trailer")
+{
+    cDocument good;
+    good.Clear();
+    cDocument bad;
+    bad.Clear();
+
+    std::string sequence = SequenceBytes(SEQ_INDEXENTRY, kIndexItemBody);
+    std::string broken = sequence;
+    broken[broken.size() - 3] = static_cast<char>(broken[broken.size() - 3] + 1);
+    broken[broken.size() - 1] = '\x1C';
+
+    auto load = [](cDocument& document, const std::string& bytes)
+    {
+        cWordstarFile file;
+        file.mDocument = &document;
+        std::filesystem::path path = TempPath();
+        WriteFileBytes(path, bytes);
+        bool loaded = file.LoadFile(path.string());
+        std::filesystem::remove(path);
+        return loaded;
+    };
+
+    CHECK(load(good, "Hi " + sequence + "there\x0D\x0A"));
+    CHECK(load(bad, "Hi " + broken + "there\x0D\x0A"));
+
+    CHECK(HasRawSequence(&good, 3, SEQ_INDEXENTRY, kIndexItemBody));
+    CHECK(HasRawSequence(&bad, 3, SEQ_INDEXENTRY, kIndexItemBody));
+    CHECK(bad.GetText() == good.GetText());
+}
+
+
+TEST_CASE("cWordstarFile - a kept sequence whose body runs past the end of the file is dropped")
+{
+    cDocument document;
+    document.Clear();
+    cWordstarFile file;
+    file.mDocument = &document;
+
+    std::string bytes = "Hi ";
+    bytes += std::string("\x1D\x40\x00\x0E", 4);
+    bytes += "abc";
+
+    std::filesystem::path path = TempPath();
+    WriteFileBytes(path, bytes);
+    file.LoadFile(path.string());
+    std::filesystem::remove(path);
+
+    CHECK(CountRawSequences(&document) == 0);
+    CHECK(document.GetParagraphText(0).rfind("Hi ", 0) == 0);
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief

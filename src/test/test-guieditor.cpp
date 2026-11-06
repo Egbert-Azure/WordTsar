@@ -17589,3 +17589,208 @@ TEST_CASE("GUI editor - a raw byte is one character for the caret with ^OD on an
         CHECK(status.column == 3);
     }
 }
+
+
+namespace
+{
+
+sRawSequence KeptIndexItem(const std::string& body)
+{
+    sRawSequence sequence;
+    sequence.type = 0x0E;
+    sequence.body = body;
+    return sequence;
+}
+
+bool HasKeptIndexItem(cDocument* doc, POSITION_T position, const std::string& body)
+{
+    sRawSequence sequence;
+    return doc->GetCharNoAdvance(position) == std::string(1, static_cast<char>(MARKER_CHAR)) &&
+           doc->GetControlChar(position) == STYLE_RAW_SEQUENCE &&
+           doc->GetRawSequence(position, sequence) &&
+           sequence.type == 0x0E && sequence.body == body;
+}
+
+// the WordStar frame of an index item: 0x1D, count, 0Eh, body, count, 0x1D
+std::string IndexItemFrame(const std::string& body)
+{
+    uint16_t count = static_cast<uint16_t>(body.size() + 4);
+    std::string frame;
+    frame += '\x1D';
+    frame += static_cast<char>(count & 0xFF);
+    frame += static_cast<char>(count >> 8);
+    frame += '\x0E';
+    frame += body;
+    frame += static_cast<char>(count & 0xFF);
+    frame += static_cast<char>(count >> 8);
+    frame += '\x1D';
+    return frame;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("Kept WordStar sequences - a block sort keeps them with their lines")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+
+    // "b<B>" and "a<A>", sorted ascending
+    doc->Insert("b");
+    doc->InsertRawSequence(KeptIndexItem("B"));
+    doc->Insert("\ra");
+    doc->InsertRawSequence(KeptIndexItem("A"));
+    doc->Insert("\r");
+    editor.LayoutDocument(true);
+
+    doc->SetPosition(0);
+    doc->SetBeginBlock();
+    doc->SetPosition(6);
+    doc->SetEndBlock();
+    editor.SortBlock(true);
+
+    CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n") == "a\nb\n");
+    CHECK(HasKeptIndexItem(doc, 1, "A"));
+    CHECK(HasKeptIndexItem(doc, 4, "B"));
+}
+
+
+TEST_CASE("Kept WordStar sequences - block case conversion keeps them")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+
+    // "ab<seq>cd. ef"
+    doc->Insert("ab");
+    doc->InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
+    doc->Insert("cd. ef\r");
+    editor.LayoutDocument(true);
+
+    doc->SetPosition(0);
+    doc->SetBeginBlock();
+    doc->SetPosition(10);
+    doc->SetEndBlock();
+
+    SUBCASE("upper case")
+    {
+        editor.UpperCaseBlock();
+        CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n") == "ABCD. EF\n");
+        CHECK(HasKeptIndexItem(doc, 2, "Alpha\\, Beta"));
+    }
+
+    SUBCASE("sentence case")
+    {
+        editor.SentenceCaseBlock();
+        CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n") == "abcd. Ef\n");
+        CHECK(HasKeptIndexItem(doc, 2, "Alpha\\, Beta"));
+    }
+}
+
+
+TEST_CASE("Kept WordStar sequences - text save and ^KW in ASCII format write nothing for them")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-keptseqtext-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cEditorCtrl with;
+    with.GetDocument()->Insert("Hi ");
+    with.GetDocument()->InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
+    with.GetDocument()->Insert("there\r");
+    with.LayoutDocument(true);
+
+    cEditorCtrl without;
+    without.GetDocument()->Insert("Hi there\r");
+    without.LayoutDocument(true);
+
+    REQUIRE(with.SaveFile((dir / "with.txt").string()));
+    REQUIRE(without.SaveFile((dir / "without.txt").string()));
+    CHECK(ReadFileBytes(dir / "with.txt") == ReadFileBytes(dir / "without.txt"));
+    CHECK(ReadFileBytes(dir / "with.txt").find('\x7F') == std::string::npos);
+
+    CHECK(with.GetAsciiBlockText(0, with.GetDocument()->GetTextSize()) == "Hi there\n");
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("Kept WordStar sequences - a WordStar save writes the frame and gives no code page warning")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-keptseqws-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    class cAskingEditor : public cBlockTargetEditor
+    {
+    public:
+        int mAsks = 0;
+
+        bool AskYesNo(const std::string& title, const std::string& question) override
+        {
+            (void)title;
+            (void)question;
+            ++mAsks;
+            return true;
+        }
+    };
+
+    cAskingEditor editor;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("Hi ");
+    doc->InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
+    doc->Insert("there\r");
+
+    auto save = dir / "out.ws";
+    cWordstarFile writer(&editor);
+    writer.mDocument = doc;
+    REQUIRE(writer.SaveRange(save.string(), 0, doc->GetTextSize()));
+
+    CHECK(ReadFileBytes(save).find("Hi " + IndexItemFrame("Alpha\\, Beta") + "there\r\n") != std::string::npos);
+    CHECK(editor.mAsks == 0);
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("Kept WordStar sequences - ^KR of a WordStar file keeps them as markers")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-keptseqkr-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    auto source = dir / "source.ws";
+    {
+        cEditorCtrl writer;
+        writer.GetDocument()->Insert("ab");
+        writer.GetDocument()->InsertRawSequence(KeptIndexItem("Alpha\\, Beta"));
+        writer.GetDocument()->Insert("cd");
+        REQUIRE(writer.SaveFile(source.string()));
+    }
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("XY\r");
+    doc->SetPosition(1);
+    REQUIRE(editor.InsertFileAtCursor(source.string()));
+
+    CHECK(doc->GetPlainText(0, doc->GetTextSize(), "\n").rfind("XabcdY", 0) == 0);
+    CHECK(HasKeptIndexItem(doc, 3, "Alpha\\, Beta"));
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}

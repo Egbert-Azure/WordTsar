@@ -278,6 +278,22 @@ bool RawByteCompare(const RawBytePair &first, const RawBytePair &second)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  first  [in] left-hand RawSequencePair element
+/// @param  second [in] right-hand RawSequencePair element
+///
+/// @return bool - true if first's position is less than second's
+///
+/// @brief
+/// Comparator for sorted array of RawSequencePair (position, sequence) entries
+///
+/////////////////////////////////////////////////////////////////////////////
+bool RawSequenceCompare(const RawSequencePair &first, const RawSequencePair &second)
+{
+    return first.first < second.first;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  first  [in] left-hand sParagraphData element
 /// @param  second [in] right-hand sParagraphData element
 ///
@@ -566,6 +582,7 @@ void cDocument::ShrinkToFit(void)
         mParagraphData[loop].endnote.shrink_to_fit() ;
         mParagraphData[loop].variable.shrink_to_fit() ;
         mParagraphData[loop].rawbyte.shrink_to_fit() ;
+        mParagraphData[loop].rawsequence.shrink_to_fit() ;
         mParagraphData[loop].offsets.shrink_to_fit() ;
     }
 }
@@ -921,6 +938,10 @@ bool cDocument::Delete(POSITION_T position, POSITION_T length)
         if (isMarker && code == STYLE_RAW_BYTE)
         {
             DeleteRawByte(position);
+        }
+        else if (isMarker && code == STYLE_RAW_SEQUENCE)
+        {
+            DeleteRawSequence(position);
         }
         else if (code < STYLE_END_OF_STYLES && grapheme.length() == 1)
         {
@@ -1759,6 +1780,60 @@ void cDocument::InsertRawByte(unsigned char byte)
         sUndoCharInfo charInfo ;
         charInfo.codepoint = STYLE_RAW_BYTE ;
         charInfo.rawByteData = byte ;
+        std::vector<sUndoCharInfo> chars ;
+        chars.push_back(charInfo) ;
+        RecordAction(UNDO_ACTION_INSERT, cursorBefore, 1, chars, cursorBefore) ;
+    }
+
+    NotifyChanged(currentparagraphnumber) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  sequence [in] WordStar sequence kept as read
+///
+/// @return nothing
+///
+/// @brief
+/// Inserts a kept sequence marker at the current position. The marker has
+/// no text and no formatting meaning; a WordStar save writes the sequence
+/// back unchanged.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::InsertRawSequence(const sRawSequence &sequence)
+{
+    POSITION_T pos = GetPosition();
+    POSITION_T cursorBefore = mCurrentPosition ;
+    bool shouldRecord = !mUndoDisabled && !mIsLoading && !mSuppressUndo ;
+
+    PARAGRAPH_T currentparagraphnumber = GetParagraphFromPosition(pos);
+    auto paraiter = mParagraphData.begin() + currentparagraphnumber;
+    pos -= paraiter->index;
+
+    PairTable t = std::make_pair(pos, TYPE_RAW_SEQUENCE);
+    RawSequencePair t1 = std::make_pair(pos, sequence);
+
+    // suppress undo recording from Insert(MARKER_CHAR) -- we record our own
+    bool oldDisabled = mUndoDisabled ;
+    mUndoDisabled = true ;
+    Insert(MARKER_CHAR);
+    mUndoDisabled = oldDisabled ;
+
+    auto iter = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), t, TableCompare);
+    auto iter1 = lower_bound(paraiter->rawsequence.begin(), paraiter->rawsequence.end(), t1, RawSequenceCompare);
+
+    size_t tpos = static_cast<size_t>(distance(paraiter->rawsequence.begin(), iter1));
+    paraiter->rawsequence.insert(paraiter->rawsequence.begin() + static_cast<ssize_t>(tpos), t1);
+
+    tpos = static_cast<size_t>(distance(paraiter->pairs.begin(), iter));
+    paraiter->pairs.insert(paraiter->pairs.begin() + static_cast<ssize_t>(tpos), t);
+
+    if (shouldRecord)
+    {
+        sUndoCharInfo charInfo ;
+        charInfo.codepoint = STYLE_RAW_SEQUENCE ;
+        charInfo.rawSequenceData = sequence ;
         std::vector<sUndoCharInfo> chars ;
         chars.push_back(charInfo) ;
         RecordAction(UNDO_ACTION_INSERT, cursorBefore, 1, chars, cursorBefore) ;
@@ -3889,6 +3964,18 @@ std::vector<sUndoCharInfo> cDocument::CaptureCharacters(POSITION_T position, POS
                         break ;
                     }
 
+                    case TYPE_RAW_SEQUENCE:
+                    {
+                        RawSequencePair scomp ;
+                        scomp.first = relPos ;
+                        auto siter = lower_bound(paraData.rawsequence.begin(), paraData.rawsequence.end(), scomp, RawSequenceCompare) ;
+                        if (siter != paraData.rawsequence.end() && siter->first == relPos)
+                        {
+                            charInfo.rawSequenceData = siter->second ;
+                        }
+                        break ;
+                    }
+
                     case TYPE_FORMAT:
                     case TYPE_INDEX:
                     case TYPE_SAVED_POSITION:
@@ -3980,6 +4067,10 @@ void cDocument::ReinsertCharacters(POSITION_T position, const std::vector<sUndoC
         else if (charInfo.rawByteData.has_value())
         {
             InsertRawByte(charInfo.rawByteData.value()) ;
+        }
+        else if (charInfo.rawSequenceData.has_value())
+        {
+            InsertRawSequence(charInfo.rawSequenceData.value()) ;
         }
         else if (!charInfo.combining.empty())
         {
@@ -5203,6 +5294,10 @@ eModifiers cDocument::GetControlChar(POSITION_T position)
                 ch = STYLE_RAW_BYTE;
                 break;
 
+            case TYPE_RAW_SEQUENCE:
+                ch = STYLE_RAW_SEQUENCE;
+                break;
+
         }
     }
 
@@ -5237,6 +5332,46 @@ unsigned char cDocument::GetRawByte(POSITION_T position)
     }
 
     return 0 ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  position [in]  document position to query
+/// @param  sequence [out] the kept sequence at position
+///
+/// @return true if position holds a kept sequence marker, false otherwise
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDocument::GetRawSequence(POSITION_T position, sRawSequence &sequence)
+{
+    if (position < 0 || position >= GetTextSize())
+    {
+        return false ;
+    }
+
+    RawSequencePair comp ;
+    PARAGRAPH_T currentparagraphnumber = GetParagraphFromPosition(position) ;
+    auto paraiter = mParagraphData.begin() + currentparagraphnumber ;
+    position -= paraiter->index ;
+    comp.first = position ;
+
+    PairTable pcomp ;
+    pcomp.first = position ;
+    auto piter = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), pcomp, TableCompare) ;
+    if (piter == paraiter->pairs.end() || piter->first != position || piter->second != TYPE_RAW_SEQUENCE)
+    {
+        return false ;
+    }
+
+    auto iter = lower_bound(paraiter->rawsequence.begin(), paraiter->rawsequence.end(), comp, RawSequenceCompare) ;
+    if (iter != paraiter->rawsequence.end() && iter->first == position)
+    {
+        sequence = iter->second ;
+        return true ;
+    }
+
+    return false ;
 }
 
 
@@ -5907,6 +6042,44 @@ void cDocument::DeleteRawByte(POSITION_T position)
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  position [in] document position of the kept sequence marker
+///
+/// @return nothing
+///
+/// @brief
+/// Removes the entries of a kept sequence marker from the rawsequence and
+/// pairs tables. Called only from Delete().
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::DeleteRawSequence(POSITION_T position)
+{
+    MY_ASSERT(position >= 0)
+    MY_ASSERT(position <= GetTextSize())
+
+    PairTable pcomp;
+    PARAGRAPH_T currentparagraphnumber = GetParagraphFromPosition(position);
+    auto paraiter = mParagraphData.begin() + currentparagraphnumber;
+    position -= paraiter->index;
+    pcomp.first = position;
+
+    auto iter = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), pcomp, TableCompare);
+    if (iter != paraiter->pairs.end() && iter->first == position && iter->second == TYPE_RAW_SEQUENCE)
+    {
+        RawSequencePair t1;
+        t1.first = position;
+
+        auto iter1 = lower_bound(paraiter->rawsequence.begin(), paraiter->rawsequence.end(), t1, RawSequenceCompare);
+        if (iter1 != paraiter->rawsequence.end() && iter1->first == position)
+        {
+            paraiter->rawsequence.erase(iter1);
+            paraiter->pairs.erase(iter);
+        }
+    }
+}
+
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -6060,6 +6233,7 @@ void cDocument::DeleteParagraph(POSITION_T position)
             paraiter->endnote.insert(paraiter->endnote.end(), paraiternext->endnote.begin(), paraiternext->endnote.end()) ;
             paraiter->variable.insert(paraiter->variable.end(), paraiternext->variable.begin(), paraiternext->variable.end()) ;
             paraiter->rawbyte.insert(paraiter->rawbyte.end(), paraiternext->rawbyte.begin(), paraiternext->rawbyte.end()) ;
+            paraiter->rawsequence.insert(paraiter->rawsequence.end(), paraiternext->rawsequence.begin(), paraiternext->rawsequence.end()) ;
             paraiter->pairs.insert(paraiter->pairs.end(), paraiternext->pairs.begin(), paraiternext->pairs.end()) ;
 
             // delete the next paragraph
@@ -6334,6 +6508,13 @@ void cDocument::IncrementAttributes(POSITION_T position, POSITION_T length, bool
     auto iterRawend = paraiter->rawbyte.end() ;
     for_each(iterRaw, iterRawend, [&](RawBytePair &x){x.first += glength ; return x;}) ;
 
+    // kept sequences
+    RawSequencePair compSeq ;
+    compSeq.first = position ;
+    auto iterSeq = lower_bound(paraiter->rawsequence.begin(), paraiter->rawsequence.end(), compSeq, RawSequenceCompare) ;
+    auto iterSeqend = paraiter->rawsequence.end() ;
+    for_each(iterSeq, iterSeqend, [&](RawSequencePair &x){x.first += glength ;}) ;
+
     PairTable comp10 ;
     comp10.first = position ;
     auto iter10 = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), comp10, TableCompare) ;
@@ -6481,6 +6662,13 @@ void cDocument::DecrementAttributes(POSITION_T position, POSITION_T length, bool
     auto iterRawend = paraiter->rawbyte.end() ;
     for_each(iterRaw, iterRawend, [&](RawBytePair &x){x.first -= glength ; return x;}) ;
 
+    // kept sequences
+    RawSequencePair compSeq ;
+    compSeq.first = position ;
+    auto iterSeq = lower_bound(paraiter->rawsequence.begin(), paraiter->rawsequence.end(), compSeq, RawSequenceCompare) ;
+    auto iterSeqend = paraiter->rawsequence.end() ;
+    for_each(iterSeq, iterSeqend, [&](RawSequencePair &x){x.first -= glength ;}) ;
+
     PairTable comp10 ;
     comp10.first = position ;
     auto iter10 = lower_bound(paraiter->pairs.begin(), paraiter->pairs.end(), comp10, TableCompare) ;
@@ -6563,7 +6751,8 @@ void cDocument::DecrementAttributes(POSITION_T position, POSITION_T length, bool
 /// Transfer all format/metadata table entries at positions >= splitRelPos
 /// from the source paragraph to the new paragraph data. Entries are erased
 /// from the source paragraph after copying. Tables transferred: color,
-/// font, format, tab, footnote, endnote, variable, rawbyte, pairs.
+/// font, format, tab, footnote, endnote, variable, rawbyte, rawsequence,
+/// pairs.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::TransferAttributesToNewParagraph(PARAGRAPH_T fromPara, sParagraphData &newData, POSITION_T splitRelPos)
@@ -6623,6 +6812,13 @@ void cDocument::TransferAttributesToNewParagraph(PARAGRAPH_T fromPara, sParagrap
     auto rawiter = lower_bound(mParagraphData[fromPara].rawbyte.begin(), mParagraphData[fromPara].rawbyte.end(), raw1, RawByteCompare) ;
     newData.rawbyte.insert(newData.rawbyte.begin(), rawiter, mParagraphData[fromPara].rawbyte.end()) ;
     mParagraphData[fromPara].rawbyte.erase(rawiter, mParagraphData[fromPara].rawbyte.end()) ;
+
+    // kept sequences
+    RawSequencePair seq1 ;
+    seq1.first = splitRelPos ;
+    auto seqiter = lower_bound(mParagraphData[fromPara].rawsequence.begin(), mParagraphData[fromPara].rawsequence.end(), seq1, RawSequenceCompare) ;
+    newData.rawsequence.insert(newData.rawsequence.begin(), seqiter, mParagraphData[fromPara].rawsequence.end()) ;
+    mParagraphData[fromPara].rawsequence.erase(seqiter, mParagraphData[fromPara].rawsequence.end()) ;
 
     // pairs (main lookup table)
     PairTable p1 ;
@@ -6846,6 +7042,13 @@ sDocumentMemoryUsage cDocument::GetMemoryUsage(void) const
         size_t variable = para.variable.capacity() * sizeof(VariablePair) ;
         size_t offsets = para.offsets.memoryAllocated() ;
         size_t rawbyte = para.rawbyte.capacity() * sizeof(RawBytePair) ;
+        size_t rawsequence = para.rawsequence.capacity() * sizeof(RawSequencePair) ;
+        size_t rawsequenceUsed = para.rawsequence.size() * sizeof(RawSequencePair) ;
+        for (const auto &entry : para.rawsequence)
+        {
+            rawsequence += entry.second.body.capacity() ;
+            rawsequenceUsed += entry.second.body.size() ;
+        }
 
         usage.attrPairsBytes += pairs ;
         usage.attrFormatBytes += format ;
@@ -6857,7 +7060,7 @@ sDocumentMemoryUsage cDocument::GetMemoryUsage(void) const
         usage.attrVariableBytes += variable ;
         usage.attrOffsetsBytes += offsets ;
 
-        usage.attributeBytes += pairs + format + font + tab + color + footnote + endnote + variable + offsets + rawbyte ;
+        usage.attributeBytes += pairs + format + font + tab + color + footnote + endnote + variable + offsets + rawbyte + rawsequence ;
 
         // attributes: size (in use)
         usage.attributeUsedBytes += para.pairs.size() * sizeof(PairTable) ;
@@ -6870,6 +7073,7 @@ sDocumentMemoryUsage cDocument::GetMemoryUsage(void) const
         usage.attributeUsedBytes += para.variable.size() * sizeof(VariablePair) ;
         usage.attributeUsedBytes += para.offsets.memoryUsed() ;
         usage.attributeUsedBytes += para.rawbyte.size() * sizeof(RawBytePair) ;
+        usage.attributeUsedBytes += rawsequenceUsed ;
     }
 
     // Undo stack

@@ -7693,6 +7693,170 @@ TEST_CASE("cDocument::GetMemoryUsage - counts the raw byte table")
 }
 
 
+namespace
+{
+
+// "abc", a kept index item, "def", hard return
+sRawSequence IndexItem(const std::string& body)
+{
+    sRawSequence sequence ;
+    sequence.type = 0x0E ;
+    sequence.body = body ;
+    return sequence ;
+}
+
+bool HasKeptSequence(cDocument& doc, POSITION_T position, const std::string& body)
+{
+    sRawSequence sequence ;
+    return doc.GetCharNoAdvance(position) == std::string(1, static_cast<char>(MARKER_CHAR)) &&
+           doc.GetControlChar(position) == STYLE_RAW_SEQUENCE &&
+           doc.GetRawSequence(position, sequence) &&
+           sequence.type == 0x0E && sequence.body == body ;
+}
+
+void BuildKeptSequenceDocument(cDocument& doc)
+{
+    doc.Clear() ;
+    doc.Insert("abc") ;
+    doc.InsertRawSequence(IndexItem("Alpha\\, Beta")) ;
+    doc.Insert("def\r") ;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("cDocument - a kept sequence is one character with no plain text")
+{
+    cDocument doc ;
+    BuildKeptSequenceDocument(doc) ;
+
+    CHECK(HasKeptSequence(doc, 3, "Alpha\\, Beta")) ;
+    CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "abcdef\n") ;
+    CHECK(doc.GetPlainText(3, 4, "\n").empty()) ;
+}
+
+
+TEST_CASE("cDocument - a kept sequence survives delete, undo and redo")
+{
+    cDocument doc ;
+    BuildKeptSequenceDocument(doc) ;
+    POSITION_T size = doc.GetTextSize() ;
+
+    doc.SetPosition(3) ;
+    CHECK(doc.Delete(3, 1)) ;
+    CHECK(doc.GetTextSize() == size - 1) ;
+    CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "abcdef\n") ;
+    sRawSequence none ;
+    CHECK_FALSE(doc.GetRawSequence(3, none)) ;
+
+    CHECK(doc.Undo()) ;
+    CHECK(doc.GetTextSize() == size) ;
+    CHECK(HasKeptSequence(doc, 3, "Alpha\\, Beta")) ;
+
+    CHECK(doc.Redo()) ;
+    CHECK(doc.GetTextSize() == size - 1) ;
+    CHECK_FALSE(doc.GetRawSequence(3, none)) ;
+
+    CHECK(doc.Undo()) ;
+    CHECK(HasKeptSequence(doc, 3, "Alpha\\, Beta")) ;
+
+    // inserting before it moves it, deleting before it moves it back
+    doc.SetPosition(1) ;
+    doc.Insert("xy") ;
+    CHECK(HasKeptSequence(doc, 5, "Alpha\\, Beta")) ;
+    CHECK(doc.Delete(1, 2)) ;
+    CHECK(HasKeptSequence(doc, 3, "Alpha\\, Beta")) ;
+}
+
+
+TEST_CASE("cDocument - a kept sequence survives a block copy and a block move")
+{
+    cDocument doc ;
+    BuildKeptSequenceDocument(doc) ;
+
+    SUBCASE("copy")
+    {
+        // "c<seq>d" copied to the start
+        doc.SetPosition(2) ;
+        doc.SetBeginBlock() ;
+        doc.SetPosition(5) ;
+        doc.SetEndBlock() ;
+        doc.SetPosition(0) ;
+        doc.CopyBlock() ;
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "cdabcdef\n") ;
+        CHECK(HasKeptSequence(doc, 1, "Alpha\\, Beta")) ;
+        CHECK(HasKeptSequence(doc, 6, "Alpha\\, Beta")) ;
+
+        CHECK(doc.Undo()) ;
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "abcdef\n") ;
+        CHECK(HasKeptSequence(doc, 3, "Alpha\\, Beta")) ;
+    }
+
+    SUBCASE("move")
+    {
+        // "c<seq>d" moved to the end of the paragraph
+        doc.SetPosition(2) ;
+        doc.SetBeginBlock() ;
+        doc.SetPosition(5) ;
+        doc.SetEndBlock() ;
+        doc.SetPosition(7) ;
+        doc.MoveBlock() ;
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "abefcd\n") ;
+        CHECK(HasKeptSequence(doc, 5, "Alpha\\, Beta")) ;
+        sRawSequence none ;
+        CHECK_FALSE(doc.GetRawSequence(3, none)) ;
+    }
+}
+
+
+TEST_CASE("cDocument - a kept sequence moves with a paragraph split and join")
+{
+    cDocument doc ;
+    BuildKeptSequenceDocument(doc) ;
+
+    // split before it: "ab" | "c<seq>def"
+    doc.SetPosition(2) ;
+    doc.Insert(HARD_RETURN) ;
+    CHECK(doc.GetParagraphFromPosition(4) == 1) ;
+    CHECK(HasKeptSequence(doc, 4, "Alpha\\, Beta")) ;
+
+    // join again
+    CHECK(doc.Delete(2, 1)) ;
+    CHECK(HasKeptSequence(doc, 3, "Alpha\\, Beta")) ;
+
+    // split after it: "abc<seq>" | "def"
+    doc.SetPosition(4) ;
+    doc.Insert(HARD_RETURN) ;
+    CHECK(HasKeptSequence(doc, 3, "Alpha\\, Beta")) ;
+    CHECK(doc.Delete(4, 1)) ;
+    CHECK(HasKeptSequence(doc, 3, "Alpha\\, Beta")) ;
+    CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "abcdef\n") ;
+}
+
+
+TEST_CASE("cDocument::GetMemoryUsage - counts the kept sequence table")
+{
+    cDocument doc ;
+    doc.Clear() ;
+
+    const size_t count = 40 ;
+    for (size_t i = 0 ; i < count ; ++i)
+    {
+        doc.Insert("a") ;
+        doc.InsertRawSequence(IndexItem("entry")) ;
+    }
+    doc.Insert("\r") ;
+
+    sDocumentMemoryUsage mem = doc.GetMemoryUsage() ;
+    size_t breakdown = mem.attrPairsBytes + mem.attrFormatBytes + mem.attrFontBytes +
+                       mem.attrTabBytes + mem.attrColorBytes + mem.attrFootnoteBytes +
+                       mem.attrEndnoteBytes + mem.attrVariableBytes + mem.attrOffsetsBytes ;
+
+    CHECK(mem.attributeBytes >= breakdown + count * sizeof(RawSequencePair)) ;
+    CHECK(mem.attributeUsedBytes >= count * (sizeof(PairTable) + sizeof(RawSequencePair))) ;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 //
 // Document Listener Tests

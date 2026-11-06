@@ -141,6 +141,7 @@ enum eType
     TYPE_SAVED_POSITION,
     TYPE_VARIABLE,
     TYPE_RAW_BYTE,              ///< a control byte from a text file, kept as content
+    TYPE_RAW_SEQUENCE,          ///< a WordStar sequence kept as it was read, see sRawSequence
 };
 
 
@@ -229,7 +230,8 @@ enum eModifiers
     STYLE_FOOTNOTE,                     // done (WS uses this for - soft-hypen for where wordwrap can occur)
     STYLE_ENDNOTE,                      // done (WS uses this for - soft-hypen for where wordwrap has occurred)
     STYLE_END_OF_STYLES,
-    STYLE_RAW_BYTE                      // a TYPE_RAW_BYTE marker, see cDocument::GetRawByte()
+    STYLE_RAW_BYTE,                     // a TYPE_RAW_BYTE marker, see cDocument::GetRawByte()
+    STYLE_RAW_SEQUENCE                  // a TYPE_RAW_SEQUENCE marker, see cDocument::GetRawSequence()
 } ;
 
 
