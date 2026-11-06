@@ -1,9 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
 
+# The Qt GUI (WordTsar) is optional, so the TUI backend (ws) can be
+# built without Qt (e.g. on cross-platform CI runners that only verify the TUI).
+option(BUILD_GUI "Build the Qt GUI (WordTsar)" ON)
+
 # Minimum macOS version. A non-empty CMAKE_OSX_DEPLOYMENT_TARGET from the
 # command line or a preset is kept. Otherwise it is the highest minos of the
 # Qt frameworks and plugins the app links or bundles, read with otool from
 # the Qt that find_package(Qt6) below resolves to; 14.0 if no Qt is found.
+# Without BUILD_GUI no Qt is probed and the target is 14.0.
 # The target must be set before project(), so the Qt6Config.cmake location
 # is probed here in find_package order and checked against Qt6_DIR after
 # find_package(Qt6).
@@ -109,7 +114,11 @@ function(wordtsar_qt_minos out_var qt_cmake_dir)
 endfunction()
 
 if(CMAKE_HOST_APPLE)
-    if("$CACHE{CMAKE_OSX_DEPLOYMENT_TARGET}" STREQUAL "")
+    if(NOT "$CACHE{CMAKE_OSX_DEPLOYMENT_TARGET}" STREQUAL "")
+        # Kept as given.
+    elseif(NOT BUILD_GUI)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
+    else()
         wordtsar_qt_cmake_dir(WORDTSAR_QT_PROBE_DIR)
         set(WORDTSAR_QT_MINOS "")
         if(WORDTSAR_QT_PROBE_DIR)
@@ -150,10 +159,6 @@ set(CMAKE_AUTOUIC_SEARCH_PATHS src/gui/dialogs)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
-
-# The Qt GUI (WordTsar) is optional, so the TUI backend (ws) can be
-# built without Qt (e.g. on cross-platform CI runners that only verify the TUI).
-option(BUILD_GUI "Build the Qt GUI (WordTsar)" ON)
 
 # Try to find Qt6 automatically first, fall back to a Homebrew/Qt-installer path if needed
 if(BUILD_GUI)
