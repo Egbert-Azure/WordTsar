@@ -206,6 +206,7 @@ The terminal UI's Opening Menu **I** (index) and **T** (table of contents) comma
 
 - Table of contents entries support a `#` placeholder that's replaced with the real page number, and leading-space indentation.
 - Index entries support `+` (bold page number), `-` (cross-reference, no page number), and `,` (sub-entry).
+- Not yet supported: "Index Every Word" auto-indexing, and page-range/odd-even filters.
 
 ## 0.9.0 Beta (2026-09-01)
 
