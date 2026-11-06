@@ -51,8 +51,6 @@
  */
 
 #include <QApplication>
-#include <QMessageBox>
-#include <QDialog>
 #include <QFileOpenEvent>
 #include <QStringList>
 
