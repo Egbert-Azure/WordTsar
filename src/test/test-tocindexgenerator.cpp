@@ -246,3 +246,31 @@ TEST_CASE("TOC/Index generator - a TOC holding only dot entries is written")
     ensureQApplication() ;
     tocindextest::CheckTOCOnlyDotEntries<cEditorCtrl>() ;
 }
+
+
+TEST_CASE("TOC/Index generator - .ix dot entries come first in document order, unparsed, without page numbers")
+{
+    ensureQApplication() ;
+    tocindextest::CheckIndexDotEntries<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - .ix comment, page break, bare, indented, escaped and duplicate dot entries")
+{
+    ensureQApplication() ;
+    tocindextest::CheckIndexDotEntryEdgeCases<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - an index holding only dot entries is written")
+{
+    ensureQApplication() ;
+    tocindextest::CheckIndexOnlyDotEntries<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - .tc .po 1i and .ix .lm 5 are written as dot command lines")
+{
+    ensureQApplication() ;
+    tocindextest::CheckDotEntrySource<cEditorCtrl>() ;
+}

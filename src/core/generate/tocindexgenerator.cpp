@@ -276,6 +276,7 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
     cLayoutBase *layout = editor->GetLayout() ;
 
     std::vector<sIndexEntry> entries ;
+    std::vector<std::string> dotCommands ;
 
     PARAGRAPH_T count = sourceDoc->GetNumberofParagraphs() ;
     for (PARAGRAPH_T loop = 0 ; loop < count ; loop++)
@@ -296,6 +297,14 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
             continue ;
         }
 
+        // an entry starting with '.' is a dot command for the generated
+        // file: kept unchanged, in document order, ahead of the entries
+        if (prefixLen < text.size() && text[prefixLen] == '.')
+        {
+            dotCommands.push_back(text.substr(prefixLen)) ;
+            continue ;
+        }
+
         sIndexEntry entry = ParseIndexEntry(text.substr(prefixLen)) ;
         if (entry.main.empty())
         {
@@ -311,7 +320,7 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
         entries.push_back(entry) ;
     }
 
-    if (entries.empty())
+    if (entries.empty() && dotCommands.empty())
     {
         return false ;
     }
@@ -375,6 +384,11 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
     }) ;
 
     sourceDoc->Clear() ;
+    for (const std::string &command : dotCommands)
+    {
+        sourceDoc->Insert(command) ;
+        sourceDoc->Insert(HARD_RETURN) ;
+    }
     for (const sGroup &group : sorted)
     {
         // A subreference is displayed indented two spaces under its main

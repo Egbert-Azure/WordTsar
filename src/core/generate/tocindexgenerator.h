@@ -91,7 +91,8 @@ public:
     /// @param  sourcePath [in] the path the source document was loaded from
     /// @param  outputFile [out] the path written ("name.IDX")
     ///
-    /// @return true if there was at least one index entry to write
+    /// @return true if there was at least one index entry or dot entry to
+    ///         write
     ///
     /// @brief
     /// Collects every .ix entry, resolves +bold/-cross-reference/,subentry
@@ -99,7 +100,11 @@ public:
     /// alphabetically, merges duplicate entries into one comma-separated
     /// page list (bold pages win over non-bold when the same page appears
     /// both ways), and writes the result to "name.IDX". Cross-reference
-    /// entries carry no page number, matching real WordStar.
+    /// entries carry no page number, matching real WordStar. An entry
+    /// whose text starts with '.' right after the one separator space is a
+    /// dot command for the generated file: it is not parsed, gets no page
+    /// number, is neither merged nor sorted, and is written ahead of the
+    /// sorted entries in document order.
     ///
     /////////////////////////////////////////////////////////////////////////
     static bool GenerateIndex(cEditorBase *editor, const std::string &sourcePath, std::string &outputFile) ;

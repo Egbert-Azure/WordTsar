@@ -346,6 +346,195 @@ void CheckTOCOnlyDotEntries(void)
     CheckWorkingDotCommand(reader, ".fo Page #") ;
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+/// Runs GenerateIndex() on `source` and returns the written path.
+/////////////////////////////////////////////////////////////////////////////
+inline std::string GenerateIndexFile(cEditorBase &editor, const std::vector<std::string> &source,
+                                     const std::string &sourcePath)
+{
+    SetSource(editor, source) ;
+    std::string outputFile ;
+    REQUIRE(cTOCIndexGenerator::GenerateIndex(&editor, sourcePath, outputFile)) ;
+    return outputFile ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Dot command status of the paragraph `text` of the loaded document, as
+/// a name for test output.
+/////////////////////////////////////////////////////////////////////////////
+inline std::string DotStatusName(cEditorBase &reader, const std::string &text)
+{
+    PARAGRAPH_T paragraph = FindParagraph(reader, text) ;
+    if (paragraph == NOT_SET)
+    {
+        return "not found" ;
+    }
+    const sParagraphLayout *layout = reader.GetLayout()->GetParagraphLayout(paragraph) ;
+    std::string result = (layout != nullptr && layout->isCommand) ? "isCommand " : "not a command " ;
+    switch (reader.GetLayout()->GetParagraphDotStatus(paragraph))
+    {
+        case DOT_ERROR:          result += "DOT_ERROR" ; break ;
+        case DOT_GOOD:           result += "DOT_GOOD" ; break ;
+        case DOT_UNKNOWN:        result += "DOT_UNKNOWN" ; break ;
+        case DOT_NOTIMPLEMENTED: result += "DOT_NOTIMPLEMENTED" ; break ;
+    }
+    return result ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Source holding one .tc and one .ix dot entry and nothing else.
+/////////////////////////////////////////////////////////////////////////////
+inline std::vector<std::string> DotEntrySource(void)
+{
+    return { ".tc .po 1i", ".ix .lm 5" } ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Checks the files generated from DotEntrySource(): each holds its dot
+/// entry unchanged as its only line. The reload status of ".lm 5" is
+/// reported, not checked.
+/////////////////////////////////////////////////////////////////////////////
+inline void CheckDotEntryOutputs(cEditorBase &reader, const std::string &tocPath, const std::string &indexPath)
+{
+    std::vector<std::string> toc = LoadGenerated(reader, tocPath) ;
+    REQUIRE(toc.empty() == false) ;
+    CHECK(toc[0] == ".po 1i") ;
+    CHECK(Join(toc) == ".po 1i") ;
+    CheckWorkingDotCommand(reader, ".po 1i") ;
+    MESSAGE("TOC lines: " << Join(toc)) ;
+
+    std::vector<std::string> index = LoadGenerated(reader, indexPath) ;
+    REQUIRE(index.empty() == false) ;
+    CHECK(index[0] == ".lm 5") ;
+    CHECK(Join(index) == ".lm 5") ;
+    MESSAGE("Index lines: " << Join(index)) ;
+    MESSAGE("Reload of \".lm 5\" in the index: " << DotStatusName(reader, ".lm 5")) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// The one-source case: a .tc and a .ix dot entry produce both files.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckDotEntrySource(void)
+{
+    cScratchDir dir("dotsource") ;
+    REQUIRE(dir.IsValid()) ;
+
+    EDITOR editor ;
+    std::string sourcePath = dir.File("source.ws") ;
+    std::vector<std::string> outputFiles ;
+    std::string tocPath = GenerateTOCFile(editor, DotEntrySource(), sourcePath, ".TOC", outputFiles) ;
+    REQUIRE(tocPath.empty() == false) ;
+    std::string indexPath = GenerateIndexFile(editor, DotEntrySource(), sourcePath) ;
+    REQUIRE(indexPath.empty() == false) ;
+
+    EDITOR reader ;
+    CheckDotEntryOutputs(reader, tocPath, indexPath) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// .ix dot entries come first in document order, unparsed and without a
+/// page number; the sorted entries follow and pick up the dot commands.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckIndexDotEntries(void)
+{
+    cScratchDir dir("indexdot") ;
+    REQUIRE(dir.IsValid()) ;
+
+    EDITOR editor ;
+    std::string indexPath = GenerateIndexFile(editor,
+        { ".ix Zebra", ".ix .pm 0", ".ix Apple", ".ix .lm 0.5i" }, dir.File("source.ws")) ;
+
+    EDITOR reader ;
+    std::vector<std::string> index = LoadGenerated(reader, indexPath) ;
+    CHECK(Join(index) == ".pm 0|.lm 0.5i|Apple, 1|Zebra, 1") ;
+    CheckWorkingDotCommand(reader, ".pm 0") ;
+    CheckWorkingDotCommand(reader, ".lm 0.5i") ;
+
+    const sLineLayout *apple = FirstLineOf(reader, "Apple, 1") ;
+    REQUIRE(apple != nullptr) ;
+
+    EDITOR plain ;
+    SetSource(plain, { "Apple, 1" }) ;
+    const sLineLayout *plainApple = FirstLineOf(plain, "Apple, 1") ;
+    REQUIRE(plainApple != nullptr) ;
+    CHECK(apple->pagex > plainApple->pagex) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Comment, page break, bare dot, indented, escaped and expression dot
+/// entries, duplicates, and ordinary entries merging as before.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckIndexDotEntryEdgeCases(void)
+{
+    cScratchDir dir("indexdotedge") ;
+    REQUIRE(dir.IsValid()) ;
+
+    EDITOR editor ;
+    std::string indexPath = GenerateIndexFile(editor,
+        { ".ix ..note, with comma", ".ix .pa", ".ix Beta", ".ix .", ".ix  .indented",
+          ".ix .po ((8.5-7.8)/2)i", ".pa", ".ix .fo Page #, part \\+ 1", ".ix .lm 0.5i",
+          ".ix .lm 0.5i", ".ix Beta", ".ix Alpha" },
+        dir.File("source.ws")) ;
+
+    EDITOR reader ;
+    std::vector<std::string> index = LoadGenerated(reader, indexPath) ;
+    CHECK(Join(index) == "..note, with comma|.pa|.|.po ((8.5-7.8)/2)i|.fo Page #, part \\+ 1|.lm 0.5i|.lm 0.5i"
+                         "| .indented, 1|Alpha, 2|Beta, 1, 2") ;
+
+    PARAGRAPH_T comment = FindParagraph(reader, "..note, with comma") ;
+    REQUIRE(comment != NOT_SET) ;
+    const sParagraphLayout *commentLayout = reader.GetLayout()->GetParagraphLayout(comment) ;
+    REQUIRE(commentLayout != nullptr) ;
+    CHECK(commentLayout->isComment) ;
+
+    CheckWorkingDotCommand(reader, ".pa") ;
+    CheckWorkingDotCommand(reader, ".po ((8.5-7.8)/2)i") ;
+    CheckWorkingDotCommand(reader, ".lm 0.5i") ;
+
+    PARAGRAPH_T indented = FindParagraph(reader, " .indented, 1") ;
+    REQUIRE(indented != NOT_SET) ;
+    const sParagraphLayout *indentedLayout = reader.GetLayout()->GetParagraphLayout(indented) ;
+    REQUIRE(indentedLayout != nullptr) ;
+    CHECK_FALSE(indentedLayout->isCommand) ;
+
+    const sLineLayout *first = FirstLineOf(reader, " .indented, 1") ;
+    const sLineLayout *beta = FirstLineOf(reader, "Beta, 1, 2") ;
+    REQUIRE(first != nullptr) ;
+    REQUIRE(beta != nullptr) ;
+    CHECK(first->pagenumber == 2) ;
+    CHECK(beta->pagenumber == 2) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// A source whose .ix entries are all dot entries still gets its index.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckIndexOnlyDotEntries(void)
+{
+    cScratchDir dir("indexonlydot") ;
+    REQUIRE(dir.IsValid()) ;
+
+    EDITOR editor ;
+    std::string indexPath = GenerateIndexFile(editor, { ".ix .pm 0", "Body text", ".ix .lm 0.5i" },
+                                              dir.File("source.ws")) ;
+
+    EDITOR reader ;
+    CHECK(Join(LoadGenerated(reader, indexPath)) == ".pm 0|.lm 0.5i") ;
+    CheckWorkingDotCommand(reader, ".pm 0") ;
+    CheckWorkingDotCommand(reader, ".lm 0.5i") ;
+}
+
 } // namespace tocindextest
 
 #endif // TOCINDEXGEN_TESTUTIL_H
