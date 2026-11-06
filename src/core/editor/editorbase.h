@@ -425,6 +425,9 @@ private:
         COORD_T caretGlyphWidth ;                // glyph width (for overwrite mode)
     } ;
 
+    // Block Case Conversion
+    void ConvertBlockCase(std::string (cDocument::*convert)(const std::string &)) ;
+
     // Caret Calc Helpers
     bool LookupCaretParagraph(sCaretCalcState& state) ;
     void RelayoutFromParagraph(PARAGRAPH_T fromPara, PARAGRAPH_T caretPara) ;   // re-layout following paragraphs after a line count change

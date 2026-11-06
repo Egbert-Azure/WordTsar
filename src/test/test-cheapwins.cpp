@@ -86,6 +86,219 @@ std::string Escape(const std::string& text)
     }
     return out;
 }
+
+// One entry per document position before the end-of-file marker: the
+// grapheme, "\\r" for a hard return, or the marker kind with its data.
+std::vector<std::string> Cells(cDocument* doc)
+{
+    std::vector<std::string> cells;
+    for (POSITION_T pos = 0; pos < doc->GetTextSize() - 1; pos++)
+    {
+        std::string g = doc->GetCharNoAdvance(pos);
+        if (g.size() == 1 && static_cast<unsigned char>(g[0]) == MARKER_CHAR)
+        {
+            eModifiers control = doc->GetControlChar(pos);
+            if (control == STYLE_TAB)
+            {
+                cells.push_back("<tab:" + std::to_string(doc->GetTab(pos).type) + ">");
+            }
+            else if (control == STYLE_RAW_BYTE)
+            {
+                cells.push_back("<raw:" + std::to_string(doc->GetRawByte(pos)) + ">");
+            }
+            else if (control == STYLE_BOLD)
+            {
+                cells.push_back("<bold>");
+            }
+            else
+            {
+                cells.push_back("<ctl:" + std::to_string(control) + ">");
+            }
+        }
+        else if (g == "\r")
+        {
+            cells.push_back("\\r");
+        }
+        else
+        {
+            cells.push_back(g);
+        }
+    }
+    return cells;
+}
+
+std::string Join(const std::vector<std::string>& cells)
+{
+    std::string out;
+    for (const auto& c : cells)
+    {
+        out += "[" + c + "]";
+    }
+    return out;
+}
+
+void InsertTabMarker(cDocument* doc)
+{
+    doc->Insert(static_cast<CHAR_T>(STYLE_TAB));
+}
+
+void InsertBoldMarker(cDocument* doc)
+{
+    doc->Insert(static_cast<CHAR_T>(STYLE_BOLD));
+}
+
+const std::string TAB = "<tab:" + std::to_string(TAB_TAB) + ">";
+const std::string BOLD = "<bold>";
+const std::string RAW2 = "<raw:2>";
+}
+
+TEST_CASE("UpperCaseBlock keeps tabs, bold and raw bytes in place, one undo restores")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    // x0 ' '1 a2 b3 TAB4 c5 B6 d7 ß8 Q9 R10 B11 RAW12 e13 ' '14 y15 \r16 next17
+    doc->Insert("x ab");
+    InsertTabMarker(doc);
+    doc->Insert("c");
+    InsertBoldMarker(doc);
+    doc->Insert("dßQR");
+    InsertBoldMarker(doc);
+    doc->InsertRawByte(0x02);
+    doc->Insert("e y\rnext");
+    layout->LayoutDocument(doc);
+
+    doc->SetPosition(10);
+    doc->SetSavePosition(0);
+    doc->SetPosition(15);
+    doc->SetSavePosition(1);
+    doc->SetPosition(2);
+    doc->SetBeginBlock();
+    doc->SetPosition(14);
+    doc->SetEndBlock();
+
+    std::vector<std::string> before = Cells(doc);
+    REQUIRE(Join(before) == Join({ "x", " ", "a", "b", TAB, "c", BOLD, "d", "ß", "Q", "R", BOLD, RAW2,
+                                   "e", " ", "y", "\\r", "n", "e", "x", "t" }));
+
+    editor.UpperCaseBlock();
+
+    std::vector<std::string> expected = { "x", " ", "A", "B", TAB, "C", BOLD, "D", "S", "S", "Q", "R", BOLD, RAW2,
+                                          "E", " ", "y", "\\r", "n", "e", "x", "t" };
+    CHECK(Join(Cells(doc)) == Join(expected));
+    CHECK(doc->GetPlainText(0, doc->GetTextSize() - 1, "\n") == "x AB\tCDSSQR\x02" "E y\nnext");
+    CHECK(doc->mBlockSet == true);
+    CHECK(doc->mStartBlock == 2);
+    CHECK(doc->mEndBlock == 15);
+    // R is at 11 after ß became SS; the letters around it were not touched
+    CHECK(doc->mSavePosition[0] == 11);
+    CHECK(doc->mSavePosition[1] == 16);
+
+    REQUIRE(editor.Undo());
+    CHECK(Join(Cells(doc)) == Join(before));
+
+    REQUIRE(editor.Redo());
+    CHECK(Join(Cells(doc)) == Join(expected));
+}
+
+TEST_CASE("LowerCaseBlock keeps tabs, bold and raw bytes in place, one undo restores")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    // X0 ' '1 A2 B3 TAB4 C5 B6 D7 q8 r9 B10 RAW11 E12 ' '13 Y14 \r15 NEXT16
+    doc->Insert("X AB");
+    InsertTabMarker(doc);
+    doc->Insert("C");
+    InsertBoldMarker(doc);
+    doc->Insert("Dqr");
+    InsertBoldMarker(doc);
+    doc->InsertRawByte(0x02);
+    doc->Insert("E Y\rNEXT");
+    layout->LayoutDocument(doc);
+
+    doc->SetPosition(9);
+    doc->SetSavePosition(0);
+    doc->SetPosition(2);
+    doc->SetBeginBlock();
+    doc->SetPosition(13);
+    doc->SetEndBlock();
+
+    std::vector<std::string> before = Cells(doc);
+
+    editor.LowerCaseBlock();
+
+    std::vector<std::string> expected = { "X", " ", "a", "b", TAB, "c", BOLD, "d", "q", "r", BOLD, RAW2,
+                                          "e", " ", "Y", "\\r", "N", "E", "X", "T" };
+    CHECK(Join(Cells(doc)) == Join(expected));
+    CHECK(doc->GetPlainText(0, doc->GetTextSize() - 1, "\n") == "X ab\tcdqr\x02" "e Y\nNEXT");
+    CHECK(doc->mBlockSet == true);
+    CHECK(doc->mStartBlock == 2);
+    CHECK(doc->mEndBlock == 13);
+    CHECK(doc->mSavePosition[0] == 9);
+
+    REQUIRE(editor.Undo());
+    CHECK(Join(Cells(doc)) == Join(before));
+
+    REQUIRE(editor.Redo());
+    CHECK(Join(Cells(doc)) == Join(expected));
+}
+
+TEST_CASE("SentenceCaseBlock keeps tabs, bold and raw bytes in place, one undo restores")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    // end. aB TAB i TAB B Cd B RAW x! yes \r next
+    doc->Insert("end. aB");
+    InsertTabMarker(doc);
+    doc->Insert("i");
+    InsertTabMarker(doc);
+    InsertBoldMarker(doc);
+    doc->Insert("Cd");
+    InsertBoldMarker(doc);
+    doc->InsertRawByte(0x02);
+    doc->Insert("x! yes\rnext");
+    layout->LayoutDocument(doc);
+
+    // between e(19) and s(20)
+    doc->SetPosition(20);
+    doc->SetSavePosition(0);
+    doc->SetPosition(0);
+    doc->SetBeginBlock();
+    doc->SetPosition(21);
+    doc->SetEndBlock();
+
+    std::vector<std::string> before = Cells(doc);
+
+    editor.SentenceCaseBlock();
+
+    std::vector<std::string> expected = { "e", "n", "d", ".", " ", "A", "b", TAB, "I", TAB, BOLD, "c", "d", BOLD, RAW2,
+                                          "x", "!", " ", "Y", "e", "s", "\\r", "n", "e", "x", "t" };
+    CHECK(Join(Cells(doc)) == Join(expected));
+    CHECK(doc->GetPlainText(0, doc->GetTextSize() - 1, "\n") == "end. Ab\tI\tcd\x02x! Yes\nnext");
+    CHECK(doc->mBlockSet == true);
+    CHECK(doc->mStartBlock == 0);
+    CHECK(doc->mEndBlock == 21);
+    CHECK(doc->mSavePosition[0] == 20);
+
+    REQUIRE(editor.Undo());
+    CHECK(Join(Cells(doc)) == Join(before));
+
+    REQUIRE(editor.Redo());
+    CHECK(Join(Cells(doc)) == Join(expected));
 }
 
 TEST_CASE("SortBlock sorts marked paragraphs ascending")

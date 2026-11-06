@@ -2937,51 +2937,7 @@ void cEditorBase::ToggleHideBlock(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::UpperCaseBlock(void)
 {
-    // *** COPIED FROM OLD SYSTEM - editorctrl.cpp::UpperCaseBlock() ***
-
-    if (!mDocument || mDocument->mBlockSet == false)
-    {
-        return;
-    }
-
-    CloseTypingGroup() ;
-    mDocument->BeginUndoGroup() ;
-
-    // Get block boundaries
-    POSITION_T start = 0;
-    POSITION_T end = 0;
-    mDocument->GetBlock(start, end);
-
-    // GetBlock() returns an exclusive end; GetBlockText() takes it as is.
-    std::string str = mDocument->GetBlockText(start, end);
-
-    // Convert to uppercase via cDocument (Unicode-aware)
-    str = mDocument->UpperCase(str) ;
-
-    // Batch wraps DeleteBlock + InsertWordStarString + block re-selection
-    // (multiple notifications coalesced into one visual update)
-    BeginBatchUpdate() ;
-
-    // Delete old block
-    mDocument->DeleteBlock();
-
-    // Insert converted text at block start
-    mDocument->SetPosition(start);
-    InsertWordStarString(str);
-    CloseTypingGroup() ;
-
-    // Re-select the block using calculated length
-    // Need to get actual inserted length from document
-    POSITION_T newEnd = mDocument->GetPosition();
-
-    mDocument->SetPosition(start);
-    mDocument->SetBeginBlock();
-    mDocument->SetPosition(newEnd);
-    mDocument->SetEndBlock();
-
-    EndBatchUpdate() ;
-
-    mDocument->EndUndoGroup() ;
+    ConvertBlockCase(&cDocument::UpperCase) ;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2997,49 +2953,7 @@ void cEditorBase::UpperCaseBlock(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::LowerCaseBlock(void)
 {
-    // *** COPIED FROM OLD SYSTEM - editorctrl.cpp::LowerCaseBlock() ***
-
-    if (!mDocument || mDocument->mBlockSet == false)
-    {
-        return;
-    }
-
-    CloseTypingGroup() ;
-    mDocument->BeginUndoGroup() ;
-
-    // Get block boundaries
-    POSITION_T start = 0;
-    POSITION_T end = 0;
-    mDocument->GetBlock(start, end);
-
-    // GetBlock() returns an exclusive end; GetBlockText() takes it as is.
-    std::string str = mDocument->GetBlockText(start, end);
-
-    // Convert to lowercase via cDocument (Unicode-aware)
-    str = mDocument->LowerCase(str) ;
-
-    // Batch wraps DeleteBlock + InsertWordStarString + block re-selection
-    BeginBatchUpdate() ;
-
-    // Delete old block
-    mDocument->DeleteBlock();
-
-    // Insert converted text at block start
-    mDocument->SetPosition(start);
-    InsertWordStarString(str);
-    CloseTypingGroup() ;
-
-    // Re-select the block using actual inserted length
-    POSITION_T newEnd = mDocument->GetPosition();
-
-    mDocument->SetPosition(start);
-    mDocument->SetBeginBlock();
-    mDocument->SetPosition(newEnd);
-    mDocument->SetEndBlock();
-
-    EndBatchUpdate() ;
-
-    mDocument->EndUndoGroup() ;
+    ConvertBlockCase(&cDocument::LowerCase) ;
 }
 
 
@@ -3054,37 +2968,152 @@ void cEditorBase::LowerCaseBlock(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::SentenceCaseBlock(void)
 {
+    ConvertBlockCase(&cDocument::SentenceCase) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  convert [in] - cDocument case function applied to the block text
+///
+/// @return nothing
+///
+/// @brief
+/// Applies a case conversion to the marked block in place. The block's
+/// plain text (tabs and raw bytes as their characters, other markers
+/// left out) is converted as a whole, so sentence boundaries see the
+/// full text. Only the characters whose text changes are replaced;
+/// markers, tabs, raw bytes and hard returns stay where they are. The
+/// block stays marked, its end moved by any change in length. One undo
+/// group.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::ConvertBlockCase(std::string (cDocument::*convert)(const std::string &))
+{
     if (!mDocument || mDocument->mBlockSet == false)
     {
-        return;
+        return ;
     }
 
     CloseTypingGroup() ;
     mDocument->BeginUndoGroup() ;
 
-    POSITION_T start = 0;
-    POSITION_T end = 0;
-    mDocument->GetBlock(start, end);
+    POSITION_T start = 0 ;
+    POSITION_T end = 0 ;
+    mDocument->GetBlock(start, end) ;
 
-    // GetBlock() returns an exclusive end; GetBlockText() takes it as is.
-    std::string str = mDocument->GetBlockText(start, end);
+    // plain characters of the block, their positions, and whether each
+    // may be replaced
+    std::vector<std::string> graphemes ;
+    std::vector<POSITION_T> positions ;
+    std::vector<bool> replaceable ;
+    std::string plain ;
+    for (POSITION_T pos = start ; pos < end ; pos++)
+    {
+        std::string grapheme = mDocument->GetCharNoAdvance(pos) ;
+        if (grapheme.empty())
+        {
+            continue ;
+        }
 
-    str = mDocument->SentenceCase(str) ;
+        bool text = true ;
+        if (grapheme.size() == 1 && static_cast<unsigned char>(grapheme[0]) == MARKER_CHAR)
+        {
+            eModifiers control = mDocument->GetControlChar(pos) ;
+            if (control == STYLE_TAB)
+            {
+                grapheme = "\t" ;
+            }
+            else if (control == STYLE_RAW_BYTE)
+            {
+                grapheme = std::string(1, static_cast<char>(mDocument->GetRawByte(pos))) ;
+            }
+            else
+            {
+                continue ;
+            }
+            text = false ;
+        }
+        else if (grapheme.size() == 1 && grapheme[0] == HARD_RETURN)
+        {
+            text = false ;
+        }
+
+        graphemes.push_back(grapheme) ;
+        positions.push_back(pos) ;
+        replaceable.push_back(text) ;
+        plain += grapheme ;
+    }
+
+    // converted text per character: from the whole converted text when it
+    // splits into the same number of characters, else character by character
+    std::vector<std::string> converted ;
+    std::string whole = (mDocument->*convert)(plain) ;
+    std::vector<POSITION_T> plainOffsets ;
+    std::vector<POSITION_T> wholeOffsets ;
+    if (mDocument->GraphemeCount(plain, plainOffsets) == graphemes.size()
+        && mDocument->GraphemeCount(whole, wholeOffsets) == graphemes.size())
+    {
+        for (size_t i = 0 ; i < graphemes.size() ; i++)
+        {
+            size_t from = static_cast<size_t>(wholeOffsets[i]) ;
+            size_t to = (i + 1 < wholeOffsets.size()) ? static_cast<size_t>(wholeOffsets[i + 1]) : whole.size() ;
+            converted.push_back(whole.substr(from, to - from)) ;
+        }
+    }
+    else
+    {
+        for (const std::string &grapheme : graphemes)
+        {
+            converted.push_back((mDocument->*convert)(grapheme)) ;
+        }
+    }
 
     BeginBatchUpdate() ;
 
-    mDocument->DeleteBlock();
+    // replace runs of adjacent changed characters, last run first so the
+    // positions of earlier runs stay valid
+    POSITION_T delta = 0 ;
+    size_t index = graphemes.size() ;
+    while (index > 0)
+    {
+        size_t last = index - 1 ;
+        if (!replaceable[last] || converted[last] == graphemes[last])
+        {
+            index-- ;
+            continue ;
+        }
 
-    mDocument->SetPosition(start);
-    InsertWordStarString(str);
-    CloseTypingGroup() ;
+        size_t first = last ;
+        while (first > 0 && replaceable[first - 1] && converted[first - 1] != graphemes[first - 1]
+               && positions[first - 1] + 1 == positions[first])
+        {
+            first-- ;
+        }
 
-    POSITION_T newEnd = mDocument->GetPosition();
+        std::string text ;
+        for (size_t i = first ; i <= last ; i++)
+        {
+            text += converted[i] ;
+        }
 
-    mDocument->SetPosition(start);
-    mDocument->SetBeginBlock();
-    mDocument->SetPosition(newEnd);
-    mDocument->SetEndBlock();
+        POSITION_T runStart = positions[first] ;
+        POSITION_T runLength = static_cast<POSITION_T>(last - first + 1) ;
+
+        // insert before the old characters, then delete them
+        mDocument->SetPosition(runStart) ;
+        mDocument->Insert(text) ;
+        POSITION_T inserted = mDocument->GetPosition() - runStart ;
+        mDocument->Delete(runStart + inserted, runLength) ;
+
+        delta += inserted - runLength ;
+        index = first ;
+    }
+
+    mDocument->mStartBlock = start ;
+    mDocument->mEndBlock = end + delta ;
+    mDocument->mBlockSet = true ;
+    mDocument->SetPosition(end + delta) ;
 
     EndBatchUpdate() ;
 
