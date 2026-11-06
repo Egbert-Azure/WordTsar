@@ -15637,6 +15637,22 @@ TEST_CASE("GUI editor - a text file ends at the first 0x1A, the rest is saved ba
         CHECK(ReadFileBytes(dir / "fail-again.txt") == "one\n" + tail);
     }
 
+    SUBCASE("a WordStar file saved as text gets no tail")
+    {
+        WriteFileBytes(dir / "src.txt", "one\n");
+        REQUIRE(editor.LoadFile((dir / "src.txt").string()));
+        REQUIRE(editor.SaveFile((dir / "src.ws").string()));
+        REQUIRE(ReadFileBytes(dir / "src.ws").find('\x1A') != std::string::npos);
+        WriteFileBytes(dir / "tail.txt", "two\n" + tail);
+        REQUIRE(editor.LoadFile((dir / "tail.txt").string()));
+        REQUIRE(editor.LoadFile((dir / "src.ws").string()));
+        REQUIRE(editor.SaveFile((dir / "from-ws.txt").string()));
+        std::string saved = ReadFileBytes(dir / "from-ws.txt");
+        CHECK(saved.find("one") != std::string::npos);
+        CHECK(saved.find('\x1A') == std::string::npos);
+        CHECK(saved.find("TAILMARK") == std::string::npos);
+    }
+
     SUBCASE("abandoning the document clears the tail")
     {
         WriteFileBytes(dir / "quit.txt", "one\n" + tail);

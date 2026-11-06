@@ -462,6 +462,14 @@ TEST_CASE("cTextFile::LoadFile - the text ends at the first 0x1A")
         CHECK(file.GetTextTail() == std::string("\x1A\xE9", 2));
     }
 
+    SUBCASE("a UTF-8 BOM before the 0x1A")
+    {
+        WriteFileBytes(path, std::string("\xEF\xBB\xBF" "one\n\x1A" "xy", 10));
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "one\n");
+        CHECK(file.GetTextTail() == "\x1A" "xy");
+    }
+
     SUBCASE("UTF-8 text with high bytes after the 0x1A stays UTF-8")
     {
         WriteFileBytes(path, std::string("caf\xC3\xA9\n\x1A\xFF\xFE", 9));
