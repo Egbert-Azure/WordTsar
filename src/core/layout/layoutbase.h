@@ -107,6 +107,7 @@ struct sFormattingCheckpoint
     // Other formatting state
     bool wordWrapEnabled;
     bool hyphenationEnabled;
+    bool continuousUnderline;
     PAGE_T pageNumberOffset;
     ePageNumberFormat pageNumFormat;
     bool printPageNumbers;
@@ -138,6 +139,7 @@ struct sFormattingCheckpoint
                lineHeight == other.lineHeight && autoLeading == other.autoLeading &&
                wordWrapEnabled == other.wordWrapEnabled &&
                hyphenationEnabled == other.hyphenationEnabled &&
+               continuousUnderline == other.continuousUnderline &&
                pageNumberOffset == other.pageNumberOffset &&
                pageNumFormat == other.pageNumFormat &&
                printPageNumbers == other.printPageNumbers &&

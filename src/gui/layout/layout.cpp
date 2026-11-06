@@ -668,6 +668,26 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
         }
         else
         {
+            // .ul off: spaces inside underlined text go in segments without underline
+            if (mLayoutState->IsUnderlineActive() && !mLayoutState->IsContinuousUnderline())
+            {
+                QFont wanted = mFont;
+                wanted.setUnderline(grapheme != " ");
+                std::string descriptor = FontUtils::FontToDescriptor(wanted);
+                if (descriptor != currentSegment.font)
+                {
+                    if (currentSegment.length > 0)
+                    {
+                        currentSegment.totalWidth = currentX;
+                        MarkSegmentIfInRange(currentSegment, paragraphStart);
+                        segments.push_back(currentSegment);
+                    }
+                    InitializeSegment(currentSegment, paragraphNum, i, lineHeight);
+                    currentSegment.font = descriptor;
+                    currentX = 0;
+                }
+            }
+
             // Regular grapheme - use helper
             AddSegmentMarker(currentSegment, pendingMarker);
             AddGraphemeToSegment(currentSegment, currentX, grapheme);

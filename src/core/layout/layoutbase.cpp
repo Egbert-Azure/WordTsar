@@ -5749,6 +5749,7 @@ void cLayoutBase::SaveFormattingCheckpoint(PARAGRAPH_T para)
     // Other formatting state
     cp.wordWrapEnabled = mLayoutState->IsWordWrapEnabled();
     cp.hyphenationEnabled = mLayoutState->IsHyphenationEnabled();
+    cp.continuousUnderline = mLayoutState->IsContinuousUnderline();
     cp.pageNumberOffset = mLayoutState->GetPageNumberOffset();
     cp.pageNumFormat = mLayoutState->GetPageNumFormat();
     cp.printPageNumbers = mLayoutState->ShouldPrintPageNumbers();
@@ -5809,6 +5810,7 @@ void cLayoutBase::RestoreFormattingCheckpoint(const sFormattingCheckpoint& cp)
     // Other formatting state
     mLayoutState->SetWordWrapEnabled(cp.wordWrapEnabled);
     mLayoutState->SetHyphenationEnabled(cp.hyphenationEnabled);
+    mLayoutState->SetContinuousUnderline(cp.continuousUnderline);
     mLayoutState->SetPageNumberOffset(cp.pageNumberOffset);
     mLayoutState->SetPageNumFormat(cp.pageNumFormat);
     mLayoutState->SetPrintPageNumbers(cp.printPageNumbers);
@@ -5873,6 +5875,7 @@ bool cLayoutBase::UpdateCheckpointIfNeeded(PARAGRAPH_T para)
     newCp.autoLeading = mLayoutState->IsAutoLeading();
     newCp.wordWrapEnabled = mLayoutState->IsWordWrapEnabled();
     newCp.hyphenationEnabled = mLayoutState->IsHyphenationEnabled();
+    newCp.continuousUnderline = mLayoutState->IsContinuousUnderline();
     newCp.pageNumberOffset = mLayoutState->GetPageNumberOffset();
     newCp.pageNumFormat = mLayoutState->GetPageNumFormat();
     newCp.printPageNumbers = mLayoutState->ShouldPrintPageNumbers();

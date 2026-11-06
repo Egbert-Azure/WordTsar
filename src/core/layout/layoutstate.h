@@ -132,6 +132,8 @@ public:
     void SetWordWrapEnabled(bool enabled);
     bool IsHyphenationEnabled(void) const;
     void SetHyphenationEnabled(bool enabled);
+    bool IsContinuousUnderline(void) const;
+    void SetContinuousUnderline(bool on);
     const std::string& GetHyphenationLanguage(void) const;
     void SetHyphenationLanguage(const std::string& language);
     bool IsLandscapeMode(void) const;
@@ -232,6 +234,7 @@ private:
     bool mDoNewPage;
     bool mWordWrapEnabled;
     bool mHyphenationEnabled;
+    bool mContinuousUnderline;  // .ul: underline spaces inside underlined text
     bool mLandscapeMode;
     bool mPrintPageNumbers;
     COORD_T mPageNumberColumn;

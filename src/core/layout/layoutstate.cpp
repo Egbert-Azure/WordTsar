@@ -126,6 +126,7 @@ cLayoutState::cLayoutState(void)
     mDoNewPage = false;
     mWordWrapEnabled = true;         // Word wrap enabled by default
     mHyphenationEnabled = true;      // Auto-hyphenation enabled by default (real WS7 default)
+    mContinuousUnderline = true;     // .ul on is the WS7 default
     mHyphenationLanguage = "en_US";  // Overwritten from the document's spell-check language
     mLandscapeMode = false;          // Portrait orientation by default
     mPrintPageNumbers = true;        // Auto page numbering enabled by default
@@ -639,6 +640,16 @@ bool cLayoutState::IsHyphenationEnabled(void) const
 void cLayoutState::SetHyphenationEnabled(bool enabled)
 {
     mHyphenationEnabled = enabled;
+}
+
+bool cLayoutState::IsContinuousUnderline(void) const
+{
+    return mContinuousUnderline;
+}
+
+void cLayoutState::SetContinuousUnderline(bool on)
+{
+    mContinuousUnderline = on;
 }
 
 const std::string& cLayoutState::GetHyphenationLanguage(void) const

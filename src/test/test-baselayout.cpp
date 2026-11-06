@@ -4229,6 +4229,58 @@ TEST_CASE("Subscript/Superscript Font Size Reduction")
 }
 
 /////////////////////////////////////////////////////////////////////////////
+/// @brief .ul on underlines the space between two underlined words, .ul off does not
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Continuous underline .ul on and off")
+{
+    ensureQApplication();
+
+    cDocument doc;
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_NONE);
+
+    // paragraphs: 0 ".ul off", 1 text, 2 ".ul on", 3 text
+    doc.Insert(".ul off\r");
+    doc.BeginUnderline();
+    doc.Insert("one two");
+    doc.EndUnderline();
+    doc.Insert("\r.ul on\r");
+    doc.BeginUnderline();
+    doc.Insert("one two");
+    doc.EndUnderline();
+    doc.Insert("\r");
+
+    layout.LayoutDocument(&doc);
+
+    // underline flag of the segment holding paragraph grapheme pos
+    auto underlinedAt = [&layout](PARAGRAPH_T paraNum, POSITION_T pos) -> bool
+    {
+        const sParagraphLayout* para = layout.GetParagraphLayout(paraNum);
+        REQUIRE(para != nullptr);
+        REQUIRE(para->lines.size() > 0);
+        for (const auto& seg : para->lines[0].segments)
+        {
+            if (pos >= seg.startPosition && pos < seg.startPosition + seg.length)
+            {
+                return FontUtils::FontFromDescriptor(seg.font).underline();
+            }
+        }
+        FAIL("no segment holds the position");
+        return false;
+    };
+
+    // grapheme 0 is the underline marker, "one" is 1-3, the space is 4, "two" is 5-7
+    CHECK(underlinedAt(1, 1) == true);
+    CHECK(underlinedAt(1, 4) == false);
+    CHECK(underlinedAt(1, 5) == true);
+
+    CHECK(underlinedAt(3, 1) == true);
+    CHECK(underlinedAt(3, 4) == true);
+    CHECK(underlinedAt(3, 5) == true);
+}
+
+/////////////////////////////////////////////////////////////////////////////
 /// @brief Test .SR command default value (90 twips = 3/48ths inch)
 /////////////////////////////////////////////////////////////////////////////
 TEST_CASE("SR Command Default Value")
@@ -10313,9 +10365,8 @@ TEST_CASE("Layout R2-1c: DOT_NOTIMPLEMENTED commands - group M-X")
     // flag as an error/not-implemented in the editor)
     CHECK(f.parser.ParseDotCommand(".TC entry") == DOT_GOOD);
 
-    // 'U' commands
+    // 'U' commands (UJ -- UL is implemented)
     CHECK(f.parser.ParseDotCommand(".UJ on") == DOT_NOTIMPLEMENTED);
-    CHECK(f.parser.ParseDotCommand(".UL on") == DOT_NOTIMPLEMENTED);
 
     // 'X' commands
     CHECK(f.parser.ParseDotCommand(".XE entry") == DOT_NOTIMPLEMENTED);

@@ -553,7 +553,7 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
             }
             if (cmdCode == "UL")  // Continuous Underlining
             {
-                return DOT_NOTIMPLEMENTED;
+                return ParseContinuousUnderline(upperCmd);
             }
             break;
         }
@@ -1232,6 +1232,44 @@ eDotCommandStatus cDotCommandParser::ParseWordWrap(const std::string& command)
     else
     {
         // Unknown parameter
+        return DOT_ERROR;
+    }
+
+    return DOT_GOOD;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  command [in] full dot command string (.ul on or .ul off)
+///
+/// @return DOT_GOOD if parsed successfully, DOT_ERROR otherwise
+///
+/// @brief
+/// Parses .UL (continuous underline). On underlines the spaces between
+/// underlined words, off leaves them plain. On is the default; .ul with
+/// no parameter means on.
+///
+/////////////////////////////////////////////////////////////////////////////
+eDotCommandStatus cDotCommandParser::ParseContinuousUnderline(const std::string& command)
+{
+    std::string param = command.substr(3);
+    param.erase(0, param.find_first_not_of(" \t\r\n"));
+    if (!param.empty())
+    {
+        param.erase(param.find_last_not_of(" \t\r\n") + 1);
+    }
+
+    // command arrives uppercased
+    if (param == "ON" || param.empty())
+    {
+        mLayoutState->SetContinuousUnderline(true);
+    }
+    else if (param == "OFF")
+    {
+        mLayoutState->SetContinuousUnderline(false);
+    }
+    else
+    {
         return DOT_ERROR;
     }
 
