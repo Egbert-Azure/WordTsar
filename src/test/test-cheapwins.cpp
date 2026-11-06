@@ -1333,3 +1333,90 @@ TEST_CASE("SentenceCase capitalizes a sentence-start sharp s as Ss")
     CHECK(CodePoints(doc.SentenceCase("x. " + sharp + " zed")) == CodePoints("x. Ss zed"));
     CHECK(CodePoints(doc.SentenceCase("x. " + sharp + sharp + " zed")) == CodePoints("x. Ss" + sharp + " zed"));
 }
+
+TEST_CASE("Case conversion with a length change keeps tabs, bold and raw bytes in place")
+{
+    ensureQApplication();
+
+    const std::string sharp = std::string("\xC3\x9F");
+
+    struct sCase
+    {
+        int which;                          // 0 upper, 1 lower, 2 sentence
+        std::string head;                   // text before the tab
+        std::vector<std::string> headBefore;
+        std::vector<std::string> headAfter;
+        std::vector<std::string> tailAfter; // z e d after the markers
+    };
+    std::vector<sCase> cases = {
+        { 0, "a" + sharp, { "a", sharp }, { "A", "S", "S" }, { "Z", "E", "D" } },
+        { 1, "aSS", { "a", "S", "S" }, { "a", "s", "s" }, { "z", "e", "d" } },
+        { 2, "x. " + sharp, { "x", ".", " ", sharp }, { "x", ".", " ", "S", "s" }, { "z", "e", "d" } },
+    };
+
+    for (const sCase& c : cases)
+    {
+        CAPTURE(c.which);
+
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+        layout->SetDocument(doc);
+
+        // head TAB z BOLD e BOLD RAW d \r tail
+        doc->Insert(c.head);
+        InsertTabMarker(doc);
+        doc->Insert(c.which == 1 ? "Z" : "z");
+        InsertBoldMarker(doc);
+        doc->Insert(c.which == 1 ? "E" : "e");
+        InsertBoldMarker(doc);
+        doc->InsertRawByte(0x02);
+        doc->Insert(c.which == 1 ? "D\rtail" : "d\rtail");
+        layout->LayoutDocument(doc);
+        doc->ClearUndoHistory();
+
+        POSITION_T end = doc->GetTextSize() - 1 - 5;
+        doc->mStartBlock = 0;
+        doc->mEndBlock = end;
+        doc->mBlockSet = true;
+
+        std::vector<std::string> before = Cells(doc);
+
+        if (c.which == 0)
+        {
+            editor.UpperCaseBlock();
+        }
+        else if (c.which == 1)
+        {
+            editor.LowerCaseBlock();
+        }
+        else
+        {
+            editor.SentenceCaseBlock();
+        }
+
+        std::vector<std::string> expected = c.headAfter;
+        expected.push_back(TAB);
+        expected.push_back(c.tailAfter[0]);
+        expected.push_back(BOLD);
+        expected.push_back(c.tailAfter[1]);
+        expected.push_back(BOLD);
+        expected.push_back(RAW2);
+        expected.push_back(c.tailAfter[2]);
+        for (const char* t : { "\\r", "t", "a", "i", "l" })
+        {
+            expected.push_back(t);
+        }
+
+        CHECK(Join(Cells(doc)) == Join(expected));
+        CHECK(doc->mBlockSet == true);
+        CHECK(doc->mStartBlock == 0);
+        CHECK(doc->mEndBlock == end + static_cast<POSITION_T>(c.headAfter.size() - c.headBefore.size()));
+
+        REQUIRE(editor.Undo());
+        CHECK(Join(Cells(doc)) == Join(before));
+
+        REQUIRE(editor.Redo());
+        CHECK(Join(Cells(doc)) == Join(expected));
+    }
+}

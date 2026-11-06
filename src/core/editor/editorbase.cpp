@@ -3047,7 +3047,9 @@ void cEditorBase::ConvertBlockCase(std::string (cDocument::*convert)(const std::
 
     // converted text per character: from the whole converted text when it
     // splits into the same number of characters, or else has the same
-    // number of code points; otherwise character by character
+    // number of code points, or else when each character's text, lower,
+    // upper or title case matches it in order; otherwise character by
+    // character
     std::vector<std::string> converted ;
     std::string whole = (mDocument->*convert)(plain) ;
     std::vector<POSITION_T> plainOffsets ;
@@ -3078,6 +3080,42 @@ void cEditorBase::ConvertBlockCase(std::string (cDocument::*convert)(const std::
         }
     }
     else
+    {
+        size_t at = 0 ;
+        for (size_t i = 0 ; i < graphemes.size() ; i++)
+        {
+            std::vector<std::string> forms = { graphemes[i] } ;
+            if (replaceable[i])
+            {
+                forms.push_back(mDocument->LowerCase(graphemes[i])) ;
+                forms.push_back(mDocument->UpperCase(graphemes[i])) ;
+                forms.push_back(mDocument->TitleCase(graphemes[i])) ;
+            }
+
+            bool found = false ;
+            for (const std::string &form : forms)
+            {
+                if (!form.empty() && whole.compare(at, form.size(), form) == 0)
+                {
+                    converted.push_back(form) ;
+                    at += form.size() ;
+                    found = true ;
+                    break ;
+                }
+            }
+            if (!found)
+            {
+                break ;
+            }
+        }
+
+        if (converted.size() != graphemes.size() || at != whole.size())
+        {
+            converted.clear() ;
+        }
+    }
+
+    if (converted.empty() && !graphemes.empty())
     {
         for (const std::string &grapheme : graphemes)
         {
