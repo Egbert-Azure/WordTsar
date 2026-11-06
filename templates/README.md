@@ -15,7 +15,7 @@ To add a chapter, copy a chapter from its first dot command (`.lh 36`) to its pa
 The `.tc` and `.ix` lines only mark entries. They do not print. The GUI inserts them. ws also generates the files.
 
 - GUI: Insert > Index/TOC Entry > TOC Entry or Index Entry adds a `.tc` or `.ix` line. The GUI has no command that generates the table of contents or the index.
-- ws: on the Opening screen, Utilities > TOC (or the key T) and Utilities > Index (or the key I) ask for a file. T writes `name.TOC` and I writes `name.IDX` next to it. ws then opens the new file. ws can also insert the entries from its Insert menu.
+- ws: on the Opening screen, the key T (Utilities > TOC) and the key I (Utilities > Index) ask for a file. The Utilities menu is shown at help level 4 only. The keys work at every help level. T writes `name.TOC` and I writes `name.IDX` next to it. ws then opens the new file. ws can also insert the entries from its Insert menu.
 
 ## Dot commands in this template
 
@@ -25,9 +25,9 @@ The `.tc` and `.ix` lines only mark entries. They do not print. The GUI inserts 
 | `.pl 11i` | Page length 11 inches. |
 | `.mt 1i` | Top margin 1 inch. |
 | `.mb 1i` | Bottom margin 1 inch. |
-| `.po 1i` | Page offset 1 inch. |
+| `.po 1i` | Page offset 1 inch: the left edge of the text, because `.lm 0i` adds nothing. |
 | `.lm 0i` | Left margin 0 inches. |
-| `.rm 6.5i` | Right margin 6.5 inches. |
+| `.rm 6.5i` | Text width 6.5 inches, measured from the page offset. With the 1 inch offset the right margin is 1 inch. |
 | `.lh 8` | Line height 8/48 inch (12 pt, single spacing). Used for the address block. |
 | `.lh 16` | Line height 16/48 inch (24 pt, double spacing). Used for the title and the body text. |
 | `.lh 36` | Line height 36/48 inch (54 pt). The blank line before a chapter heading drops it down the page. |
