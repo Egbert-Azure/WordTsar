@@ -339,6 +339,26 @@ TEST_CASE("TOC/Index generator - files that cannot be written are reported")
 }
 
 
+TEST_CASE("TOC/Index generator - a .tc entry keeps its bold markers in the table of contents")
+{
+    ensureQApplication() ;
+    tocindextest::cScratchDir dir("tocbold") ;
+    REQUIRE(dir.IsValid()) ;
+
+    cEditorCtrl editor ;
+    tocindextest::SetMarkedSource(editor, { ".tc {B}Chapter{B} One #" }) ;
+    std::vector<std::string> outputFiles ;
+    REQUIRE(cTOCIndexGenerator::GenerateTOC(&editor, dir.File("source.ws"), outputFiles)) ;
+    REQUIRE(outputFiles.size() == 1) ;
+
+    cEditorCtrl reader ;
+    CHECK(tocindextest::Join(tocindextest::LoadGenerated(reader, outputFiles[0])) == "Chapter One 1") ;
+    cDocument *doc = reader.GetDocument() ;
+    CHECK(doc->GetControlChar(0) == STYLE_BOLD) ;
+    CHECK(doc->GetControlChar(8) == STYLE_BOLD) ;
+}
+
+
 namespace {
 
 /////////////////////////////////////////////////////////////////////////////

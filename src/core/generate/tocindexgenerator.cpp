@@ -46,30 +46,25 @@
 namespace {
 
 /////////////////////////////////////////////////////////////////////////////
-// GetParagraphText() includes the paragraph's own terminator; strip it so
-// prefix/content checks below see just the dot command and its argument.
+// One grapheme of entry text. A marker carries its kind and data as
+// captured from the source document.
 /////////////////////////////////////////////////////////////////////////////
-std::string TrimTerminator(const std::string &text)
+struct sEntryChar
 {
-    std::string result = text ;
-    while (result.empty() == false && (result.back() == '\r' || result.back() == '\n'))
-    {
-        result.pop_back() ;
-    }
-    return result ;
-}
+    std::string text ;
+    bool marker ;
+    sUndoCharInfo info ;
+};
+
+typedef std::vector<sEntryChar> tEntryText ;
+
 
 /////////////////////////////////////////////////////////////////////////////
-// Paragraph text without its terminator and without kept sequence markers.
+// Paragraph graphemes without the terminator and without kept sequence
+// markers; other markers are kept with their data.
 /////////////////////////////////////////////////////////////////////////////
-std::string EntryParagraphText(cDocument *doc, PARAGRAPH_T paragraph)
+tEntryText EntryParagraphChars(cDocument *doc, PARAGRAPH_T paragraph)
 {
-    std::string raw = doc->GetParagraphText(paragraph) ;
-    if (raw.find(static_cast<char>(MARKER_CHAR)) == std::string::npos)
-    {
-        return TrimTerminator(raw) ;
-    }
-
     POSITION_T start = 0 ;
     POSITION_T end = 0 ;
     doc->GetParagraphStartandEnd(paragraph, start, end) ;
@@ -78,18 +73,117 @@ std::string EntryParagraphText(cDocument *doc, PARAGRAPH_T paragraph)
     std::vector<POSITION_T> offsets ;
     doc->GetParagraphGraphemes(paragraph, graphemes, offsets) ;
 
-    std::string text ;
-    sRawSequence sequence ;
+    tEntryText chars ;
     for (size_t loop = 0 ; loop < graphemes.size() ; loop++)
     {
-        if (graphemes[loop].size() == 1 && graphemes[loop][0] == static_cast<char>(MARKER_CHAR) &&
-            doc->GetRawSequence(start + static_cast<POSITION_T>(loop), sequence) == true)
+        sEntryChar c ;
+        c.text = graphemes[loop] ;
+        c.marker = graphemes[loop].size() == 1 && graphemes[loop][0] == static_cast<char>(MARKER_CHAR) ;
+        if (c.marker == true)
         {
+            POSITION_T position = start + static_cast<POSITION_T>(loop) ;
+            sRawSequence sequence ;
+            if (doc->GetRawSequence(position, sequence) == true)
+            {
+                continue ;
+            }
+            std::vector<sUndoCharInfo> info = doc->CaptureCharacters(position, 1) ;
+            if (info.size() != 1)
+            {
+                continue ;
+            }
+            c.info = info[0] ;
+        }
+        chars.push_back(c) ;
+    }
+
+    while (chars.empty() == false && chars.back().marker == false &&
+           chars.back().text.find_first_not_of("\r\n") == std::string::npos)
+    {
+        chars.pop_back() ;
+    }
+    return chars ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Entry text as one string, a marker as the MARKER_CHAR byte.
+/////////////////////////////////////////////////////////////////////////////
+std::string PlainText(const tEntryText &chars)
+{
+    std::string text ;
+    for (const sEntryChar &c : chars)
+    {
+        text += c.text ;
+    }
+    return text ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Entry text of plain characters, one per byte.
+/////////////////////////////////////////////////////////////////////////////
+tEntryText FromPlain(const std::string &text)
+{
+    tEntryText chars ;
+    for (char byte : text)
+    {
+        sEntryChar c ;
+        c.text = std::string(1, byte) ;
+        c.marker = false ;
+        chars.push_back(c) ;
+    }
+    return chars ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Entry characters from `bytes` bytes into the plain text onward.
+/////////////////////////////////////////////////////////////////////////////
+tEntryText TailFrom(const tEntryText &chars, size_t bytes)
+{
+    size_t count = 0 ;
+    size_t index = 0 ;
+    while (index < chars.size() && count < bytes)
+    {
+        count += chars[index].text.size() ;
+        index++ ;
+    }
+    return tEntryText(chars.begin() + static_cast<std::ptrdiff_t>(index), chars.end()) ;
+}
+
+
+bool IsChar(const tEntryText &chars, size_t index, const char *text)
+{
+    return index < chars.size() && chars[index].marker == false && chars[index].text == text ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Inserts entry text at the document position, markers rebuilt with their
+// data.
+/////////////////////////////////////////////////////////////////////////////
+void InsertEntry(cDocument *doc, const tEntryText &chars)
+{
+    std::string run ;
+    for (const sEntryChar &c : chars)
+    {
+        if (c.marker == false)
+        {
+            run += c.text ;
             continue ;
         }
-        text += graphemes[loop] ;
+        if (run.empty() == false)
+        {
+            doc->Insert(run) ;
+            run.clear() ;
+        }
+        doc->ReinsertCharacters(doc->GetPosition(), { c.info }) ;
     }
-    return TrimTerminator(text) ;
+    if (run.empty() == false)
+    {
+        doc->Insert(run) ;
+    }
 }
 
 
@@ -125,36 +219,37 @@ std::string ToLowerCopy(const std::string &text)
 // If you want the # symbol to appear in the entry, precede it with a
 // backslash."
 /////////////////////////////////////////////////////////////////////////////
-std::string SubstitutePageNumber(const std::string &raw, PAGE_T pageNumber)
+tEntryText SubstitutePageNumber(const tEntryText &raw, PAGE_T pageNumber)
 {
-    std::string result ;
+    tEntryText result ;
     for (size_t pos = 0 ; pos < raw.size() ; pos++)
     {
-        if (raw[pos] == '\\' && pos + 1 < raw.size() && raw[pos + 1] == '#')
+        if (IsChar(raw, pos, "\\") && IsChar(raw, pos + 1, "#"))
         {
-            result += '#' ;
+            result.push_back(raw[pos + 1]) ;
             pos++ ;
             continue ;
         }
-        if (raw[pos] == '#')
+        if (IsChar(raw, pos, "#"))
         {
-            result += std::to_string(pageNumber) ;
+            tEntryText number = FromPlain(std::to_string(pageNumber)) ;
+            result.insert(result.end(), number.begin(), number.end()) ;
             continue ;
         }
-        result += raw[pos] ;
+        result.push_back(raw[pos]) ;
     }
     return result ;
 }
 
 struct sTOCEntry
 {
-    std::string text ;
+    tEntryText text ;
 };
 
 struct sIndexEntry
 {
-    std::string main ;
-    std::string sub ;
+    tEntryText main ;
+    tEntryText sub ;
     bool bold ;
     bool crossref ;
     PAGE_T page ;
@@ -168,7 +263,7 @@ struct sIndexEntry
 // comma -- the manual's own example, "-Naming files, see Files", uses a
 // comma as ordinary English, not a subreference marker.
 /////////////////////////////////////////////////////////////////////////////
-sIndexEntry ParseIndexEntry(const std::string &raw)
+sIndexEntry ParseIndexEntry(const tEntryText &raw)
 {
     sIndexEntry entry ;
     entry.bold = false ;
@@ -176,39 +271,33 @@ sIndexEntry ParseIndexEntry(const std::string &raw)
     entry.page = 0 ;
 
     size_t pos = 0 ;
-    if (pos < raw.size() && raw[pos] == '+')
+    if (IsChar(raw, pos, "+"))
     {
         entry.bold = true ;
         pos++ ;
     }
-    else if (pos < raw.size() && raw[pos] == '-')
+    else if (IsChar(raw, pos, "-"))
     {
         entry.crossref = true ;
         pos++ ;
     }
 
-    std::string main ;
-    std::string sub ;
-    std::string *target = &main ;
+    tEntryText *target = &entry.main ;
     for ( ; pos < raw.size() ; pos++)
     {
-        char c = raw[pos] ;
-        if (c == '\\' && pos + 1 < raw.size())
+        if (IsChar(raw, pos, "\\") && pos + 1 < raw.size())
         {
             pos++ ;
-            *target += raw[pos] ;
+            target->push_back(raw[pos]) ;
             continue ;
         }
-        if (c == ',' && entry.crossref == false && target == &main)
+        if (IsChar(raw, pos, ",") && entry.crossref == false && target == &entry.main)
         {
-            target = &sub ;
+            target = &entry.sub ;
             continue ;
         }
-        *target += c ;
+        target->push_back(raw[pos]) ;
     }
-
-    entry.main = main ;
-    entry.sub = sub ;
     return entry ;
 }
 
@@ -321,7 +410,7 @@ void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAG
                 std::string body ;
                 if (DecodeIndexItemBody(sequence.body, codepage, body) == true)
                 {
-                    sIndexEntry entry = ParseIndexEntry(body) ;
+                    sIndexEntry entry = ParseIndexEntry(FromPlain(body)) ;
                     if (entry.main.empty() == false)
                     {
                         if (entry.crossref == false)
@@ -355,7 +444,7 @@ void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAG
             if (visible == true && first != std::string::npos)
             {
                 sIndexEntry entry ;
-                entry.main = text.substr(first, last - first + 1) ;
+                entry.main = FromPlain(text.substr(first, last - first + 1)) ;
                 entry.bold = false ;
                 entry.crossref = false ;
                 entry.page = PageOfIndex(paraLayout, openIndex) ;
@@ -392,7 +481,8 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
     PARAGRAPH_T count = sourceDoc->GetNumberofParagraphs() ;
     for (PARAGRAPH_T loop = 0 ; loop < count ; loop++)
     {
-        std::string text = EntryParagraphText(sourceDoc, loop) ;
+        tEntryText chars = EntryParagraphChars(sourceDoc, loop) ;
+        std::string text = PlainText(chars) ;
         if (StartsWithNoCase(text, ".tc") == false)
         {
             continue ;
@@ -423,8 +513,8 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
         // an entry starting with '.' is a dot command for the generated
         // file and is written unchanged
         sTOCEntry entry ;
-        entry.text = text.substr(prefixLen) ;
-        if (entry.text[0] != '.')
+        entry.text = TailFrom(chars, prefixLen) ;
+        if (IsChar(entry.text, 0, ".") == false)
         {
             entry.text = SubstitutePageNumber(entry.text, page) ;
         }
@@ -445,7 +535,7 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
         sourceDoc->Clear() ;
         for (const sTOCEntry &entry : tables[table])
         {
-            sourceDoc->Insert(entry.text) ;
+            InsertEntry(sourceDoc, entry.text) ;
             sourceDoc->Insert(HARD_RETURN) ;
         }
 
@@ -490,12 +580,13 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
     cLayoutBase *layout = editor->GetLayout() ;
 
     std::vector<sIndexEntry> entries ;
-    std::vector<std::string> dotCommands ;
+    std::vector<tEntryText> dotCommands ;
 
     PARAGRAPH_T count = sourceDoc->GetNumberofParagraphs() ;
     for (PARAGRAPH_T loop = 0 ; loop < count ; loop++)
     {
-        std::string text = EntryParagraphText(sourceDoc, loop) ;
+        tEntryText chars = EntryParagraphChars(sourceDoc, loop) ;
+        std::string text = PlainText(chars) ;
         if (StartsWithNoCase(text, ".ix") == false)
         {
             // dot command and comment lines hold no index marks
@@ -523,11 +614,11 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
         // file: kept unchanged, in document order, ahead of the entries
         if (prefixLen < text.size() && text[prefixLen] == '.')
         {
-            dotCommands.push_back(text.substr(prefixLen)) ;
+            dotCommands.push_back(TailFrom(chars, prefixLen)) ;
             continue ;
         }
 
-        sIndexEntry entry = ParseIndexEntry(text.substr(prefixLen)) ;
+        sIndexEntry entry = ParseIndexEntry(TailFrom(chars, prefixLen)) ;
         if (entry.main.empty())
         {
             continue ;
@@ -552,8 +643,8 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
     // marked both bold and non-bold keeps only the bold form.
     struct sGroup
     {
-        std::string mainDisplay ;
-        std::string subDisplay ;
+        tEntryText mainDisplay ;
+        tEntryText subDisplay ;
         bool crossref ;
         std::set<PAGE_T> normalPages ;
         std::set<PAGE_T> boldPages ;
@@ -563,7 +654,8 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
 
     for (const sIndexEntry &entry : entries)
     {
-        std::string key = ToLowerCopy(entry.main) + "\x01" + ToLowerCopy(entry.sub) + "\x01" + (entry.crossref ? "1" : "0") ;
+        std::string key = ToLowerCopy(PlainText(entry.main)) + "\x01" + ToLowerCopy(PlainText(entry.sub)) + "\x01" +
+                          (entry.crossref ? "1" : "0") ;
 
         auto it = groups.find(key) ;
         if (it == groups.end())
@@ -596,19 +688,19 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
     }
     std::sort(sorted.begin(), sorted.end(), [](const sGroup &a, const sGroup &b)
     {
-        std::string am = ToLowerCopy(a.mainDisplay) ;
-        std::string bm = ToLowerCopy(b.mainDisplay) ;
+        std::string am = ToLowerCopy(PlainText(a.mainDisplay)) ;
+        std::string bm = ToLowerCopy(PlainText(b.mainDisplay)) ;
         if (am != bm)
         {
             return am < bm ;
         }
-        return ToLowerCopy(a.subDisplay) < ToLowerCopy(b.subDisplay) ;
+        return ToLowerCopy(PlainText(a.subDisplay)) < ToLowerCopy(PlainText(b.subDisplay)) ;
     }) ;
 
     sourceDoc->Clear() ;
-    for (const std::string &command : dotCommands)
+    for (const tEntryText &command : dotCommands)
     {
-        sourceDoc->Insert(command) ;
+        InsertEntry(sourceDoc, command) ;
         sourceDoc->Insert(HARD_RETURN) ;
     }
     for (const sGroup &group : sorted)
@@ -618,8 +710,15 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
         // too, so it gets its own line above; a bare subreference with no
         // plain-main sibling just shows indented on its own, which is a
         // reasonable degradation of a case the manual doesn't spell out.
-        std::string line = group.subDisplay.empty() ? group.mainDisplay : ("  " + group.subDisplay) ;
-        sourceDoc->Insert(line) ;
+        if (group.subDisplay.empty() == true)
+        {
+            InsertEntry(sourceDoc, group.mainDisplay) ;
+        }
+        else
+        {
+            sourceDoc->Insert("  ") ;
+            InsertEntry(sourceDoc, group.subDisplay) ;
+        }
 
         if (group.crossref == false)
         {
