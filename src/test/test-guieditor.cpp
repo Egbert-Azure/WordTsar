@@ -17383,6 +17383,69 @@ TEST_CASE("Text file control bytes - save as WordStar leaves the byte out and wa
 }
 
 
+TEST_CASE("Text file control bytes - RTF and DOCX export leave the byte out with no space")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-gui-rawexport-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cEditorCtrl editor;
+    auto path = dir / "in.txt";
+    std::string bytes = "abc\x02" "def ghi\x7F\x01" "jkl\n"
+                        "\x02" "xyz\n" + FillerLine(1) + "\n" + FillerLine(2) + "\n";
+    WriteFileBytes(path, bytes);
+    REQUIRE(editor.LoadFile(path.string()));
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc->IsTextFile());
+
+    // a header line with a raw byte: ".h1 hd^Bhd"
+    doc->SetPosition(0);
+    doc->Insert(".h1 hd");
+    doc->InsertRawByte(0x02);
+    doc->Insert("hd\r");
+    REQUIRE(WholePlainText(doc) == ".h1 hd\x02hd\n" + bytes);
+
+    auto reloaded = [&](const std::filesystem::path& file)
+    {
+        cEditorCtrl reader;
+        REQUIRE(reader.LoadFile(file.string()));
+        return WholePlainText(reader.GetDocument());
+    };
+
+    SUBCASE("RTF")
+    {
+        auto out = dir / "out.rtf";
+        REQUIRE(editor.SaveFile(out.string()));
+        std::string rtf = ReadFileBytes(out);
+        CHECK(rtf.find('\x02') == std::string::npos);
+        CHECK(rtf.find('\x01') == std::string::npos);
+        CHECK(rtf.find('\x7F') == std::string::npos);
+        CHECK(rtf.find("abcdef ghijkl") != std::string::npos);
+        CHECK(rtf.find("hdhd") != std::string::npos);
+        std::string text = reloaded(out);
+        CHECK(text.find("abcdef ghijkl\n") != std::string::npos);
+        CHECK(text.find("\nxyz\n") != std::string::npos);
+    }
+
+    SUBCASE("DOCX")
+    {
+        auto out = dir / "out.docx";
+        REQUIRE(editor.SaveFile(out.string()));
+        std::string text = reloaded(out);
+        CHECK(text.find('\x02') == std::string::npos);
+        CHECK(text.find('\x01') == std::string::npos);
+        CHECK(text.find("abcdef ghijkl\n") != std::string::npos);
+        CHECK(text.find("\nxyz\n") != std::string::npos);
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
 TEST_CASE("Text file control bytes - ^KR and clipboard paste keep the byte in a text document only")
 {
     ensureQApplication();
