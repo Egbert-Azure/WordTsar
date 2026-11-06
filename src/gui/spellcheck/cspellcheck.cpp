@@ -164,7 +164,7 @@ void cSpellCheck::CheckDocument(void)
 
                             spellcheck.badword->setText(word.c_str()) ;
                             restoreGeometry(mGeometry);
-                            int ecode = exec() ;
+                            int ecode = RunDialog() ;
 
                             spellcheck.suggestions->clear() ;
 
@@ -424,7 +424,7 @@ void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWo
 
         spellcheck.badword->setText(word.c_str()) ;
         restoreGeometry(mGeometry) ;
-        int ecode = exec() ;
+        int ecode = RunDialog() ;
 
         spellcheck.suggestions->clear() ;
 
@@ -491,6 +491,12 @@ void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWo
     {
         mEditor->GetDocument()->RestoreBlocks() ;
     }
+}
+
+
+int cSpellCheck::RunDialog(void)
+{
+    return exec() ;
 }
 
 

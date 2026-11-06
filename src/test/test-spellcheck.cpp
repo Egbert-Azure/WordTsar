@@ -24,6 +24,9 @@
 #include "src/gui/layout/layout.h"
 #include "src/core/document/document.h"
 #include "src/core/spellcheck/spellcheck.h"
+#include "src/gui/spellcheck/cspellcheck.h"
+#include <algorithm>
+#include <deque>
 #include <QApplication>
 #include <QTimer>
 
@@ -99,6 +102,70 @@ TEST_CASE("P2.6 Spell Check - Methods exist and are callable")
         // Verify it's callable (would show dialog in real environment)
         CHECK(true);  // Placeholder - actual test would require dialog mocking
     }
+}
+
+namespace {
+// cSpellCheck that returns scripted result codes instead of showing the dialog.
+class cScriptedSpellCheck : public cSpellCheck
+{
+public:
+    cScriptedSpellCheck(cEditorCtrl *parent, eSpellMode mode) : cSpellCheck(parent, mode) {}
+
+    std::deque<int> mCodes ;
+    int mRuns = 0 ;
+
+protected:
+    int RunDialog(void) override
+    {
+        mRuns++ ;
+        if (mCodes.empty())
+        {
+            return QDialog::Rejected ;
+        }
+        int code = mCodes.front() ;
+        mCodes.pop_front() ;
+        return code ;
+    }
+} ;
+}
+
+TEST_CASE("cSpellCheck - Replace with a suggestion that ends in the following period")
+{
+    ensureQApplication();
+
+    const std::string language = "de_DE";
+    cSpellChecker checker(language);
+    REQUIRE(checker.CheckWord("evtl") == false);
+    std::vector<std::string> suggestions = checker.suggestions("evtl");
+    auto found = std::find(suggestions.begin(), suggestions.end(), "evtl.");
+    INFO("suggestions: ", doctest::toString(suggestions.size()));
+    REQUIRE(found != suggestions.end());
+    size_t index = static_cast<size_t>(found - suggestions.begin());
+
+    cEditorCtrl editor;
+    editor.mSpellCheckLanguage = language;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("evtl.");
+    editor.GetLayout()->LayoutDocument(doc);
+    doc->SetPosition(0);
+    editor.CalculateCaretPosition();
+    REQUIRE(editor.GetCaretDocumentPosition() == 0);
+    doc->MarkSaved();
+
+    cScriptedSpellCheck dialog(&editor, SPELLCHECKWORD);
+    for (size_t page = 0; page < index / 5; ++page)
+    {
+        dialog.mCodes.push_back(SPELLMORE);
+    }
+    dialog.mCodes.push_back(static_cast<int>(index % 5) + 1);
+    dialog.CheckWord();
+
+    std::string text = doc->GetText();
+    text = text.substr(0, text.find('\x1A'));
+    text = text.substr(0, text.find('\x7F'));
+    CHECK(dialog.mRuns >= 1);
+    CHECK(doc->IsModified());
+    CHECK(text == "evtl.");
 }
 
 TEST_CASE("P2.6 Spell Check - Document state handling")

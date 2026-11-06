@@ -78,6 +78,7 @@ public slots:
     void suggestiondoubleclicked(QListWidgetItem *item) ;
 
 protected:
+    virtual int RunDialog(void) ;          // shows the dialog and returns its result code
     void keyPressEvent(QKeyEvent *event) override;
     void showEvent(QShowEvent *e) ;
 
