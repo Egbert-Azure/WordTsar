@@ -991,3 +991,33 @@ TEST_CASE("Case conversion keeps every other code point of multi-code-point char
                      "q\u0301q. " + FAMILY + " " + FLAG + " \u1EA0\u0301 \u00DF\u0301x! \u00C9 I");
     }
 }
+
+TEST_CASE("SentenceCaseBlock keeps sentence context when a marker splits a character")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    // the bold marker splits the flag into two characters in the document;
+    // without the marker the two regional indicators are one character
+    doc->Insert("end. wOW \U0001F1E9");
+    InsertBoldMarker(doc);
+    doc->Insert("\U0001F1EA i AM\rtail");
+    layout->LayoutDocument(doc);
+
+    doc->mStartBlock = 0;
+    doc->mEndBlock = doc->GetTextSize() - 1 - 5;
+    doc->mBlockSet = true;
+    std::vector<std::string> before = Cells(doc);
+
+    editor.SentenceCaseBlock();
+
+    CHECK(Join(Cells(doc)) == Join({ "e", "n", "d", ".", " ", "W", "o", "w", " ", "\U0001F1E9", BOLD, "\U0001F1EA",
+                                     " ", "I", " ", "a", "m", "\\r", "t", "a", "i", "l" }));
+
+    REQUIRE(editor.Undo());
+    CHECK(Join(Cells(doc)) == Join(before));
+}

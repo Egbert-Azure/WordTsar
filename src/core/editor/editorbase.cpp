@@ -3046,11 +3046,16 @@ void cEditorBase::ConvertBlockCase(std::string (cDocument::*convert)(const std::
     }
 
     // converted text per character: from the whole converted text when it
-    // splits into the same number of characters, else character by character
+    // splits into the same number of characters, or else has the same
+    // number of code points; otherwise character by character
     std::vector<std::string> converted ;
     std::string whole = (mDocument->*convert)(plain) ;
     std::vector<POSITION_T> plainOffsets ;
     std::vector<POSITION_T> wholeOffsets ;
+    std::u32string plain32 ;
+    std::u32string whole32 ;
+    mDocument->GetCodePoints(plain, plain32) ;
+    mDocument->GetCodePoints(whole, whole32) ;
     if (mDocument->GraphemeCount(plain, plainOffsets) == graphemes.size()
         && mDocument->GraphemeCount(whole, wholeOffsets) == graphemes.size())
     {
@@ -3059,6 +3064,17 @@ void cEditorBase::ConvertBlockCase(std::string (cDocument::*convert)(const std::
             size_t from = static_cast<size_t>(wholeOffsets[i]) ;
             size_t to = (i + 1 < wholeOffsets.size()) ? static_cast<size_t>(wholeOffsets[i + 1]) : whole.size() ;
             converted.push_back(whole.substr(from, to - from)) ;
+        }
+    }
+    else if (plain32.size() == whole32.size())
+    {
+        size_t at = 0 ;
+        for (const std::string &grapheme : graphemes)
+        {
+            std::u32string grapheme32 ;
+            mDocument->GetCodePoints(grapheme, grapheme32) ;
+            converted.push_back(mDocument->NormalizeToUTF8(whole32.substr(at, grapheme32.size()))) ;
+            at += grapheme32.size() ;
         }
     }
     else
