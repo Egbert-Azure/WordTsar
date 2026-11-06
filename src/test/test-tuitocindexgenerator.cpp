@@ -70,3 +70,33 @@ TEST_CASE("TUI TOC/Index generator - a kept sequence in .tc and .ix entry text l
 {
     tocindextest::CheckSequenceInEntryText<cWSEditorCtrl>() ;
 }
+
+
+TEST_CASE("TUI TOC/Index generator - index marks around a word merge with .ix entries for that word")
+{
+    tocindextest::CheckIndexMarksMergeWithIx<cWSEditorCtrl>() ;
+}
+
+
+TEST_CASE("TUI TOC/Index generator - an index mark without a partner in its paragraph gives no entry")
+{
+    tocindextest::CheckUnpairedIndexMarks<cWSEditorCtrl>() ;
+}
+
+
+TEST_CASE("TUI TOC/Index generator - index marks in dot command lines give no entry")
+{
+    tocindextest::CheckIndexMarksInDotLines<cWSEditorCtrl>() ;
+}
+
+
+TEST_CASE("TUI TOC/Index generator - index mark entry text is the plain text, taken as it is")
+{
+    tocindextest::CheckIndexMarkPlainText<cWSEditorCtrl>() ;
+}
+
+
+TEST_CASE("TUI TOC/Index generator - an index mark gets the page of its line")
+{
+    tocindextest::CheckIndexMarkPageOfLine<cWSEditorCtrl>() ;
+}

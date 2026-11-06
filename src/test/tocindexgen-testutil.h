@@ -642,6 +642,108 @@ void CheckSequenceInEntryText(void)
     CHECK(Join(LoadGenerated(reader, indexPath)) == ".lm 0|Alpha, 1") ;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+/// Index of a source built by SetMarkedSource(), loaded back.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+std::string MarkedIndex(const std::string &tag, const std::vector<std::string> &source)
+{
+    cScratchDir dir(tag) ;
+    REQUIRE(dir.IsValid()) ;
+
+    EDITOR editor ;
+    std::string indexPath = GenerateMarkedIndexFile(editor, source, dir.File("source.ws")) ;
+
+    EDITOR reader ;
+    return Join(LoadGenerated(reader, indexPath)) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// A marked word on pages 1 and 3 and the same word as .ix on page 2 give
+/// one index line.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckIndexMarksMergeWithIx(void)
+{
+    CHECK(MarkedIndex<EDITOR>("markmerge",
+        { "Page one {K}word{K} text", ".pa", ".ix word", "Page two", ".pa", "Page three {K}word{K}" })
+        == "word, 1, 2, 3") ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// A mark without a partner in its paragraph gives no entry; a third mark
+/// opens a new pair; an empty or blank pair gives no entry.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckUnpairedIndexMarks(void)
+{
+    CHECK(MarkedIndex<EDITOR>("markunpaired",
+        { "One {K}lone mark", "{K}first{K} then {K}third", "Empty {K}{K} and {K}  {K} pairs", "Next {K}line" })
+        == "first, 1") ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Marks in dot command and comment lines are not index entries.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckIndexMarksInDotLines(void)
+{
+    CHECK(MarkedIndex<EDITOR>("markdot",
+        { ".h1 {K}Head{K}", ".f1 {K}Foot{K}", ".tc {K}Chapter{K} #", "..{K}note{K}", "Body {K}real{K} text" })
+        == "real, 1") ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Markers between the index marks are left out of the entry text; the
+/// text is taken as it is, without .ix sub-entry rules.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckIndexMarkPlainText(void)
+{
+    CHECK(MarkedIndex<EDITOR>("markplain",
+        { "A {K}Big {B}bold{B}{T}word{K} b", "{K}-Naming, files+{K}" })
+        == "-Naming, files+, 1|Big boldword, 1") ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// The page of an index mark is the page of the line holding the first
+/// mark, not the page the paragraph ends on.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckIndexMarkPageOfLine(void)
+{
+    cScratchDir dir("markpage") ;
+    REQUIRE(dir.IsValid()) ;
+
+    // a paragraph long enough to run from page 1 onto page 2
+    std::string longText ;
+    for (int loop = 0 ; loop < 1200 ; loop++)
+    {
+        longText += "filler " ;
+    }
+    EDITOR editor ;
+    SetMarkedSource(editor, { "{K}start{K} " + longText + "{K}end{K}" }) ;
+
+    const sParagraphLayout *para = editor.GetLayout()->GetParagraphLayout(0) ;
+    REQUIRE(para != nullptr) ;
+    REQUIRE(para->lines.empty() == false) ;
+    PAGE_T first = para->lines.front().pagenumber ;
+    PAGE_T last = para->lines.back().pagenumber ;
+    REQUIRE(first < last) ;
+
+    std::string indexPath ;
+    REQUIRE(cTOCIndexGenerator::GenerateIndex(&editor, dir.File("source.ws"), indexPath)) ;
+
+    EDITOR reader ;
+    CHECK(Join(LoadGenerated(reader, indexPath)) ==
+          "end, " + std::to_string(last) + "|start, " + std::to_string(first)) ;
+}
+
 } // namespace tocindextest
 
 #endif // TOCINDEXGEN_TESTUTIL_H

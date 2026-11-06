@@ -205,6 +205,97 @@ sIndexEntry ParseIndexEntry(const std::string &raw)
     return entry ;
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+// Page of the line holding paragraph-relative grapheme index `index`.
+/////////////////////////////////////////////////////////////////////////////
+PAGE_T PageOfIndex(const sParagraphLayout *paraLayout, POSITION_T index)
+{
+    if (paraLayout == nullptr || paraLayout->lines.empty())
+    {
+        return 1 ;
+    }
+    PAGE_T page = paraLayout->lines.front().pagenumber ;
+    for (const sLineLayout &line : paraLayout->lines)
+    {
+        if (line.linestart > index)
+        {
+            break ;
+        }
+        page = line.pagenumber ;
+    }
+    return page ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Index entries from ^K index mark pairs in one paragraph. Marks pair up
+// in order; a mark left without a partner is ignored. The text between a
+// pair, without markers, is the entry as it stands. A pair holding no
+// visible text gives no entry. The page is the page of the first mark.
+/////////////////////////////////////////////////////////////////////////////
+void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAGRAPH_T paragraph,
+                       std::vector<sIndexEntry> &entries)
+{
+    std::string raw = doc->GetParagraphText(paragraph) ;
+    if (raw.find(static_cast<char>(MARKER_CHAR)) == std::string::npos)
+    {
+        return ;
+    }
+
+    POSITION_T start = 0 ;
+    POSITION_T end = 0 ;
+    doc->GetParagraphStartandEnd(paragraph, start, end) ;
+
+    std::vector<std::string> graphemes ;
+    std::vector<POSITION_T> offsets ;
+    doc->GetParagraphGraphemes(paragraph, graphemes, offsets) ;
+
+    bool open = false ;
+    POSITION_T openIndex = 0 ;
+    std::string text ;
+    for (size_t loop = 0 ; loop < graphemes.size() ; loop++)
+    {
+        POSITION_T index = static_cast<POSITION_T>(loop) ;
+        bool isMarker = graphemes[loop].size() == 1 && graphemes[loop][0] == static_cast<char>(MARKER_CHAR) ;
+        if (isMarker == true)
+        {
+            if (doc->GetControlChar(start + index) != STYLE_INDEX)
+            {
+                continue ;
+            }
+            if (open == false)
+            {
+                open = true ;
+                openIndex = index ;
+                text.clear() ;
+                continue ;
+            }
+
+            open = false ;
+            bool visible = std::any_of(text.begin(), text.end(), [](char c)
+            {
+                return std::isspace(static_cast<unsigned char>(c)) == 0 ;
+            }) ;
+            if (visible == true)
+            {
+                sIndexEntry entry ;
+                entry.main = text ;
+                entry.bold = false ;
+                entry.crossref = false ;
+                entry.page = PageOfIndex(paraLayout, openIndex) ;
+                entries.push_back(entry) ;
+            }
+            continue ;
+        }
+
+        if (open == true && graphemes[loop] != "\r" && graphemes[loop] != "\n")
+        {
+            text += graphemes[loop] ;
+        }
+    }
+}
+
 } // namespace
 
 
@@ -318,6 +409,14 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
         std::string text = EntryParagraphText(sourceDoc, loop) ;
         if (StartsWithNoCase(text, ".ix") == false)
         {
+            // dot command and comment lines hold no index marks
+            const sParagraphLayout *paraLayout = layout->GetParagraphLayout(loop) ;
+            bool dotLine = (text.empty() == false && text[0] == '.') ||
+                           (paraLayout != nullptr && (paraLayout->isCommand || paraLayout->isComment)) ;
+            if (dotLine == false)
+            {
+                CollectIndexMarks(sourceDoc, paraLayout, loop, entries) ;
+            }
             continue ;
         }
 

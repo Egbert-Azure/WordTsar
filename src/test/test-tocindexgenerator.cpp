@@ -281,3 +281,38 @@ TEST_CASE("TOC/Index generator - a kept sequence in .tc and .ix entry text leave
     ensureQApplication() ;
     tocindextest::CheckSequenceInEntryText<cEditorCtrl>() ;
 }
+
+
+TEST_CASE("TOC/Index generator - index marks around a word merge with .ix entries for that word")
+{
+    ensureQApplication() ;
+    tocindextest::CheckIndexMarksMergeWithIx<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - an index mark without a partner in its paragraph gives no entry")
+{
+    ensureQApplication() ;
+    tocindextest::CheckUnpairedIndexMarks<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - index marks in dot command lines give no entry")
+{
+    ensureQApplication() ;
+    tocindextest::CheckIndexMarksInDotLines<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - index mark entry text is the plain text, taken as it is")
+{
+    ensureQApplication() ;
+    tocindextest::CheckIndexMarkPlainText<cEditorCtrl>() ;
+}
+
+
+TEST_CASE("TOC/Index generator - an index mark gets the page of its line")
+{
+    ensureQApplication() ;
+    tocindextest::CheckIndexMarkPageOfLine<cEditorCtrl>() ;
+}
