@@ -512,6 +512,97 @@ TEST_CASE("TUI layout - building header / footer lines leaves the layout state u
 }
 
 
+TEST_CASE("TUI layout - a raw byte has no width in the print layout")
+{
+    cDocument doc;
+    cLayout layout;
+    REQUIRE(layout.InitializeFontSystem());
+    layout.SetDocument(&doc);
+
+    // A0 ^B1 B2 \r3
+    doc.Insert("A");
+    doc.InsertRawByte(0x02);
+    doc.Insert("B\r");
+
+    auto byteWidth = [&](void)
+    {
+        std::vector<sSegmentLayout> segments = layout.BuildParagraphSegments(0);
+        REQUIRE(segments.size() == 1);
+        REQUIRE(segments[0].position.size() == 4);
+        CHECK(segments[0].length == 4);
+        return segments[0].position[2] - segments[0].position[1];
+    };
+
+    SUBCASE("screen: the width of the caret notation")
+    {
+        for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+        {
+            CAPTURE(static_cast<int>(mode));
+            layout.SetShowControl(mode);
+            layout.SetMarkersVisible(true);
+            CHECK(byteWidth() == doctest::Approx(layout.GetTextWidth("^B")));
+            CHECK(layout.GetTextWidth("^B") > 0);
+        }
+    }
+
+    SUBCASE("print: no width")
+    {
+        layout.SetShowControl(SHOW_NONE);
+        layout.SetMarkersVisible(false);
+        CHECK(byteWidth() == doctest::Approx(0.0));
+        layout.SetMarkersVisible(true);
+    }
+
+    layout.ShutdownFontSystem();
+}
+
+
+TEST_CASE("TUI layout - a raw byte in a header is hidden on screen and in print")
+{
+    // .h1 a^Bb and the same header without the byte
+    cDocument doc;
+    doc.Insert(".h1 a");
+    doc.InsertRawByte(0x02);
+    doc.Insert("b\r");
+    doc.Insert("text\r");
+
+    cDocument plain;
+    plain.Insert(".h1 ab\r");
+    plain.Insert("text\r");
+
+    auto headerWidth = [&](cDocument& source, bool markersVisible, std::vector<std::string>& graphemes)
+    {
+        cLayout layout;
+        REQUIRE(layout.InitializeFontSystem());
+        layout.SetDocument(&source);
+        layout.SetShowControl(markersVisible ? SHOW_ALL : SHOW_NONE);
+        layout.SetMarkersVisible(markersVisible);
+        layout.LayoutDocument(&source);
+
+        COORD_T width = 0;
+        for (const auto& segment : layout.BuildHeaderFooterSegments(0, 4, 1, graphemes))
+        {
+            width += segment.totalWidth;
+        }
+        layout.ShutdownFontSystem();
+        return width;
+    };
+
+    for (bool markersVisible : { true, false })
+    {
+        CAPTURE(markersVisible);
+        std::vector<std::string> graphemes;
+        std::vector<std::string> plainGraphemes;
+        COORD_T width = headerWidth(doc, markersVisible, graphemes);
+        COORD_T plainWidth = headerWidth(plain, markersVisible, plainGraphemes);
+
+        CHECK(graphemes == plainGraphemes);
+        CHECK(width == doctest::Approx(plainWidth));
+        CHECK(width > 0);
+    }
+}
+
+
 TEST_CASE("TUI layout - a soft tab at the start of a paragraph lays out like a normal tab")
 {
     // x of the period after a tab of the given type at the start of ".xx text"

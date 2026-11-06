@@ -683,7 +683,8 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 continue;
             }
 
-            // Raw byte from a text file - always visible, one grapheme
+            // Raw byte from a text file - one grapheme, visible on screen,
+            // no width in the print layout (markers hidden)
             if (controlType == STYLE_RAW_BYTE)
             {
                 AddSegmentMarker(currentSegment, pendingMarker);
@@ -691,7 +692,10 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 currentSegment.length++;
                 currentSegment.hasControlCodes = true;
                 currentSegment.controlCodeIndices.push_back(currentSegment.length - 1);
-                currentX += GetTextWidth(GetDisplayCharacter(documentPos, grapheme));
+                if (GetMarkersVisible())
+                {
+                    currentX += GetTextWidth(GetDisplayCharacter(documentPos, grapheme));
+                }
 
                 continue;
             }
