@@ -190,14 +190,23 @@ TEST_CASE("Book template - every dot command is one WordTsar carries out")
     std::vector<std::string> dots = DotLines(editor);
     REQUIRE(dots.size() >= 10);
 
-    // Page setup: Letter, 1 inch margins, no automatic page number
-    std::vector<std::string> setup = {".op", ".pl 11i", ".mt 1i", ".mb 1i", ".po 1i", ".lm 0i", ".rm 6.5i"};
+    // Page setup: Letter, 1 inch margins, no automatic page number; then the
+    // contents page layout lines, copied into the generated table of contents
+    std::vector<std::string> setup = {".op", ".pl 11in", ".mt 1in", ".mb 1in", ".po 1in", ".lm 0", ".rm 6.5in",
+                                      ".tc .. Contents page layout", ".tc .po 1in", ".tc .rm 6.5in",
+                                      ".tc .lh 24pt", ".tc .pf on", ".tc", ".tcContents", ".tc", ".lh 12pt"};
+    REQUIRE(dots.size() > setup.size());
     CHECK(std::vector<std::string>(dots.begin(), dots.begin() + static_cast<long>(setup.size())) == setup);
 
+    // The Contents heading of the contents page is a centre tab
+    PARAGRAPH_T contents = FindParagraph(editor, ".tcContents");
+    REQUIRE(contents != NOT_SET);
+    CHECK(doc->GetParagraphText(contents).rfind(std::string(".tc") + static_cast<char>(MARKER_CHAR) + "Contents", 0) == 0);
+
     // Line heights: single spaced contact block, double spaced body, chapter drop
-    CHECK(CountStartingWith(dots, ".lh 8") == 1);
-    CHECK(CountStartingWith(dots, ".lh 16") == 3);
-    CHECK(CountStartingWith(dots, ".lh 36") == 2);
+    CHECK(CountStartingWith(dots, ".lh 12pt") == 1);
+    CHECK(CountStartingWith(dots, ".lh 24pt") == 3);
+    CHECK(CountStartingWith(dots, ".lh 54pt") == 2);
 
     // Title page ends with .pa; the running header follows it
     auto firstPageBreak = std::find(dots.begin(), dots.end(), ".pa");
@@ -207,7 +216,7 @@ TEST_CASE("Book template - every dot command is one WordTsar carries out")
     CHECK(CountStartingWith(std::vector<std::string>(dots.begin(), firstPageBreak), ".h") == 0);
 
     // Two chapters, each with a .tc entry and a closing .pa
-    CHECK(CountStartingWith(dots, ".tc ") == 2);
+    CHECK(CountStartingWith(dots, ".tc Chapter ") == 2);
     CHECK(CountStartingWith(dots, ".pa") == 3);
     CHECK(dots.back() == ".pa");
     auto chapterOne = std::find(dots.begin(), dots.end(), ".tc Chapter One . . . #");
@@ -339,8 +348,12 @@ TEST_CASE("Book template - the text is plain ASCII")
     for (unsigned char c : text)
     {
         CAPTURE(static_cast<int>(c));
-        CHECK((c == '\r' || c == '\n' || (c >= 0x20 && c <= 0x7E)));
+        CHECK((c == '\r' || c == '\n' || c == 0x0B || (c >= 0x20 && c <= 0x7E)));
     }
+
+    // One word in chapter one between two ^PK index marks
+    CHECK(std::count(text.begin(), text.end(), '\x0B') == 2);
+    CHECK(text.find("opening lines of your \x0Bstory\x0B.") != std::string::npos);
 
     // Only ^Z padding after the text
     CHECK(pos >= 128);
