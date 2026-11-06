@@ -406,7 +406,7 @@ yet done.
 | -- Date/Time/Page/etc. | &&@&&, &&!&&, etc. | -- | Insert variable placeholders |
 | File | ^KR | -- | Insert file at cursor |
 | **Index/TOC Entry submenu** | | | |
-| -- Mark for Index | ^PK | Alt+P,K | Insert an index mark (GUI menu) |
+| -- Mark for Index | ^PK | Alt+P,K | Insert an index mark (GUI and ws menu) |
 
 ### Style Menu
 

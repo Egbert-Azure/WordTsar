@@ -972,6 +972,29 @@ TEST_CASE("TUI edit screen - Help menu has Help and Change Help Level")
 }
 
 
+TEST_CASE("TUI edit screen - Insert menu Mark for Index inserts an index mark")
+{
+    cWSWordTsar app;
+    app.TestBuildMenus();
+    const std::vector<wordstartui::sMenuItem>& items = app.TestGetMenu().GetItems();
+    auto insert = std::find_if(items.begin(), items.end(),
+                               [](const wordstartui::sMenuItem& item) { return item.title == "Insert"; });
+    REQUIRE(insert != items.end());
+    auto index = std::find_if(insert->entries.begin(), insert->entries.end(),
+                              [](const wordstartui::sMenuEntry& entry) { return entry.title == "Index/TOC Entry"; });
+    REQUIRE(index != insert->entries.end());
+    REQUIRE(index->submenu.size() >= 3);
+    CHECK(index->submenu[1].title == "Index Entry...");
+    CHECK(index->submenu[2].title == "Mark for Index");
+    CHECK(index->submenu[2].shortcut == "^PK");
+    REQUIRE(static_cast<bool>(index->submenu[2].callback) == true);
+
+    index->submenu[2].callback();
+    cDocument* doc = app.TestGetEditor()->GetDocument();
+    CHECK(doc->GetControlChar(0) == STYLE_INDEX);
+}
+
+
 namespace
 {
 

@@ -1382,6 +1382,7 @@ void cWSWordTsar::BuildMenus(void)
     int insertIndex = mMenu.AddSubMenu(insert, "&Index/TOC Entry");
     mMenu.AddSubMenuItem(insertIndex, std::string("TOC Entry...") + SC(".tc", ""), [this](void) { InsertTOCEntry(); });
     mMenu.AddSubMenuItem(insertIndex, std::string("Index Entry...") + SC("^ONI", ""), [this](void) { InsertIndexEntry(); });
+    mMenu.AddSubMenuItem(insertIndex, std::string("Mark for Index") + SC("^PK", "Alt+P, K"), [this](void) { InjectChord(CTRL_P, 'k'); });
     mMenu.AddSubMenuItem(insertIndex, std::string("Dot Leader to Tab") + SC("^P.", ""), unavailable, false);
 
     mMenu.AddSubItem(insert, std::string("Outline Number...") + SC("^OZ", ""), unavailable, false);
