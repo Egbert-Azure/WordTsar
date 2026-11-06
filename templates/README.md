@@ -37,7 +37,7 @@ The `.tc` and `.ix` lines only mark entries. They do not print. The GUI inserts 
 | `.cp 4` | If less than four lines (at the current line height) remain on the page, the next paragraph starts on a new page. It keeps the scene break with the text after it. |
 | `.ix Placeholder Topic` | Index entry. It does not print. ws writes it to the `.IDX` file with its page number. |
 
-Units: write inch values with the `i` suffix (`1i`, `6.5i`). Do not write `in`, `mm` or `pt`. WordTsar reads them wrongly. `.lh` takes numbers in 1/48 inch.
+Units: any of `i`, `in`, `"`, `c`, `cm`, `mm`, `p` and `pt` works (`1i`, `2.5cm`, `24pt`). A number without a unit means columns for `.lm`, `.rm` and `.po`, lines for `.mt`, `.mb` and `.pl`, and 1/48 inch for `.lh`.
 
 ## Notes
 
