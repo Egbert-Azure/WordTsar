@@ -665,13 +665,13 @@ std::string MarkedIndex(const std::string &tag, const std::vector<std::string> &
 
 /////////////////////////////////////////////////////////////////////////////
 /// A marked word on pages 1 and 3 and the same word as .ix on page 2 give
-/// one index line.
+/// one index line; spaces inside the marks at either end are dropped.
 /////////////////////////////////////////////////////////////////////////////
 template <class EDITOR>
 void CheckIndexMarksMergeWithIx(void)
 {
     CHECK(MarkedIndex<EDITOR>("markmerge",
-        { "Page one {K}word{K} text", ".pa", ".ix word", "Page two", ".pa", "Page three {K}word{K}" })
+        { "Page one {K}word{K} text", ".pa", ".ix word", "Page two", ".pa", "Page three {K} word {K}" })
         == "word, 1, 2, 3") ;
 }
 

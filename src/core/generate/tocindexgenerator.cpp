@@ -284,9 +284,9 @@ bool DecodeIndexItemBody(const std::string &body, eCodePage codepage, std::strin
 /////////////////////////////////////////////////////////////////////////////
 // Index entries from one paragraph: ^K index mark pairs and kept 0Eh index
 // items. Marks pair up in order; a mark left without a partner is ignored.
-// The text between a pair, without markers, is the entry as it stands. A
-// pair holding no visible text gives no entry. An index item's body is
-// read as a .ix entry. The page is the page of the line holding the first
+// The text between a pair, without markers and without spaces at either
+// end, is the entry as it stands. A pair holding no visible text gives no
+// entry. An index item's body is read as a .ix entry. The page is the page of the line holding the first
 // mark or the index item.
 /////////////////////////////////////////////////////////////////////////////
 void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAGRAPH_T paragraph,
@@ -346,14 +346,16 @@ void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAG
             }
 
             open = false ;
+            size_t first = text.find_first_not_of(' ') ;
+            size_t last = text.find_last_not_of(' ') ;
             bool visible = std::any_of(text.begin(), text.end(), [](char c)
             {
                 return std::isspace(static_cast<unsigned char>(c)) == 0 ;
             }) ;
-            if (visible == true)
+            if (visible == true && first != std::string::npos)
             {
                 sIndexEntry entry ;
-                entry.main = text ;
+                entry.main = text.substr(first, last - first + 1) ;
                 entry.bold = false ;
                 entry.crossref = false ;
                 entry.page = PageOfIndex(paraLayout, openIndex) ;
