@@ -25,7 +25,14 @@
 #include "src/core/document/document.h"
 
 #include <QApplication>
+#include <algorithm>
 #include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <iterator>
+#include <unistd.h>
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -758,4 +765,186 @@ TEST_CASE("CenterTextVertically inserts blank lines above short text on an other
     // blank lines inserted above it (real value depends on page/line
     // height, so just check it grew substantially, not an exact count).
     CHECK(after > before + 5);
+}
+
+namespace {
+// Code points of a UTF-8 string as "U+XXXX ..." for failure output.
+std::string CodePoints(const std::string& text)
+{
+    std::string out;
+    size_t i = 0;
+    while (i < text.size())
+    {
+        unsigned char c = static_cast<unsigned char>(text[i]);
+        size_t len = (c < 0x80) ? 1 : (c < 0xE0) ? 2 : (c < 0xF0) ? 3 : 4;
+        char32_t cp = (len == 1) ? c : (len == 2) ? (c & 0x1F) : (len == 3) ? (c & 0x0F) : (c & 0x07);
+        for (size_t k = 1; k < len && i + k < text.size(); k++)
+        {
+            cp = (cp << 6) | (static_cast<unsigned char>(text[i + k]) & 0x3F);
+        }
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "U+%04X ", static_cast<unsigned>(cp));
+        out += buf;
+        i += len;
+    }
+    return out;
+}
+
+// Every grapheme of the document as stored, end-of-file marker excluded.
+std::string StoredText(cDocument* doc)
+{
+    std::string out;
+    for (POSITION_T pos = 0; pos < doc->GetTextSize() - 1; pos++)
+    {
+        out += doc->GetCharNoAdvance(pos);
+    }
+    return out;
+}
+
+std::string ReadBytes(const std::filesystem::path& path)
+{
+    std::ifstream f(path, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+}
+
+const std::string FAMILY = "\U0001F468‍\U0001F469‍\U0001F467";
+const std::string FLAG = "\U0001F1E9\U0001F1EA";
+
+// Document "text\rtail" with text marked as the block. Runs op, checks the
+// text against expected through character access, GetPlainText and a text
+// save, then one undo against the original and redo against expected.
+void CheckBlockOp(const std::string& text, const std::function<void(cEditorCtrl&)>& op,
+                  const std::string& expectedText)
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-graphemes-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+    struct sRemoveDir
+    {
+        std::filesystem::path path;
+        ~sRemoveDir()
+        {
+            std::error_code ec;
+            std::filesystem::remove_all(path, ec);
+        }
+    } removeDir{ dir };
+
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+        layout->SetDocument(doc);
+
+        doc->Insert(text + "\rtail");
+        layout->LayoutDocument(doc);
+
+        std::string original = doc->Normalize(text) + "\rtail";
+        std::string expected = doc->Normalize(expectedText) + "\rtail";
+        std::string originalPlain = original;
+        std::string expectedPlain = expected;
+        std::replace(originalPlain.begin(), originalPlain.end(), '\r', '\n');
+        std::replace(expectedPlain.begin(), expectedPlain.end(), '\r', '\n');
+        REQUIRE(StoredText(doc) == original);
+
+        doc->mStartBlock = 0;
+        doc->mEndBlock = doc->GetTextSize() - 1 - 5;
+        doc->mBlockSet = true;
+        doc->ClearUndoHistory();
+
+        REQUIRE(editor.SaveFile((dir / "before.txt").string()));
+        std::string savedBefore = ReadBytes(dir / "before.txt");
+        REQUIRE(savedBefore.find(originalPlain) != std::string::npos);
+
+        op(editor);
+
+        INFO("expected: ", CodePoints(expected));
+        INFO("actual:   ", CodePoints(StoredText(doc)));
+        CHECK(StoredText(doc) == expected);
+        CHECK(doc->GetPlainText(0, doc->GetTextSize() - 1, "\n") == expectedPlain);
+        REQUIRE(editor.SaveFile((dir / "after.txt").string()));
+        std::string savedAfter = ReadBytes(dir / "after.txt");
+        CHECK(savedAfter.find(expectedPlain) != std::string::npos);
+
+        // an operation that changes nothing leaves no undo step
+        if (expected == original)
+        {
+            CHECK(doc->CanUndo() == false);
+            return;
+        }
+
+        REQUIRE(editor.Undo());
+        INFO("after undo: ", CodePoints(StoredText(doc)));
+        CHECK(StoredText(doc) == original);
+        CHECK(doc->GetPlainText(0, doc->GetTextSize() - 1, "\n") == originalPlain);
+        REQUIRE(editor.SaveFile((dir / "undo.txt").string()));
+        CHECK(ReadBytes(dir / "undo.txt") == savedBefore);
+
+        REQUIRE(editor.Redo());
+        INFO("after redo: ", CodePoints(StoredText(doc)));
+        CHECK(StoredText(doc) == expected);
+        REQUIRE(editor.SaveFile((dir / "redo.txt").string()));
+        CHECK(ReadBytes(dir / "redo.txt") == savedAfter);
+    }
+}
+
+std::string JoinLines(const std::vector<std::string>& lines)
+{
+    std::string out;
+    for (size_t i = 0; i < lines.size(); i++)
+    {
+        out += (i > 0 ? "\r" : "") + lines[i];
+    }
+    return out;
+}
+}
+
+TEST_CASE("SortBlock keeps every code point of multi-code-point characters")
+{
+    ensureQApplication();
+
+    const std::string l1 = "1 " + FLAG;
+    const std::string l2 = "2 ß́ x";
+    const std::string l3 = "3 q́";
+    const std::string l4 = "4 é";
+    const std::string l5 = "5 ạ́";
+    const std::string l6 = "6 " + FAMILY;
+    std::string text = JoinLines({ l3, l6, l1, l5, l2, l4 });
+
+    SUBCASE("ascending")
+    {
+        CheckBlockOp(text, [](cEditorCtrl& e) { e.SortBlock(true); },
+                     JoinLines({ l1, l2, l3, l4, l5, l6 }));
+    }
+    SUBCASE("descending")
+    {
+        CheckBlockOp(text, [](cEditorCtrl& e) { e.SortBlock(false); },
+                     JoinLines({ l6, l5, l4, l3, l2, l1 }));
+    }
+}
+
+TEST_CASE("Block copy and delete undo keep every code point of multi-code-point characters")
+{
+    ensureQApplication();
+
+    const std::string text = "q́ " + FAMILY + " " + FLAG + " ạ́ ß́ é";
+
+    SUBCASE("^KC copies the block after itself")
+    {
+        CheckBlockOp(text, [](cEditorCtrl& e)
+        {
+            cDocument* doc = e.GetDocument();
+            doc->SetPosition(doc->mEndBlock);
+            e.CopyBlock();
+        }, text + text);
+    }
+    SUBCASE("delete of the block, undone")
+    {
+        CheckBlockOp(text, [](cEditorCtrl& e)
+        {
+            cDocument* doc = e.GetDocument();
+            POSITION_T length = doc->mEndBlock - doc->mStartBlock;
+            doc->Delete(0, length);
+        }, "");
+    }
 }

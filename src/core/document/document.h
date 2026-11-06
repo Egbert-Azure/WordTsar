@@ -174,6 +174,7 @@ enum eUndoActionType
 struct sUndoCharInfo
 {
     CHAR_T codepoint ;                                  ///< the original codepoint (HARD_RETURN, STYLE_BOLD, regular char, etc.)
+    std::u32string combining ;                          ///< code points after the first of a multi-code-point character
 
     // metadata for special elements (only one populated at a time, empty for regular chars)
     // these are needed because InsertTab/Font/Color require metadata that

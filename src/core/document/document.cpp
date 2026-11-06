@@ -3830,6 +3830,7 @@ std::vector<sUndoCharInfo> cDocument::CaptureCharacters(POSITION_T position, POS
             if (!codepoints.empty())
             {
                 charInfo.codepoint = codepoints[0] ;
+                charInfo.combining = codepoints.substr(1) ;
             }
         }
 
@@ -3895,6 +3896,26 @@ void cDocument::ReinsertCharacters(POSITION_T position, const std::vector<sUndoC
         else if (charInfo.rawByteData.has_value())
         {
             InsertRawByte(charInfo.rawByteData.value()) ;
+        }
+        else if (!charInfo.combining.empty())
+        {
+            // one character of several code points, recorded as one
+            bool shouldRecord = !mUndoDisabled && !mIsLoading && !mSuppressUndo ;
+            POSITION_T cursorBefore = mCurrentPosition ;
+            bool oldSuppressUndo = mSuppressUndo ;
+            mSuppressUndo = true ;
+
+            Insert(charInfo.codepoint) ;
+            for (char32_t cp : charInfo.combining)
+            {
+                Insert(static_cast<CHAR_T>(cp)) ;
+            }
+
+            mSuppressUndo = oldSuppressUndo ;
+            if (shouldRecord)
+            {
+                RecordAction(UNDO_ACTION_INSERT, cursorBefore, 1, { charInfo }, cursorBefore) ;
+            }
         }
         else
         {
