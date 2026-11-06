@@ -15595,23 +15595,36 @@ TEST_CASE("GUI editor - a text file ends at the first 0x1A, the rest is saved ba
         CHECK(ReadFileBytes(dir / "ws-again.txt") == "one\ntwo\n");
     }
 
-    SUBCASE("an RTF save drops the tail")
+    SUBCASE("an RTF export keeps the tail for the next text save")
     {
         WriteFileBytes(dir / "rtf.txt", "one\n" + tail);
         REQUIRE(editor.LoadFile((dir / "rtf.txt").string()));
         REQUIRE(editor.SaveFile((dir / "rtf.rtf").string()));
         CHECK(ReadFileBytes(dir / "rtf.rtf").find("TAILMARK") == std::string::npos);
         REQUIRE(editor.SaveFile((dir / "rtf-again.txt").string()));
-        CHECK(ReadFileBytes(dir / "rtf-again.txt") == "one\n");
+        CHECK(ReadFileBytes(dir / "rtf-again.txt") == "one\n" + tail);
     }
 
-    SUBCASE("a DOCX save drops the tail")
+    SUBCASE("a DOCX export keeps the tail for the next text save")
     {
         WriteFileBytes(dir / "docx.txt", "one\n" + tail);
         REQUIRE(editor.LoadFile((dir / "docx.txt").string()));
         REQUIRE(editor.SaveFile((dir / "docx.docx").string()));
         REQUIRE(editor.SaveFile((dir / "docx-again.txt").string()));
-        CHECK(ReadFileBytes(dir / "docx-again.txt") == "one\n");
+        CHECK(ReadFileBytes(dir / "docx-again.txt") == "one\n" + tail);
+    }
+
+    SUBCASE("RTF and DOCX exports, then a WordStar save drops the tail")
+    {
+        WriteFileBytes(dir / "both.txt", "one\n" + tail);
+        REQUIRE(editor.LoadFile((dir / "both.txt").string()));
+        REQUIRE(editor.SaveFile((dir / "both.rtf").string()));
+        REQUIRE(editor.SaveFile((dir / "both.docx").string()));
+        REQUIRE(editor.SaveFile((dir / "both-again.txt").string()));
+        CHECK(ReadFileBytes(dir / "both-again.txt") == "one\n" + tail);
+        REQUIRE(editor.SaveFile((dir / "both.ws").string()));
+        REQUIRE(editor.SaveFile((dir / "both-ws.txt").string()));
+        CHECK(ReadFileBytes(dir / "both-ws.txt") == "one\n");
     }
 
     SUBCASE("abandoning the document clears the tail")

@@ -7205,8 +7205,8 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
             mDocument->SetTextFile(savesAsText);
         }
 
-        // Only a text save keeps the text tail
-        if (savesAsText == false)
+        // A text save or an export keeps the text tail
+        if (savesAsText == false && isExport == false)
         {
             mDocument->SetTextTail("");
         }
