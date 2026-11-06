@@ -102,6 +102,7 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     ../src/test/test-tuifontutils.cpp
     ../src/test/test-config.cpp
     ../src/test/test-abouttext.cpp
+    ../src/test/test-aboutdialog.cpp
     ../src/test/test-wordstarinput.cpp
     ../src/test/test-isolation.cpp
 
@@ -315,7 +316,7 @@ endif()
 set(resources_resource_files
     "../src/gui/images/busy.gif"
     "../src/gui/images/icon64x64.png"
-    "../src/gui/images/splash.png"
+    "../src/gui/images/wordtsar-logo.png"
 )
 
 qt_add_resources(WSTest "resources"

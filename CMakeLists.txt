@@ -424,7 +424,7 @@ target_compile_definitions(WordTsar PRIVATE
 set(resources_resource_files
     "src/gui/images/busy.gif"
     "src/gui/images/icon64x64.png"
-    "src/gui/images/splash.png"
+    "src/gui/images/wordtsar-logo.png"
 )
 
 qt_add_resources(WordTsar "resources"

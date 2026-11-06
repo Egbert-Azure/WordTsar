@@ -82,6 +82,7 @@
 #include "src/gui/editor/editorctrl.h"
 #include "src/gui/utils/fontutils.h"
 #include "src/gui/misc/busy.h"
+#include "src/gui/dialogs/aboutdialog.h"
 #include "src/gui/menu/menuprovider.h"
 #include "src/gui/menu/wordstarmenu.h"
 #include "src/gui/menu/modernmenu.h"
@@ -2344,41 +2345,8 @@ void cWordTsar::PrintPreview(void)
 
 void cWordTsar::AboutWordTsar(void)
 {
-    std::string abouttext ;
-    abouttext = string_sprintf("<h2>WordTsar %s</h2>" \
-                    "<p>Wordstar for the 21st century. This is a macOS-focused fork of "
-                    "Gerald Brandt's WordTsar &mdash; the Wordstar-clone editing engine, "
-                    "document formats, and original design are his work; this fork adds "
-                    "macOS-specific packaging and features on top. Not endorsed by or "
-                    "affiliated with the upstream WordTsar project.</p>" \
-                    "<p>Copyright (C) 2018 Gerald Brandt<br>" \
-                    "Portions Copyright (C) 2026 Egbert H. Schroeer</p>" \
-                    "<p>This program comes with ABSOLUTELY NO WARRANTY. This is free "
-                    "software, and you are welcome to redistribute it under the terms "
-                    "of the GNU Affero General Public License v3.0. See LICENSE.md in "
-                    "the source distribution, or "
-                    "https://www.gnu.org/licenses/agpl-3.0.html for the full licence "
-                    "text.</p>" \
-                    "https://github.com/Egbert-Azure/WordTsar<br>" \
-                    "<h4>Embedded Third-Party Code</h4>" \
-                    "</p>"
-                    , FULLVERSION_STRING) ;
-
-    abouttext += "Chillout - MIT License - crash handling<br>" ;
-    abouttext += "cpp-unicodelib - MIT License - Unicode text processing<br>" ;
-    abouttext += "kuba-zip - MIT License - ZIP archive handling<br>" ;
-    abouttext += "PicoMath - BSD 3-Clause License - math expression parser<br>" ;
-    abouttext += "pugixml - MIT License - XML parsing<br>" ;
-    abouttext += "SimpleINI - MIT License - INI file parsing<br>" ;
-    abouttext += "<h4>System Libraries</h4>" ;
-    abouttext += "Qt version " ;
-    abouttext += QT_VERSION_STR ;
-    abouttext += "<br>" ;
-    abouttext += "macOS CoreText - font shaping, discovery, and metrics (TUI)<br>" ;
-    abouttext += "macOS CoreGraphics/Quartz - PDF generation (TUI)<br>" ;
-    abouttext += "macOS NSSpellChecker - spell checking<br>" ;
-
-    QMessageBox::about(this, "About WordTsar", abouttext.c_str()) ;
+    cAboutDialog dialog(this) ;
+    dialog.exec() ;
 }
 
 void cWordTsar::ExitWordTsar(void)
