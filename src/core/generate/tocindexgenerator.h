@@ -61,7 +61,7 @@ public:
     ///                 from, used to derive each output file's name
     /// @param  outputFiles [out] paths actually written, one per non-empty
     ///                 table: plain .tc entries go to "name.TOC",
-    ///                 .tc1-.tc9 entries go to "name.T01".."name.T09"
+    ///                 .tc1-.tc9 entries go to "name.TO1".."name.TO9"
     /// @param  failedFiles [out] optional: paths of non-empty tables that
     ///                 could not be written
     ///

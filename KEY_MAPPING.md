@@ -451,7 +451,7 @@ yet done.
 | -- Word | ^QN | -- | Check current word |
 | -- Type Word | ^QO | -- | Enter word for dictionary |
 | Word Count | ^K? | Alt+K,? | Count words in block |
-| Generate Table of Contents... | -- | -- | Write name.TOC and name.T01-T09 from a chosen file's .tc entries |
+| Generate Table of Contents... | -- | -- | Write name.TOC and name.TO1-TO9 from a chosen file's .tc entries |
 | Generate Index... | -- | -- | Write name.IDX from a chosen file's .ix entries and index marks |
 | **Reformat submenu** | | | |
 | -- Rest of Document | ^QU | Alt+Q,U | Reformat/relayout |

@@ -128,6 +128,6 @@ TEST_CASE("TUI TOC/Index generator - a source file on disk gives the golden tabl
     tocindextest::WriteGoldenSource<cWSEditorCtrl>(sourcePath) ;
 
     std::vector<std::string> written = tocindextest::GenerateFromDisk<cWSEditorCtrl>(sourcePath) ;
-    CHECK(tocindextest::Join(written) == dir.File("golden.TOC") + "|" + dir.File("golden.T01") + "|" + dir.File("golden.IDX")) ;
+    CHECK(tocindextest::Join(written) == dir.File("golden.TOC") + "|" + dir.File("golden.TO1") + "|" + dir.File("golden.IDX")) ;
     tocindextest::CheckGoldenOutputs<cWSEditorCtrl>(dir.File("golden")) ;
 }

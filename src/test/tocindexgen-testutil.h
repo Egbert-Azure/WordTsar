@@ -365,8 +365,8 @@ void CheckTOCDotEntryEdgeCases(void)
     std::string t02Path ;
     for (const std::string &path : outputFiles)
     {
-        if (path.find(".T01") != std::string::npos) t01Path = path ;
-        if (path.find(".T02") != std::string::npos) t02Path = path ;
+        if (path.find(".TO1") != std::string::npos) t01Path = path ;
+        if (path.find(".TO2") != std::string::npos) t02Path = path ;
     }
     REQUIRE(t01Path.empty() == false) ;
     REQUIRE(t02Path.empty() == false) ;
@@ -841,7 +841,7 @@ void CheckUnwritableOutput(void)
     std::vector<std::string> failedFiles ;
     CHECK_FALSE(cTOCIndexGenerator::GenerateTOC(&editor, sourcePath, outputFiles, &failedFiles)) ;
     CHECK(outputFiles.empty()) ;
-    CHECK(Join(failedFiles) == locked.File("source.TOC") + "|" + locked.File("source.T01")) ;
+    CHECK(Join(failedFiles) == locked.File("source.TOC") + "|" + locked.File("source.TO1")) ;
 
     SetSource(editor, { ".tc Chapter #", ".tc1 Figure #", ".ix Apple" }) ;
     std::string outputFile ;
@@ -872,7 +872,7 @@ inline std::vector<std::string> GoldenSource(void)
 }
 
 inline const char *GoldenTOC(void)   { return "Chapter One 1|.lm 0|Chapter Two 2" ; }
-inline const char *GoldenT01(void)   { return "Figure 1" ; }
+inline const char *GoldenTO1(void)   { return "Figure 1" ; }
 inline const char *GoldenIndex(void) { return ".pm 0|Apple, 1|marked, 1|Zebra, 2" ; }
 
 
@@ -923,7 +923,7 @@ void CheckGoldenOutputs(const std::string &stem)
 {
     EDITOR reader ;
     CHECK(Join(LoadGenerated(reader, stem + ".TOC")) == GoldenTOC()) ;
-    CHECK(Join(LoadGenerated(reader, stem + ".T01")) == GoldenT01()) ;
+    CHECK(Join(LoadGenerated(reader, stem + ".TO1")) == GoldenTO1()) ;
     CHECK(Join(LoadGenerated(reader, stem + ".IDX")) == GoldenIndex()) ;
 }
 

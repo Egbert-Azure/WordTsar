@@ -8086,7 +8086,7 @@ cEditorCtrl::eSaveQuestion cEditorCtrl::AskSaveBeforeGenerate(const std::string&
 ///
 /// @brief
 /// Utilities > Generate Table of Contents: writes name.TOC and
-/// name.T01..name.T09 next to a chosen source file.
+/// name.TO1..name.TO9 next to a chosen source file.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::GenerateTOCFromFile(void)

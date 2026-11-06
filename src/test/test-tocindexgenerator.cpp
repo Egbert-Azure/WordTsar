@@ -99,7 +99,7 @@ TEST_CASE("TOC/Index generator - table of contents resolves real page numbers, r
     for (auto &path : outputFiles)
     {
         if (path.find(".TOC") != std::string::npos) tocPath = path ;
-        if (path.find(".T01") != std::string::npos) t01Path = path ;
+        if (path.find(".TO1") != std::string::npos) t01Path = path ;
     }
     REQUIRE(tocPath.empty() == false) ;
     REQUIRE(t01Path.empty() == false) ;
@@ -359,6 +359,22 @@ TEST_CASE("TOC/Index generator - a .tc entry keeps its bold markers in the table
 }
 
 
+TEST_CASE("TOC/Index generator - a .tc1 entry goes to name.TO1")
+{
+    ensureQApplication() ;
+    tocindextest::cScratchDir dir("tocto1") ;
+    REQUIRE(dir.IsValid()) ;
+
+    cEditorCtrl editor ;
+    tocindextest::SetSource(editor, { ".tc1 Figure #" }) ;
+    std::vector<std::string> outputFiles ;
+    REQUIRE(cTOCIndexGenerator::GenerateTOC(&editor, dir.File("source.ws"), outputFiles)) ;
+    CHECK(tocindextest::Join(outputFiles) == dir.File("source.TO1")) ;
+    CHECK(std::filesystem::exists(dir.File("source.TO1"))) ;
+    CHECK_FALSE(std::filesystem::exists(dir.File("source.T01"))) ;
+}
+
+
 namespace {
 
 /////////////////////////////////////////////////////////////////////////////
@@ -504,26 +520,26 @@ TEST_CASE("GUI Generate - table of contents and index of a file on disk match th
                                              "Generate Index: " + dir.File("")) ;
     CHECK(editor.mSaveQuestions.empty()) ;
     CHECK(editor.mErrors.empty()) ;
-    CHECK(JoinLines(editor.mMessages) == "Table of Contents: Wrote:\n" + stem + ".TOC\n" + stem + ".T01\n" +
+    CHECK(JoinLines(editor.mMessages) == "Table of Contents: Wrote:\n" + stem + ".TOC\n" + stem + ".TO1\n" +
                                          "Index: Wrote:\n" + stem + ".IDX") ;
-    CHECK(tocindextest::DirectoryListing(dir.File("")) == "golden.IDX|golden.T01|golden.TOC|golden.ws") ;
+    CHECK(tocindextest::DirectoryListing(dir.File("")) == "golden.IDX|golden.TO1|golden.TOC|golden.ws") ;
 
     std::string toc = tocindextest::ReadBytes(stem + ".TOC") ;
-    std::string t01 = tocindextest::ReadBytes(stem + ".T01") ;
+    std::string t01 = tocindextest::ReadBytes(stem + ".TO1") ;
     std::string idx = tocindextest::ReadBytes(stem + ".IDX") ;
     REQUIRE(toc.empty() == false) ;
     REQUIRE(t01.empty() == false) ;
     REQUIRE(idx.empty() == false) ;
     tocindextest::CheckGoldenOutputs<cEditorCtrl>(stem) ;
 
-    for (const char *extension : { ".TOC", ".T01", ".IDX" })
+    for (const char *extension : { ".TOC", ".TO1", ".IDX" })
     {
         std::filesystem::remove(stem + extension) ;
     }
     std::vector<std::string> written = tocindextest::GenerateFromDisk<cEditorCtrl>(sourcePath) ;
-    CHECK(tocindextest::Join(written) == stem + ".TOC|" + stem + ".T01|" + stem + ".IDX") ;
+    CHECK(tocindextest::Join(written) == stem + ".TOC|" + stem + ".TO1|" + stem + ".IDX") ;
     CHECK(tocindextest::ReadBytes(stem + ".TOC") == toc) ;
-    CHECK(tocindextest::ReadBytes(stem + ".T01") == t01) ;
+    CHECK(tocindextest::ReadBytes(stem + ".TO1") == t01) ;
     CHECK(tocindextest::ReadBytes(stem + ".IDX") == idx) ;
 }
 
@@ -638,7 +654,7 @@ TEST_CASE("GUI Generate - unsaved changes in the source: Cancel, Save and Don't 
                 CHECK(doc->IsModified()) ;
                 CHECK(tocindextest::ReadBytes(sourcePath) == original) ;
                 CHECK_FALSE(std::filesystem::exists(stem + ".TOC")) ;
-                CHECK_FALSE(std::filesystem::exists(stem + ".T01")) ;
+                CHECK_FALSE(std::filesystem::exists(stem + ".TO1")) ;
                 CHECK_FALSE(std::filesystem::exists(stem + ".IDX")) ;
                 continue ;
             }
@@ -743,7 +759,7 @@ TEST_CASE("GUI Generate - a file that cannot be read or written gives an error n
     chmod(lockedDir.c_str(), 0755) ;
 
     CHECK(editor.mMessages.empty()) ;
-    CHECK(JoinLines(editor.mErrors) == "Table of Contents: Cannot write\n" + stem + ".TOC\n" + stem + ".T01\n" +
+    CHECK(JoinLines(editor.mErrors) == "Table of Contents: Cannot write\n" + stem + ".TOC\n" + stem + ".TO1\n" +
                                        "Index: Cannot write\n" + stem + ".IDX") ;
     CHECK(StateOf(editor) == before) ;
     CHECK(tocindextest::DirectoryListing(lockedDir) == "golden.ws") ;

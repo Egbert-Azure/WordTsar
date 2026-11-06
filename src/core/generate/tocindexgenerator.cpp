@@ -546,7 +546,7 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
         }
         else
         {
-            snprintf(extbuf, sizeof(extbuf), ".T%02d", table) ;
+            snprintf(extbuf, sizeof(extbuf), ".TO%d", table) ;
         }
         std::string outputPath = stem.string() + extbuf ;
 
