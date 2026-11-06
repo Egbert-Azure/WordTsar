@@ -72,6 +72,7 @@ public:
     static bool IsAcceptableFileSize(long long fileSize);
 
     std::string GetLineEnding(void) const;
+    std::string GetTextTail(void) const;
     void SetRawBytes(bool rawBytes);
 
 protected:
@@ -80,6 +81,7 @@ private:
     eTextEncoding DetectBOM(const std::vector<unsigned char>& buffer, size_t& bomSize);
     eTextEncoding DetectEncodingHeuristic(const std::vector<unsigned char>& buffer, size_t length);
     bool IsBinaryFile(const std::vector<unsigned char>& buffer, size_t length);
+    static size_t TextEnd(const std::vector<unsigned char>& buffer, size_t start, size_t length);
     eTextEncoding GuessCodePage(const std::vector<unsigned char>& buffer, size_t length);
     std::string ConvertUTF16ToUTF8(const std::vector<unsigned char>& buffer, size_t length, bool littleEndian);
     std::string ConvertUTF32ToUTF8(const std::vector<unsigned char>& buffer, size_t length, bool littleEndian);
@@ -90,6 +92,7 @@ private:
     std::string DetectLineEnding(const std::string& content);
 
     std::string mLineEnding = "\n";              ///< first line ending of the loaded file
+    std::string mTextTail;                       ///< bytes from the first 0x1A to the end of the loaded file
     bool mRawBytes = true;                       ///< LoadFile() inserts with cDocument::InsertRaw()
 };
 

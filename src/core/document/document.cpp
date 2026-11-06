@@ -527,6 +527,7 @@ void cDocument::Clear(void)
     mSavedBlockHidden = false ;
     mTextFile = false ;
     mLineEnding = "\n" ;
+    mTextTail.clear() ;
 
     mCPParagraph = 1024 ;           // random number just so it's no 0 to start (see GetParagraphCodepoints())
 
@@ -1963,6 +1964,30 @@ void cDocument::SetLineEnding(const std::string &lineEnding)
 std::string cDocument::GetLineEnding(void)
 {
     return mLineEnding ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  tail   [IN] - bytes a plain-text save writes after the text
+///
+/// @return nothing
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::SetTextTail(const std::string &tail)
+{
+    mTextTail = tail ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the bytes a plain-text save writes after the text
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDocument::GetTextTail(void)
+{
+    return mTextTail ;
 }
 
 

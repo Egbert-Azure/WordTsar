@@ -312,6 +312,8 @@ public:
     bool IsTextFile(void) ;
     void SetLineEnding(const std::string &lineEnding) ;
     std::string GetLineEnding(void) ;
+    void SetTextTail(const std::string &tail) ;
+    std::string GetTextTail(void) ;
 
     // --- Position ---
     POSITION_T GetTextSize(void) ;
@@ -518,6 +520,7 @@ private:
     bool mSuppressUndo ;                                ///< true to suppress undo recording without implying file-load semantics
     bool mTextFile ;                                    ///< true if the document was loaded or last saved as plain text
     std::string mLineEnding = "\n" ;                  ///< line ending written by a plain-text save
+    std::string mTextTail ;                             ///< bytes from the first 0x1A of a text file, written after the text by a plain-text save
 
     // --- Paragraph Lookup Cache ---
     POSITION_T mLastParagraphFromPosition ;

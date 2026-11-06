@@ -406,3 +406,145 @@ TEST_CASE("cTextFile::SaveFile - writes the document line ending")
 
 
 //===========================================================================
+
+
+//===========================================================================
+// B5 - 0x1A ends the text of a text file
+//===========================================================================
+
+TEST_CASE("cTextFile::LoadFile - the text ends at the first 0x1A")
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path path = dir / "in.txt";
+
+    cDocument doc;
+    doc.Clear();
+    cTextFile file;
+    file.mDocument = &doc;
+
+    SUBCASE("text, 0x1A, padding")
+    {
+        WriteFileBytes(path, std::string("one\ntwo\n\x1A\x1A\x1A", 11));
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "one\ntwo\n");
+        CHECK(file.GetTextTail() == std::string("\x1A\x1A\x1A", 3));
+    }
+
+    SUBCASE("bytes after the 0x1A are not text")
+    {
+        WriteFileBytes(path, std::string("one\x1A" "two\x1A", 8));
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "one");
+        CHECK(file.GetTextTail() == std::string("\x1A" "two\x1A", 5));
+    }
+
+    SUBCASE("a long text with a short tail")
+    {
+        std::string text = std::string(100, 'a') + "\n";
+        WriteFileBytes(path, text + "\x1A" + "xy");
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == text);
+        CHECK(file.GetTextTail() == "\x1A" "xy");
+    }
+
+    SUBCASE("no 0x1A: no tail")
+    {
+        WriteFileBytes(path, "one\ntwo\n");
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(file.GetTextTail() == "");
+    }
+
+    SUBCASE("a code page file")
+    {
+        WriteFileBytes(path, std::string("caf\xE9\n\x1A\xE9", 7));
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "caf\xC3\xA9\n");
+        CHECK(file.GetTextTail() == std::string("\x1A\xE9", 2));
+    }
+
+    SUBCASE("UTF-8 text with high bytes after the 0x1A stays UTF-8")
+    {
+        WriteFileBytes(path, std::string("caf\xC3\xA9\n\x1A\xFF\xFE", 9));
+        REQUIRE(file.LoadFile(path.string()));
+        CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "caf\xC3\xA9\n");
+        CHECK(file.GetTextTail() == std::string("\x1A\xFF\xFE", 3));
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+TEST_CASE("cTextFile::LoadFile - control bytes after the first 0x1A do not make a file binary")
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path path = dir / "macro.txt";
+
+    std::string bytes = "one\ntwo\n" + std::string("\x1A") + std::string(40, '\x01') + std::string(40, '\x1A');
+    WriteFileBytes(path, bytes);
+
+    cDocument doc;
+    doc.Clear();
+    cTextFile file;
+    file.mDocument = &doc;
+    REQUIRE(file.LoadFile(path.string()));
+    CHECK(doc.GetPlainText(0, doc.GetTextSize(), "\n") == "one\ntwo\n");
+    CHECK(file.GetTextTail() == bytes.substr(8));
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+TEST_CASE("cTextFile::LoadFile - control bytes before the first 0x1A still make a file binary")
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path path = dir / "bin.dat";
+
+    WriteFileBytes(path, "ab" + std::string(40, '\x01') + std::string("\x1A") + std::string(400, 'x'));
+
+    cDocument doc;
+    doc.Clear();
+    cTextFile file;
+    file.mDocument = &doc;
+    CHECK(file.LoadFile(path.string()) == false);
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+TEST_CASE("cTextFile::SaveFile - writes the document text tail after the text")
+{
+    std::filesystem::path dir = MakeTempDir();
+    std::filesystem::path path = dir / "out.txt";
+
+    cDocument doc;
+    doc.Clear();
+    doc.Insert("a\rb\r");
+    cTextFile file;
+    file.mDocument = &doc;
+
+    SUBCASE("no tail")
+    {
+        REQUIRE(file.SaveFile(path.string(), doc.GetTextSize()));
+        CHECK(ReadFileBytes(path) == "a\nb\n");
+    }
+
+    SUBCASE("a tail")
+    {
+        doc.SetTextTail(std::string("\x1A\x01\x1A", 3));
+        REQUIRE(file.SaveFile(path.string(), doc.GetTextSize()));
+        CHECK(ReadFileBytes(path) == std::string("a\nb\n\x1A\x01\x1A", 7));
+    }
+
+    SUBCASE("Clear removes the tail")
+    {
+        doc.SetTextTail(std::string("\x1A\x1A", 2));
+        doc.Clear();
+        doc.Insert("a\rb\r");
+        CHECK(doc.GetTextTail() == "");
+        REQUIRE(file.SaveFile(path.string(), doc.GetTextSize()));
+        CHECK(ReadFileBytes(path) == "a\nb\n");
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}

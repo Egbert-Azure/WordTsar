@@ -1107,10 +1107,11 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
         MarkDocumentSaved();
     }
 
-    // A text file saves with the line ending it was opened with
+    // A text file saves with the line ending and the tail it was opened with
     if (success && loadedAsText)
     {
         mDocument->SetLineEnding(static_cast<cTextFile*>(fileReader)->GetLineEnding());
+        mDocument->SetTextTail(static_cast<cTextFile*>(fileReader)->GetTextTail());
     }
 
     delete fileReader;
@@ -1351,6 +1352,12 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
         if (isExport == false)
         {
             mDocument->SetTextFile(savesAsText);
+        }
+
+        // Only a text save keeps the text tail
+        if (savesAsText == false)
+        {
+            mDocument->SetTextTail("");
         }
 
         mFileName = filepath.filename().string();

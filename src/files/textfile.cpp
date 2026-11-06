@@ -49,6 +49,9 @@
  * - Line endings are normalized: LF and CR+LF are converted to CR only
  *   (WordTsar's internal paragraph delimiter). The first line ending in
  *   the file is kept for GetLineEnding(); LF if the file has none.
+ * - A file that is not UTF-16 or UTF-32 ends at its first 0x1A. The bytes
+ *   from there to the end are kept by GetTextTail(); SaveFile() writes the
+ *   document's text tail after the text.
  * - Control bytes for which IsRawTextByte() is true are inserted as raw
  *   byte markers (cDocument::InsertRaw) and saved back unchanged, unless
  *   SetRawBytes(false) was called.
@@ -367,6 +370,28 @@ static void AppendCodepointAsUTF8(std::string& out, uint32_t cp)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  buffer [in] file data
+/// @param  start  [in] index to search from
+/// @param  length [in] index to search up to (exclusive)
+///
+/// @return index of the first 0x1A in [start, length); length if there is none
+///
+/////////////////////////////////////////////////////////////////////////////
+size_t cTextFile::TextEnd(const std::vector<unsigned char>& buffer, size_t start, size_t length)
+{
+    for (size_t i = start; i < length; i++)
+    {
+        if (buffer[i] == 0x1A)
+        {
+            return i;
+        }
+    }
+
+    return length;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  buffer [in] file data to check
 /// @param  length [in] number of bytes to analyze
 ///
@@ -376,8 +401,9 @@ static void AppendCodepointAsUTF8(std::string& out, uint32_t cp)
 /// Detect binary files by checking for known binary file signatures and
 /// counting non-text control characters. Checks for ELF, PE/MZ, PNG,
 /// JPEG, PDF, ZIP, GIF, and GZIP signatures. Then counts control bytes
-/// in ranges 0x01-0x07 and 0x0E-0x1F (excluding tab, LF, CR). If
-/// control characters exceed 5% of the sample, the file is binary.
+/// in ranges 0x01-0x07 and 0x0E-0x1F (excluding tab, LF, CR) before the
+/// first 0x1A. If they exceed 5% of the bytes before the first 0x1A, the
+/// file is binary.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cTextFile::IsBinaryFile(const std::vector<unsigned char>& buffer, size_t length)
@@ -436,10 +462,11 @@ bool cTextFile::IsBinaryFile(const std::vector<unsigned char>& buffer, size_t le
         return true;
     }
 
-    // Count non-text control characters (0x01-0x07, 0x0E-0x1F)
-    // Excludes tab (0x09), LF (0x0A), CR (0x0D) which are valid in text
+    // Count non-text control characters (0x01-0x07, 0x0E-0x1F) before the
+    // first 0x1A. Excludes tab (0x09), LF (0x0A), CR (0x0D) which are valid in text
+    size_t textLength = TextEnd(buffer, 0, length);
     int controlCount = 0;
-    for (size_t i = 0; i < length; i++)
+    for (size_t i = 0; i < textLength; i++)
     {
         unsigned char byte = buffer[i];
         if ((byte >= 0x01 && byte <= 0x07) || (byte >= 0x0E && byte <= 0x1F))
@@ -449,7 +476,7 @@ bool cTextFile::IsBinaryFile(const std::vector<unsigned char>& buffer, size_t le
     }
 
     // If more than 5% of bytes are control characters, likely binary
-    if (controlCount > static_cast<int>(length / 20))
+    if (controlCount > static_cast<int>(textLength / 20))
     {
         return true;
     }
@@ -558,7 +585,8 @@ eTextEncoding cTextFile::GuessCodePage(const std::vector<unsigned char>& buffer,
 /// Heuristically detect encoding by analyzing byte patterns.
 /// Checks for binary file signatures, UTF-16 null byte patterns,
 /// valid UTF-8 sequences, and legacy code page indicators.
-/// Falls back to GuessCodePage() when UTF-8 validation fails.
+/// Falls back to GuessCodePage() when UTF-8 validation fails. UTF-8
+/// validation and GuessCodePage() use the bytes before the first 0x1A.
 ///
 /////////////////////////////////////////////////////////////////////////////
 eTextEncoding cTextFile::DetectEncodingHeuristic(const std::vector<unsigned char>& buffer, size_t length)
@@ -609,14 +637,16 @@ eTextEncoding cTextFile::DetectEncodingHeuristic(const std::vector<unsigned char
         }
     }
 
+    size_t textLength = TextEnd(buffer, 0, length);
+
     // Try to validate as UTF-8
-    if (IsValidUTF8(buffer.data(), length))
+    if (IsValidUTF8(buffer.data(), textLength))
     {
         return eTextEncoding::UTF8;
     }
 
     // UTF-8 failed, guess legacy code page
-    return GuessCodePage(buffer, length);
+    return GuessCodePage(buffer, textLength);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -917,7 +947,9 @@ std::string cTextFile::NormalizeLineEndings(const std::string& content)
 /// normalization. Detects and rejects binary files. Supports UTF-8,
 /// UTF-16LE, UTF-16BE, UTF-32LE, UTF-32BE with or without BOM, and
 /// legacy encodings (Latin-1/CP1252, DOS CP437, DOS CP850). Handles
-/// CR, LF, and CRLF line endings.
+/// CR, LF, and CRLF line endings. A file that is not UTF-16 or UTF-32 ends
+/// at its first 0x1A: the bytes from the 0x1A to the end are not loaded and
+/// GetTextTail() returns them.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cTextFile::LoadFile(std::string filename)
@@ -979,6 +1011,16 @@ bool cTextFile::LoadFile(std::string filename)
         return false;
     }
 
+    // A single-byte or UTF-8 file ends at its first 0x1A; the bytes from
+    // there to the end are kept as the tail
+    size_t textEnd = buffer.size();
+    if (encoding != eTextEncoding::UTF16LE && encoding != eTextEncoding::UTF16BE &&
+        encoding != eTextEncoding::UTF32LE && encoding != eTextEncoding::UTF32BE)
+    {
+        textEnd = TextEnd(buffer, bomSize, buffer.size());
+    }
+    mTextTail.assign(reinterpret_cast<char*>(buffer.data() + textEnd), buffer.size() - textEnd);
+
     // Convert to UTF-8 based on detected encoding
     std::string utf8Content;
 
@@ -998,7 +1040,7 @@ bool cTextFile::LoadFile(std::string filename)
     {
         // Already UTF-8, just skip BOM if present
         utf8Content = std::string(reinterpret_cast<char*>(buffer.data() + bomSize),
-                                   buffer.size() - bomSize);
+                                   textEnd - bomSize);
 
         // Validate UTF-8
         if (!IsValidUTF8(reinterpret_cast<unsigned char*>(utf8Content.data()), utf8Content.size()))
@@ -1011,23 +1053,23 @@ bool cTextFile::LoadFile(std::string filename)
     if (encoding == eTextEncoding::LATIN1)
     {
         // Convert Latin-1/CP1252 high bytes to proper UTF-8
-        utf8Content = ConvertLatin1ToUTF8(buffer, bomSize, buffer.size() - bomSize);
+        utf8Content = ConvertLatin1ToUTF8(buffer, bomSize, textEnd - bomSize);
     }
     else if (encoding == eTextEncoding::DOS_CP437)
     {
         // Convert DOS Code Page 437 high bytes to proper UTF-8
-        utf8Content = ConvertCP437ToUTF8(buffer, bomSize, buffer.size() - bomSize);
+        utf8Content = ConvertCP437ToUTF8(buffer, bomSize, textEnd - bomSize);
     }
     else if (encoding == eTextEncoding::DOS_CP850)
     {
         // Convert DOS Code Page 850 high bytes to proper UTF-8
-        utf8Content = ConvertCP850ToUTF8(buffer, bomSize, buffer.size() - bomSize);
+        utf8Content = ConvertCP850ToUTF8(buffer, bomSize, textEnd - bomSize);
     }
     else if (encoding == eTextEncoding::SYSTEM_LOCALE)
     {
         // Treat as plain ASCII/system locale
         utf8Content = std::string(reinterpret_cast<char*>(buffer.data() + bomSize),
-                                   buffer.size() - bomSize);
+                                   textEnd - bomSize);
     }
 
     // Normalize line endings (CR, LF, CRLF -> HARD_RETURN)
@@ -1106,7 +1148,8 @@ bool cTextFile::LoadFile(std::string filename)
 /// @brief
 /// Save document as UTF-8 plain text with the document's line ending.
 /// Uses cDocument::GetPlainText(): a tab marker is written as a tab, other
-/// markers and the end-of-file marker are not written.
+/// markers and the end-of-file marker are not written. The document's text
+/// tail (cDocument::GetTextTail) is written after the text.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cTextFile::SaveFile(std::string filename, POSITION_T length)
@@ -1118,6 +1161,7 @@ bool cTextFile::SaveFile(std::string filename, POSITION_T length)
     }
 
     file << mDocument->GetPlainText(0, length, mDocument->GetLineEnding());
+    file << mDocument->GetTextTail();
 
     // close() flushes; a failed write or flush sets failbit or badbit
     file.close();
@@ -1144,6 +1188,17 @@ void cTextFile::SetRawBytes(bool rawBytes)
 std::string cTextFile::GetLineEnding(void) const
 {
     return mLineEnding;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the bytes of the loaded file from its first 0x1A to the end;
+///         empty if it has none
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cTextFile::GetTextTail(void) const
+{
+    return mTextTail;
 }
 
 /////////////////////////////////////////////////////////////////////////////

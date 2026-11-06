@@ -536,6 +536,127 @@ TEST_CASE("cWSEditorCtrl - a text file saves with the line endings it was opened
 }
 
 
+TEST_CASE("cWSEditorCtrl - a text file ends at the first 0x1A, the rest is saved back unchanged")
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-tui-eot-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    REQUIRE(doc != nullptr);
+
+    const std::string tail = std::string("\x1A") + "TAILMARK" + std::string(3, '\x1A');
+
+    auto shownText = [&](void)
+    {
+        return doc->GetPlainText(0, doc->GetTextSize(), "\n");
+    };
+
+    SUBCASE("LF: only the text is shown, an unedited save is byte-identical")
+    {
+        std::string bytes = "one\ttwo\nthree\n" + tail;
+        WriteFileBytes(dir / "lf.txt", bytes);
+        REQUIRE(editor.LoadFile((dir / "lf.txt").string()));
+        CHECK(shownText() == "one\ttwo\nthree\n");
+        REQUIRE(editor.SaveFile((dir / "lf.txt").string()));
+        CHECK(ReadFileBytes(dir / "lf.txt") == bytes);
+    }
+
+    SUBCASE("CRLF: only the text is shown, an unedited save is byte-identical")
+    {
+        std::string bytes = "one\r\ntwo\r\n" + tail;
+        WriteFileBytes(dir / "crlf.txt", bytes);
+        REQUIRE(editor.LoadFile((dir / "crlf.txt").string()));
+        CHECK(shownText() == "one\ntwo\n");
+        REQUIRE(editor.SaveFile((dir / "crlf.txt").string()));
+        CHECK(ReadFileBytes(dir / "crlf.txt") == bytes);
+    }
+
+    SUBCASE("an edit before the 0x1A keeps the same tail")
+    {
+        WriteFileBytes(dir / "edit.txt", "one\ntwo\n" + tail);
+        REQUIRE(editor.LoadFile((dir / "edit.txt").string()));
+        doc->SetPosition(0);
+        doc->Insert("X");
+        REQUIRE(editor.SaveFile((dir / "edit.txt").string()));
+        CHECK(ReadFileBytes(dir / "edit.txt") == "Xone\ntwo\n" + tail);
+    }
+
+    SUBCASE("a text document saved to a name without extension keeps the tail")
+    {
+        WriteFileBytes(dir / "a.txt", "one\n" + tail);
+        REQUIRE(editor.LoadFile((dir / "a.txt").string()));
+        REQUIRE(editor.SaveFile((dir / "b").string()));
+        CHECK(ReadFileBytes(dir / "b") == "one\n" + tail);
+    }
+
+    SUBCASE("a file without 0x1A gets none on save")
+    {
+        WriteFileBytes(dir / "none.txt", "one\ntwo");
+        REQUIRE(editor.LoadFile((dir / "none.txt").string()));
+        REQUIRE(editor.SaveFile((dir / "none.txt").string()));
+        CHECK(ReadFileBytes(dir / "none.txt") == "one\ntwo");
+    }
+
+    SUBCASE("control bytes after the 0x1A over 5% of the file: still opens as text")
+    {
+        std::string bytes = "one\ntwo\n" + std::string("\x1A") + std::string(40, '\x01') + std::string(40, '\x1A');
+        WriteFileBytes(dir / "macro.txt", bytes);
+        REQUIRE(editor.LoadFile((dir / "macro.txt").string()));
+        CHECK(doc->IsTextFile());
+        CHECK(shownText() == "one\ntwo\n");
+        REQUIRE(editor.SaveFile((dir / "macro.txt").string()));
+        CHECK(ReadFileBytes(dir / "macro.txt") == bytes);
+    }
+
+    SUBCASE("a WordStar save drops the tail")
+    {
+        WriteFileBytes(dir / "ws.txt", "one\ntwo\n" + tail);
+        REQUIRE(editor.LoadFile((dir / "ws.txt").string()));
+        REQUIRE(editor.SaveFile((dir / "ws.ws").string()));
+        CHECK(ReadFileBytes(dir / "ws.ws").find("TAILMARK") == std::string::npos);
+        REQUIRE(editor.SaveFile((dir / "ws-again.txt").string()));
+        CHECK(ReadFileBytes(dir / "ws-again.txt") == "one\ntwo\n");
+    }
+
+    SUBCASE("an RTF save drops the tail")
+    {
+        WriteFileBytes(dir / "rtf.txt", "one\n" + tail);
+        REQUIRE(editor.LoadFile((dir / "rtf.txt").string()));
+        REQUIRE(editor.SaveFile((dir / "rtf.rtf").string()));
+        CHECK(ReadFileBytes(dir / "rtf.rtf").find("TAILMARK") == std::string::npos);
+        REQUIRE(editor.SaveFile((dir / "rtf-again.txt").string()));
+        CHECK(ReadFileBytes(dir / "rtf-again.txt") == "one\n");
+    }
+
+    SUBCASE("abandoning the document clears the tail")
+    {
+        WriteFileBytes(dir / "quit.txt", "one\n" + tail);
+        REQUIRE(editor.LoadFile((dir / "quit.txt").string()));
+        editor.AbandonFile();
+        doc = editor.GetDocument();
+        doc->Insert("new\r");
+        REQUIRE(editor.SaveFile((dir / "new.txt").string()));
+        CHECK(ReadFileBytes(dir / "new.txt") == "new\n");
+    }
+
+    SUBCASE("opening another text file replaces the tail")
+    {
+        WriteFileBytes(dir / "first.txt", "one\n" + tail);
+        WriteFileBytes(dir / "second.txt", "two\n");
+        REQUIRE(editor.LoadFile((dir / "first.txt").string()));
+        REQUIRE(editor.LoadFile((dir / "second.txt").string()));
+        REQUIRE(editor.SaveFile((dir / "second.txt").string()));
+        CHECK(ReadFileBytes(dir / "second.txt") == "two\n");
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
 TEST_CASE("cWSEditorCtrl - Write Block to File writes plain text from a text document")
 {
     std::string pattern =
