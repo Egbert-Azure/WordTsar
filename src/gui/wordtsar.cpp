@@ -2132,6 +2132,8 @@ BlockMathAction->setEnabled(false) ;
     QAction *SortBlockAscAction = new QAction(mMenuProvider->GetUtilSortBlockAscLabel(), mMenuBar) ;
     QAction *SortBlockDesAction = new QAction(mMenuProvider->GetUtilSortBlockDesLabel(), mMenuBar) ;
     QAction *WordCountAction = new QAction(mMenuProvider->GetUtilWordCountLabel(), mMenuBar) ;
+    QAction *GenerateTOCAction = new QAction(mMenuProvider->GetUtilGenerateTOCLabel(), mMenuBar) ;
+    QAction *GenerateIndexAction = new QAction(mMenuProvider->GetUtilGenerateIndexLabel(), mMenuBar) ;
     QAction *PlayMacroAction = new QAction(mMenuProvider->GetUtilPlayMacroLabel(), mMenuBar) ;
 PlayMacroAction->setEnabled(false) ;
     QAction *RecordMacroAction = new QAction(mMenuProvider->GetUtilRecordMacroLabel(), mMenuBar) ;
@@ -2197,6 +2199,10 @@ ReformatNotesAction->setEnabled(false) ;
     utilitiesmenu->addAction(WordCountAction) ;
     utilitiesmenu->addSeparator() ;
 
+    utilitiesmenu->addAction(GenerateTOCAction) ;
+    utilitiesmenu->addAction(GenerateIndexAction) ;
+    utilitiesmenu->addSeparator() ;
+
     QMenu *MacrosMenu = utilitiesmenu->addMenu("&Macros") ;
     MacrosMenu->addAction(PlayMacroAction) ;
     MacrosMenu->addAction(RecordMacroAction) ;
@@ -2239,6 +2245,8 @@ ReformatNotesAction->setEnabled(false) ;
     connect(SortBlockAscAction, &QAction::triggered, this, &cWordTsar::SortBlockAsc) ;
     connect(SortBlockDesAction, &QAction::triggered, this, &cWordTsar::SortBlockDes) ;
     connect(WordCountAction, &QAction::triggered, this, &cWordTsar::WordCount) ;
+    connect(GenerateTOCAction, &QAction::triggered, this, &cWordTsar::GenerateTableOfContents) ;
+    connect(GenerateIndexAction, &QAction::triggered, this, &cWordTsar::GenerateIndex) ;
     connect(PlayMacroAction, &QAction::triggered, this, &cWordTsar::PlayMacro) ;
     connect(RecordMacroAction, &QAction::triggered, this, &cWordTsar::RecordMacro) ;
     connect(EditMacroAction, &QAction::triggered, this, &cWordTsar::EditMacro) ;
@@ -3486,6 +3494,18 @@ void cWordTsar::WordCount(void)
 {
     mMenuInput->HandleKey(CTRL_K) ;
     mMenuInput->HandleKey('?') ;
+}
+
+
+void cWordTsar::GenerateTableOfContents(void)
+{
+    mEditor->GenerateTOCFromFile() ;
+}
+
+
+void cWordTsar::GenerateIndex(void)
+{
+    mEditor->GenerateIndexFromFile() ;
 }
 
 

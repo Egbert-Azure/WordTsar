@@ -258,6 +258,8 @@ private slots :
     void SortBlockAsc(void) ;
     void SortBlockDes(void) ;
     void WordCount(void) ;
+    void GenerateTableOfContents(void) ;
+    void GenerateIndex(void) ;
     void PlayMacro(void) ;
     void RecordMacro(void) ;
     void EditMacro(void) ;

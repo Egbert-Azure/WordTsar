@@ -221,6 +221,18 @@ public:
     void PageUp(void);
     void PageDown(void);
 
+    // --- Table of contents and index generation from a file ---
+    // The source runs on a hidden editor; this editor's document is not
+    // changed unless the source is this document and the user saves it.
+    enum eSaveQuestion
+    {
+        SAVE_QUESTION_SAVE,
+        SAVE_QUESTION_DONT_SAVE,
+        SAVE_QUESTION_CANCEL
+    };
+    void GenerateTOCFromFile(void);
+    void GenerateIndexFromFile(void);
+
     // --- Main window integration ---
     void Preferences(void) override;
     void ToggleFullscreen(void) override;
@@ -259,10 +271,18 @@ protected:
     void focusInEvent(QFocusEvent* event) override;
     void focusOutEvent(QFocusEvent* event) override;
 
+    // --- Generate commands: source file chooser and save question ---
+    // Return an empty string, or SAVE_QUESTION_CANCEL, under QT_TESTING=1.
+    virtual std::string PromptForGenerateSource(const std::string& title, const std::string& defaultPath);
+    virtual eSaveQuestion AskSaveBeforeGenerate(const std::string& filename);
+
 private:
     // --- Initialization helper ---
     // Common initialization shared by both constructors
     void Init(void) ;
+
+    // --- Generate commands ---
+    void GenerateFromFile(bool index);
 
     // --- Backup ---
     bool WriteBackup(void);             // Write the -bak backup; status message on failure

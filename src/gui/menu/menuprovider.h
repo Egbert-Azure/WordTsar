@@ -246,6 +246,10 @@ public:
     virtual QString GetUtilSortBlockDesLabel(void) const = 0;
     virtual QString GetUtilWordCountLabel(void) const = 0;
 
+    // Utilities Menu - Generate
+    virtual QString GetUtilGenerateTOCLabel(void) const = 0;
+    virtual QString GetUtilGenerateIndexLabel(void) const = 0;
+
     // Utilities Menu - Macros
     virtual QString GetUtilPlayMacroLabel(void) const = 0;
     virtual QString GetUtilRecordMacroLabel(void) const = 0;

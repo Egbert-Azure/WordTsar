@@ -118,3 +118,16 @@ TEST_CASE("TUI TOC/Index generator - files that cannot be written are reported")
 {
     tocindextest::CheckUnwritableOutput<cWSEditorCtrl>() ;
 }
+
+
+TEST_CASE("TUI TOC/Index generator - a source file on disk gives the golden table of contents and index")
+{
+    tocindextest::cScratchDir dir("tuigolden") ;
+    REQUIRE(dir.IsValid()) ;
+    std::string sourcePath = dir.File("golden.ws") ;
+    tocindextest::WriteGoldenSource<cWSEditorCtrl>(sourcePath) ;
+
+    std::vector<std::string> written = tocindextest::GenerateFromDisk<cWSEditorCtrl>(sourcePath) ;
+    CHECK(tocindextest::Join(written) == dir.File("golden.TOC") + "|" + dir.File("golden.T01") + "|" + dir.File("golden.IDX")) ;
+    tocindextest::CheckGoldenOutputs<cWSEditorCtrl>(dir.File("golden")) ;
+}

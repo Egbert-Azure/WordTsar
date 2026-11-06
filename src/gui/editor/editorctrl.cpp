@@ -133,6 +133,8 @@
 #include "src/gui/utils/macwriteblock.h"
 
 #include <filesystem>
+#include <fstream>
+#include "src/core/generate/tocindexgenerator.h"
 #include "src/input/wordtsarinput.h"
 #include "src/input/moderninput.h"
 #include "src/core/include/version.h"
@@ -8017,6 +8019,210 @@ bool cEditorCtrl::CloseEvent(void)
         }
     }
     return true;  // No changes, allow close
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  title [in] dialog title
+/// @param  defaultPath [in] file or directory the dialog starts at
+///
+/// @return the chosen file, empty if cancelled or under QT_TESTING=1
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorCtrl::PromptForGenerateSource(const std::string& title, const std::string& defaultPath)
+{
+    const char* qtTesting = std::getenv("QT_TESTING");
+    if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
+    {
+        return "";
+    }
+
+    QString filename = QFileDialog::getOpenFileName(
+        this,
+        QString::fromStdString(title),
+        QString::fromStdString(defaultPath),
+        BuildFileFilterString(false)
+    );
+    return filename.toStdString();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] name of the modified document
+///
+/// @return the answer: Save, Don't Save or Cancel; Cancel under QT_TESTING=1
+///
+/////////////////////////////////////////////////////////////////////////////
+cEditorCtrl::eSaveQuestion cEditorCtrl::AskSaveBeforeGenerate(const std::string& filename)
+{
+    const char* qtTesting = std::getenv("QT_TESTING");
+    if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
+    {
+        return SAVE_QUESTION_CANCEL;
+    }
+
+    QMessageBox box(QMessageBox::Question, "Save File",
+                    QString("Save changes to %1 first?").arg(QString::fromStdString(filename)),
+                    QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
+    box.setDefaultButton(QMessageBox::Save);
+    int result = box.exec();
+    if (result == QMessageBox::Save)
+    {
+        return SAVE_QUESTION_SAVE;
+    }
+    if (result == QMessageBox::Discard)
+    {
+        return SAVE_QUESTION_DONT_SAVE;
+    }
+    return SAVE_QUESTION_CANCEL;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Utilities > Generate Table of Contents: writes name.TOC and
+/// name.T01..name.T09 next to a chosen source file.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::GenerateTOCFromFile(void)
+{
+    GenerateFromFile(false);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Utilities > Generate Index: writes name.IDX next to a chosen source file.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::GenerateIndexFromFile(void)
+{
+    GenerateFromFile(true);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  index [in] true for the index, false for the table of contents
+///
+/// @return nothing
+///
+/// @brief
+/// Asks for the source file, starting at this document's file or, for an
+/// untitled document, at its directory. A modified source that is this
+/// document is saved first or not, as the user answers. The source is
+/// loaded into a hidden editor that the generator runs on and that is
+/// destroyed before the result is shown; this editor's document is not
+/// touched. No generated file is opened.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::GenerateFromFile(bool index)
+{
+    const std::string chooserTitle = index ? "Generate Index" : "Generate Table of Contents";
+    const std::string messageTitle = index ? "Index" : "Table of Contents";
+
+    std::string current;
+    if (mFileSet)
+    {
+        current = (std::filesystem::path(mFileDir) / mFileName).string();
+    }
+
+    std::string source = PromptForGenerateSource(chooserTitle, mFileSet ? current : mFileDir);
+    if (source.empty())
+    {
+        return;
+    }
+
+    std::error_code ec;
+    bool isCurrent = mFileSet && std::filesystem::equivalent(source, current, ec);
+    if (isCurrent && mDocument != nullptr && mDocument->IsModified())
+    {
+        eSaveQuestion answer = AskSaveBeforeGenerate(mFileName);
+        if (answer == SAVE_QUESTION_CANCEL)
+        {
+            return;
+        }
+        if (answer == SAVE_QUESTION_SAVE)
+        {
+            if (SaveFile(current) == false)
+            {
+                return;
+            }
+            MarkDocumentSaved();
+        }
+    }
+
+    std::vector<std::string> written;
+    std::vector<std::string> failed;
+    bool readable = std::ifstream(source, std::ios::binary).good();
+    if (readable)
+    {
+        cEditorCtrl generator;
+        generator.mAutoSaveTimer->stop();
+        generator.SetCodePage(GetCodePage());
+        generator.mSpellCheckLanguage = mSpellCheckLanguage;
+        generator.GetLayout()->SetHyphenationLanguage(mSpellCheckLanguage);
+
+        readable = generator.LoadFile(source);
+        if (readable && index)
+        {
+            std::string outputFile;
+            std::string failedFile;
+            if (cTOCIndexGenerator::GenerateIndex(&generator, source, outputFile, &failedFile))
+            {
+                written.push_back(outputFile);
+            }
+            if (failedFile.empty() == false)
+            {
+                failed.push_back(failedFile);
+            }
+        }
+        else if (readable)
+        {
+            cTOCIndexGenerator::GenerateTOC(&generator, source, written, &failed);
+        }
+    }
+
+    auto lines = [](const std::vector<std::string>& paths)
+    {
+        std::string text;
+        for (size_t loop = 0; loop < paths.size(); loop++)
+        {
+            text += (loop > 0 ? "\n" : "") + paths[loop];
+        }
+        return text;
+    };
+
+    if (readable == false)
+    {
+        ShowError(messageTitle, "Cannot read\n" + source);
+    }
+    else if (failed.empty() == false)
+    {
+        std::string text = "Cannot write\n" + lines(failed);
+        if (written.empty() == false)
+        {
+            text += "\n\nWrote:\n" + lines(written);
+        }
+        ShowError(messageTitle, text);
+    }
+    else if (written.empty())
+    {
+        ShowMessage(messageTitle, std::string("No ") + (index ? "index" : "table of contents") +
+                                  " entries were found in\n" + source);
+    }
+    else
+    {
+        ShowMessage(messageTitle, "Wrote:\n" + lines(written));
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////

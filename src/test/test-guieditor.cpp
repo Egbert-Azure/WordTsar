@@ -17912,3 +17912,15 @@ TEST_CASE("Menu providers - Insert has Mark for Index with its key")
     CHECK(wordstar.GetStyleStrikeoutLabel() == QString("&Strikeout\t^PX"));
     CHECK(modern.GetStyleStrikeoutLabel() == QString("&Strikeout\tAlt+P, X"));
 }
+
+
+TEST_CASE("Menu providers - Utilities has Generate Table of Contents and Generate Index")
+{
+    cWordStarMenuProvider wordstar;
+    cModernMenuProvider modern;
+    for (const IMenuProvider* provider : { static_cast<const IMenuProvider*>(&wordstar), static_cast<const IMenuProvider*>(&modern) })
+    {
+        CHECK(provider->GetUtilGenerateTOCLabel() == QString("&Generate Table of Contents..."));
+        CHECK(provider->GetUtilGenerateIndexLabel() == QString("Generate Inde&x..."));
+    }
+}

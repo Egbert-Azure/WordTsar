@@ -33,6 +33,8 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <sys/stat.h>
 #include <system_error>
@@ -45,6 +47,7 @@
 #include "src/core/include/config.h"
 #include "src/core/layout/layoutbase.h"
 #include "src/core/layout/layoutstructs.h"
+#include "src/files/wordstar/wordstarfile.h"
 
 namespace tocindextest {
 
@@ -855,6 +858,99 @@ void CheckUnwritableOutput(void)
     failedFile = "stale" ;
     CHECK_FALSE(cTOCIndexGenerator::GenerateIndex(&editor, sourcePath, outputFile, &failedFile)) ;
     CHECK(failedFile.empty()) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Source with .tc, .tc1, .ix, an index mark pair and dot entries, in
+/// SetMarkedSource() form, and the files generated from it.
+/////////////////////////////////////////////////////////////////////////////
+inline std::vector<std::string> GoldenSource(void)
+{
+    return { ".tc Chapter One #", ".ix Apple", "Some {K}marked{K} words", ".tc1 Figure #", ".tc .lm 0",
+             ".pa", ".tc Chapter Two #", ".ix .pm 0", ".ix Zebra" } ;
+}
+
+inline const char *GoldenTOC(void)   { return "Chapter One 1|.lm 0|Chapter Two 2" ; }
+inline const char *GoldenT01(void)   { return "Figure 1" ; }
+inline const char *GoldenIndex(void) { return ".pm 0|Apple, 1|marked, 1|Zebra, 2" ; }
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Writes GoldenSource() to `path` as a WordStar file.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void WriteGoldenSource(const std::string &path)
+{
+    EDITOR editor ;
+    SetMarkedSource(editor, GoldenSource()) ;
+    cWordstarFile writer(&editor) ;
+    REQUIRE(writer.SaveFile(path, editor.GetDocument()->GetTextSize())) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Loads `sourcePath` into a fresh editor for each table, as ws does, and
+/// runs GenerateTOC() and GenerateIndex(); returns the written paths.
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+std::vector<std::string> GenerateFromDisk(const std::string &sourcePath)
+{
+    std::vector<std::string> written ;
+    {
+        EDITOR editor ;
+        REQUIRE(editor.LoadFile(sourcePath)) ;
+        std::vector<std::string> outputFiles ;
+        CHECK(cTOCIndexGenerator::GenerateTOC(&editor, sourcePath, outputFiles)) ;
+        written = outputFiles ;
+    }
+    {
+        EDITOR editor ;
+        REQUIRE(editor.LoadFile(sourcePath)) ;
+        std::string outputFile ;
+        CHECK(cTOCIndexGenerator::GenerateIndex(&editor, sourcePath, outputFile)) ;
+        written.push_back(outputFile) ;
+    }
+    return written ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Checks the files generated next to `stem` from GoldenSource().
+/////////////////////////////////////////////////////////////////////////////
+template <class EDITOR>
+void CheckGoldenOutputs(const std::string &stem)
+{
+    EDITOR reader ;
+    CHECK(Join(LoadGenerated(reader, stem + ".TOC")) == GoldenTOC()) ;
+    CHECK(Join(LoadGenerated(reader, stem + ".T01")) == GoldenT01()) ;
+    CHECK(Join(LoadGenerated(reader, stem + ".IDX")) == GoldenIndex()) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Whole file content, empty if it cannot be read.
+/////////////////////////////////////////////////////////////////////////////
+inline std::string ReadBytes(const std::string &path)
+{
+    std::ifstream in(path, std::ios::binary) ;
+    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Names of the files in `directory`, sorted, joined with '|'.
+/////////////////////////////////////////////////////////////////////////////
+inline std::string DirectoryListing(const std::string &directory)
+{
+    std::vector<std::string> names ;
+    std::error_code ec ;
+    for (const auto &entry : std::filesystem::directory_iterator(directory, ec))
+    {
+        names.push_back(entry.path().filename().string()) ;
+    }
+    std::sort(names.begin(), names.end()) ;
+    return Join(names) ;
 }
 
 } // namespace tocindextest

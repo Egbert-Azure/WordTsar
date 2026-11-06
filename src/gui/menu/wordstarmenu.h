@@ -242,6 +242,8 @@ public:
     QString GetUtilSortBlockAscLabel(void) const override;
     QString GetUtilSortBlockDesLabel(void) const override;
     QString GetUtilWordCountLabel(void) const override;
+    QString GetUtilGenerateTOCLabel(void) const override;
+    QString GetUtilGenerateIndexLabel(void) const override;
 
     // Utilities Menu - Macros
     QString GetUtilPlayMacroLabel(void) const override;

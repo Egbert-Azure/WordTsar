@@ -337,3 +337,433 @@ TEST_CASE("TOC/Index generator - files that cannot be written are reported")
     ensureQApplication() ;
     tocindextest::CheckUnwritableOutput<cEditorCtrl>() ;
 }
+
+
+namespace {
+
+/////////////////////////////////////////////////////////////////////////////
+/// cEditorCtrl with the file chooser, the save question and the message
+/// boxes of the Generate commands replaced by recorded answers.
+/////////////////////////////////////////////////////////////////////////////
+class cGenerateTestEditor : public cEditorCtrl
+{
+public:
+    std::string mChooserAnswer ;
+    std::vector<std::string> mChooserCalls ;
+    eSaveQuestion mSaveAnswer = SAVE_QUESTION_CANCEL ;
+    std::vector<std::string> mSaveQuestions ;
+    std::vector<std::string> mMessages ;
+    std::vector<std::string> mErrors ;
+    int mTopLevelAtMessage = -1 ;
+
+    void ShowMessage(const std::string &title, const std::string &message) override
+    {
+        mTopLevelAtMessage = static_cast<int>(QApplication::topLevelWidgets().size()) ;
+        mMessages.push_back(title + ": " + message) ;
+    }
+
+    void ShowError(const std::string &title, const std::string &message) override
+    {
+        mTopLevelAtMessage = static_cast<int>(QApplication::topLevelWidgets().size()) ;
+        mErrors.push_back(title + ": " + message) ;
+    }
+
+protected:
+    std::string PromptForGenerateSource(const std::string &title, const std::string &defaultPath) override
+    {
+        mChooserCalls.push_back(title + ": " + defaultPath) ;
+        return mChooserAnswer ;
+    }
+
+    eSaveQuestion AskSaveBeforeGenerate(const std::string &filename) override
+    {
+        mSaveQuestions.push_back(filename) ;
+        return mSaveAnswer ;
+    }
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Text, modified flag, caret and block of an editor's document.
+/////////////////////////////////////////////////////////////////////////////
+struct sDocumentState
+{
+    std::string text ;
+    bool modified = false ;
+    POSITION_T position = 0 ;
+    bool block = false ;
+    POSITION_T blockStart = 0 ;
+    POSITION_T blockEnd = 0 ;
+    bool canRedo = false ;
+
+    bool operator==(const sDocumentState &other) const
+    {
+        return text == other.text && modified == other.modified && position == other.position &&
+               block == other.block && blockStart == other.blockStart && blockEnd == other.blockEnd &&
+               canRedo == other.canRedo ;
+    }
+};
+
+sDocumentState StateOf(cEditorCtrl &editor)
+{
+    cDocument *doc = editor.GetDocument() ;
+    sDocumentState state ;
+    state.text = doc->GetText() ;
+    state.modified = doc->IsModified() ;
+    state.position = doc->GetPosition() ;
+    state.block = doc->GetBlock(state.blockStart, state.blockEnd) ;
+    state.canRedo = doc->CanRedo() ;
+    return state ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Number of undo steps; undoes them all.
+/////////////////////////////////////////////////////////////////////////////
+int UndoDepth(cEditorCtrl &editor)
+{
+    int depth = 0 ;
+    while (editor.GetDocument()->Undo())
+    {
+        depth++ ;
+    }
+    return depth ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+/// Types text into paragraph `paragraph`, marks a block and moves the caret.
+/////////////////////////////////////////////////////////////////////////////
+void EditDocument(cEditorCtrl &editor, PARAGRAPH_T paragraph, const std::string &text)
+{
+    cDocument *doc = editor.GetDocument() ;
+    POSITION_T start ;
+    POSITION_T end ;
+    doc->GetParagraphStartandEnd(paragraph, start, end) ;
+    doc->SetPosition(start) ;
+    doc->Insert(text) ;
+    doc->SetPosition(start + 1) ;
+    doc->SetBeginBlock() ;
+    doc->SetPosition(start + 4) ;
+    doc->SetEndBlock() ;
+    doc->SetPosition(start + 2) ;
+    editor.LayoutDocument(true) ;
+}
+
+
+std::string JoinLines(const std::vector<std::string> &lines)
+{
+    std::string result ;
+    for (size_t loop = 0 ; loop < lines.size() ; loop++)
+    {
+        result += (loop > 0 ? "\n" : "") + lines[loop] ;
+    }
+    return result ;
+}
+
+} // namespace
+
+
+TEST_CASE("GUI Generate - table of contents and index of a file on disk match the generator byte for byte")
+{
+    ensureQApplication() ;
+
+    tocindextest::cScratchDir dir("guigolden") ;
+    REQUIRE(dir.IsValid()) ;
+    std::string sourcePath = dir.File("golden.ws") ;
+    tocindextest::WriteGoldenSource<cEditorCtrl>(sourcePath) ;
+    std::string stem = dir.File("golden") ;
+
+    cGenerateTestEditor editor ;
+    editor.mFileDir = dir.File("") ;
+    editor.mChooserAnswer = sourcePath ;
+    editor.GenerateTOCFromFile() ;
+    editor.GenerateIndexFromFile() ;
+
+    CHECK(JoinLines(editor.mChooserCalls) == "Generate Table of Contents: " + dir.File("") + "\n" +
+                                             "Generate Index: " + dir.File("")) ;
+    CHECK(editor.mSaveQuestions.empty()) ;
+    CHECK(editor.mErrors.empty()) ;
+    CHECK(JoinLines(editor.mMessages) == "Table of Contents: Wrote:\n" + stem + ".TOC\n" + stem + ".T01\n" +
+                                         "Index: Wrote:\n" + stem + ".IDX") ;
+    CHECK(tocindextest::DirectoryListing(dir.File("")) == "golden.IDX|golden.T01|golden.TOC|golden.ws") ;
+
+    std::string toc = tocindextest::ReadBytes(stem + ".TOC") ;
+    std::string t01 = tocindextest::ReadBytes(stem + ".T01") ;
+    std::string idx = tocindextest::ReadBytes(stem + ".IDX") ;
+    REQUIRE(toc.empty() == false) ;
+    REQUIRE(t01.empty() == false) ;
+    REQUIRE(idx.empty() == false) ;
+    tocindextest::CheckGoldenOutputs<cEditorCtrl>(stem) ;
+
+    for (const char *extension : { ".TOC", ".T01", ".IDX" })
+    {
+        std::filesystem::remove(stem + extension) ;
+    }
+    std::vector<std::string> written = tocindextest::GenerateFromDisk<cEditorCtrl>(sourcePath) ;
+    CHECK(tocindextest::Join(written) == stem + ".TOC|" + stem + ".T01|" + stem + ".IDX") ;
+    CHECK(tocindextest::ReadBytes(stem + ".TOC") == toc) ;
+    CHECK(tocindextest::ReadBytes(stem + ".T01") == t01) ;
+    CHECK(tocindextest::ReadBytes(stem + ".IDX") == idx) ;
+}
+
+
+TEST_CASE("GUI Generate - the open document is unchanged when it is the source and when it is not")
+{
+    ensureQApplication() ;
+
+    tocindextest::cScratchDir dir("guiunchanged") ;
+    REQUIRE(dir.IsValid()) ;
+    std::string sourcePath = dir.File("golden.ws") ;
+    tocindextest::WriteGoldenSource<cEditorCtrl>(sourcePath) ;
+
+    for (bool isSource : { true, false })
+    {
+        CAPTURE(isSource) ;
+
+        cEditorCtrl control ;
+        cGenerateTestEditor editor ;
+        if (isSource)
+        {
+            REQUIRE(control.LoadFile(sourcePath)) ;
+            REQUIRE(editor.LoadFile(sourcePath)) ;
+        }
+        EditDocument(control, 1, "Typed ") ;
+        EditDocument(editor, 1, "Typed ") ;
+        if (isSource)
+        {
+            REQUIRE(editor.SaveFile(sourcePath)) ;
+            editor.MarkDocumentSaved() ;
+            control.MarkDocumentSaved() ;
+            CHECK(editor.mChooserCalls.empty()) ;
+        }
+        int controlDepth = UndoDepth(control) ;
+        REQUIRE(controlDepth > 0) ;
+
+        sDocumentState before = StateOf(editor) ;
+        CHECK(before.modified == (isSource == false)) ;
+        CHECK(before.block) ;
+
+        editor.mChooserAnswer = sourcePath ;
+        editor.GenerateTOCFromFile() ;
+        editor.GenerateIndexFromFile() ;
+        CHECK(editor.mErrors.empty()) ;
+        CHECK(editor.mMessages.size() == 2) ;
+        CHECK(editor.mSaveQuestions.empty()) ;
+        if (isSource)
+        {
+            CHECK(editor.mChooserCalls.front() == "Generate Table of Contents: " + sourcePath) ;
+        }
+
+        sDocumentState after = StateOf(editor) ;
+        CHECK(after == before) ;
+        CHECK(after.text == before.text) ;
+        CHECK(after.modified == before.modified) ;
+        CHECK(after.position == before.position) ;
+        CHECK(after.blockStart == before.blockStart) ;
+        CHECK(after.blockEnd == before.blockEnd) ;
+        CHECK(UndoDepth(editor) == controlDepth) ;
+    }
+}
+
+
+TEST_CASE("GUI Generate - unsaved changes in the source: Cancel, Save and Don't save")
+{
+    ensureQApplication() ;
+
+    for (bool index : { false, true })
+    {
+        for (cEditorCtrl::eSaveQuestion answer : { cEditorCtrl::SAVE_QUESTION_CANCEL, cEditorCtrl::SAVE_QUESTION_SAVE,
+                                                   cEditorCtrl::SAVE_QUESTION_DONT_SAVE })
+        {
+            CAPTURE(index) ;
+            CAPTURE(static_cast<int>(answer)) ;
+
+            tocindextest::cScratchDir dir("guisave") ;
+            REQUIRE(dir.IsValid()) ;
+            std::string sourcePath = dir.File("golden.ws") ;
+            tocindextest::WriteGoldenSource<cEditorCtrl>(sourcePath) ;
+            std::string original = tocindextest::ReadBytes(sourcePath) ;
+            std::string stem = dir.File("golden") ;
+
+            cGenerateTestEditor editor ;
+            REQUIRE(editor.LoadFile(sourcePath)) ;
+            cDocument *doc = editor.GetDocument() ;
+            doc->SetPosition(0) ;
+            doc->Insert(index ? ".ix Added" : ".tc Added #") ;
+            doc->Insert(HARD_RETURN) ;
+            editor.LayoutDocument(true) ;
+            REQUIRE(doc->IsModified()) ;
+            std::string edited = doc->GetText() ;
+
+            editor.mChooserAnswer = sourcePath ;
+            editor.mSaveAnswer = answer ;
+            if (index)
+            {
+                editor.GenerateIndexFromFile() ;
+            }
+            else
+            {
+                editor.GenerateTOCFromFile() ;
+            }
+
+            CHECK(JoinLines(editor.mSaveQuestions) == "golden.ws") ;
+            CHECK(editor.mErrors.empty()) ;
+            CHECK(doc->GetText() == edited) ;
+
+            std::string output = stem + (index ? ".IDX" : ".TOC") ;
+            if (answer == cEditorCtrl::SAVE_QUESTION_CANCEL)
+            {
+                CHECK(editor.mMessages.empty()) ;
+                CHECK(doc->IsModified()) ;
+                CHECK(tocindextest::ReadBytes(sourcePath) == original) ;
+                CHECK_FALSE(std::filesystem::exists(stem + ".TOC")) ;
+                CHECK_FALSE(std::filesystem::exists(stem + ".T01")) ;
+                CHECK_FALSE(std::filesystem::exists(stem + ".IDX")) ;
+                continue ;
+            }
+
+            CHECK(editor.mMessages.size() == 1) ;
+            cEditorCtrl reader ;
+            std::string generated = tocindextest::Join(tocindextest::LoadGenerated(reader, output)) ;
+            if (answer == cEditorCtrl::SAVE_QUESTION_SAVE)
+            {
+                CHECK_FALSE(doc->IsModified()) ;
+                CHECK(tocindextest::ReadBytes(sourcePath) != original) ;
+                CHECK(generated == (index ? std::string(".pm 0|Added, 1|Apple, 1|marked, 1|Zebra, 2")
+                                          : std::string("Added 1|Chapter One 1|.lm 0|Chapter Two 2"))) ;
+            }
+            else
+            {
+                CHECK(doc->IsModified()) ;
+                CHECK(tocindextest::ReadBytes(sourcePath) == original) ;
+                CHECK(generated == (index ? tocindextest::GoldenIndex() : tocindextest::GoldenTOC())) ;
+            }
+        }
+    }
+}
+
+
+TEST_CASE("GUI Generate - a source without entries writes nothing and says so")
+{
+    ensureQApplication() ;
+
+    tocindextest::cScratchDir dir("guinone") ;
+    REQUIRE(dir.IsValid()) ;
+    std::string sourcePath = dir.File("plain.ws") ;
+    {
+        cEditorCtrl writer ;
+        tocindextest::SetSource(writer, { "Plain text", ".pa", "More text" }) ;
+        cWordstarFile file(&writer) ;
+        REQUIRE(file.SaveFile(sourcePath, writer.GetDocument()->GetTextSize())) ;
+    }
+
+    cGenerateTestEditor editor ;
+    editor.mChooserAnswer = sourcePath ;
+    editor.GenerateTOCFromFile() ;
+    editor.GenerateIndexFromFile() ;
+
+    CHECK(editor.mErrors.empty()) ;
+    CHECK(JoinLines(editor.mMessages) == "Table of Contents: No table of contents entries were found in\n" + sourcePath + "\n" +
+                                         "Index: No index entries were found in\n" + sourcePath) ;
+    CHECK(tocindextest::DirectoryListing(dir.File("")) == "plain.ws") ;
+}
+
+
+TEST_CASE("GUI Generate - cancelling the file chooser does nothing")
+{
+    ensureQApplication() ;
+
+    tocindextest::cScratchDir dir("guichooser") ;
+    REQUIRE(dir.IsValid()) ;
+    std::string sourcePath = dir.File("golden.ws") ;
+    tocindextest::WriteGoldenSource<cEditorCtrl>(sourcePath) ;
+
+    cGenerateTestEditor editor ;
+    REQUIRE(editor.LoadFile(sourcePath)) ;
+    EditDocument(editor, 1, "Typed ") ;
+    sDocumentState before = StateOf(editor) ;
+
+    editor.mChooserAnswer = "" ;
+    editor.mSaveAnswer = cEditorCtrl::SAVE_QUESTION_SAVE ;
+    editor.GenerateTOCFromFile() ;
+    editor.GenerateIndexFromFile() ;
+
+    CHECK(editor.mChooserCalls.size() == 2) ;
+    CHECK(editor.mSaveQuestions.empty()) ;
+    CHECK(editor.mMessages.empty()) ;
+    CHECK(editor.mErrors.empty()) ;
+    CHECK(StateOf(editor) == before) ;
+    CHECK(tocindextest::DirectoryListing(dir.File("")) == "golden.ws") ;
+}
+
+
+TEST_CASE("GUI Generate - a file that cannot be read or written gives an error naming it")
+{
+    ensureQApplication() ;
+
+    tocindextest::cScratchDir dir("guierror") ;
+    REQUIRE(dir.IsValid()) ;
+    std::string lockedDir = dir.File("locked") ;
+    REQUIRE(std::filesystem::create_directory(lockedDir)) ;
+    std::string sourcePath = (std::filesystem::path(lockedDir) / "golden.ws").string() ;
+    tocindextest::WriteGoldenSource<cEditorCtrl>(sourcePath) ;
+    std::string stem = (std::filesystem::path(lockedDir) / "golden").string() ;
+
+    cGenerateTestEditor editor ;
+    REQUIRE(editor.LoadFile(sourcePath)) ;
+    EditDocument(editor, 1, "Typed ") ;
+    sDocumentState before = StateOf(editor) ;
+
+    REQUIRE(chmod(lockedDir.c_str(), 0555) == 0) ;
+    editor.mChooserAnswer = sourcePath ;
+    editor.mSaveAnswer = cEditorCtrl::SAVE_QUESTION_DONT_SAVE ;
+    editor.GenerateTOCFromFile() ;
+    editor.GenerateIndexFromFile() ;
+    chmod(lockedDir.c_str(), 0755) ;
+
+    CHECK(editor.mMessages.empty()) ;
+    CHECK(JoinLines(editor.mErrors) == "Table of Contents: Cannot write\n" + stem + ".TOC\n" + stem + ".T01\n" +
+                                       "Index: Cannot write\n" + stem + ".IDX") ;
+    CHECK(StateOf(editor) == before) ;
+    CHECK(tocindextest::DirectoryListing(lockedDir) == "golden.ws") ;
+
+    std::string missing = dir.File("missing.ws") ;
+    editor.mErrors.clear() ;
+    editor.mChooserAnswer = missing ;
+    editor.GenerateTOCFromFile() ;
+    editor.GenerateIndexFromFile() ;
+    CHECK(editor.mMessages.empty()) ;
+    CHECK(JoinLines(editor.mErrors) == "Table of Contents: Cannot read\n" + missing + "\n" +
+                                       "Index: Cannot read\n" + missing) ;
+    CHECK(StateOf(editor) == before) ;
+}
+
+
+TEST_CASE("GUI Generate - the editor that runs the generator is gone before the message")
+{
+    ensureQApplication() ;
+
+    tocindextest::cScratchDir dir("guileak") ;
+    REQUIRE(dir.IsValid()) ;
+    std::string sourcePath = dir.File("golden.ws") ;
+    tocindextest::WriteGoldenSource<cEditorCtrl>(sourcePath) ;
+
+    cGenerateTestEditor editor ;
+    int topLevel = static_cast<int>(QApplication::topLevelWidgets().size()) ;
+    int children = static_cast<int>(editor.children().size()) ;
+    QWidget *active = QApplication::activeWindow() ;
+
+    editor.mChooserAnswer = sourcePath ;
+    editor.GenerateTOCFromFile() ;
+    CHECK(editor.mTopLevelAtMessage == topLevel) ;
+    editor.mTopLevelAtMessage = -1 ;
+    editor.GenerateIndexFromFile() ;
+    CHECK(editor.mTopLevelAtMessage == topLevel) ;
+
+    CHECK(editor.mMessages.size() == 2) ;
+    CHECK(static_cast<int>(QApplication::topLevelWidgets().size()) == topLevel) ;
+    CHECK(static_cast<int>(editor.children().size()) == children) ;
+    CHECK(QApplication::activeWindow() == active) ;
+    CHECK(editor.isVisible() == false) ;
+}
