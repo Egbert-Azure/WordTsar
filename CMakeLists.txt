@@ -120,7 +120,13 @@ if(CMAKE_HOST_APPLE)
             set(CMAKE_OSX_DEPLOYMENT_TARGET "${WORDTSAR_QT_MINOS}")
         else()
             set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
-            message(WARNING "No minimum macOS version read from Qt; deployment target falls back to 14.0")
+            if(WORDTSAR_QT_PROBE_DIR)
+                message(WARNING "No minimum macOS version read from the Qt in "
+                    "'${WORDTSAR_QT_PROBE_DIR}'; deployment target falls back to 14.0")
+            else()
+                message(WARNING "No Qt6Config.cmake found for the deployment target; "
+                    "deployment target falls back to 14.0")
+            endif()
         endif()
     endif()
     message(STATUS "macOS deployment target: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
@@ -156,16 +162,21 @@ if(NOT Qt6_FOUND)
     set(CMAKE_PREFIX_PATH ${WORDTSAR_QT_FALLBACK_PREFIXES})
 endif()
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets PrintSupport)
-if(DEFINED WORDTSAR_QT_PROBE_DIR)
+if(WORDTSAR_QT_PROBE_DIR)
     get_filename_component(qt_found_real "${Qt6_DIR}" REALPATH)
     get_filename_component(qt_probe_real "${WORDTSAR_QT_PROBE_DIR}" REALPATH)
-    if(WORDTSAR_QT_PROBE_DIR STREQUAL "" OR NOT qt_found_real STREQUAL qt_probe_real)
+    if(NOT qt_found_real STREQUAL qt_probe_real)
         message(FATAL_ERROR
             "The macOS deployment target was derived from the Qt in "
             "'${WORDTSAR_QT_PROBE_DIR}', but find_package(Qt6) found '${Qt6_DIR}'. "
             "Pass -DQt6_DIR=<dir>, a CMAKE_PREFIX_PATH that selects one Qt, or "
             "-DCMAKE_OSX_DEPLOYMENT_TARGET=<version>.")
     endif()
+elseif(DEFINED WORDTSAR_QT_PROBE_DIR)
+    message(WARNING
+        "The macOS deployment target ${CMAKE_OSX_DEPLOYMENT_TARGET} was not read from "
+        "the Qt that find_package(Qt6) found in '${Qt6_DIR}'. If that Qt needs a "
+        "newer macOS, pass -DCMAKE_OSX_DEPLOYMENT_TARGET=<version>.")
 endif()
 endif()
 
