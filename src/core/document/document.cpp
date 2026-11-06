@@ -621,6 +621,14 @@ void cDocument::Insert(CHAR_T ch)
     CHAR_T originalCodepoint = ch ;
     POSITION_T cursorBefore = mCurrentPosition ;
 
+    // the character before, as it was, in case the new code point joins it
+    bool shouldRecord = !mUndoDisabled && !mIsLoading && !mSuppressUndo ;
+    std::vector<sUndoCharInfo> charBefore ;
+    if (shouldRecord && cursorBefore > 0)
+    {
+        charBefore = CaptureCharacters(cursorBefore - 1, 1) ;
+    }
+
     // convert the CHAR_T codepoint into a utf8 array
     std::string utf8 ;
     int ulen = unicode::utf8::encode_codepoint(ch, utf8) ;
@@ -701,7 +709,8 @@ void cDocument::Insert(CHAR_T ch)
 
     // A new grapheme emerged: advance the cursor, and (for text) shift the
     // attribute positions that follow. Control chars already shifted above.
-    if (len < offsets.size())
+    bool addedCharacter = (len < offsets.size()) ;
+    if (addedCharacter)
     {
         mCurrentPosition++;
         if (!isControl)
@@ -733,14 +742,19 @@ void cDocument::Insert(CHAR_T ch)
         InsertParagraph(mCurrentPosition, splitOffset, currentparagraphnumber);
     }
 
-    // record undo action for the insert
-    if (!mUndoDisabled && !mIsLoading && !mSuppressUndo)
+    // record undo action for the insert, or for the change of the
+    // character the code point joined
+    if (shouldRecord && addedCharacter)
     {
         sUndoCharInfo charInfo ;
         charInfo.codepoint = originalCodepoint ;
         std::vector<sUndoCharInfo> chars ;
         chars.push_back(charInfo) ;
         RecordAction(UNDO_ACTION_INSERT, cursorBefore, 1, chars, cursorBefore) ;
+    }
+    else if (shouldRecord && cursorBefore > 0)
+    {
+        RecordMerge(cursorBefore - 1, charBefore, cursorBefore) ;
     }
 
     // notify listeners of document content change
@@ -770,6 +784,15 @@ void cDocument::Insert(const std::string &text)
     bool shouldRecord = !mUndoDisabled && !mIsLoading && !mSuppressUndo ;
     POSITION_T insertPosition = mCurrentPosition ;
     POSITION_T cursorBefore = mCurrentPosition ;
+
+    // the character before, as it was, in case the text joins it
+    std::vector<sUndoCharInfo> charBefore ;
+    std::string textBefore ;
+    if (shouldRecord && insertPosition > 0)
+    {
+        charBefore = CaptureCharacters(insertPosition - 1, 1) ;
+        textBefore = GetCharNoAdvance(insertPosition - 1) ;
+    }
 
     // Batch the per-character inserts into ONE undo action and ONE notification.
     // Use mSuppressUndo (not mIsLoading) so file-loading semantics are not falsely
@@ -801,14 +824,33 @@ void cDocument::Insert(const std::string &text)
     mSuppressUndo = oldSuppressUndo ;
     mSuppressNotify = oldSuppressNotify ;
 
-    // record one combined undo action for the characters the insert
-    // added: a CRLF is one hard return, and a character of several code
-    // points is one character
+    // the change of a character the text joined, then one combined undo
+    // action for the characters the insert added: a CRLF is one hard
+    // return, and a character of several code points is one character
+    bool merged = shouldRecord && insertPosition > 0
+                  && GetCharNoAdvance(insertPosition - 1) != textBefore ;
+    bool openedGroup = false ;
+    if (merged)
+    {
+        if (!mUndoGroupOpen)
+        {
+            BeginUndoGroup() ;
+            mCurrentGroup.cursorBefore = cursorBefore ;
+            openedGroup = true ;
+        }
+        RecordMerge(insertPosition - 1, charBefore, cursorBefore) ;
+    }
+
     POSITION_T length = mCurrentPosition - insertPosition ;
     if (shouldRecord && length > 0)
     {
         RecordAction(UNDO_ACTION_INSERT, insertPosition, length,
                      CaptureCharacters(insertPosition, length), cursorBefore) ;
+    }
+
+    if (openedGroup)
+    {
+        EndUndoGroup() ;
     }
 
     // notify listeners of document content change
@@ -3632,6 +3674,70 @@ void cDocument::RecordAction(eUndoActionType type, POSITION_T position, POSITION
         group.actions.push_back(action) ;
 
         PushUndoGroup(group) ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  position     [IN] - position of the character code points joined
+/// @param  before       [IN] - that character as captured before the insert
+/// @param  cursorBefore [IN] - cursor position before the insert
+///
+/// @return nothing
+///
+/// @brief
+/// Records code points that joined the character at position. When the
+/// latest undo action is the insert that ends with that character (in the
+/// open group, or in the top group if that group is not the saved state
+/// and nothing can be redone), the action takes the character as it is
+/// now and stays one step. Otherwise the change is recorded as a delete of
+/// the old character and an insert of the new one, in one group.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::RecordMerge(POSITION_T position, const std::vector<sUndoCharInfo> &before, POSITION_T cursorBefore)
+{
+    if (mUndoDisabled || mIsLoading || before.empty())
+    {
+        return ;
+    }
+
+    sUndoGroup *group = nullptr ;
+    if (mUndoGroupOpen && !mCurrentGroup.actions.empty())
+    {
+        group = &mCurrentGroup ;
+    }
+    else if (!mUndoStack.empty() && mRedoStack.empty() && !mSavePointLost
+             && mUndoStack.back().id != mSavedUndoGroupId)
+    {
+        group = &mUndoStack.back() ;
+    }
+
+    if (group != nullptr && !group->actions.empty())
+    {
+        sUndoAction &last = group->actions.back() ;
+        if (last.type == UNDO_ACTION_INSERT && last.position + last.length == position + 1)
+        {
+            last.chars = CaptureCharacters(last.position, last.length) ;
+            last.cursorAfter = mCurrentPosition ;
+            group->cursorAfter = mCurrentPosition ;
+            return ;
+        }
+    }
+
+    bool openedGroup = !mUndoGroupOpen ;
+    if (openedGroup)
+    {
+        BeginUndoGroup() ;
+        mCurrentGroup.cursorBefore = cursorBefore ;
+    }
+
+    RecordAction(UNDO_ACTION_DELETE, position, 1, before, cursorBefore) ;
+    RecordAction(UNDO_ACTION_INSERT, position, 1, CaptureCharacters(position, 1), cursorBefore) ;
+
+    if (openedGroup)
+    {
+        EndUndoGroup() ;
     }
 }
 

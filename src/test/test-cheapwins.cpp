@@ -1168,6 +1168,121 @@ void CheckFlagAndHistory(cDocument* doc, const std::string& savedText)
 }
 
 const std::string ACUTE = "\u0301";
+const std::string E_ACUTE = "\u00E9";
+}
+
+TEST_CASE("Typing a combining mark after a letter typed in the same session is one undo step")
+{
+    ensureQApplication();
+
+    // 0: typed in one typing group; 1: two document inserts; 2: document
+    // insert of the letter, then of the mark as one code point
+    for (int how = 0; how < 3; how++)
+    {
+        CAPTURE(how);
+
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->ClearUndoHistory();
+        doc->MarkSaved();
+
+        if (how == 0)
+        {
+            editor.InsertText("e");
+            editor.InsertText(ACUTE);
+            editor.CloseTypingGroup();
+        }
+        else if (how == 1)
+        {
+            doc->Insert("e");
+            doc->Insert(ACUTE);
+        }
+        else
+        {
+            doc->Insert("e");
+            doc->Insert(static_cast<CHAR_T>(0x0301));
+        }
+        CHECK(StoredText(doc) == E_ACUTE);
+        CHECK(doc->IsModified());
+        CHECK(doc->CanUndo());
+        CheckFlagAndHistory(doc, "");
+
+        REQUIRE(editor.Undo());
+        CHECK(StoredText(doc) == "");
+        CheckFlagAndHistory(doc, "");
+        CHECK(doc->CanUndo() == false);
+
+        REQUIRE(editor.Redo());
+        CHECK(StoredText(doc) == E_ACUTE);
+        CheckFlagAndHistory(doc, "");
+    }
+}
+
+TEST_CASE("A combining mark after a letter with no undo step leaves its own undo step")
+{
+    ensureQApplication();
+
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-mark-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    for (int setup = 0; setup < 6; setup++)
+    {
+        CAPTURE(setup);
+
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+
+        // 0-2: loaded text; 3-5: history cleared after the letter
+        if (setup < 3)
+        {
+            std::ofstream((dir / "q.txt"), std::ios::binary) << "q";
+            REQUIRE(editor.LoadFile((dir / "q.txt").string()));
+        }
+        else
+        {
+            doc->Insert("q");
+            doc->ClearUndoHistory();
+            doc->MarkSaved();
+        }
+        REQUIRE(StoredText(doc) == "q");
+        REQUIRE(doc->IsModified() == false);
+        REQUIRE(doc->CanUndo() == false);
+
+        // typed, inserted as text, inserted as one code point
+        doc->SetPosition(1);
+        if (setup % 3 == 0)
+        {
+            editor.InsertText(ACUTE);
+            editor.CloseTypingGroup();
+        }
+        else if (setup % 3 == 1)
+        {
+            doc->Insert(ACUTE);
+        }
+        else
+        {
+            doc->Insert(static_cast<CHAR_T>(0x0301));
+        }
+
+        CHECK(CharacterList(Characters(doc)) == CharacterList({ "q" + ACUTE }));
+        CHECK(doc->IsModified());
+        CHECK(doc->CanUndo());
+        CheckFlagAndHistory(doc, "q");
+
+        REQUIRE(editor.Undo());
+        CHECK(CharacterList(Characters(doc)) == CharacterList({ "q" }));
+        CHECK(doc->IsModified() == false);
+        CheckFlagAndHistory(doc, "q");
+
+        REQUIRE(editor.Redo());
+        CHECK(CharacterList(Characters(doc)) == CharacterList({ "q" + ACUTE }));
+        CheckFlagAndHistory(doc, "q");
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
 }
 
 TEST_CASE("A combining mark inserted at the start of the document is a character of its own")

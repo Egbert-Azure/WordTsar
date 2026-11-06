@@ -478,6 +478,7 @@ private:
     void RecordAction(eUndoActionType type, POSITION_T position, POSITION_T length,
                       const std::vector<sUndoCharInfo> &chars, POSITION_T cursorBefore) ;
     void CommitOpenUndoGroup(void) ;
+    void RecordMerge(POSITION_T position, const std::vector<sUndoCharInfo> &before, POSITION_T cursorBefore) ;
     void PushUndoGroup(sUndoGroup &group) ;
     uint64_t TopUndoGroupId(void) const ;
 
