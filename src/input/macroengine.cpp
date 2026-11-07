@@ -633,7 +633,7 @@ void cMacroEngine::PlayCommand(void)
     std::vector<std::string> names = store.List();
     if (names.empty() == true)
     {
-        mEditor.SetStatusMessage("No macros");
+        mEditor.SetStatusMessage("No macros yet. Record one with ^MR.");
         return;
     }
 

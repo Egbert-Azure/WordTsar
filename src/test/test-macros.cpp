@@ -321,6 +321,16 @@ TEST_CASE("Macro: a missing config macros folder is created with the default mac
     Chord(editor, 'M', 'p');
     CHECK(editor.mListed == std::vector<std::string>{ "CHAPTER", "NEXTCH", "PREVCH", "SCENE" });
 
+    for (const char* name : { "CHAPTER", "NEXTCH", "PREVCH", "SCENE" })
+    {
+        std::filesystem::remove(folder / (std::string(name) + ".txt"));
+    }
+    editor.mListed.clear();
+    Chord(editor, 'M', 'p');
+    CHECK(editor.mListed.empty());
+    CHECK(editor.GetStatusMessage() == "No macros yet. Record one with ^MR.");
+    CHECK(std::filesystem::exists(folder / "CHAPTER.txt") == false);
+
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
     std::error_code ec;
