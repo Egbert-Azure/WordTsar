@@ -371,11 +371,48 @@ bool DecodeIndexItemBody(const std::string &body, eCodePage codepage, std::strin
 
 
 /////////////////////////////////////////////////////////////////////////////
+// `text` without spaces, opening brackets and quotes at the start and
+// without spaces, closing punctuation and quotes at the end.
+/////////////////////////////////////////////////////////////////////////////
+std::string TrimIndexMarkText(std::string text)
+{
+    static const char *const leading[] = { " ", "(", "[", "{", "\"", "'", "\xE2\x80\x9C", "\xE2\x80\x98" } ;
+    static const char *const trailing[] = { " ", ".", ",", ";", ":", "!", "?", ")", "]", "}", "\"", "'",
+                                            "\xE2\x80\x9D", "\xE2\x80\x99" } ;
+    bool trimmed = true ;
+    while (trimmed == true)
+    {
+        trimmed = false ;
+        for (const char *cut : leading)
+        {
+            std::string piece(cut) ;
+            if (text.compare(0, piece.size(), piece) == 0)
+            {
+                text.erase(0, piece.size()) ;
+                trimmed = true ;
+            }
+        }
+        for (const char *cut : trailing)
+        {
+            std::string piece(cut) ;
+            if (text.size() >= piece.size() && text.compare(text.size() - piece.size(), piece.size(), piece) == 0)
+            {
+                text.erase(text.size() - piece.size()) ;
+                trimmed = true ;
+            }
+        }
+    }
+    return text ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
 // Index entries from one paragraph: ^K index mark pairs and kept 0Eh index
 // items. Marks pair up in order; a mark left without a partner is ignored.
-// The text between a pair, without markers and without spaces at either
-// end, is the entry as it stands. A pair holding no visible text gives no
-// entry. An index item's body is read as a .ix entry. The page is the page of the line holding the first
+// The text between a pair, without markers, without spaces at either end,
+// without closing punctuation and quotes at the end and opening brackets
+// and quotes at the start, is the entry as it stands. A pair holding no
+// other text gives no entry. An index item's body is read as a .ix entry. The page is the page of the line holding the first
 // mark or the index item.
 /////////////////////////////////////////////////////////////////////////////
 void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAGRAPH_T paragraph,
@@ -435,16 +472,15 @@ void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAG
             }
 
             open = false ;
-            size_t first = text.find_first_not_of(' ') ;
-            size_t last = text.find_last_not_of(' ') ;
-            bool visible = std::any_of(text.begin(), text.end(), [](char c)
+            std::string trimmed = TrimIndexMarkText(text) ;
+            bool visible = std::any_of(trimmed.begin(), trimmed.end(), [](char c)
             {
                 return std::isspace(static_cast<unsigned char>(c)) == 0 ;
             }) ;
-            if (visible == true && first != std::string::npos)
+            if (visible == true)
             {
                 sIndexEntry entry ;
-                entry.main = FromPlain(text.substr(first, last - first + 1)) ;
+                entry.main = FromPlain(trimmed) ;
                 entry.bold = false ;
                 entry.crossref = false ;
                 entry.page = PageOfIndex(paraLayout, openIndex) ;

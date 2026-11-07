@@ -23,6 +23,7 @@
 #include "src/core/document/document.h"
 #include "src/core/utils/config.h"
 #include "src/input/keystroke.h"
+#include "src/test/tocindexgen-testutil.h"
 
 #ifdef WORDTSAR_TUI_BUILD
 #include "src/tui/editor/editorctrl.h"
@@ -579,6 +580,43 @@ TEST_CASE("Macro: a missing config macros folder is created with the default mac
     CHECK(editor.mListed.empty());
     CHECK(editor.GetStatusMessage() == "No macros yet. Record one with ^MR.");
     CHECK(std::filesystem::exists(folder / "CHAPTER.wsm") == false);
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
+
+
+TEST_CASE("Macro: INDEX marks a word followed by punctuation without the punctuation")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    cMacroTestEditor editor;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("Alpha word, beta");
+    doc->SetPosition(8);
+    editor.LayoutDocument(true);
+    editor.mChoice = "INDEX";
+    Chord(editor, 'M', 'p');
+    editor.LayoutDocument(true);
+
+    std::string indexPath;
+    REQUIRE(cTOCIndexGenerator::GenerateIndex(&editor, (home / "source.ws").string(), indexPath));
+    tMacroTestEditorBase reader;
+    CHECK(tocindextest::Join(tocindextest::LoadGenerated(reader, indexPath)) == "word, 1");
 
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
