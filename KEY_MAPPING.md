@@ -23,6 +23,7 @@ Both apps -- the terminal `ws` and the GUI `WordTsar` -- support both modes inde
   - [O Chord -- Onscreen Formatting and Display](#o-chord----onscreen-formatting-and-display)
   - [P Chord -- Style and Print Formatting](#p-chord----style-and-print-formatting)
   - [M Chord -- Macros and Insertion (WordStar Only)](#m-chord----macros-and-insertion-wordstar-only)
+  - [Macros](#macros)
   - [Additional Alt Shortcuts](#additional-alt-shortcuts)
 - [Menu Mapping](#menu-mapping)
   - [File Menu](#file-menu)
@@ -277,7 +278,32 @@ The M chord has no Alt+letter equivalent in Modern mode, but Alt+M does work as 
 | : | ^M,: | Insert drive letter (Windows) |
 | . | ^M,. | Insert current directory path |
 | \ | ^M,\ | Insert full path + filename |
-| P/R/D/S/E/O/Y | ^M,&lt;letter&gt; | Macro play/record/edit/single-step/rename/copy/delete (not yet implemented) |
+| P | ^M,P | Play a macro |
+| R | ^M,R | Start recording a macro; again to stop |
+| D | ^M,D | Open a macro file as text |
+| E | ^M,E | Rename a macro |
+| O | ^M,O | Copy a macro |
+| Y | ^M,Y | Delete a macro |
+| S | ^M,S | Single-step a macro (not yet implemented) |
+
+In `ws`, ^M arrives as Enter, so the chord there is Alt+M (the terminal sends `ESC m`; see Additional Alt Shortcuts below).
+
+### Macros
+
+| Key | WordStar | Modern | Description |
+|-----|----------|--------|-------------|
+| Record | ^M,R | Utilities > Macros > Record | Start recording. The status line says "Recording" |
+| Stop | ^M,R or Alt+= | Alt+= | Stop recording and ask for a name. The macro is saved as `<name>.txt` in the `macros` folder next to config.ini |
+| Pause | Alt+- | Alt+- | While recording, add a pause |
+| Play | ^M,P | Utilities > Macros > Play... | List the macros in the `macros` folder next to the open document, then those in the `macros` folder next to config.ini, and play the chosen one |
+| Edit | ^M,D | Utilities > Macros > Edit... | Open the macro file as a text document |
+| Rename | ^M,E | Utilities > Macros > Rename... | Rename the macro in its folder |
+| Copy | ^M,O | Utilities > Macros > Copy... | Copy the macro under a new name into the same folder |
+| Delete | ^M,Y | Utilities > Macros > Delete... | Delete the macro after asking |
+
+In the GUI, Alt is the Option key (Option+- and Option+=). In `ws`, Alt+- and Alt+= arrive as `ESC -` and `ESC =`.
+
+A macro file is plain text, one key per line: a key name (^KB, Enter, Tab, Left), the typed character, or PAUSE. Playback stops at a pause and the status line says "Type, then press Enter": what you type goes into the document, Enter continues the macro and Esc cancels it. One undo removes a whole playback. Menu commands and most dialogs are not recorded; the Find and Replace answers are.
 
 ### Additional Alt Shortcuts
 
@@ -289,6 +315,8 @@ The M chord has no Alt+letter equivalent in Modern mode, but Alt+M does work as 
 | Alt+P | Enter ^P chord mode | Enter Alt+P chord mode |
 | Alt+M | Enter ^M chord mode | -- |
 | Alt+U | Redo | -- (Modern uses Ctrl+Y) |
+| Alt+- | Macro pause while recording | Macro pause while recording |
+| Alt+= | Stop recording a macro | Stop recording a macro |
 
 **These Alt shortcuts are TUI-only, and need a terminal setting most terminal
 emulators don't enable by default.** `ws` detects Alt/Option the classic
@@ -453,6 +481,15 @@ yet done.
 | Word Count | ^K? | Alt+K,? | Count words in block |
 | Generate Table of Contents... | -- | -- | Write name.TOC and name.TO1-TO9 from a chosen file's .tc entries |
 | Generate Index... | -- | -- | Write name.IDX from a chosen file's .ix entries and index marks |
+| **Macros submenu** | | | |
+| -- Record | ^MR | -- | Start recording a macro |
+| -- Stop Recording | ^MR | Alt+= | Stop recording and ask for a name |
+| -- Play... | ^MP | -- | Play a macro |
+| -- Edit... | ^MD | -- | Open a macro file as text |
+| -- Rename... | ^ME | -- | Rename a macro |
+| -- Copy... | ^MO | -- | Copy a macro |
+| -- Delete... | ^MY | -- | Delete a macro |
+| -- Single Step... | ^MS | -- | Not yet implemented |
 | **Reformat submenu** | | | |
 | -- Rest of Document | ^QU | Alt+Q,U | Reformat/relayout |
 | System Preferences | -- | -- | Full configuration dialog |
@@ -571,6 +608,8 @@ These provide alternative entry to chord modes (useful in terminals where Ctrl i
 | Alt+P | Enter ^P chord mode | Yes |
 | Alt+M | Enter ^M chord mode | Yes |
 | Alt+U | Redo last action | Yes |
+| Alt+- | Macro pause while recording | Yes |
+| Alt+= | Stop recording a macro | Yes |
 
 ### Special / Navigation Keys
 
@@ -626,13 +665,13 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^M= | Insert math result | -- | No |
 | ^M# | Insert math expression | -- | No |
 | ^M$ | Insert math as dollar | -- | No |
-| ^MP | Play macro | -- | No |
-| ^MR | Record macro | -- | No |
-| ^MD | Edit/create macro | -- | No |
+| ^MP | Play macro | Play the chosen macro | Yes |
+| ^MR | Record macro | Start recording; ^MR again stops and asks for a name | Yes |
+| ^MD | Edit/create macro | Open the chosen macro file as a text document | Yes |
 | ^MS | Single-step macro | -- | No |
-| ^ME | Rename macro | -- | No |
-| ^MO | Copy macro | -- | No |
-| ^MY | Delete macro | -- | No |
+| ^ME | Rename macro | Rename the chosen macro | Yes |
+| ^MO | Copy macro | Copy the chosen macro under a new name | Yes |
+| ^MY | Delete macro | Delete the chosen macro | Yes |
 
 ### ^K Chord -- Block and File
 
@@ -832,6 +871,8 @@ These activate chord modes identical to WordStar's ^K, ^Q, ^O, ^P groups.
 | Alt+Q | Enter navigation/deletion chord mode | Yes |
 | Alt+O | Enter onscreen formatting chord mode | Yes |
 | Alt+P | Enter style/print chord mode | Yes |
+| Alt+- | Macro pause while recording | Yes |
+| Alt+= | Stop recording a macro | Yes |
 
 ### Special / Navigation Keys (Modern)
 
