@@ -217,16 +217,19 @@ TEST_CASE("Book template - every dot command is one WordTsar carries out")
     CHECK(*(firstPageBreak + 1) == ".h1 Surname / TITLE / #");
     CHECK(CountStartingWith(std::vector<std::string>(dots.begin(), firstPageBreak), ".h") == 0);
 
-    // Two chapters, each with a .tc entry and a closing .pa
+    // Two chapters, each with a .tc entry; the second begins with .pa, the
+    // last one has no .pa after it
     CHECK(CountStartingWith(dots, ".tc Chapter ") == 2);
-    CHECK(CountStartingWith(dots, ".pa") == 3);
-    CHECK(dots.back() == ".pa");
+    CHECK(CountStartingWith(dots, ".pa") == 2);
     auto chapterOne = std::find(dots.begin(), dots.end(), ".tc Chapter One . . . #");
     auto chapterTwo = std::find(dots.begin(), dots.end(), ".tc Chapter Two . . . #");
     REQUIRE(chapterOne != dots.end());
     REQUIRE(chapterTwo != dots.end());
     CHECK(chapterOne > firstPageBreak);
-    CHECK(std::find(chapterOne, chapterTwo, ".pa") != chapterTwo);
+    auto secondBreak = std::find(chapterOne, chapterTwo, ".pa");
+    REQUIRE(secondBreak != chapterTwo);
+    CHECK(*(secondBreak + 1) == ".lh 54pt");
+    CHECK(std::find(chapterTwo, dots.end(), ".pa") == dots.end());
 
     // One index entry, one conditional page break before the scene break
     CHECK(CountStartingWith(dots, ".ix ") == 1);
@@ -427,7 +430,7 @@ TEST_CASE("Chapter and scene templates read in with ^KR")
     doc->GetParagraphStartandEnd(chapterTwo - 3, start, end);
     doc->SetPosition(start);
     REQUIRE(editor.InsertFileAtCursor(CHAPTER_TEMPLATE));
-    insertBefore("Placeholder paragraph. The chapter ends with a page break, so the next chapter starts on a new page.",
+    insertBefore("Placeholder paragraph. The next chapter begins with a page break, so it starts on a new page.",
                  SCENE_TEMPLATE);
     layout->LayoutDocument(doc);
 
@@ -445,7 +448,7 @@ TEST_CASE("Chapter and scene templates read in with ^KR")
     std::vector<std::string> dots = DotLines(editor);
     CHECK(CountStartingWith(dots, ".cp 4") == 2);
     CHECK(CountStartingWith(dots, ".lh 54pt") == 3);
-    CHECK(CountStartingWith(dots, ".pa") == 4);
+    CHECK(CountStartingWith(dots, ".pa") == 3);
     auto title = std::find(dots.begin(), dots.end(), ".tc Chapter Title . . . #");
     REQUIRE(title != dots.end());
     CHECK(*(title - 2) == ".lh 54pt");
