@@ -2,6 +2,23 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.17.0 (2026-11-07)
+
+**Additions**
+
+- ^MP runs WordStar 7 macros (.WSM): Sub, Goto, Call, Return, Stop, PlayMacro, ChainMacro, Key, PauseForInput, PauseForKey, IfException (ACK, QRY, NCM, DEF) and the settings AutoRestore, Insert, CmdTags, HideDots, SetHelpLevel, ColMode, ColReplace and WSQuiet (#83).
+- The whole macro, and every macro it plays, is checked first. If it uses something WordTsar does not have, nothing runs and the status line says "Not supported in WordTsar: <command>, line <n>" (#83).
+- A runaway macro is stopped: macros played inside each other, Calls nested too deep, or too many statements without a key (#83).
+- A macro can type the file name for ^KR and answer a question with the dialog keys up to F10 (#83).
+- ^MP lists macro files with .WSM in upper case, too (#83).
+- Macros from the Sawyer archive run if they pass the check (#83).
+- New macros in templates/macros: CHWORDS and SCWORDS (word count of the chapter or scene), NEXTSC and PREVSC (next or previous # scene break), MARKPARA, DELPARA and MOVEPARA (mark, delete or move the paragraph), PLAINMS (em dashes, ellipses and curly quotes to plain text) and NBSPACE (non-breaking spaces to spaces) (#83).
+
+**Changes**
+
+- Changed: ^K, now works like ^K<: it removes the block markers (#83).
+- Changed: NEXTCH and PREVCH keep the cursor in place after the last or before the first chapter (#83).
+
 ## 0.16.0 (2026-11-06)
 
 **Fixes**
