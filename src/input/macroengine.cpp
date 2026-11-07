@@ -219,8 +219,25 @@ std::string cMacroStore::FindPath(const std::string& name) const
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  name [in] macro name
+///
+/// @return file in the document macros folder if that folder exists,
+///         otherwise in the config macros folder; empty if neither applies
+///
+/////////////////////////////////////////////////////////////////////////////
 std::string cMacroStore::SavePath(const std::string& name) const
 {
+    std::error_code ec;
+    if ((mDocumentDir.empty() == false) && (std::filesystem::is_directory(mDocumentDir, ec) == true))
+    {
+        return (std::filesystem::path(mDocumentDir) / FileName(name)).string();
+    }
+    if (mConfigDir.empty() == true)
+    {
+        return std::string();
+    }
     return (std::filesystem::path(mConfigDir) / FileName(name)).string();
 }
 
@@ -251,16 +268,20 @@ bool cMacroStore::Load(const std::string& name, std::vector<std::string>& lines)
 
 bool cMacroStore::Save(const std::string& name, const std::vector<std::string>& lines) const
 {
-    if (mConfigDir.empty() == true)
+    std::string path = SavePath(name);
+    if (path.empty() == true)
     {
         return false;
     }
 
-    CreateDefaults();
-    std::error_code ec;
-    std::filesystem::create_directories(mConfigDir, ec);
+    if (std::filesystem::path(path).parent_path() == std::filesystem::path(mConfigDir))
+    {
+        CreateDefaults();
+        std::error_code ec;
+        std::filesystem::create_directories(mConfigDir, ec);
+    }
 
-    std::ofstream out(SavePath(name), std::ios::binary | std::ios::trunc);
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out)
     {
         return false;

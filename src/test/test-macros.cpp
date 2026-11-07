@@ -380,6 +380,51 @@ TEST_CASE("Macro: Alt+- and Alt+= type an en dash and a not-equal sign unless re
 }
 
 
+TEST_CASE("Macro: a recording is saved in the macros folder next to the document if there is one")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+    const std::filesystem::path withMacros = home / "with";
+    const std::filesystem::path withoutMacros = home / "without";
+    std::filesystem::create_directories(withMacros / "macros");
+    std::filesystem::create_directories(withoutMacros);
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    const std::filesystem::path config = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.txt";
+
+    cMacroTestEditor editor;
+    editor.mFileSet = true;
+    editor.mFileDir = withMacros.string();
+    Chord(editor, 'M', 'r');
+    TypeText(editor, "a");
+    editor.Key(TextKeyStroke("=", false, false, true));
+    CHECK(std::filesystem::exists(withMacros / "macros" / "t1.txt"));
+    CHECK(std::filesystem::exists(config) == false);
+
+    editor.mFileDir = withoutMacros.string();
+    Chord(editor, 'M', 'r');
+    TypeText(editor, "b");
+    editor.Key(TextKeyStroke("=", false, false, true));
+    CHECK(std::filesystem::exists(config));
+    CHECK(std::filesystem::exists(withoutMacros / "macros") == false);
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
+
+
 TEST_CASE("Macro: a missing config macros folder is created with the default macros")
 {
     EnsureMacroTestApplication();
