@@ -29,6 +29,7 @@
 #include "src/tui/dialogs/filebrowser.h"
 #include "src/core/include/config.h"
 #include "src/core/utils/abouttext.h"
+#include "src/input/macroengine.h"
 
 #include <chrono>
 #include <cstdint>
@@ -197,6 +198,7 @@ private:
     int MacroMenuState(void) const;          // 1 recording, 2 playing, 0 neither
     void RunMacroCommand(void (cEditorBase::*command)(void));
     void OpeningEditMacro(void);
+    bool OpeningMacroPauseKey(const wordstartui::sInputEvent& event);
     void InjectChord(int controlCode, char follow);
     void InjectControl(int controlCode);
     void CheckCommandSignals(void);
@@ -289,6 +291,20 @@ private:
     wordstartui::sTerminalCapabilities mCapabilities{};
 
     eAppMode mMode;            // startup screen / opening menu / editor
+
+    // Played macro keys go to the Opening screen key handler while it
+    // shows, otherwise to the editor's FeedKey.
+    class cMacroKeySink : public IMacroKeySink
+    {
+    public:
+        explicit cMacroKeySink(cWSWordTsar& app) : mApp(app) {}
+        bool FeedMacroKey(const sKeyStroke& key) override;
+        bool EditsDocument(void) const override;
+
+    private:
+        cWSWordTsar& mApp;
+    };
+    cMacroKeySink mMacroSink{ *this };
     bool mHaveFileArg;         // a file was given on the command line
     abouttext::sSystemInfo mStartupSystem;   // system values shown on the startup screen
     bool mStartupSystemKnown;                // mStartupSystem has been filled

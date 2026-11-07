@@ -198,6 +198,7 @@ bool IsUnavailableOpeningKey(char typed)
 cWSWordTsar::cWSWordTsar(void)
 {
     mEditor = new cWSEditorCtrl();
+    mEditor->SetMacroKeySink(&mMacroSink);
     mView = new cWSEditorView(mEditor);
     mMenuInput = new cWordStarInput(mEditor);
     mRows = 24;
@@ -1619,6 +1620,102 @@ void cWSWordTsar::OpeningEditMacro(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  event [in] Opening screen event
+///
+/// @return true if Enter or Esc continued or cancelled a paused macro
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSWordTsar::OpeningMacroPauseKey(const sInputEvent& event)
+{
+    if ((event.type != wordstartui::INPUT_TYPE_SPECIAL) ||
+        ((event.special != wordstartui::SPECIAL_KEY_ENTER) && (event.special != wordstartui::SPECIAL_KEY_ESCAPE)))
+    {
+        return false;
+    }
+
+    eSpecialKey key = (event.special == wordstartui::SPECIAL_KEY_ENTER) ? SPECIAL_ENTER : SPECIAL_ESCAPE;
+    if (mEditor->MacroInterceptKey(SpecialKeyStroke(key)) == false)
+    {
+        return false;
+    }
+    CheckCommandSignals();
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  key [in] played macro key
+///
+/// @return true if the key was handled
+///
+/// @brief
+/// On the Opening screen the key goes to its key handler as an input event;
+/// on the edit screen to the editor's FeedKey.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSWordTsar::cMacroKeySink::FeedMacroKey(const sKeyStroke& key)
+{
+    if (mApp.mMode != APP_OPENING)
+    {
+        return mApp.mEditor->FeedKey(key);
+    }
+
+    sInputEvent event{};
+    event.shift = key.shift;
+    event.ctrl = key.ctrl;
+    event.alt = key.alt;
+    switch (key.kind)
+    {
+        case KEYSTROKE_CHAR:
+            event.type = wordstartui::INPUT_TYPE_CONTROL;
+            event.controlCode = key.ch;
+            break;
+
+        case KEYSTROKE_TEXT:
+            event.type = wordstartui::INPUT_TYPE_TEXT;
+            event.textUtf8 = key.utf8;
+            break;
+
+        case KEYSTROKE_SPECIAL:
+            if ((key.special >= SPECIAL_F1) && (key.special <= SPECIAL_F12))
+            {
+                event.type = wordstartui::INPUT_TYPE_FUNCTION;
+                event.functionKey = 1 + (key.special - SPECIAL_F1);
+                break;
+            }
+            event.type = wordstartui::INPUT_TYPE_SPECIAL;
+            switch (key.special)
+            {
+                case SPECIAL_ENTER:     event.special = wordstartui::SPECIAL_KEY_ENTER;       break;
+                case SPECIAL_TAB:       event.special = wordstartui::SPECIAL_KEY_TAB;         break;
+                case SPECIAL_BACKSPACE: event.special = wordstartui::SPECIAL_KEY_BACKSPACE;   break;
+                case SPECIAL_DELETE:    event.special = wordstartui::SPECIAL_KEY_DELETE;      break;
+                case SPECIAL_HOME:      event.special = wordstartui::SPECIAL_KEY_HOME;        break;
+                case SPECIAL_END:       event.special = wordstartui::SPECIAL_KEY_END;         break;
+                case SPECIAL_PAGE_UP:   event.special = wordstartui::SPECIAL_KEY_PAGE_UP;     break;
+                case SPECIAL_PAGE_DOWN: event.special = wordstartui::SPECIAL_KEY_PAGE_DOWN;   break;
+                case SPECIAL_UP:        event.special = wordstartui::SPECIAL_KEY_ARROW_UP;    break;
+                case SPECIAL_DOWN:      event.special = wordstartui::SPECIAL_KEY_ARROW_DOWN;  break;
+                case SPECIAL_LEFT:      event.special = wordstartui::SPECIAL_KEY_ARROW_LEFT;  break;
+                case SPECIAL_RIGHT:     event.special = wordstartui::SPECIAL_KEY_ARROW_RIGHT; break;
+                case SPECIAL_ESCAPE:    event.special = wordstartui::SPECIAL_KEY_ESCAPE;      break;
+                default:                return false;
+            }
+            break;
+
+        default:
+            return false;
+    }
+    return mApp.HandleOpeningKey(event);
+}
+
+bool cWSWordTsar::cMacroKeySink::EditsDocument(void) const
+{
+    return mApp.mMode != APP_OPENING;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
@@ -1668,8 +1765,11 @@ void cWSWordTsar::BuildOpeningMenus(void)
     mOpeningMenu.AddSubItem(util, "&Index...  I", run(eOpeningAction::INDEX_DOCUMENT));
     mOpeningMenu.AddSubItem(util, "&TOC...  T", run(eOpeningAction::TABLE_OF_CONTENTS));
     int utilMacros = mOpeningMenu.AddSubMenu(util, "&Macros  \xe2\x96\xba");   // U+25BA
-    mOpeningMenu.AddSubMenuItem(utilMacros, "Record", unavailable, false);
-    mOpeningMenu.AddSubMenuItem(utilMacros, "Play...", unavailable, false);
+    mOpeningMenu.AddSubMenuItem(utilMacros, "&Record", [this](void)
+    {
+        mEditor->SetStatusMessage("Open a document to record a macro.");
+    });
+    mOpeningMenu.AddSubMenuItem(utilMacros, "&Play...", [this](void) { mEditor->MacroPlay(); });
     mOpeningMenu.AddSubMenuSeparator(utilMacros);
     mOpeningMenu.AddSubMenuItem(utilMacros, "&Edit...", [this](void) { OpeningEditMacro(); });
     mOpeningMenu.AddSubMenuItem(utilMacros, "Re&name...", [this](void) { mEditor->MacroRename(); });
@@ -2353,9 +2453,15 @@ void cWSWordTsar::DrawOpeningFiles(cScreen& screen, int headerRow, int listRow, 
     bar(headerRow - 1, upperRule, upperStyle);
     bar(mRows - 1, "\xe2\x96\x84", OpeningBarStyle());   // U+2584 LOWER HALF BLOCK
 
-    // A transient status message covers the start of the last row.
+    // A transient status message covers the start of the last row, after
+    // the macro state while a macro is paused.
     std::string message = mEditor->GetStatusMessage();
     mEditor->TickStatusMessage();
+    std::string macroState = mEditor->MacroStateText();
+    if (macroState.empty() == false)
+    {
+        message = (message.empty() == true) ? macroState : (macroState + "  " + message);
+    }
     if (message.empty() == false)
     {
         screen.PutText(mRows - 1, 1, " " + message + " ", base);
@@ -3295,6 +3401,10 @@ bool cWSWordTsar::HandleEvent(const sInputEvent& event)
 
     if (mMode == APP_OPENING)
     {
+        if (OpeningMacroPauseKey(event) == true)
+        {
+            return true;
+        }
         return HandleOpeningKey(event);
     }
 

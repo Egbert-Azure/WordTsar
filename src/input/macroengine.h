@@ -75,12 +75,32 @@ private:
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @class IMacroKeySink
+///
+/// @brief
+/// Receives the keys of a playing macro. The default sink is the editor's
+/// FeedKey; a front end can set its own, e.g. for a screen without a
+/// document.
+///
+/////////////////////////////////////////////////////////////////////////////
+class IMacroKeySink
+{
+public:
+    virtual ~IMacroKeySink(void) = default;
+    virtual bool FeedMacroKey(const sKeyStroke& key) = 0;     // dispatch one played key
+    virtual bool EditsDocument(void) const = 0;               // true while keys go to the document
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @class cMacroEngine
 ///
 /// @brief
 /// Records the keys fed to cEditorBase::FeedKey and plays macro files back
-/// through FeedKey. Find and Replace prompt answers are recorded as the keys
-/// typed at the WS7 prompts and read back from the macro without a dialog.
+/// through the key sink (FeedKey by default). Find and Replace prompt
+/// answers are recorded as the keys typed at the WS7 prompts and read back
+/// from the macro without a dialog.
 ///
 /////////////////////////////////////////////////////////////////////////////
 class cMacroEngine
@@ -109,6 +129,7 @@ public:
     void CopyCommand(void);                                   // ^MO
     void DeleteCommand(void);                                 // ^MY
     void Play(const std::vector<std::string>& lines);
+    void SetKeySink(IMacroKeySink* sink);                     // nullptr: the editor's FeedKey
 
     // Find and Replace prompts
     bool ReadPrompt(sFindRequest& request, bool replace);     // answer from the playing macro
@@ -119,6 +140,7 @@ public:
 private:
     enum eNext { NEXT_KEY, NEXT_END, NEXT_ERROR };
 
+    IMacroKeySink& Sink(void);
     cMacroStore MakeStore(void) const;
     std::string ChooseMacro(const cMacroStore& store, const std::string& title);   // empty if none or cancelled
     void CopyOrRename(bool rename);
@@ -130,6 +152,8 @@ private:
     int ReadField(std::string& text);                         // 1 Enter, 0 Esc, -1 end of macro
 
     cEditorBase& mEditor;
+    std::unique_ptr<IMacroKeySink> mEditorSink;
+    IMacroKeySink* mSink;                                     // front end sink, nullptr for mEditorSink
 
     // Recording
     bool mRecording;
@@ -143,6 +167,7 @@ private:
     bool mPlaying;
     bool mPaused;
     bool mCleared;                                            // document cleared during playback
+    bool mUndoOpen;                                           // the playback undo group is open
     std::vector<std::string> mLines;
     size_t mNextLine;
     std::deque<sKeyStroke> mPending;

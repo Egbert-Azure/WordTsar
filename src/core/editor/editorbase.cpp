@@ -657,6 +657,31 @@ bool cEditorBase::IsMacroPlaying(void) const
 }
 
 
+std::string cEditorBase::MacroStateText(void) const
+{
+    return mMacro->StateText() ;
+}
+
+
+void cEditorBase::SetMacroKeySink(IMacroKeySink* sink)
+{
+    mMacro->SetKeySink(sink) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  key [in] key typed on a screen whose keys do not go through FeedKey
+///
+/// @return true if the key continued or cancelled a paused playback
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::MacroInterceptKey(const sKeyStroke& key)
+{
+    return mMacro->InterceptKey(key) ;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief

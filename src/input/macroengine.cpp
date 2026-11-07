@@ -102,6 +102,19 @@ bool IsEscape(const sKeyStroke& key)
     return (key.kind == KEYSTROKE_SPECIAL) && (key.special == SPECIAL_ESCAPE);
 }
 
+
+// Default key sink: the editor's FeedKey.
+class cEditorKeySink : public IMacroKeySink
+{
+public:
+    explicit cEditorKeySink(cEditorBase& editor) : mEditor(editor) {}
+    bool FeedMacroKey(const sKeyStroke& key) override { return mEditor.FeedKey(key); }
+    bool EditsDocument(void) const override { return true; }
+
+private:
+    cEditorBase& mEditor;
+};
+
 } // namespace
 
 
@@ -326,6 +339,8 @@ bool cMacroStore::Delete(const std::string& name) const
 /////////////////////////////////////////////////////////////////////////////
 cMacroEngine::cMacroEngine(cEditorBase& editor)
     : mEditor(editor)
+    , mEditorSink(std::make_unique<cEditorKeySink>(editor))
+    , mSink(nullptr)
     , mRecording(false)
     , mPauseTyping(false)
     , mRecordMode(INPUT_WORDSTAR)
@@ -334,6 +349,7 @@ cMacroEngine::cMacroEngine(cEditorBase& editor)
     , mPlaying(false)
     , mPaused(false)
     , mCleared(false)
+    , mUndoOpen(false)
     , mNextLine(0)
 {
 }
@@ -341,6 +357,23 @@ cMacroEngine::cMacroEngine(cEditorBase& editor)
 
 cMacroEngine::~cMacroEngine(void)
 {
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  sink [in] receiver of played keys; nullptr for the editor's FeedKey
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::SetKeySink(IMacroKeySink* sink)
+{
+    mSink = sink;
+}
+
+
+IMacroKeySink& cMacroEngine::Sink(void)
+{
+    return (mSink != nullptr) ? *mSink : *mEditorSink;
 }
 
 
@@ -833,8 +866,9 @@ void cMacroEngine::DeleteCommand(void)
 /// @param  lines [in] macro file lines
 ///
 /// @brief
-/// Plays the lines through FeedKey as one undo step, up to the end or the
-/// first PAUSE.
+/// Plays the lines through the key sink as one undo step, up to the end or
+/// the first PAUSE. The undo step starts when the keys first reach a
+/// document.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMacroEngine::Play(const std::vector<std::string>& lines)
@@ -871,7 +905,12 @@ void cMacroEngine::Play(const std::vector<std::string>& lines)
     }
 
     mPlaying = true;
-    mEditor.BeginMacroUndo();
+    mUndoOpen = false;
+    if (Sink().EditsDocument() == true)
+    {
+        mEditor.BeginMacroUndo();
+        mUndoOpen = true;
+    }
     Run();
 }
 
@@ -880,7 +919,8 @@ void cMacroEngine::Play(const std::vector<std::string>& lines)
 ///
 /// @brief
 /// Feeds keys until the macro ends, pauses, fails or a key closes the
-/// document. Runs the editor's after-key update after every key.
+/// document. Runs the editor's after-key update after every key. A key fed
+/// to a sink without a document may load one; that does not stop playback.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMacroEngine::Run(void)
@@ -903,7 +943,17 @@ void cMacroEngine::Run(void)
             return;
         }
 
-        mEditor.FeedKey(key);
+        bool editing = Sink().EditsDocument();
+        Sink().FeedMacroKey(key);
+        if (editing == false)
+        {
+            mCleared = false;
+            if ((Sink().EditsDocument() == true) && (mUndoOpen == false))
+            {
+                mEditor.BeginMacroUndo();
+                mUndoOpen = true;
+            }
+        }
 
         bool stop = (mCleared == true) || (mEditor.MacroStopRequested() == true);
         mEditor.AfterMacroKey();
@@ -928,7 +978,11 @@ void cMacroEngine::Finish(void)
     mPending.clear();
     mLines.clear();
     mPlayInput.reset();
-    mEditor.EndMacroUndo(mCleared == false);
+    if (mUndoOpen == true)
+    {
+        mUndoOpen = false;
+        mEditor.EndMacroUndo(mCleared == false);
+    }
     mEditor.Repaint();
 }
 

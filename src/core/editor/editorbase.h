@@ -32,6 +32,7 @@
 
 class IInputHandler;
 class cMacroEngine;
+class IMacroKeySink;
 struct sKeyStroke;
 
 /////////////////////////////////////////////////////////////////////////////
@@ -254,6 +255,9 @@ public:
     void MacroEndRecording(void);
     bool IsMacroRecording(void) const;
     bool IsMacroPlaying(void) const;
+    std::string MacroStateText(void) const;                   // sStatus::macroState
+    void SetMacroKeySink(IMacroKeySink* sink);                // Receiver of played keys; nullptr for FeedKey
+    bool MacroInterceptKey(const sKeyStroke& key);            // Enter/Esc at a playback pause outside FeedKey
     void BeginMacroUndo(void);                                // Open the undo step of a playback
     void EndMacroUndo(bool sameDocument);                     // Close it; sameDocument false after the document was cleared
     virtual void AfterMacroKey(void) {}                       // Front-end update after each played key (default none)
