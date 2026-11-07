@@ -131,6 +131,11 @@ public:
     {
         (void)title;
         (void)question;
+        bool yes = false;
+        if (MacroAnswersQuestion(yes) == true)
+        {
+            return yes;
+        }
         return true;
     }
 
@@ -942,4 +947,77 @@ TEST_CASE("Macro: keys to a screen without a document are checked, runaway macro
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
     std::error_code ec;
     std::filesystem::remove_all(home, ec);
+}
+
+
+namespace
+{
+
+// Plays body as macro name from a fresh config macros folder; returns the
+// document text and the status message.
+struct sPlayed
+{
+    std::string text;
+    std::string status;
+};
+
+sPlayed PlayInlineMacro(const std::string& name, const std::string& body, const std::string& start)
+{
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    std::filesystem::create_directories(folder);
+    {
+        std::ofstream out(folder / (name + ".wsm"), std::ios::binary);
+        std::string source = body;
+        size_t at = source.find("$HOME");
+        if (at != std::string::npos)
+        {
+            source.replace(at, 5, home.string());
+        }
+        out << "Sub MAIN\r\n" << source << "End Sub\r\n\x1A";
+    }
+    {
+        std::ofstream out(home / "insert.txt", std::ios::binary);
+        out << "inserted ";
+    }
+
+    sPlayed played;
+    {
+        cMacroTestEditor editor;
+        TypeText(editor, start);
+        editor.GetDocument()->SetPosition(0);
+        editor.LayoutDocument(true);
+        editor.mChoice = name;
+        Chord(editor, 'M', 'p');
+        played.text = editor.GetDocument()->GetText();
+        played.status = editor.GetStatusMessage();
+    }
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+    return played;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("Macro: ^B is accepted and changes nothing")
+{
+    EnsureMacroTestApplication();
+    sPlayed played = PlayInlineMacro("ALIGN", "Key(\"ab^Bc\")\r\n", "text");
+    CHECK(played.status.empty());
+    CHECK(played.text.find("abctext") == 0);
 }

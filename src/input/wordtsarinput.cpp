@@ -619,7 +619,8 @@ const char DIGITS[] = "0123456789" ;
 const sCommandKeys COMMAND_KEYS[] =
 {
     { WSCMD_CONTROL, WSCMD_PREFIX,          "\x0B\x0D\x0F\x10\x11" },
-    { WSCMD_CONTROL, WSCMD_RUNS,            "\x01\x03\x04\x05\x06\x07\x08\x09\x0C\x0E\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B" },
+    // ^B (align paragraph) has no case below: paragraphs reflow on their own.
+    { WSCMD_CONTROL, WSCMD_RUNS,            "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0C\x0E\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B" },
 
     { WSCMD_ALT,     WSCMD_PREFIX,          "kqopm" },
     { WSCMD_ALT,     WSCMD_RUNS,            "\x15-=" },
