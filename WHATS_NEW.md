@@ -19,6 +19,12 @@ Release history for WordTsar, in reverse chronological order.
 - Changed: ^K, now works like ^K<: it removes the block markers (#83).
 - Changed: NEXTCH and PREVCH keep the cursor in place after the last or before the first chapter (#83).
 
+**Fixes**
+
+- Fixed: a macro stops after a message or question it does not answer (#84).
+- Fixed: SETUP, NEXTCH and PREVCH work with dot commands hidden and in page view (#84).
+- Fixed: Writing Tools, AutoFill, Dictation and Emoji & Symbols are gone from the Edit menu (#85).
+
 ## 0.16.0 (2026-11-06)
 
 **Fixes**
