@@ -21,6 +21,21 @@ In short: copy the templates folder, open BOOK.WS, then ^MP SETUP (in ws: Option
 - PREVSC: jumps to the previous centred # scene break. Before the first one the cursor stays.
 - CHWORDS: marks the chapter at the cursor as the block, from its .lh 54pt line to the next .pa or the end, and shows its word count.
 
+## Writer's kit
+
+| Macro | What it does |
+|---|---|
+| CHWORDS | Word count of the chapter at the cursor (marks it as the block) |
+| SCWORDS | Word count of the scene at the cursor (marks it as the block) |
+| NEXTCH, PREVCH | Next or previous chapter |
+| NEXTSC, PREVSC | Next or previous `#` scene break |
+| MARKPARA | Marks the paragraph at the cursor as the block |
+| DELPARA | Deletes the paragraph at the cursor |
+| MOVEPARA | Moves the paragraph at the cursor to where you put the cursor, then Enter |
+| PLAINMS | Em dashes to `--`, ellipsis characters to `...`, curly quotes to straight ones |
+| NBSPACE | Non-breaking spaces to ordinary spaces |
+| TRIM | Removes spaces at the ends of lines (from the Sawyer archive, not shipped) |
+
 ^MD opens a macro as a text file. New macros are recorded with ^MR, see KEY_MAPPING.md.
 
 If you have the Sawyer archive, copy its .WSM files into your `macros` folder. ^MP does not run a macro that uses a command WordTsar does not have; the status line names the command and the line.
