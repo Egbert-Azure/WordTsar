@@ -551,6 +551,8 @@ cMacroEngine::cMacroEngine(cEditorBase& editor)
     , mDropFirst(false)
     , mAnswerKind(MACRO_EXCEPTION_ACK)
     , mStatementsWithoutKey(0)
+    , mKeyLine(0)
+    , mUnanswered(false)
     , mAutoRestore(false)
     , mSavedInsert(true)
     , mSavedShowControl(0)
@@ -1246,7 +1248,7 @@ bool cMacroEngine::Play(const std::vector<std::string>& lines, const std::string
     }
 
     mFrames.clear();
-    mFrames.push_back({ script, script->Main(), {} });
+    mFrames.push_back({ script, name, script->Main(), {} });
     mPending.clear();
     mPaused = false;
     mPauseForKey = false;
@@ -1255,6 +1257,8 @@ bool cMacroEngine::Play(const std::vector<std::string>& lines, const std::string
     mJump = false;
     mDropFirst = false;
     mStatementsWithoutKey = 0;
+    mKeyLine = 0;
+    mUnanswered = false;
     mAutoRestore = false;
     SaveSettings();
 
@@ -1291,6 +1295,8 @@ bool cMacroEngine::Play(const std::vector<std::string>& lines, const std::string
 /// Runs statements until the macro ends, pauses, stops or a key closes the
 /// document. Runs the editor's after-key update after every key. A key fed
 /// to a sink without a document may load one; that does not stop playback.
+/// A key that raised a message or question no IfException answers stops
+/// the macro: "Macro NAME stopped at line N".
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMacroEngine::Run(void)
@@ -1325,8 +1331,14 @@ void cMacroEngine::Run(void)
             }
 
             bool stop = (mCleared == true) || (mEditor.MacroStopRequested() == true);
+            bool unanswered = mUnanswered;
+            mUnanswered = false;
             mEditor.AfterMacroKey();
-            if (stop == true)
+            if ((unanswered == true) && (stop == false))
+            {
+                mEditor.SetStatusMessage(mStopText, false, 60, true);
+            }
+            if ((stop == true) || (unanswered == true))
             {
                 Finish();
                 return;
@@ -1364,6 +1376,7 @@ void cMacroEngine::Run(void)
             case MACRO_KEYS:
             {
                 frame.pc++;
+                mKeyLine = statement.line;
                 size_t answer = (drop == true) ? cMacroScript::AnswerLength(statement.keys, mAnswerKind) : 0;
                 mPending.assign(statement.keys.begin() + static_cast<long>(answer), statement.keys.end());
                 break;
@@ -1443,7 +1456,7 @@ void cMacroEngine::Run(void)
                                 statement.line);
                     return;
                 }
-                mFrames.push_back({ script->second, script->second->Main(), {} });
+                mFrames.push_back({ script->second, statement.text, script->second->Main(), {} });
                 break;
             }
 
@@ -1635,6 +1648,7 @@ bool cMacroEngine::NextDialogKey(sKeyStroke& key)
             return false;
         }
         frame.pc++;
+        mKeyLine = statement.line;
         mPending.assign(statement.keys.begin(), statement.keys.end());
     }
 
@@ -1737,7 +1751,7 @@ bool cMacroEngine::ReadFileName(std::string& name)
 /// @return true if the IfException after the playing Key statement has a
 ///         clause for kind (or DEF); the clause runs after the key and the
 ///         keys that answer the exception (cMacroScript::AnswerLength) are
-///         not played
+///         not played. Otherwise an ACK or QRY stops the macro after the key.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cMacroEngine::AnswerException(eMacroException kind, bool* yes)
@@ -1751,6 +1765,7 @@ bool cMacroEngine::AnswerException(eMacroException kind, bool* yes)
     const std::vector<sMacroStatement>& statements = frame.script->Statements();
     if ((frame.pc >= statements.size()) || (statements[frame.pc].kind != MACRO_IF_EXCEPTION))
     {
+        StopUnanswered(kind);
         return false;
     }
 
@@ -1780,6 +1795,7 @@ bool cMacroEngine::AnswerException(eMacroException kind, bool* yes)
     }
     if (found == false)
     {
+        StopUnanswered(kind);
         return false;
     }
 
@@ -1818,6 +1834,21 @@ bool cMacroEngine::AnswerException(eMacroException kind, bool* yes)
     mDropFirst = (kind != MACRO_EXCEPTION_NCM);
     mAnswerKind = answerKind;
     return true;
+}
+
+
+// An ACK or QRY of a played key that no clause answers: the macro stops
+// after the key.
+void cMacroEngine::StopUnanswered(eMacroException kind)
+{
+    if ((kind == MACRO_EXCEPTION_NCM) || (mUnanswered == true))
+    {
+        return;
+    }
+    const std::string& name = mFrames.back().name;
+    mUnanswered = true;
+    mStopText = "Macro " + ((name.empty() == true) ? std::string() : name + " ") + "stopped at line " +
+                std::to_string(mKeyLine);
 }
 
 

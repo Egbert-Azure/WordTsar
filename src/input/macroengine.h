@@ -147,7 +147,8 @@ public:
 
     // Exceptions of a played key: true if the IfException after the Key
     // statement answers it; then no dialog is shown. For QRY, yes is the
-    // answer: see AnswerException.
+    // answer: see AnswerException. An ACK or QRY it does not answer stops
+    // the macro after the key.
     bool AnswerException(eMacroException kind, bool* yes = nullptr);
 
     void OnDocumentCleared(void);
@@ -156,6 +157,7 @@ private:
     struct sFrame
     {
         std::shared_ptr<const cMacroScript> script;
+        std::string name;                                     // macro name, empty if it has none
         size_t pc;                                            // next statement
         std::vector<size_t> calls;                            // return statements of Call
     };
@@ -172,6 +174,7 @@ private:
     void Finish(void);
     void EndFrame(void);
     void StopRunaway(const std::string& reason, size_t line);
+    void StopUnanswered(eMacroException kind);
     void ApplySetting(const sMacroStatement& statement);
     void SaveSettings(void);
     void RestoreSettings(void);
@@ -210,6 +213,9 @@ private:
     bool mDropFirst;                                          // the clause's first keys answered the exception
     eMacroException mAnswerKind;                              // how many keys answered it, see cMacroScript::AnswerLength
     long mStatementsWithoutKey;                               // statements run since the last played key
+    size_t mKeyLine;                                          // line of the Key statement being played
+    bool mUnanswered;                                         // a played key raised an exception no clause answers
+    std::string mStopText;                                    // "Macro NAME stopped at line N" for mUnanswered
     std::unique_ptr<IInputHandler> mPlayInput;
 
     // Settings at the start, restored at the end after AutoRestore(ON)
