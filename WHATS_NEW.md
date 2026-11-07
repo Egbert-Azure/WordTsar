@@ -2,17 +2,43 @@
 
 Release history for WordTsar, in reverse chronological order.
 
-## Unreleased
+## 0.16.0 (2026-11-06)
 
 **Fixes**
 
 - Fixed: the WordStar index-item and paragraph-number codes are now kept when you open and save a file. They show as <Index> and <Para#> tags when command tags are on (^OD) (#74).
 - Fixed: a .tc or .ix line that starts with a dot is now written to the generated file as a dot command. Index ones go at the top (#72).
+- Fixed: the generated table of contents keeps formatting codes in its entries (#79).
+- Fixed: numbered tables of contents are named name.TO1 to name.TO9, not name.T01 (#79).
+- Fixed: page numbers in the table of contents and index come from the print layout, whatever ^OD shows (#79).
+- Fixed: dot-command measurements accept units: i, in, ", c, cm, mm, p and pt. Brackets are accepted. With no unit, .lm .rm and .po are in columns, .mt .mb and .pl in lines, and .lh in 1/48 inch (#80).
+- Fixed: .pf on, off and dis are accepted (#82).
+- Fixed: ^F from the last word of a paragraph goes to the first word of the next paragraph. Before, it moved one character back (#78).
+- Fixed: the text between ^K index marks is trimmed of punctuation at both ends (#78).
+- Fixed: case conversion and sort keep tabs, bold and raw bytes in the block (#69).
+- Fixed: ^KZ over whole lines no longer joins the last sorted line to the next line (#70).
+- Fixed: SIGTERM, from kill or from logout, quits with an emergency save and no crash report (#68).
+- Fixed: the app bundle now carries the version and the minimum macOS version (#23).
 
 **Changes**
 
 - Changed: ^PK now marks text for the index. Strikethrough is on ^PX only, and the generator reads the marks. Mark for Index is in the Insert menu in the GUI and ws (#73).
 - Changed: the GUI Utilities menu has Generate Table of Contents and Generate Index. The files are written next to the source, as in ws (#77).
+- Changed: .ul on and off underline or leave out the spaces between underlined words (#81).
+
+**Additions**
+
+- Added: macros. ^MR records a macro and ^MP plays one. While recording, Alt+- adds a pause and Alt+= stops. Playback stops at a pause and Enter continues. One undo removes a whole playback (#78).
+- Added: macros are saved as .wsm files in the WordStar 7 macro language (Key("...") and PauseForInput). Real WordStar 7 can play them after you open one in Macros > Edit/Create and save it (#78).
+- Added: ^MD edits a macro as text, ^ME renames it, ^MO copies it and ^MY deletes it (#78).
+- Added: the Utilities > Macros menu in the GUI and in ws, and macro playback from the ws Opening screen (#78).
+- Added: when the macros folder next to config.ini is missing, it is created with the default macros CHAPTER, SCENE, INDEX, NEXTCH and PREVCH (#78).
+- Added: a new recording is saved in the macros folder next to the open document, if the document has one (#78).
+- Added: a Find or Replace started from the menu while recording is recorded as ^QF or ^QA (#78).
+- Added: Alt+- and Alt+= (Option+- and Option+= in the GUI) type an en dash and a not-equal sign when not recording (#78).
+- Added: ws trims spaces around a macro name (#78).
+- Added: Option+M is the ws key for the ^M chord. Set Option as Meta in the terminal (#78).
+- Added: the templates folder, with the book template BOOK.WS and the macros SETUP, CHAPTER, SCENE, INDEX, NEXTCH and PREVCH (#71, #78).
 
 ## 0.15.0 (2026-11-05)
 
