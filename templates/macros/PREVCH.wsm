@@ -1,5 +1,10 @@
+REM PREVCH: to the start of the previous chapter. Before the first
+REM chapter the cursor stays where it is.
 Sub MAIN
 Key("^QF.lh 54pt{Enter}")
 Key("B{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
 End Sub
 
