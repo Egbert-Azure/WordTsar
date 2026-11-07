@@ -331,6 +331,17 @@ TEST_CASE("Macro: a recording is saved as WordStar 7 macro source and a .txt mac
     REQUIRE(edit.SaveFile((folder / "t2.wsm").string()));
     CHECK(ReadBytes(folder / "t2.wsm") == source);
 
+    // A one-key-per-line .txt macro is converted when ^MP lists it.
+    {
+        std::ofstream old(folder / "old.txt", std::ios::binary);
+        old << "a\nb\nEnter\n";
+    }
+    player.mChoice.clear();
+    Chord(player, 'M', 'p');
+    CHECK(player.mListed == std::vector<std::string>{ "CHAPTER", "INDEX", "NEXTCH", "PREVCH", "SCENE", "old", "t1", "t2" });
+    CHECK(ReadBytes(folder / "old.wsm") == "Sub MAIN\r\nKey(\"ab{Enter}\")\r\nEnd Sub\r\n\x1A");
+    CHECK(std::filesystem::exists(folder / "old.txt") == false);
+
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
     std::error_code ec;

@@ -38,6 +38,7 @@ namespace
 
 const char MACRO_FOLDER[] = "macros";
 const char MACRO_EXTENSION[] = ".wsm";
+const char KEY_LINES_EXTENSION[] = ".txt";
 const char MODERN_LINE[] = "REM Modern";
 const char STATE_RECORDING[] = "Recording";
 const char STATE_PAUSED[] = "Type, then press Enter";
@@ -166,6 +167,90 @@ std::vector<std::string> ListFolder(const std::string& dir)
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  dir    [in]     macros folder
+/// @param  failed [in,out] names of the .txt files that could not be
+///                         converted are appended here
+///
+/// @brief
+/// Converts each one-key-per-line <name>.txt in the folder to <name>.wsm
+/// and removes the .txt. A .txt with an existing <name>.wsm is left alone.
+///
+/////////////////////////////////////////////////////////////////////////////
+void ConvertFolder(const std::string& dir, std::vector<std::string>& failed)
+{
+    if (dir.empty() == true)
+    {
+        return;
+    }
+
+    std::error_code ec;
+    std::filesystem::directory_iterator it(dir, ec);
+    if (ec)
+    {
+        return;
+    }
+
+    std::vector<std::string> names;
+    for (const std::filesystem::directory_entry& entry : it)
+    {
+        std::string file = entry.path().filename().string();
+        if ((entry.is_regular_file(ec) == true) && (EndsWith(file, KEY_LINES_EXTENSION) == true) &&
+            (file.size() > 4) && (file[0] != '.'))
+        {
+            names.push_back(file.substr(0, file.size() - 4));
+        }
+    }
+    std::sort(names.begin(), names.end());
+
+    for (const std::string& name : names)
+    {
+        std::filesystem::path source = std::filesystem::path(dir) / (name + KEY_LINES_EXTENSION);
+        std::filesystem::path target = std::filesystem::path(dir) / (name + MACRO_EXTENSION);
+        if (std::filesystem::exists(target, ec) == true)
+        {
+            continue;
+        }
+
+        std::vector<std::string> lines;
+        {
+            std::ifstream in(source, std::ios::binary);
+            std::string line;
+            while (std::getline(in, line))
+            {
+                lines.push_back(StripLineEnd(line));
+            }
+        }
+
+        std::string text;
+        if (KeyLinesToMacroSource(lines, text) == false)
+        {
+            failed.push_back(name);
+            continue;
+        }
+
+        bool written = false;
+        {
+            std::ofstream out(target, std::ios::binary | std::ios::trunc);
+            if (out)
+            {
+                out.write(text.data(), static_cast<std::streamsize>(text.size()));
+                out.close();
+                written = !out.fail();
+            }
+        }
+        if (written == false)
+        {
+            std::filesystem::remove(target, ec);
+            failed.push_back(name);
+            continue;
+        }
+        std::filesystem::remove(source, ec);
+    }
+}
+
+
 bool IsEnter(const sKeyStroke& key)
 {
     return (key.kind == KEYSTROKE_SPECIAL) && (key.special == SPECIAL_ENTER);
@@ -273,9 +358,28 @@ void cMacroStore::CreateDefaults(void) const
 }
 
 
-std::vector<std::string> cMacroStore::List(void) const
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  unconverted [out] if not nullptr, the names of .txt macros that
+///                           could not be converted
+///
+/// @return macro names, document folder first
+///
+/// @brief
+/// Converts the one-key-per-line .txt macros in both folders first.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::vector<std::string> cMacroStore::List(std::vector<std::string>* unconverted) const
 {
     CreateDefaults();
+    std::vector<std::string> failed;
+    ConvertFolder(mDocumentDir, failed);
+    ConvertFolder(mConfigDir, failed);
+    if (unconverted != nullptr)
+    {
+        *unconverted = failed;
+    }
+
     std::vector<std::string> names = ListFolder(mDocumentDir);
     size_t documentCount = names.size();
 
@@ -787,10 +891,15 @@ void cMacroEngine::PlayCommand(void)
     }
 
     cMacroStore store = MakeStore();
-    std::vector<std::string> names = store.List();
+    std::vector<std::string> unconverted;
+    std::vector<std::string> names = store.List(&unconverted);
+    ReportUnconverted(unconverted);
     if (names.empty() == true)
     {
-        mEditor.SetStatusMessage("No macros yet. Record one with ^MR.");
+        if (unconverted.empty() == true)
+        {
+            mEditor.SetStatusMessage("No macros yet. Record one with ^MR.");
+        }
         return;
     }
 
@@ -817,18 +926,33 @@ void cMacroEngine::PlayCommand(void)
 /// @param  title [in] list title
 ///
 /// @return the chosen macro name; empty if there are none (status "No
-///         macros") or the list was cancelled
+///         macros" or "Cannot convert") or the list was cancelled
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cMacroEngine::ChooseMacro(const cMacroStore& store, const std::string& title)
 {
-    std::vector<std::string> names = store.List();
+    std::vector<std::string> unconverted;
+    std::vector<std::string> names = store.List(&unconverted);
+    ReportUnconverted(unconverted);
     if (names.empty() == true)
     {
-        mEditor.SetStatusMessage("No macros");
+        if (unconverted.empty() == true)
+        {
+            mEditor.SetStatusMessage("No macros");
+        }
         return std::string();
     }
     return mEditor.ChooseFromList(title, names);
+}
+
+
+// "Cannot convert <name>.txt" for the first macro that was not converted.
+void cMacroEngine::ReportUnconverted(const std::vector<std::string>& unconverted)
+{
+    if (unconverted.empty() == false)
+    {
+        mEditor.SetStatusMessage("Cannot convert " + unconverted.front() + KEY_LINES_EXTENSION, false, 60, true);
+    }
 }
 
 

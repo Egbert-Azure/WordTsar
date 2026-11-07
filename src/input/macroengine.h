@@ -43,7 +43,9 @@ struct sFindRequest;
 /// Macro files <name>.wsm (WordStar 7 macro source, see KeysToMacroSource)
 /// in the "macros" folder next to the document and
 /// in the "macros" folder next to config.ini. Lists the document folder
-/// first; on equal names the document folder wins. New macros are saved in
+/// first; on equal names the document folder wins. A one-key-per-line
+/// <name>.txt in either folder is converted to <name>.wsm when the list is
+/// read, unless <name>.wsm exists. New macros are saved in
 /// the document folder if it exists, otherwise in the config folder, which
 /// is created on demand. A missing config folder is created with the
 /// default macros when the list is read or a macro is saved there.
@@ -59,7 +61,7 @@ public:
     static std::string FileName(const std::string& name);    // name with ".wsm"
 
     void CreateDefaults(void) const;                          // config folder with the default macros, if missing
-    std::vector<std::string> List(void) const;               // macro names without ".wsm"
+    std::vector<std::string> List(std::vector<std::string>* unconverted = nullptr) const;   // macro names without ".wsm"
     std::string FindPath(const std::string& name) const;     // file of a listed macro, empty if none
     std::string SavePath(const std::string& name) const;     // file a new macro is saved to, empty if none
     bool Load(const std::string& name, std::vector<std::string>& lines) const;   // lines up to the first 0x1A
@@ -146,6 +148,7 @@ private:
     IMacroKeySink& Sink(void);
     cMacroStore MakeStore(void) const;
     std::string ChooseMacro(const cMacroStore& store, const std::string& title);   // empty if none or cancelled
+    void ReportUnconverted(const std::vector<std::string>& unconverted);
     void CopyOrRename(bool rename);
     void DropCurrentKey(void);
     void StopRecording(void);
