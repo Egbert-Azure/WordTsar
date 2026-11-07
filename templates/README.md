@@ -18,6 +18,7 @@ In short: copy the templates folder, open BOOK.WS, then ^MP SETUP (in ws: Option
 - INDEX: marks the word at the cursor for the index with ^PK. Put the cursor inside the word. It does not mark the last word of the document: mark that one by hand with ^PK before and after it.
 - NEXTCH and PREVCH: jump to the start of the next or previous chapter. After the last or before the first chapter the cursor stays.
 - NEXTSC: jumps to the next centred # scene break. After the last one the cursor stays.
+- PREVSC: jumps to the previous centred # scene break. Before the first one the cursor stays.
 
 ^MD opens a macro as a text file. New macros are recorded with ^MR, see KEY_MAPPING.md.
 
