@@ -224,6 +224,7 @@ public:
     virtual bool SaveFile(const std::string& filename) = 0;   // Save file
     virtual void EmergencySaveFile(char *text) = 0;           // Emergency save on fatal error (e.g., bad_alloc)
     virtual std::string PromptForLoadFile(void) = 0;          // Show file open dialog
+    std::string RequestLoadFile(void);                        // File name from the playing macro, otherwise PromptForLoadFile
     virtual std::string PromptForSaveFile(void) = 0;          // Show file save dialog
     virtual bool CloseEvent(void) = 0;                        // Handle close (confirm save)
     virtual void FileIOProgress(int /*percent*/) {}           // Report file I/O progress (default no-op)

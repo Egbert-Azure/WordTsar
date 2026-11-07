@@ -79,6 +79,7 @@ enum eWordStarCommand
     WSCMD_PREFIX,               ///< chord prefix, waits for the next key
     WSCMD_FIND,                 ///< Find prompt (^QF)
     WSCMD_REPLACE,              ///< Find and Replace prompt (^QA)
+    WSCMD_FILE,                 ///< file name prompt a macro answers (^KR)
     WSCMD_SUBKEY,               ///< waits for one more key (^KZ)
     WSCMD_DIALOG,               ///< opens a dialog a macro cannot answer
     WSCMD_NOT_IMPLEMENTED,      ///< "not implemented" message

@@ -628,7 +628,8 @@ const sCommandKeys COMMAND_KEYS[] =
     { 'k',           WSCMD_RUNS,            "bkcvy\"'.<h[]?udsxq" },
     { 'k',           WSCMD_RUNS,            DIGITS },
     { 'k',           WSCMD_SUBKEY,          "z" },
-    { 'k',           WSCMD_DIALOG,          "rtpw" },
+    { 'k',           WSCMD_FILE,            "r" },
+    { 'k',           WSCMD_DIALOG,          "tpw" },
     { 'k',           WSCMD_NOT_IMPLEMENTED, "oej\\lfmniag" },
 
     { 'o',           WSCMD_RUNS,            "dc]tjwvgeh<>=+" },
@@ -1590,7 +1591,7 @@ bool cWordStarInput::OnControlKChar(char ch)
     {
         case 'r' :          // insert a file at the cursor (real WordStar 7 ^KR)
             {
-                std::string filename = mEditor->PromptForLoadFile();
+                std::string filename = mEditor->RequestLoadFile();
                 if(!filename.empty())
                 {
                     mEditor->SetEnabled(false) ;

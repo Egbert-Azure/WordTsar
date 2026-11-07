@@ -142,6 +142,7 @@ public:
     // Find and Replace prompts
     bool AnswersPrompt(void) const;                           // true while a played key runs
     bool ReadPrompt(sFindRequest& request, bool replace);     // answer from the playing macro
+    bool ReadFileName(std::string& name);                     // file name from the playing macro; false if cancelled
     void RecordPrompt(const sFindRequest& request, bool replace, bool ok);
 
     // Exceptions of a played key: true if the IfException after the Key

@@ -2393,6 +2393,30 @@ bool cEditorBase::RequestFind(sFindRequest& request, bool replace)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return the file name; empty if cancelled
+///
+/// @brief
+/// While a played key runs, the macro types the name; otherwise the file
+/// dialog asks for it.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorBase::RequestLoadFile(void)
+{
+    if (mMacro->AnswersPrompt() == true)
+    {
+        std::string name;
+        if (mMacro->ReadFileName(name) == false)
+        {
+            return std::string();
+        }
+        return name;
+    }
+    return PromptForLoadFile();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @brief
 /// ^QF: asks for the search text and options, stores them and searches.
 ///

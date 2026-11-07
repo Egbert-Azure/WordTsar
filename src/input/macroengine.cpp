@@ -1603,7 +1603,7 @@ void cMacroEngine::ApplySetting(const sMacroStatement& statement)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  key [out] next key for a Find or Replace dialog
+/// @param  key [out] next key for a dialog the macro answers
 ///
 /// @return false if the macro has no more keys before a statement other
 ///         than Key or a setting
@@ -1671,7 +1671,7 @@ bool cMacroEngine::AnswersPrompt(void) const
 /////////////////////////////////////////////////////////////////////////////
 bool cMacroEngine::ReadPrompt(sFindRequest& request, bool replace)
 {
-    cMacroDialog dialog(replace);
+    cMacroDialog dialog((replace == true) ? cMacroDialog::DIALOG_REPLACE : cMacroDialog::DIALOG_FIND);
     while (true)
     {
         sKeyStroke key;
@@ -1694,6 +1694,38 @@ bool cMacroEngine::ReadPrompt(sFindRequest& request, bool replace)
     request.replace = dialog.Replacement();
     ApplyFindOptionLetters(dialog.Options(), request);
     return true;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  name [out] the file name typed by the macro
+///
+/// @return false if the macro cancels the prompt (Esc) or has no more keys
+///         for it
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cMacroEngine::ReadFileName(std::string& name)
+{
+    cMacroDialog dialog(cMacroDialog::DIALOG_FILE);
+    while (true)
+    {
+        sKeyStroke key;
+        if (NextDialogKey(key) == false)
+        {
+            return false;
+        }
+        cMacroDialog::eResult result = dialog.Feed(key);
+        if (result == cMacroDialog::DIALOG_CANCEL)
+        {
+            return false;
+        }
+        if (result == cMacroDialog::DIALOG_OK)
+        {
+            name = dialog.Text();
+            return true;
+        }
+    }
 }
 
 

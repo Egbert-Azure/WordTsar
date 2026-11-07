@@ -1031,3 +1031,12 @@ TEST_CASE("Macro: a QRY clause typing a dialog answer up to F10 answers the ques
     CHECK(played.status.empty());
     CHECK(played.text.find("xtext") == 0);
 }
+
+
+TEST_CASE("Macro: ^KR reads the file name from the macro")
+{
+    EnsureMacroTestApplication();
+    sPlayed played = PlayInlineMacro("INSERT", "Key(\"^KR$HOME/insert.txt{Enter}\")\r\n", "text");
+    CHECK(played.status.empty());
+    CHECK(played.text.find("inserted text") == 0);
+}

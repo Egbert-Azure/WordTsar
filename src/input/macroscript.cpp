@@ -627,11 +627,19 @@ private:
                 return true;
             }
 
+            case WSCMD_FILE:
+            {
+                mState = STATE_DIALOG;
+                mDialog = cMacroDialog(cMacroDialog::DIALOG_FILE);
+                mDialogName = name;
+                return true;
+            }
+
             case WSCMD_FIND:
             case WSCMD_REPLACE:
             {
                 mState = STATE_DIALOG;
-                mDialog = cMacroDialog(command == WSCMD_REPLACE);
+                mDialog = cMacroDialog((command == WSCMD_REPLACE) ? cMacroDialog::DIALOG_REPLACE : cMacroDialog::DIALOG_FIND);
                 mDialogName = name;
                 return true;
             }
@@ -655,20 +663,16 @@ private:
 
     eState mState = STATE_TOP;
     char mChord = '\0';
-    cMacroDialog mDialog = cMacroDialog(false);
+    cMacroDialog mDialog = cMacroDialog(cMacroDialog::DIALOG_FIND);
     std::string mDialogName;
 };
 
 } // namespace
 
 
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @param  replace [in] true for Find and Replace
-///
-/////////////////////////////////////////////////////////////////////////////
-cMacroDialog::cMacroDialog(bool replace)
-    : mReplace(replace)
+cMacroDialog::cMacroDialog(eKind kind)
+    : mKind(kind)
+    , mLast((kind == DIALOG_REPLACE) ? 2 : ((kind == DIALOG_FIND) ? 1 : 0))
     , mField(0)
     , mControlP(false)
 {
@@ -677,8 +681,7 @@ cMacroDialog::cMacroDialog(bool replace)
 
 std::string& cMacroDialog::Field(void)
 {
-    size_t last = (mReplace == true) ? 2 : 1;
-    if (mField >= last)
+    if ((mKind != DIALOG_FILE) && (mField >= mLast))
     {
         return mOptions;
     }
@@ -699,8 +702,8 @@ std::string& cMacroDialog::Field(void)
 /////////////////////////////////////////////////////////////////////////////
 cMacroDialog::eResult cMacroDialog::Feed(const sKeyStroke& key)
 {
-    const size_t last = (mReplace == true) ? 2 : 1;
-    bool options = (mField >= last);
+    const size_t last = mLast;
+    bool options = (mKind != DIALOG_FILE) && (mField >= last);
 
     if (mControlP == true)
     {
@@ -728,7 +731,7 @@ cMacroDialog::eResult cMacroDialog::Feed(const sKeyStroke& key)
             switch (key.special)
             {
                 case SPECIAL_ENTER:
-                    if (options == true)
+                    if (mField >= last)
                     {
                         return DIALOG_OK;
                     }
@@ -804,6 +807,10 @@ cMacroDialog::eResult cMacroDialog::Feed(const sKeyStroke& key)
                 if ((key.utf8.size() == 1) && (isalpha(static_cast<unsigned char>(key.utf8[0])) != 0))
                 {
                     char letter = static_cast<char>(toupper(static_cast<unsigned char>(key.utf8[0])));
+                    if (mKind == DIALOG_FILE)
+                    {
+                        return DIALOG_OPEN;
+                    }
                     if (letter == 'T')
                     {
                         mField = last;

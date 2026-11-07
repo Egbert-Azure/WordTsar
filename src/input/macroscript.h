@@ -87,31 +87,34 @@ struct sMacroStatement
 /// @class cMacroDialog
 ///
 /// @brief
-/// The Find or Find and Replace dialog answered by played keys. Fields Find,
-/// (Replace,) Options. Enter goes to the next field and in Options closes
-/// the dialog; Tab goes to the next field, Shift+Tab back; F10 and ^K close
-/// it; Esc cancels. ^Y clears the field, ^N types a hard return, ^P and a
-/// key types that control code, Backspace deletes. Alt+T goes to Options,
-/// another Alt+letter turns that option letter on or off.
+/// A dialog answered by played keys: Find (fields Find, Options), Find and
+/// Replace (Find, Replace, Options) or a file name (one field). Enter goes
+/// to the next field and in the last one closes the dialog; Tab goes to
+/// the next field, Shift+Tab back; F10 and ^K close it; Esc cancels. ^Y
+/// clears the field, ^N types a hard return, ^P and a key types that
+/// control code, Backspace deletes. Alt+T goes to Options, another
+/// Alt+letter turns that option letter on or off.
 ///
 /////////////////////////////////////////////////////////////////////////////
 class cMacroDialog
 {
 public:
+    enum eKind { DIALOG_FIND, DIALOG_REPLACE, DIALOG_FILE };
     enum eResult { DIALOG_OPEN, DIALOG_OK, DIALOG_CANCEL };
 
-    explicit cMacroDialog(bool replace);
+    explicit cMacroDialog(eKind kind);
     eResult Feed(const sKeyStroke& key);
 
-    const std::string& Text(void) const;
+    const std::string& Text(void) const;                   // search text or file name
     const std::string& Replacement(void) const;
     const std::string& Options(void) const;
 
 private:
     std::string& Field(void);
 
-    bool mReplace;
-    size_t mField;                  // 0 Find, 1 Replace, last Options
+    eKind mKind;
+    size_t mLast;                   // index of the last field
+    size_t mField;                  // 0 Find or file name, 1 Replace, mLast Options
     bool mControlP;                 // ^P typed, waiting for the control key
     std::string mText;
     std::string mReplacement;
