@@ -24,6 +24,7 @@
 #include "src/gui/editor/editorctrl.h"
 #include "src/core/document/document.h"
 #include <QApplication>
+#include <QKeyEvent>
 
 #include <filesystem>
 #include <string>
@@ -150,4 +151,19 @@ TEST_CASE("cWordStarInput - GUI ^KD saves and clears, the editor stays open")
 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
+}
+
+
+TEST_CASE("GUI key - a typed non-ASCII character is inserted, not taken as a control key")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+
+    // U+010B has the low byte 0x0B, which is ^K.
+    QKeyEvent press(QEvent::KeyPress, Qt::Key_unknown, Qt::NoModifier, QString(QChar(0x010B)));
+    QApplication::sendEvent(&editor, &press);
+
+    CHECK(editor.mInput->CheckControlMode() == false);
+    CHECK(editor.GetDocument()->GetText().find("\xC4\x8B") != std::string::npos);
 }

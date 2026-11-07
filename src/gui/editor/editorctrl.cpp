@@ -3908,7 +3908,6 @@ bool cEditorCtrl::KeyEventToStroke(QKeyEvent* event, sKeyStroke& stroke) const
         {
             // Alt+letter
             stroke = TextKeyStroke(std::string(1, static_cast<char>(key - Qt::Key_A + 'a')), shift, false, true) ;
-            stroke.ch = stroke.utf8[0] ;
         }
         return true ;
     }
@@ -3921,7 +3920,6 @@ bool cEditorCtrl::KeyEventToStroke(QKeyEvent* event, sKeyStroke& stroke) const
     }
 
     stroke = TextKeyStroke(text.toStdString(), shift, ctrl, alt) ;
-    stroke.ch = static_cast<char>(text.at(0).unicode()) ;
     return true ;
 }
 

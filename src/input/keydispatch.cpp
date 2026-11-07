@@ -33,9 +33,9 @@
 /// @brief
 /// While a chord is pending, Delete and Backspace complete it as their
 /// character equivalents (0x7F and ^H). Control keys go to HandleKey, named
-/// keys to HandleSpecialKey. Typed text goes to HandleKey first; if the
-/// handler does not take it and neither Ctrl nor Alt is held, it is
-/// inserted.
+/// keys to HandleSpecialKey. A typed ASCII character goes to HandleKey
+/// first; typed text the handler does not take is inserted if neither Ctrl
+/// nor Alt is held.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool DispatchKey(cEditorBase& editor, IInputHandler& input, const sKeyStroke& key)
@@ -77,7 +77,9 @@ bool DispatchKey(cEditorBase& editor, IInputHandler& input, const sKeyStroke& ke
                 return false ;
             }
 
-            if ((key.ch != 0) && (input.HandleKey(key.ch, key.shift, key.alt) == true))
+            // Only a single ASCII character can be a command key.
+            bool ascii = (key.utf8.size() == 1) && (static_cast<unsigned char>(key.utf8[0]) < 0x80U) ;
+            if ((ascii == true) && (input.HandleKey(key.utf8[0], key.shift, key.alt) == true))
             {
                 return true ;
             }

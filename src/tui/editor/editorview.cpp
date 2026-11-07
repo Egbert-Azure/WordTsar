@@ -1788,13 +1788,7 @@ bool cWSEditorView::HandleEvent(const sInputEvent& event)
 
         if (first >= 0x20)
         {
-            sKeyStroke stroke = TextKeyStroke(event.textUtf8, event.shift, false, event.alt);
-            if (event.textUtf8.size() == 1)
-            {
-                stroke.ch = event.textUtf8[0];
-            }
-
-            bool handled = mEditor->FeedKey(stroke);
+            bool handled = mEditor->FeedKey(TextKeyStroke(event.textUtf8, event.shift, false, event.alt));
             if ((handled == false) && (event.alt == true))
             {
                 mEditor->InsertText(event.textUtf8);
