@@ -262,6 +262,7 @@ private slots :
     void GenerateIndex(void) ;
     void PlayMacro(void) ;
     void RecordMacro(void) ;
+    void StopRecordMacro(void) ;
     void EditMacro(void) ;
     void SingleStep(void) ;
     void CopyMacro(void) ;
@@ -363,6 +364,16 @@ private:
     bool mRevealCodesVisible ;                // reveal codes toggle state
     QAction *mCommandTagsAction ;             // Command Tags / Show Formatting menu action
     QMenu *mRecentFilesMenu ;                 // File > Recent Files submenu
+
+    // Utilities > Macros actions, enabled by UpdateMacroActions()
+    QAction *mPlayMacroAction = nullptr ;
+    QAction *mRecordMacroAction = nullptr ;
+    QAction *mStopMacroAction = nullptr ;
+    QAction *mEditMacroAction = nullptr ;
+    QAction *mRenameMacroAction = nullptr ;
+    QAction *mCopyMacroAction = nullptr ;
+    QAction *mDeleteMacroAction = nullptr ;
+    void UpdateMacroActions(void) ;
 
     // File loading
     QString mLoadFileName ;

@@ -134,7 +134,7 @@ const char *LookupControlKeyHelp(char lower)
         case 'm' :
             return "^M - Enter Macro Menu chord\n\n"
                    "Opens the Macro menu -- date/time/filename/path insertion, and "
-                   "keyboard macro record/play/edit (macro playback not yet implemented). "
+                   "keyboard macro play/record/edit/rename/copy/delete. "
                    "Press a second key to choose." ;
         case 'n' :
             return "^N - Insert line break\n\n"
@@ -567,29 +567,39 @@ const char *LookupMChordHelp(char lower)
                    "Would insert the last Calculator/Block Math result formatted as "
                    "currency, for example \"$23.10\"." ;
         case 'p' :
-            return "^MP - Play macro (not yet implemented)\n\n"
-                   "Would run a previously recorded keyboard macro." ;
+            return "^MP - Play macro\n\n"
+                   "Lists the macros in the macros folder next to the document, then "
+                   "those in the macros folder next to config.ini, and plays the chosen "
+                   "one. One undo removes the whole playback. At a pause the status line "
+                   "says \"Type, then press Enter\": what you type goes into the "
+                   "document, Enter continues the macro and Esc stops it." ;
         case 'r' :
-            return "^MR - Record macro (not yet implemented)\n\n"
-                   "Would record a series of keystrokes to a named macro file for "
-                   "later playback." ;
+            return "^MR - Record macro\n\n"
+                   "Starts recording keystrokes; the status line says \"Recording\". "
+                   "^MR again, or Alt+=, stops recording and asks for a name; the macro "
+                   "is saved as <name>.txt in the macros folder next to config.ini. "
+                   "While recording, Alt+- adds a pause. Menu commands are not "
+                   "recorded." ;
         case 'd' :
-            return "^MD - Edit/Create macro (not yet implemented)\n\n"
-                   "Would open a macro's own text for direct editing, using "
-                   "WordStar's macro language." ;
+            return "^MD - Edit macro\n\n"
+                   "Opens the chosen macro file as a text document: one key per line, "
+                   "written as a key name (^KB, Enter, Tab, Left) or the typed "
+                   "character, and PAUSE for a pause." ;
         case 's' :
             return "^MS - Single-step macro (not yet implemented)\n\n"
                    "Would play a macro back one command at a time, to help locate "
                    "errors in it." ;
         case 'e' :
-            return "^ME - Rename macro (not yet implemented)\n\n"
-                   "Would rename a macro, or reassign its hot key." ;
+            return "^ME - Rename macro\n\n"
+                   "Renames the chosen macro in its folder. Asks before replacing a "
+                   "macro of the new name." ;
         case 'o' :
-            return "^MO - Copy macro (not yet implemented)\n\n"
-                   "Would copy an existing macro under a new name." ;
+            return "^MO - Copy macro\n\n"
+                   "Copies the chosen macro under a new name into the same folder. Asks "
+                   "before replacing a macro of the new name." ;
         case 'y' :
-            return "^MY - Delete macro (not yet implemented)\n\n"
-                   "Would delete a recorded macro." ;
+            return "^MY - Delete macro\n\n"
+                   "Deletes the chosen macro after asking." ;
         default  : return nullptr ;
     }
 }

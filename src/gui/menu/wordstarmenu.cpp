@@ -952,12 +952,17 @@ QString cWordStarMenuProvider::GetUtilPlayMacroLabel(void) const
 
 QString cWordStarMenuProvider::GetUtilRecordMacroLabel(void) const
 {
-    return "&Record...\t^MR";
+    return "&Record\t^MR";
+}
+
+QString cWordStarMenuProvider::GetUtilStopRecordMacroLabel(void) const
+{
+    return "S&top Recording\t^MR";
 }
 
 QString cWordStarMenuProvider::GetUtilEditMacroLabel(void) const
 {
-    return "&Edit/Create...\t^MD";
+    return "&Edit...\t^MD";
 }
 
 QString cWordStarMenuProvider::GetUtilSingleStepLabel(void) const

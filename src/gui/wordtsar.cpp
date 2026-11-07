@@ -243,9 +243,9 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
         "                  <b>----- MACRO MENU -----</b>\n"
         " "
         "    <u>MACRO FUNCTIONS</u>                   <u>INSERT</u>\n"
-        " <i>P play</i>          <i>E rename</i>        <b>@</b> today's date         <b>*</b> current filename\n"
-        " <i>R record</i>        <i>O copy</i>          <b>!</b> current time         <b>:</b> current drive\n"
-        " <i>D edit/create</i>   <i>Y delete</i>        <i>= last math result</i>     <b>.</b> current directory\n"
+        " <b>P</b> play          <b>E</b> rename        <b>@</b> today's date         <b>*</b> current filename\n"
+        " <b>R</b> record        <b>O</b> copy          <b>!</b> current time         <b>:</b> current drive\n"
+        " <b>D</b> edit/create   <b>Y</b> delete        <i>= last math result</i>     <b>.</b> current directory\n"
         " <i>S single step</i>                   <i># last math expression</i> <b>\\</b> current path\n"
         "                                 <i>$ last math as dollar</i>"
         "</pre>" ;
@@ -784,6 +784,8 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
     {
         return ;
     }
+
+    UpdateMacroActions() ;
 
     sStatus cstatus ;
     editor->GetStatus(cstatus) ;
@@ -2157,20 +2159,16 @@ BlockMathAction->setEnabled(false) ;
     QAction *WordCountAction = new QAction(mMenuProvider->GetUtilWordCountLabel(), mMenuBar) ;
     QAction *GenerateTOCAction = new QAction(mMenuProvider->GetUtilGenerateTOCLabel(), mMenuBar) ;
     QAction *GenerateIndexAction = new QAction(mMenuProvider->GetUtilGenerateIndexLabel(), mMenuBar) ;
-    QAction *PlayMacroAction = new QAction(mMenuProvider->GetUtilPlayMacroLabel(), mMenuBar) ;
-PlayMacroAction->setEnabled(false) ;
-    QAction *RecordMacroAction = new QAction(mMenuProvider->GetUtilRecordMacroLabel(), mMenuBar) ;
-RecordMacroAction->setEnabled(false) ;
-    QAction *EditMacroAction = new QAction(mMenuProvider->GetUtilEditMacroLabel(), mMenuBar) ;
-EditMacroAction->setEnabled(false) ;
+    mRecordMacroAction = new QAction(mMenuProvider->GetUtilRecordMacroLabel(), mMenuBar) ;
+    mStopMacroAction = new QAction(mMenuProvider->GetUtilStopRecordMacroLabel(), mMenuBar) ;
+mStopMacroAction->setEnabled(false) ;
+    mPlayMacroAction = new QAction(mMenuProvider->GetUtilPlayMacroLabel(), mMenuBar) ;
+    mEditMacroAction = new QAction(mMenuProvider->GetUtilEditMacroLabel(), mMenuBar) ;
+    mRenameMacroAction = new QAction(mMenuProvider->GetUtilRenameMacroLabel(), mMenuBar) ;
+    mCopyMacroAction = new QAction(mMenuProvider->GetUtilCopyMacroLabel(), mMenuBar) ;
+    mDeleteMacroAction = new QAction(mMenuProvider->GetUtilDeleteMacroLabel(), mMenuBar) ;
     QAction *SingleStepAction = new QAction(mMenuProvider->GetUtilSingleStepLabel(), mMenuBar) ;
 SingleStepAction->setEnabled(false) ;
-    QAction *CopyMacroAction = new QAction(mMenuProvider->GetUtilCopyMacroLabel(), mMenuBar) ;
-CopyMacroAction->setEnabled(false) ;
-    QAction *DeleteMacroAction = new QAction(mMenuProvider->GetUtilDeleteMacroLabel(), mMenuBar) ;
-DeleteMacroAction->setEnabled(false) ;
-    QAction *RenameMacroAction = new QAction(mMenuProvider->GetUtilRenameMacroLabel(), mMenuBar) ;
-RenameMacroAction->setEnabled(false) ;
     QAction *DataFileAction = new QAction(mMenuProvider->GetUtilDataFileLabel(), mMenuBar) ;
 DataFileAction->setEnabled(false) ;
     QAction *NameVarsAction = new QAction(mMenuProvider->GetUtilNameVarsLabel(), mMenuBar) ;
@@ -2227,13 +2225,17 @@ ReformatNotesAction->setEnabled(false) ;
     utilitiesmenu->addSeparator() ;
 
     QMenu *MacrosMenu = utilitiesmenu->addMenu("&Macros") ;
-    MacrosMenu->addAction(PlayMacroAction) ;
-    MacrosMenu->addAction(RecordMacroAction) ;
-    MacrosMenu->addAction(EditMacroAction) ;
+    MacrosMenu->addAction(mRecordMacroAction) ;
+    MacrosMenu->addAction(mStopMacroAction) ;
+    MacrosMenu->addAction(mPlayMacroAction) ;
+    MacrosMenu->addSeparator() ;
+    MacrosMenu->addAction(mEditMacroAction) ;
+    MacrosMenu->addAction(mRenameMacroAction) ;
+    MacrosMenu->addAction(mCopyMacroAction) ;
+    MacrosMenu->addAction(mDeleteMacroAction) ;
+    MacrosMenu->addSeparator() ;
     MacrosMenu->addAction(SingleStepAction) ;
-    MacrosMenu->addAction(CopyMacroAction) ;
-    MacrosMenu->addAction(DeleteMacroAction) ;
-    MacrosMenu->addAction(RenameMacroAction) ;
+    connect(MacrosMenu, &QMenu::aboutToShow, this, &cWordTsar::UpdateMacroActions) ;
 
     QMenu *MergeMenu = utilitiesmenu->addMenu("Merge &Print Commands") ;
     MergeMenu->addAction(DataFileAction) ;
@@ -2270,13 +2272,14 @@ ReformatNotesAction->setEnabled(false) ;
     connect(WordCountAction, &QAction::triggered, this, &cWordTsar::WordCount) ;
     connect(GenerateTOCAction, &QAction::triggered, this, &cWordTsar::GenerateTableOfContents) ;
     connect(GenerateIndexAction, &QAction::triggered, this, &cWordTsar::GenerateIndex) ;
-    connect(PlayMacroAction, &QAction::triggered, this, &cWordTsar::PlayMacro) ;
-    connect(RecordMacroAction, &QAction::triggered, this, &cWordTsar::RecordMacro) ;
-    connect(EditMacroAction, &QAction::triggered, this, &cWordTsar::EditMacro) ;
+    connect(mPlayMacroAction, &QAction::triggered, this, &cWordTsar::PlayMacro) ;
+    connect(mRecordMacroAction, &QAction::triggered, this, &cWordTsar::RecordMacro) ;
+    connect(mStopMacroAction, &QAction::triggered, this, &cWordTsar::StopRecordMacro) ;
+    connect(mEditMacroAction, &QAction::triggered, this, &cWordTsar::EditMacro) ;
     connect(SingleStepAction, &QAction::triggered, this, &cWordTsar::SingleStep) ;
-    connect(CopyMacroAction, &QAction::triggered, this, &cWordTsar::CopyMacro) ;
-    connect(DeleteMacroAction, &QAction::triggered, this, &cWordTsar::DeleteMacro) ;
-    connect(RenameMacroAction, &QAction::triggered, this, &cWordTsar::RenameMacro) ;
+    connect(mCopyMacroAction, &QAction::triggered, this, &cWordTsar::CopyMacro) ;
+    connect(mDeleteMacroAction, &QAction::triggered, this, &cWordTsar::DeleteMacro) ;
+    connect(mRenameMacroAction, &QAction::triggered, this, &cWordTsar::RenameMacro) ;
     connect(DataFileAction, &QAction::triggered, this, &cWordTsar::DataFile) ;
     connect(NameVarsAction, &QAction::triggered, this, &cWordTsar::NameVars) ;
     connect(SetVarAction, &QAction::triggered, this, &cWordTsar::SetVar) ;
@@ -3534,22 +3537,28 @@ void cWordTsar::GenerateIndex(void)
 
 void cWordTsar::PlayMacro(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('p') ;
+    mEditor->MacroPlay() ;
 }
 
 
 void cWordTsar::RecordMacro(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('r') ;
+    if (mEditor->IsMacroRecording() == false)
+    {
+        mEditor->MacroRecord() ;
+    }
+}
+
+
+void cWordTsar::StopRecordMacro(void)
+{
+    mEditor->MacroEndRecording() ;
 }
 
 
 void cWordTsar::EditMacro(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('D') ;
+    mEditor->MacroEdit() ;
 }
 
 
@@ -3562,22 +3571,55 @@ void cWordTsar::SingleStep(void)
 
 void cWordTsar::CopyMacro(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('O') ;
+    mEditor->MacroCopy() ;
 }
 
 
 void cWordTsar::DeleteMacro(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('y') ;
+    mEditor->MacroDelete() ;
 }
 
 
 void cWordTsar::RenameMacro(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('e') ;
+    mEditor->MacroRename() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Record only while neither recording nor playing, Stop Recording only
+/// while recording, Play only while neither; the file commands not while
+/// a macro plays.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordTsar::UpdateMacroActions(void)
+{
+    if ((mEditor == nullptr) || (mRecordMacroAction == nullptr))
+    {
+        return ;
+    }
+
+    bool recording = mEditor->IsMacroRecording() ;
+    bool playing = mEditor->IsMacroPlaying() ;
+    bool idle = (recording == false) && (playing == false) ;
+
+    auto set = [](QAction* action, bool enabled)
+    {
+        if (action->isEnabled() != enabled)
+        {
+            action->setEnabled(enabled) ;
+        }
+    } ;
+    set(mRecordMacroAction, idle) ;
+    set(mStopMacroAction, recording) ;
+    set(mPlayMacroAction, idle) ;
+    set(mEditMacroAction, playing == false) ;
+    set(mRenameMacroAction, playing == false) ;
+    set(mCopyMacroAction, playing == false) ;
+    set(mDeleteMacroAction, playing == false) ;
 }
 
 

@@ -620,7 +620,7 @@ void CheckMenuContents(const wordstartui::sMenuItem& item, const std::vector<sEx
         CHECK(entry.title == expected[index].title);
         CHECK(entry.shortcut == expected[index].shortcut);
         CHECK(entry.enabled == expected[index].enabled);
-        CHECK(entry.submenu.empty() == true);
+        CHECK(entry.submenu.empty() == (entry.shortcut != "\xe2\x96\xba"));
     }
 }
 
@@ -659,7 +659,7 @@ TEST_CASE("TUI Opening screen - Opening menu contents")
     CheckMenuContents(items[1], {
         {"Index...", "I", true},
         {"TOC...", "T", true},
-        {"Macros", "\xe2\x96\xba", false},
+        {"Macros", "\xe2\x96\xba", true},
         {nullptr, "", false},
         {"System Preferences...", "", true},
     });
@@ -2776,7 +2776,6 @@ TEST_CASE("TUI Opening screen - entries WordTsar does not implement say so")
         {
             {"f", "n", 0}, {"f", "k", 0}, {"f", "f", 0}, {"f", "o", 0}, {"f", "t", 0},
             {"f", "e", 0}, {"f", "c", 0}, {"f", "h", 0}, {"f", "r", 0},
-            {"u", "m", 1},
             {"a", "m", 2}, {"a", "t", 2}, {"a", "s", 2},
         };
         for (const sCase& entry : cases)

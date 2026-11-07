@@ -1489,14 +1489,35 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(util, std::string("&Word Count") + SC("^K?", "Alt+K, ?"), [this](void) { InjectChord(CTRL_K, '?'); });
     mMenu.AddSeparator(util);
 
+    // Macros: Record only while neither recording nor playing, Stop
+    // Recording only while recording, the rest not while a macro plays.
+    mMenuMacroState = MacroMenuState();
+    bool macroRecording = (mMenuMacroState == 1);
+    bool macroPlaying = (mMenuMacroState == 2);
+    bool macroIdle = (mMenuMacroState == 0);
     int utilMacros = mMenu.AddSubMenu(util, "Macr&os");
-    mMenu.AddSubMenuItem(utilMacros, std::string("Play...") + SC("^MP", ""), unavailable, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Record...") + SC("^MR", ""), unavailable, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Edit/Create...") + SC("^MD", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Record") + SC("^MR", ""), [this](void)
+    {
+        if (mEditor->IsMacroRecording() == false)
+        {
+            RunMacroCommand(&cEditorBase::MacroRecord);
+        }
+    }, macroIdle);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Stop Recording") + SC("^MR", "Alt+="),
+                         [this](void) { RunMacroCommand(&cEditorBase::MacroEndRecording); }, macroRecording);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Play...") + SC("^MP", ""),
+                         [this](void) { RunMacroCommand(&cEditorBase::MacroPlay); }, macroIdle);
+    mMenu.AddSubMenuSeparator(utilMacros);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Edit...") + SC("^MD", ""),
+                         [this](void) { RunMacroCommand(&cEditorBase::MacroEdit); }, !macroPlaying);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Rename...") + SC("^ME", ""),
+                         [this](void) { RunMacroCommand(&cEditorBase::MacroRename); }, !macroPlaying);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Copy...") + SC("^MO", ""),
+                         [this](void) { RunMacroCommand(&cEditorBase::MacroCopy); }, !macroPlaying);
+    mMenu.AddSubMenuItem(utilMacros, std::string("Delete...") + SC("^MY", ""),
+                         [this](void) { RunMacroCommand(&cEditorBase::MacroDelete); }, !macroPlaying);
+    mMenu.AddSubMenuSeparator(utilMacros);
     mMenu.AddSubMenuItem(utilMacros, std::string("Single Step...") + SC("^MS", ""), unavailable, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Copy...") + SC("^MO", ""), unavailable, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Delete...") + SC("^MY", ""), unavailable, false);
-    mMenu.AddSubMenuItem(utilMacros, std::string("Rename...") + SC("^ME", ""), unavailable, false);
 
     int utilMerge = mMenu.AddSubMenu(util, "Merge &Print Commands");
     mMenu.AddSubMenuItem(utilMerge, std::string("Data File...") + SC(".df", ""), unavailable, false);
@@ -1537,6 +1558,63 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(help, "&Change Help Level...", [this](void) { mEditor->PromptHelpLevel(); });
     mMenu.AddSeparator(help);
     mMenu.AddSubItem(help, "&About WordTsar", [this](void) { ShowAboutWordTsar(); });
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return 1 while a macro is recorded, 2 while one plays, otherwise 0
+///
+/////////////////////////////////////////////////////////////////////////////
+int cWSWordTsar::MacroMenuState(void) const
+{
+    if (mEditor->IsMacroRecording() == true)
+    {
+        return 1;
+    }
+    if (mEditor->IsMacroPlaying() == true)
+    {
+        return 2;
+    }
+    return 0;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  command [in] cEditorBase macro command
+///
+/// @brief
+/// Runs a macro command from the menu bar. It bypasses FeedKey, so it is
+/// not recorded.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::RunMacroCommand(void (cEditorBase::*command)(void))
+{
+    (mEditor->*command)();
+    mView->EnsureCaretVisible();
+    CheckCommandSignals();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Opening screen Macros > Edit: opens the chosen macro file and switches
+/// to the edit screen when it was loaded.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::OpeningEditMacro(void)
+{
+    std::string before = mEditor->mFileDir + "/" + mEditor->mFileName;
+    bool beforeSet = mEditor->mFileSet;
+
+    mEditor->MacroEdit();
+
+    std::string after = mEditor->mFileDir + "/" + mEditor->mFileName;
+    if ((mEditor->mFileSet == true) && ((beforeSet == false) || (after != before)))
+    {
+        mFilename = (std::filesystem::path(mEditor->mFileDir) / mEditor->mFileName).string();
+        mEditor->RelayoutAndRedraw();
+        SetMode(APP_EDITOR);
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1589,7 +1667,16 @@ void cWSWordTsar::BuildOpeningMenus(void)
     int util = mOpeningMenu.AddMenu("Utilities", 'U');
     mOpeningMenu.AddSubItem(util, "&Index...  I", run(eOpeningAction::INDEX_DOCUMENT));
     mOpeningMenu.AddSubItem(util, "&TOC...  T", run(eOpeningAction::TABLE_OF_CONTENTS));
-    mOpeningMenu.AddSubItem(util, "&Macros  \xe2\x96\xba", unavailable, false);   // U+25BA
+    int utilMacros = mOpeningMenu.AddSubMenu(util, "&Macros  \xe2\x96\xba");   // U+25BA
+    mOpeningMenu.AddSubMenuItem(utilMacros, "Record", unavailable, false);
+    mOpeningMenu.AddSubMenuItem(utilMacros, "Play...", unavailable, false);
+    mOpeningMenu.AddSubMenuSeparator(utilMacros);
+    mOpeningMenu.AddSubMenuItem(utilMacros, "&Edit...", [this](void) { OpeningEditMacro(); });
+    mOpeningMenu.AddSubMenuItem(utilMacros, "Re&name...", [this](void) { mEditor->MacroRename(); });
+    mOpeningMenu.AddSubMenuItem(utilMacros, "&Copy...", [this](void) { mEditor->MacroCopy(); });
+    mOpeningMenu.AddSubMenuItem(utilMacros, "&Delete...", [this](void) { mEditor->MacroDelete(); });
+    mOpeningMenu.AddSubMenuSeparator(utilMacros);
+    mOpeningMenu.AddSubMenuItem(utilMacros, "Single Step...", unavailable, false);
     mOpeningMenu.AddSeparator(util);
     mOpeningMenu.AddSubItem(util, "System &Preferences...", run(eOpeningAction::PREFERENCES));
     mOpeningMenu.SetMenuBoxLayout(util, 20, 17);
@@ -3215,6 +3302,10 @@ bool cWSWordTsar::HandleEvent(const sInputEvent& event)
     // it used to open System Preferences here, ahead of the normal input
     // pipeline -- now it falls through so mView/mInput can handle it.
 
+    if ((mMenu.IsOpen() == false) && (MacroMenuState() != mMenuMacroState))
+    {
+        BuildMenus();
+    }
     if (mMenu.HandleEvent(event) == true)
     {
         CheckCommandSignals();

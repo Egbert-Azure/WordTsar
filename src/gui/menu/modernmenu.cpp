@@ -1385,12 +1385,17 @@ QString cModernMenuProvider::GetUtilPlayMacroLabel(void) const
 
 QString cModernMenuProvider::GetUtilRecordMacroLabel(void) const
 {
-    return "&Record...";
+    return "&Record";
+}
+
+QString cModernMenuProvider::GetUtilStopRecordMacroLabel(void) const
+{
+    return "S&top Recording\tAlt+=";
 }
 
 QString cModernMenuProvider::GetUtilEditMacroLabel(void) const
 {
-    return "&Edit/Create...";
+    return "&Edit...";
 }
 
 QString cModernMenuProvider::GetUtilSingleStepLabel(void) const

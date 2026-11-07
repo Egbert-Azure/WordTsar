@@ -248,6 +248,7 @@ public:
     // Utilities Menu - Macros
     QString GetUtilPlayMacroLabel(void) const override;
     QString GetUtilRecordMacroLabel(void) const override;
+    QString GetUtilStopRecordMacroLabel(void) const override;
     QString GetUtilEditMacroLabel(void) const override;
     QString GetUtilSingleStepLabel(void) const override;
     QString GetUtilCopyMacroLabel(void) const override;

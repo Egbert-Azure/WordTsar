@@ -38,6 +38,7 @@
 class cWSEditorCtrl;
 class cWSEditorView;
 class cConfig;
+class cEditorBase;
 class cWordStarInput;
 
 // Actions of the Opening screen, run from its menu panel.
@@ -193,6 +194,9 @@ private:
     void LayoutChrome(void);
     void BuildMenus(void);
     void BuildOpeningMenus(void);
+    int MacroMenuState(void) const;          // 1 recording, 2 playing, 0 neither
+    void RunMacroCommand(void (cEditorBase::*command)(void));
+    void OpeningEditMacro(void);
     void InjectChord(int controlCode, char follow);
     void InjectControl(int controlCode);
     void CheckCommandSignals(void);
@@ -277,6 +281,7 @@ private:
     // and can't collide with a chord the user has half-typed on the real one.
     cWordStarInput* mMenuInput; // owned
     wordstartui::cMenuBar mMenu;
+    int mMenuMacroState = 0;              // MacroMenuState() mMenu was built for
     wordstartui::cMenuBar mOpeningMenu;   // Opening screen menu bar (help level 4)
     std::string mFilename;
     int mRows;

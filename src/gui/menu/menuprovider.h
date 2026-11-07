@@ -253,6 +253,7 @@ public:
     // Utilities Menu - Macros
     virtual QString GetUtilPlayMacroLabel(void) const = 0;
     virtual QString GetUtilRecordMacroLabel(void) const = 0;
+    virtual QString GetUtilStopRecordMacroLabel(void) const = 0;
     virtual QString GetUtilEditMacroLabel(void) const = 0;
     virtual QString GetUtilSingleStepLabel(void) const = 0;
     virtual QString GetUtilCopyMacroLabel(void) const = 0;
