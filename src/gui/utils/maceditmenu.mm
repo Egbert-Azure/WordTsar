@@ -18,7 +18,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+#import <AppKit/AppKit.h>
 
 #include "maceditmenu.h"
 
@@ -31,4 +31,67 @@ void RegisterMacEditMenuDefaults()
             @"NSDisabledCharacterPaletteMenuItem" : @YES,
         }];
     }
+}
+
+static bool IsWritingToolsOrAutoFill(NSMenuItem* item)
+{
+    NSString* ident = [item identifier];
+    if (ident != nil && ([ident containsString:@"WritingTools"] || [ident containsString:@"AutoFill"]))
+    {
+        return true;
+    }
+
+    for (NSMenuItem* sub in [[item submenu] itemArray])
+    {
+        if ([sub action] == nil)
+        {
+            continue;
+        }
+        NSString* action = NSStringFromSelector([sub action]);
+        if ([action isEqualToString:@"showWritingTools:"] || [action hasPrefix:@"_handleInsertFrom"])
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Removes the item and the separator directly in front of it.
+static void StripMenu(NSMenu* menu)
+{
+    for (NSInteger i = [menu numberOfItems] - 1; i >= 0; --i)
+    {
+        NSMenuItem* item = [menu itemAtIndex:i];
+        if (![item isSeparatorItem] && IsWritingToolsOrAutoFill(item))
+        {
+            [menu removeItemAtIndex:i];
+            if (i > 0 && [[menu itemAtIndex:i - 1] isSeparatorItem])
+            {
+                [menu removeItemAtIndex:i - 1];
+                --i;
+            }
+        }
+    }
+}
+
+static void StripMainMenu()
+{
+    for (NSMenuItem* top in [[NSApp mainMenu] itemArray])
+    {
+        if ([top submenu] != nil)
+        {
+            StripMenu([top submenu]);
+        }
+    }
+}
+
+void InstallMacEditMenuCleanup()
+{
+    NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+    void (^strip)(NSNotification*) = ^(NSNotification*) { StripMainMenu(); };
+
+    [center addObserverForName:NSApplicationDidFinishLaunchingNotification object:nil
+                         queue:nil usingBlock:strip];
+    [center addObserverForName:NSMenuDidBeginTrackingNotification object:nil
+                         queue:nil usingBlock:strip];
 }

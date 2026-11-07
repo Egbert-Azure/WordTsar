@@ -163,6 +163,7 @@ int main(int argc, char *argv[])
 {
     // AppKit reads these when the QApplication builds the menu bar
     RegisterMacEditMenuDefaults();
+    InstallMacEditMenuCleanup();
 
     cWordTsarApplication app(argc, argv);
 
