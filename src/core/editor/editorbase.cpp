@@ -6200,6 +6200,28 @@ POSITION_T cEditorBase::SkipOverHiddenContent(POSITION_T pos, int direction)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @brief
+/// Moves the caret forward to the next visible text if it is on a hidden
+/// dot command line or a hidden control code.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::MoveCaretOffHiddenContent(void)
+{
+    if (mDocument == nullptr)
+    {
+        return;
+    }
+    POSITION_T currentPos = mDocument->GetPosition();
+    POSITION_T safePos = SkipOverHiddenContent(currentPos, +1);
+    if (safePos != currentPos)
+    {
+        mDocument->SetPosition(safePos);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  std::string filepath [in] - full path to the document file
 ///
 /// @return nothing

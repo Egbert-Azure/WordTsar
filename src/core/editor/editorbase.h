@@ -304,6 +304,7 @@ public:
 
     // Caret Movement
     void CalculateCaretPosition(void);
+    void MoveCaretOffHiddenContent(void);                     // forward to the next visible text if the caret is on hidden content
     virtual void ScrollIntoView(void);
     void MoveCaretLeft(void);
     void MoveCaretRight(void);

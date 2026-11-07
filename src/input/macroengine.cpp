@@ -27,6 +27,7 @@
 #include <system_error>
 
 #include "src/core/editor/editorbase.h"
+#include "src/core/layout/layoutbase.h"
 #include "src/core/utils/config.h"
 #include "src/input/defaultmacros.h"
 #include "src/input/moderninput.h"
@@ -558,6 +559,7 @@ cMacroEngine::cMacroEngine(cEditorBase& editor)
     , mSavedShowControl(0)
     , mSavedShowDot(true)
     , mSavedHelpLevel(0)
+    , mSavedPageView(false)
 {
 }
 
@@ -1535,24 +1537,45 @@ void cMacroEngine::Finish(void)
 }
 
 
+// The control display shown: the layout's, SHOW_NONE in page view.
+static eShowControl ShownControls(cEditorBase& editor)
+{
+    cLayoutBase* layout = editor.GetLayout();
+    return (layout != nullptr) ? layout->GetShowControl() : editor.GetShowControls();
+}
+
+
+// In page view the saved control display is the one continuous view
+// returns to.
 void cMacroEngine::SaveSettings(void)
 {
     mSavedInsert = mEditor.mInsertMode;
-    mSavedShowControl = static_cast<int>(mEditor.GetShowControls());
+    mSavedPageView = (mEditor.GetDisplayMode() == DISPLAY_PAGE);
+    mSavedShowControl = static_cast<int>((mSavedPageView == true) ? mEditor.GetShowControls() : ShownControls(mEditor));
     mSavedShowDot = mEditor.GetShowDot();
     mSavedHelpLevel = mEditor.mHelpLevel;
 }
 
 
+// Back to the saved settings and view. A caret on a line hidden again
+// moves forward to the next visible text.
 void cMacroEngine::RestoreSettings(void)
 {
     mEditor.mInsertMode = mSavedInsert;
     mEditor.mHelpLevel = mSavedHelpLevel;
     mEditor.SetShowDot(mSavedShowDot);
-    if (static_cast<int>(mEditor.GetShowControls()) != mSavedShowControl)
+    if (mEditor.GetDisplayMode() != DISPLAY_PAGE)
     {
-        mEditor.SetShowControls(static_cast<eShowControl>(mSavedShowControl));
-        mEditor.LayoutDocument(true);
+        if (static_cast<int>(ShownControls(mEditor)) != mSavedShowControl)
+        {
+            mEditor.SetShowControls(static_cast<eShowControl>(mSavedShowControl));
+            mEditor.LayoutDocument(true);
+        }
+        if (mSavedPageView == true)
+        {
+            mEditor.SetDisplayMode(DISPLAY_PAGE);
+        }
+        mEditor.MoveCaretOffHiddenContent();
     }
     mEditor.CalculateCaretPosition();
 }
@@ -1563,16 +1586,24 @@ void cMacroEngine::RestoreSettings(void)
 /// @param  statement [in] a MACRO_SETTING statement
 ///
 /// @brief
-/// Insert sets insert mode. CmdTags and HideDots set the control display:
-/// dot commands hidden shows nothing (SHOW_NONE), otherwise command tags
-/// show all (SHOW_ALL) or dot commands only (SHOW_DOT). SetHelpLevel 0-4
+/// Insert sets insert mode. CmdTags and HideDots set the control display
+/// shown: dot commands hidden shows nothing (SHOW_NONE), otherwise command
+/// tags show all (SHOW_ALL) or dot commands only (SHOW_DOT). In page view,
+/// HideDots(OFF) and CmdTags(ON) switch to continuous view. SetHelpLevel 0-4
 /// sets the help level 0-3. ColMode, ColReplace and WSQuiet have no
 /// WordTsar setting.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMacroEngine::ApplySetting(const sMacroStatement& statement)
 {
-    eShowControl show = mEditor.GetShowControls();
+    bool shows = ((statement.setting == MACRO_SETTING_HIDE_DOTS) && (statement.value == 0)) ||
+                 ((statement.setting == MACRO_SETTING_CMD_TAGS) && (statement.value != 0));
+    if ((shows == true) && (mEditor.GetDisplayMode() == DISPLAY_PAGE))
+    {
+        mEditor.SetDisplayMode(DISPLAY_CONTINUOUS);
+    }
+
+    eShowControl show = ShownControls(mEditor);
     bool tags = (show == SHOW_ALL);
     bool hideDots = (show == SHOW_NONE);
 

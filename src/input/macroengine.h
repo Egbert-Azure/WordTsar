@@ -224,6 +224,7 @@ private:
     int mSavedShowControl;
     bool mSavedShowDot;
     int mSavedHelpLevel;
+    bool mSavedPageView;
 };
 
 /// @}
