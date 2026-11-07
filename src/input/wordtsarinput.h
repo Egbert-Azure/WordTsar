@@ -63,6 +63,39 @@ enum eSpecialChars
 } ;
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @enum eWordStarCommand
+///
+/// @brief
+/// What a key does in WordStar mode, from the command tables in
+/// wordtsarinput.cpp. The key handlers report WSCMD_NOT_IMPLEMENTED and
+/// WSCMD_INVALID keys from the same tables.
+///
+/////////////////////////////////////////////////////////////////////////////
+enum eWordStarCommand
+{
+    WSCMD_RUNS,                 ///< runs without asking for input
+    WSCMD_PREFIX,               ///< chord prefix, waits for the next key
+    WSCMD_FIND,                 ///< Find prompt (^QF)
+    WSCMD_REPLACE,              ///< Find and Replace prompt (^QA)
+    WSCMD_SUBKEY,               ///< waits for one more key (^KZ)
+    WSCMD_DIALOG,               ///< opens a dialog a macro cannot answer
+    WSCMD_NOT_IMPLEMENTED,      ///< "not implemented" message
+    WSCMD_INVALID               ///< no command: "invalid command" or not handled
+};
+
+const char WSCMD_CONTROL = 0;   ///< WordStarCommand prefix: a control key (1-31)
+const char WSCMD_ALT = 1;       ///< WordStarCommand prefix: an Alt key
+
+// Command of key ch after prefix: WSCMD_CONTROL, WSCMD_ALT or a chord
+// prefix 'k', 'q', 'o', 'p', 'm'. Chord keys are lower case, ^X as 'x'.
+eWordStarCommand WordStarCommand(char prefix, char ch);
+
+// Command of a named key (no chord pending).
+eWordStarCommand WordStarSpecialCommand(eSpecialKey key);
+
+
 
 class cWordStarInput : public IInputHandler
 {
@@ -88,6 +121,7 @@ public:
     void OnControlKZChar(char key) ;
     void OnHelpTargetChar(char key) ;
     void OnHelpChordTargetChar(char key) ;
+    bool ChordAvailable(char prefix, char ch) ;   // reports a not implemented or invalid chord key
 
     // =================================================================
     // MEMBER VARIABLES

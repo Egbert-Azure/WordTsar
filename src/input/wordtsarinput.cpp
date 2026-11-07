@@ -63,6 +63,7 @@
  * @see cEditorBase Editor base class receiving commands
  */
 
+#include <cstring>
 #include <filesystem>
 
 #include "wordtsarinput.h"
@@ -605,7 +606,93 @@ const char *LookupMChordHelp(char lower)
     }
 }
 
+
+struct sCommandKeys
+{
+    char prefix ;
+    eWordStarCommand command ;
+    const char *keys ;
+} ;
+
+// Keys that are not listed for a prefix are WSCMD_INVALID.
+const char DIGITS[] = "0123456789" ;
+const sCommandKeys COMMAND_KEYS[] =
+{
+    { WSCMD_CONTROL, WSCMD_PREFIX,          "\x0B\x0D\x0F\x10\x11" },
+    { WSCMD_CONTROL, WSCMD_RUNS,            "\x01\x03\x04\x05\x06\x07\x08\x09\x0C\x0E\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B" },
+
+    { WSCMD_ALT,     WSCMD_PREFIX,          "kqopm" },
+    { WSCMD_ALT,     WSCMD_RUNS,            "\x15-=" },
+
+    { 'k',           WSCMD_RUNS,            "bkcvy\"'.<h[]?udsxq" },
+    { 'k',           WSCMD_RUNS,            DIGITS },
+    { 'k',           WSCMD_SUBKEY,          "z" },
+    { 'k',           WSCMD_DIALOG,          "rtpw" },
+    { 'k',           WSCMD_NOT_IMPLEMENTED, "oej\\lfmniag" },
+
+    { 'o',           WSCMD_RUNS,            "dc]tjwvgeh<>=+" },
+    { 'o',           WSCMD_DIALOG,          "?pylxiouf sab" },
+    { 'o',           WSCMD_NOT_IMPLEMENTED, "kmz#n" },
+
+    { 'q',           WSCMD_FIND,            "f" },
+    { 'q',           WSCMD_REPLACE,         "a" },
+    { 'q',           WSCMD_RUNS,            "exrcbksdu \x7Fy=pv" },
+    { 'q',           WSCMD_RUNS,            DIGITS },
+    { 'q',           WSCMD_DIALOG,          "lnoghitj" },
+    { 'q',           WSCMD_NOT_IMPLEMENTED, "<mwz" },
+
+    { 'p',           WSCMD_RUNS,            "bsvtyxk" },
+    { 'p',           WSCMD_DIALOG,          "=+-" },
+    { 'p',           WSCMD_NOT_IMPLEMENTED, "dnah fg*&oci.0qwer!?" },
+
+    { 'm',           WSCMD_RUNS,            "@!*.\\" },
+    { 'm',           WSCMD_DIALOG,          "prdeoy" },
+    { 'm',           WSCMD_NOT_IMPLEMENTED, "=#$s" },
+} ;
+
 } // namespace
+
+
+eWordStarCommand WordStarCommand(char prefix, char ch)
+{
+    if (ch == '\0')
+    {
+        return WSCMD_INVALID ;
+    }
+    for (const sCommandKeys &entry : COMMAND_KEYS)
+    {
+        if ((entry.prefix == prefix) && (std::strchr(entry.keys, ch) != nullptr))
+        {
+            return entry.command ;
+        }
+    }
+    return WSCMD_INVALID ;
+}
+
+
+eWordStarCommand WordStarSpecialCommand(eSpecialKey key)
+{
+    switch (key)
+    {
+        case SPECIAL_F1 :
+            return WSCMD_DIALOG ;
+
+        case SPECIAL_F2 :
+        case SPECIAL_F3 :
+        case SPECIAL_F4 :
+        case SPECIAL_F5 :
+        case SPECIAL_F6 :
+        case SPECIAL_F7 :
+        case SPECIAL_F8 :
+        case SPECIAL_F9 :
+        case SPECIAL_F10 :
+        case SPECIAL_F12 :
+            return WSCMD_INVALID ;
+
+        default :
+            return WSCMD_RUNS ;
+    }
+}
 
 /// @ingroup Keyboard
 /// @{
@@ -674,6 +761,11 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
     if (alt)
     {
         char lower = tolower(ch) ;
+
+        if (WordStarCommand(WSCMD_ALT, lower) == WSCMD_INVALID)
+        {
+            return false ;
+        }
 
         if (lower == 'k')
         {
@@ -819,6 +911,11 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
     {
         bool upordown = mEditor->mLastKeyUpOrDown ;                     // has an up or down key been pressed
         mEditor->mLastKeyUpOrDown = false ;
+
+        if (WordStarCommand(WSCMD_CONTROL, ch) == WSCMD_INVALID)
+        {
+            return false ;
+        }
 
         switch(ch)
         {
@@ -1014,6 +1111,11 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
     if ((CheckControlMode() == true) && (key == SPECIAL_DELETE))
     {
         return HandleKey(static_cast<char>(0x7F), shift, alt) ;
+    }
+
+    if (WordStarSpecialCommand(key) == WSCMD_INVALID)
+    {
+        return false ;
     }
 
     bool handled = true ;
@@ -1269,6 +1371,11 @@ void cWordStarInput::OnControlMChar(char ch)
     }
     ch = tolower(ch) ;
 
+    if (ChordAvailable('m', ch) == false)
+    {
+        return ;
+    }
+
     switch(ch)
     {
         case '@' :
@@ -1341,16 +1448,6 @@ void cWordStarInput::OnControlMChar(char ch)
 
         case 'y' :
             mEditor->MacroDelete() ;
-            break ;
-
-        case '=' :
-        case '#' :
-        case '$' :
-        case 's' :
-            {
-                std::string t = string_sprintf("^M-%c", ch) ;
-                mEditor->NotImplemented(t) ;
-            }
             break ;
 
         default :
@@ -1444,6 +1541,34 @@ void cWordStarInput::OnHelpChordTargetChar(char ch)
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  prefix [in] chord prefix 'k', 'q', 'o', 'p' or 'm'
+/// @param  ch     [in] key after the prefix, lower case
+///
+/// @return true if the key has a command; otherwise the "not implemented"
+///         or "invalid command" message was shown
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordStarInput::ChordAvailable(char prefix, char ch)
+{
+    eWordStarCommand command = WordStarCommand(prefix, ch) ;
+    std::string t = string_sprintf("^%c-%c", toupper(prefix), ch) ;
+
+    if (command == WSCMD_NOT_IMPLEMENTED)
+    {
+        mEditor->NotImplemented(t) ;
+        return false ;
+    }
+    if (command == WSCMD_INVALID)
+    {
+        mEditor->InvalidCommand(t) ;
+        return false ;
+    }
+    return true ;
+}
+
+
 bool cWordStarInput::OnControlKChar(char ch)
 {
     mControlKMode = false ;
@@ -1454,6 +1579,11 @@ bool cWordStarInput::OnControlKChar(char ch)
         ch += '@' ;
     }
     ch = tolower(ch) ;
+
+    if (ChordAvailable('k', ch) == false)
+    {
+        return false ;
+    }
     
     switch(ch)
     {
@@ -1684,23 +1814,6 @@ bool cWordStarInput::OnControlKChar(char ch)
             retval = true ;
             break ;
 
-        case 'o' :
-        case 'e' :
-        case 'j' :
-        case '\\' :
-        case 'l' :
-        case 'f' :
-        case 'm' :
-        case 'n' :
-        case 'i' :
-        case 'a' :
-        case 'g' :
-            {
-                std::string t = string_sprintf("^K-%c", ch) ;
-                mEditor->NotImplemented(t) ;
-            }
-            break ;
-
         default :
             {
                 std::string t = string_sprintf("^K-%c", ch).c_str() ;
@@ -1752,6 +1865,11 @@ void cWordStarInput::OnControlOChar(char ch)
     }
 
     ch = tolower(ch) ;
+
+    if (ChordAvailable('o', ch) == false)
+    {
+        return ;
+    }
     
     switch(ch)
     {
@@ -1833,17 +1951,6 @@ void cWordStarInput::OnControlOChar(char ch)
             mEditor->ToggleHyphenation() ;
             break ;
 
-        case 'k' :
-        case 'm' :
-        case 'z' :
-        case '#' :
-        case 'n' :
-            {
-                std::string t = string_sprintf("^O-%c", ch) ;
-                mEditor->NotImplemented(t) ;
-            }
-            break ;
-        
         case '<' :
             mEditor->SetParagraphAlignment(JUST_LEFT) ;
             break ;
@@ -1879,6 +1986,11 @@ void cWordStarInput::OnControlQChar(char ch)
         ch += '@' ;
     }
     ch = tolower(ch) ;
+
+    if (ChordAvailable('q', ch) == false)
+    {
+        return ;
+    }
     
     switch(ch)
     {
@@ -1995,16 +2107,6 @@ void cWordStarInput::OnControlQChar(char ch)
             mEditor->Thesaurus() ;
             break ;
 
-        case '<' :
-        case 'm' :
-        case 'w' :
-        case 'z' :
-            {
-                std::string t = string_sprintf("^Q-%c", ch) ;
-                mEditor->NotImplemented(t) ;
-            }
-            break ;
-        
         default :
             {
                 std::string t = string_sprintf("^Q-%c", ch).c_str() ;
@@ -2028,6 +2130,11 @@ void cWordStarInput::OnControlPChar(char ch)
         ch += '@' ;
     }
     ch = tolower(ch) ;
+
+    if (ChordAvailable('p', ch) == false)
+    {
+        return ;
+    }
     
     switch(ch)
     {
@@ -2088,32 +2195,6 @@ void cWordStarInput::OnControlPChar(char ch)
             
         case '-' :
             mEditor->SelectColor() ;
-            break ;
-            
-        case 'd' :
-        case 'n' :
-        case 'a' :
-        case 'h' :
-        case ' ' :
-        case 'f' :
-        case 'g' :
-        case '*' :
-        case '&' :
-        case 'o' :
-        case 'c' :
-        case 'i' :
-        case '.' :
-        case '0' :
-        case 'q' :
-        case 'w' :
-        case 'e' :
-        case 'r' :
-        case '!' :
-        case '?' :
-            {
-                std::string t = string_sprintf("^P-%c", ch) ;
-                mEditor->NotImplemented(t) ;
-            }
             break ;
             
         default :
