@@ -4,7 +4,7 @@ BOOK.WS is a manuscript template for a novel: a title page, a running header wit
 
 ## Use
 
-1. Copy this folder (BOOK.WS and `macros`). Open BOOK.WS in WordTsar or in ws. ^MP lists the macros in the `macros` folder next to the open document first. In ws, ^M arrives as Enter: use Alt+M instead (Option+M with the Option key set to send Esc, see KEY_MAPPING.md). In Modern mode, use Utilities > Macros > Play....
+1. Copy this folder (BOOK.WS and `macros`). Open BOOK.WS in WordTsar or in ws. ^MP lists the macros in the `macros` folder next to the open document first. In ws, type ^M as Option+M (set Option as Meta in the terminal, see KEY_MAPPING.md). In Modern mode, use Utilities > Macros > Play....
 2. ^MP SETUP. It asks, in this order: title, author's name, surname, street, city/state/ZIP, country, e-mail, phone. At each stop the status line says "Type, then press Enter". Type the value and press Enter.
 3. For each new chapter, put the cursor at the end of the last paragraph of the chapter before and press ^MP CHAPTER. It asks for the chapter title the same way, adds a page break, the drop line, the contents entry and the centred heading, and leaves the cursor at the first paragraph.
 
