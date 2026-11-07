@@ -2047,6 +2047,217 @@ void cEditorBase::GotoLastFindandReplace(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  request [in] Find or Replace answer
+///
+/// @return the option letters in the order B G R N U W ?
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string FindOptionLetters(const sFindRequest& request)
+{
+    std::string letters;
+    if (request.backward == true)
+    {
+        letters += 'B';
+    }
+    if (request.scope == 1)
+    {
+        letters += 'G';
+    }
+    if (request.scope == 2)
+    {
+        letters += 'R';
+    }
+    if (request.dontAsk == true)
+    {
+        letters += 'N';
+    }
+    if (request.ignoreCase == true)
+    {
+        letters += 'U';
+    }
+    if (request.wholeWord == true)
+    {
+        letters += 'W';
+    }
+    if (request.wildcard == true)
+    {
+        letters += '?';
+    }
+    return letters;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  letters [in]  option letters, any order and case; others ignored
+/// @param  request [out] options set from the letters (all cleared first)
+///
+/////////////////////////////////////////////////////////////////////////////
+void ApplyFindOptionLetters(const std::string& letters, sFindRequest& request)
+{
+    request.backward = false;
+    request.ignoreCase = false;
+    request.wholeWord = false;
+    request.wildcard = false;
+    request.dontAsk = false;
+    request.scope = 0;
+
+    for (char c : letters)
+    {
+        switch (toupper(static_cast<unsigned char>(c)))
+        {
+            case 'B': request.backward = true;   break;
+            case 'G': request.scope = 1;         break;
+            case 'R': request.scope = 2;         break;
+            case 'N': request.dontAsk = true;    break;
+            case 'U': request.ignoreCase = true; break;
+            case 'W': request.wholeWord = true;  break;
+            case '?': request.wildcard = true;   break;
+            default:                             break;
+        }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  request [in,out] current values on entry, the answer on return
+/// @param  replace [in]     true for Find and Replace
+///
+/// @return false if the prompt was cancelled
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::RequestFind(sFindRequest& request, bool replace)
+{
+    if (replace == true)
+    {
+        return PromptReplace(request);
+    }
+    return PromptFind(request);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// ^QF: asks for the search text and options, stores them and searches.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::Find(void)
+{
+    if (mDocument == nullptr)
+    {
+        return;
+    }
+
+    mLastFindandReplace = mDocument->GetPosition();
+
+    sFindRequest request;
+    request.text = mSearchText;
+    request.replace = mReplaceText;
+    request.backward = mSearchBackwards;
+    request.ignoreCase = mCaseCmp;
+    request.wholeWord = mWholeWord;
+    request.wildcard = mWildCard;
+    request.dontAsk = (mReplaceAsk == false);
+    request.scope = (mWholeFile == true) ? 1 : 0;
+
+    if ((RequestFind(request, false) == false) || (request.text.empty() == true))
+    {
+        return;
+    }
+
+    mSearchText = request.text;
+    mSearchBackwards = request.backward;
+    mCaseCmp = request.ignoreCase;
+    mWholeWord = request.wholeWord;
+    mWildCard = request.wildcard;
+    mWholeFile = (request.scope == 1);
+
+    FindAgain();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// ^QA: asks for the search and replacement text and options, then replaces
+/// the next occurrence, or every occurrence in the entire file (G) or the
+/// rest of the file (R) as one undo step.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::Replace(void)
+{
+    if (mDocument == nullptr)
+    {
+        return;
+    }
+
+    mLastFindandReplace = mDocument->GetPosition();
+
+    sFindRequest request;
+    request.text = mSearchText;
+    request.replace = mReplaceText;
+    request.backward = mSearchBackwards;
+    request.ignoreCase = mCaseCmp;
+    request.wholeWord = mWholeWord;
+    request.wildcard = mWildCard;
+    request.dontAsk = (mReplaceAsk == false);
+    request.scope = 0;
+
+    if ((RequestFind(request, true) == false) || (request.text.empty() == true))
+    {
+        return;
+    }
+
+    mSearchText = request.text;
+    mReplaceText = request.replace;
+    mSearchBackwards = request.backward;
+    mCaseCmp = request.ignoreCase;
+    mWholeWord = request.wholeWord;
+    mWildCard = request.wildcard;
+    mReplaceAsk = (request.dontAsk == false);
+    mReplaceScope = request.scope;
+    mWholeFile = false;
+    mReplaceSize = static_cast<POSITION_T>(mSearchText.length());
+
+    if (mReplaceScope == 0)
+    {
+        ReplaceAgain();
+        return;
+    }
+
+    if (mReplaceScope == 1)
+    {
+        if (mSearchBackwards == true)
+        {
+            mDocument->SetPosition(mDocument->GetTextSize() - 1);
+        }
+        else
+        {
+            mDocument->SetPosition(0);
+        }
+    }
+
+    CloseTypingGroup();
+    mDocument->BeginUndoGroup();
+    BeginBatchUpdate();
+    bool done = false;
+    long count = -1;
+    while (done == false)
+    {
+        count++;
+        done = ReplaceAgain(true);
+    }
+    EndBatchUpdate();
+    mDocument->EndUndoGroup();
+
+    ShowMessage("Replace", "Replaced " + std::to_string(count) + " items");
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief

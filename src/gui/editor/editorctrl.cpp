@@ -5069,42 +5069,23 @@ void cEditorCtrl::ClipboardPaste(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return nothing
+/// @param  request [in,out] current values on entry, the answer on return
+///
+/// @return false if cancelled
 ///
 /// @brief
-/// Initiates a new search operation. Saves the current position and
-/// sets up search parameters, then calls FindAgain() to perform the search.
-///
-/// *** COPIED FROM OLD SYSTEM - editorctrl.cpp::Find() ***
-/// API CHANGE: mDocument member becomes mDocument pointer
+/// Find dialog. Under QT_TESTING=1 no dialog is shown and the current
+/// values are returned unchanged.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::Find(void)
+bool cEditorCtrl::PromptFind(sFindRequest& request)
 {
-    // *** COPIED FROM OLD SYSTEM - editorctrl.cpp::Find() (lines 3058-3089) ***
-    // API CHANGE: mDocument.GetPosition() becomes mDocument->GetPosition()
-
-    if (!mDocument)
-    {
-        return;
-    }
-
-    // Save position before starting search (for GotoLastFindandReplace)
-    mLastFindandReplace = mDocument->GetPosition();
-
-    // Skip dialog if running in test mode (QT_TESTING environment variable set)
     const char* qtTesting = std::getenv("QT_TESTING");
     if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
     {
-        // Test mode - use existing mSearchText without dialog
-        if (!mSearchText.empty())
-        {
-            FindAgain();
-        }
-        return;
+        return true;
     }
 
-    // Show Find dialog
     QDialog dialog(this);
     Ui::Find find;
     find.setupUi(&dialog);
@@ -5112,28 +5093,24 @@ void cEditorCtrl::Find(void)
     find.mNextOccurance->setChecked(true);
 
     // Pre-populate with previous search text if available
-    if (!mSearchText.empty())
+    if (!request.text.empty())
     {
-        find.mFind->setText(QString::fromStdString(mSearchText));
+        find.mFind->setText(QString::fromStdString(request.text));
         find.mFind->selectAll();
     }
 
-    int ecode = dialog.exec();
-
-    if (ecode != 0)
+    if (dialog.exec() == 0)
     {
-        QString text = find.mFind->text();
-        if (text.length() != 0)
-        {
-            mWholeFile = find.mGlobal->isChecked();
-            mCaseCmp = find.mIgnoreCase->isChecked();
-            mSearchBackwards = find.mBackward->isChecked();
-            mWildCard = find.mUseWildCard->isChecked();
-            mWholeWord = find.mWholeWord->isChecked();
-            mSearchText = text.toStdString();
-            FindAgain();
-        }
+        return false;
     }
+
+    request.text = find.mFind->text().toStdString();
+    request.scope = find.mGlobal->isChecked() ? 1 : 0;
+    request.ignoreCase = find.mIgnoreCase->isChecked();
+    request.backward = find.mBackward->isChecked();
+    request.wildcard = find.mUseWildCard->isChecked();
+    request.wholeWord = find.mWholeWord->isChecked();
+    return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -5472,50 +5449,23 @@ bool cEditorCtrl::ReplaceAgain(bool noquery)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return nothing
+/// @param  request [in,out] current values on entry, the answer on return
+///
+/// @return false if cancelled
 ///
 /// @brief
-/// Initiates a find-and-replace operation. Shows dialog to get
-/// search/replace text and options, then performs replacement.
-///
-/// Supports three modes:
-/// - Next occurrence: Find and replace once (with optional confirmation)
-/// - Entire file: Replace all from start/end of document
-/// - Rest of file: Replace all from current position
-///
-/// *** COPIED FROM OLD SYSTEM - editorctrl.cpp::Replace() ***
-/// API CHANGE: mDocument member becomes mDocument pointer
+/// Find and Replace dialog. Under QT_TESTING=1 no dialog is shown and the
+/// current values are returned unchanged.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::Replace(void)
+bool cEditorCtrl::PromptReplace(sFindRequest& request)
 {
-    // *** COPIED FROM OLD SYSTEM - editorctrl.cpp::Replace() (lines 2867-2954) ***
-    // API CHANGE: mDocument.GetPosition() becomes mDocument->GetPosition()
-    // API CHANGE: mDocument.SetPosition() becomes mDocument->SetPosition()
-    // API CHANGE: mDocument.GetTextSize() becomes mDocument->GetTextSize()
-
-    if (!mDocument)
-    {
-        return;
-    }
-
-    // Save position before starting search (for GotoLastFindandReplace)
-    mLastFindandReplace = mDocument->GetPosition();
-
-    // Skip dialog if running in test mode (QT_TESTING environment variable set)
     const char* qtTesting = std::getenv("QT_TESTING");
     if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
     {
-        // Test mode - use existing mSearchText/mReplaceText without dialog
-        if (!mSearchText.empty())
-        {
-            mReplaceSize = static_cast<POSITION_T>(mSearchText.length());
-            ReplaceAgain();
-        }
-        return;
+        return true;
     }
 
-    // Show Find/Replace dialog
     QDialog dialog(this);
     Ui::FindReplace findandreplace;
     findandreplace.setupUi(&dialog);
@@ -5523,81 +5473,37 @@ void cEditorCtrl::Replace(void)
     findandreplace.mNextOccurance->setChecked(true);
 
     // Pre-populate with previous search/replace text if available
-    if (!mSearchText.empty())
+    if (!request.text.empty())
     {
-        findandreplace.mFind->setText(QString::fromStdString(mSearchText));
+        findandreplace.mFind->setText(QString::fromStdString(request.text));
     }
-    if (!mReplaceText.empty())
+    if (!request.replace.empty())
     {
-        findandreplace.mReplace->setText(QString::fromStdString(mReplaceText));
+        findandreplace.mReplace->setText(QString::fromStdString(request.replace));
     }
 
-    int ecode = dialog.exec();
-
-    if (ecode != 0)
+    if (dialog.exec() == 0)
     {
-        QString findText = findandreplace.mFind->text();
-        if (findText.length() == 0)
-        {
-            return;
-        }
-
-        mSearchText = findText.toStdString();
-        mReplaceText = findandreplace.mReplace->text().toStdString();
-        mCaseCmp = findandreplace.mIgnoreCase->isChecked();
-        mSearchBackwards = findandreplace.mBackward->isChecked();
-        mWildCard = findandreplace.mUseWildCard->isChecked();
-        mWholeWord = findandreplace.mWholeWords->isChecked();
-        bool dontask = findandreplace.mDontAsk->isChecked();
-        mReplaceAsk = !dontask;
-        mReplaceSize = static_cast<POSITION_T>(mSearchText.length());
-
-        bool next = findandreplace.mNextOccurance->isChecked();
-        bool entire = findandreplace.mGlobal->isChecked();
-        bool rest = findandreplace.mRestofFile->isChecked();
-
-        if (next)
-        {
-            // Single replacement
-            ReplaceAgain();
-        }
-        else if (entire || rest)
-        {
-            // Batch replacement
-            if (entire)
-            {
-                // Start from beginning (forward) or end (backward)
-                if (mSearchBackwards)
-                {
-                    mDocument->SetPosition(mDocument->GetTextSize() - 1);
-                }
-                else
-                {
-                    mDocument->SetPosition(0);
-                }
-            }
-
-            // Replace all occurrences with counting
-            // Undo group wraps the entire batch so one Ctrl+Z undoes all
-            CloseTypingGroup();
-            mDocument->BeginUndoGroup();
-            BeginBatchUpdate();
-            bool retval = false;
-            long count = -1;
-            while (retval == false)
-            {
-                count++;
-                retval = ReplaceAgain(true);
-            }
-            EndBatchUpdate();
-            mDocument->EndUndoGroup();
-
-            // Show replacement count dialog (matches old WordStar behavior)
-            QString t = string_sprintf("Replaced %ld items", count).c_str();
-            QMessageBox msgBox(QMessageBox::Information, "Replace", t, QMessageBox::Ok, this);
-            msgBox.exec();
-        }
+        return false;
     }
+
+    request.text = findandreplace.mFind->text().toStdString();
+    request.replace = findandreplace.mReplace->text().toStdString();
+    request.ignoreCase = findandreplace.mIgnoreCase->isChecked();
+    request.backward = findandreplace.mBackward->isChecked();
+    request.wildcard = findandreplace.mUseWildCard->isChecked();
+    request.wholeWord = findandreplace.mWholeWords->isChecked();
+    request.dontAsk = findandreplace.mDontAsk->isChecked();
+    request.scope = 0;
+    if (findandreplace.mGlobal->isChecked())
+    {
+        request.scope = 1;
+    }
+    else if (findandreplace.mRestofFile->isChecked())
+    {
+        request.scope = 2;
+    }
+    return true;
 }
 
 

@@ -73,6 +73,31 @@ struct sStatus
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @struct sFindRequest
+///
+/// @brief
+/// Answer to a Find or Find and Replace prompt. The options are the WS7
+/// option letters: B backward, G entire file, R rest of file (Replace),
+/// N replace without asking, U ignore case, W whole words, ? wildcard.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sFindRequest
+{
+    std::string text;               // Text to find
+    std::string replace;            // Replacement text (Replace only)
+    bool backward = false;          // B
+    bool ignoreCase = false;        // U
+    bool wholeWord = false;         // W
+    bool wildcard = false;          // ?
+    bool dontAsk = false;           // N
+    int scope = 0;                  // 0 next occurrence, 1 entire file (G), 2 rest of file (R)
+};
+
+std::string FindOptionLetters(const sFindRequest& request);                  // Option letters of a request
+void ApplyFindOptionLetters(const std::string& letters, sFindRequest& request);   // Set the options from letters
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @class cEditorBase
 ///
 /// @brief
@@ -137,10 +162,12 @@ public:
     // Pure Virtual - Clipboard and Search
     virtual void ClipboardCopy(void) = 0;                     // Copy block to system clipboard
     virtual void ClipboardPaste(void) = 0;                    // Paste from system clipboard
-    virtual void Find(void) = 0;                              // Show find dialog
+    void Find(void);                                          // Ask for the search, then find (^QF)
     virtual void FindAgain(void) = 0;                         // Repeat last find
     virtual bool ReplaceAgain(bool noquery = false) = 0;      // Repeat last replace
-    virtual void Replace(void) = 0;                           // Show find & replace dialog
+    void Replace(void);                                       // Ask for the search and replacement, then replace (^QA)
+    virtual bool PromptFind(sFindRequest& request) = 0;       // Find dialog; request holds the current values; false on cancel
+    virtual bool PromptReplace(sFindRequest& request) = 0;    // Find and Replace dialog; as PromptFind
     virtual void GotoCharacter(void) = 0;                     // Show goto character dialog
     virtual void GotoCharacterBackward(void) = 0;             // Show goto character backward dialog
     virtual void GotoPage(void) = 0;                          // Show goto page dialog
@@ -389,6 +416,9 @@ public:
     void TickStatusMessage(void);
 
 protected:
+    // Find and Replace prompt: request holds the current values on entry
+    bool RequestFind(sFindRequest& request, bool replace);
+
     // Caret Coordinate Helpers
     void AdjustCaretYForPageMode(const sLineLayout* line);
     COORD_T ScreenYToViewportY(const sLineLayout* line) const;

@@ -165,10 +165,10 @@ public:
     void SetTitle(const std::string& title) override;
     void ClipboardCopy(void) override;
     void ClipboardPaste(void) override;
-    void Find(void) override;
     void FindAgain(void) override;
     bool ReplaceAgain(bool noquery = false) override;
-    void Replace(void) override;
+    bool PromptFind(sFindRequest& request) override;
+    bool PromptReplace(sFindRequest& request) override;
     void GotoCharacter(void) override;
     void GotoCharacterBackward(void) override;
     void GotoPage(void) override;

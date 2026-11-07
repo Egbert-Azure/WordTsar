@@ -82,10 +82,10 @@ public:
     // ---- Pure virtual: clipboard and search ----
     void ClipboardCopy(void) override;
     void ClipboardPaste(void) override;
-    void Find(void) override;
     void FindAgain(void) override;
     bool ReplaceAgain(bool noquery = false) override;
-    void Replace(void) override;
+    bool PromptFind(sFindRequest& request) override;
+    bool PromptReplace(sFindRequest& request) override;
     void GotoCharacter(void) override;
     void GotoCharacterBackward(void) override;
     void GotoPage(void) override;
@@ -286,21 +286,6 @@ private:
 
     // Cached clipboard tool (0=none, detected on first use)
     int mClipboardTool;
-
-    // ---- Search / replace state (mirrors cTUIEditorCtrl) ----
-    std::string mSearchText;                     // Current search text
-    std::string mReplaceText;                    // Current replacement text
-    bool mWholeWord;                             // Match whole words only
-    bool mCaseCmp;                               // Ignore case when true
-    bool mSearchBackwards;                       // Search backward when true
-    bool mWildCard;                              // Enable wildcard matching
-    bool mWholeFile;                             // Search/replace over the whole file
-    bool mReplaceAsk;                            // Prompt before each replacement
-    int mReplaceScope;                           // 0=next, 1=entire file, 2=rest of file
-    POSITION_T mReplaceSize;                     // Grapheme length of the last match
-    POSITION_T mLastFindandReplace;              // Position before the last find/replace
-    // mStartSearchBlock, mEndSearchBlock, mSearchBlockSet are inherited (public)
-    // from cEditorBase and shared with the view for search-result highlighting.
 };
 
 #endif // WSTUI_EDITORCTRL_H

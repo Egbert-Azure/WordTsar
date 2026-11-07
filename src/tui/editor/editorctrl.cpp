@@ -153,17 +153,6 @@ cWSEditorCtrl::cWSEditorCtrl(void)
     , mRedrawHook(nullptr)
     , mHost(nullptr)
     , mClipboardTool(0)
-    , mSearchText()
-    , mReplaceText()
-    , mWholeWord(false)
-    , mCaseCmp(false)
-    , mSearchBackwards(false)
-    , mWildCard(false)
-    , mWholeFile(false)
-    , mReplaceAsk(true)
-    , mReplaceScope(0)
-    , mReplaceSize(0)
-    , mLastFindandReplace(0)
 {
     // wordstartui does not support page view mode (no pixel rendering)
     mPageModeSupported = false;
@@ -2087,45 +2076,39 @@ void cWSEditorCtrl::ClipboardPaste(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return nothing
+/// @param  request [in,out] current values on entry, the answer on return
 ///
-/// @brief
-/// Show the Find dialog, store the collected search text and options, then
-/// repeat the search via FindAgain().
+/// @return false if cancelled or there is no dialog host
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cWSEditorCtrl::Find(void)
+bool cWSEditorCtrl::PromptFind(sFindRequest& request)
 {
-    if (!mHost || !mDocument)
+    if (!mHost)
     {
-        return;
+        return false;
     }
 
-    // Save position before starting search (for GotoLastFindandReplace)
-    mLastFindandReplace = mDocument->GetPosition();
-
     wsdialogs::sFindOptions initial;
-    initial.text = mSearchText;
-    initial.wholeWord = mWholeWord;
-    initial.ignoreCase = mCaseCmp;
-    initial.backward = mSearchBackwards;
-    initial.wildcard = mWildCard;
-    initial.scope = mWholeFile ? 1 : 0;
+    initial.text = request.text;
+    initial.wholeWord = request.wholeWord;
+    initial.ignoreCase = request.ignoreCase;
+    initial.backward = request.backward;
+    initial.wildcard = request.wildcard;
+    initial.scope = (request.scope == 1) ? 1 : 0;
 
     wsdialogs::sFindOptions result = wsdialogs::FindDialog(mHost, initial);
     if (!result.ok)
     {
-        return;
+        return false;
     }
 
-    mSearchText = result.text;
-    mWholeWord = result.wholeWord;
-    mCaseCmp = result.ignoreCase;
-    mSearchBackwards = result.backward;
-    mWildCard = result.wildcard;
-    mWholeFile = (result.scope == 1);
-
-    FindAgain();
+    request.text = result.text;
+    request.wholeWord = result.wholeWord;
+    request.ignoreCase = result.ignoreCase;
+    request.backward = result.backward;
+    request.wildcard = result.wildcard;
+    request.scope = result.scope;
+    return true;
 }
 
 
@@ -2360,84 +2343,43 @@ bool cWSEditorCtrl::ReplaceAgain(bool noquery)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return nothing
+/// @param  request [in,out] current values on entry, the answer on return
 ///
-/// @brief
-/// Show the Find & Replace dialog, store the options, then perform a single
-/// replacement or a counted batch replacement depending on the scope.
+/// @return false if cancelled or there is no dialog host
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cWSEditorCtrl::Replace(void)
+bool cWSEditorCtrl::PromptReplace(sFindRequest& request)
 {
-    if (!mHost || !mDocument)
+    if (!mHost)
     {
-        return;
+        return false;
     }
 
-    mLastFindandReplace = mDocument->GetPosition();
-
     wsdialogs::sReplaceOptions initial;
-    initial.find = mSearchText;
-    initial.replace = mReplaceText;
-    initial.scope = 0;
-    initial.dontAsk = !mReplaceAsk;
-    initial.wholeWord = mWholeWord;
-    initial.ignoreCase = mCaseCmp;
-    initial.backward = mSearchBackwards;
-    initial.wildcard = mWildCard;
+    initial.find = request.text;
+    initial.replace = request.replace;
+    initial.scope = request.scope;
+    initial.dontAsk = request.dontAsk;
+    initial.wholeWord = request.wholeWord;
+    initial.ignoreCase = request.ignoreCase;
+    initial.backward = request.backward;
+    initial.wildcard = request.wildcard;
 
     wsdialogs::sReplaceOptions result = wsdialogs::ReplaceDialog(mHost, initial);
     if (!result.ok)
     {
-        return;
+        return false;
     }
 
-    mSearchText = result.find;
-    mReplaceText = result.replace;
-    mWholeWord = result.wholeWord;
-    mCaseCmp = result.ignoreCase;
-    mSearchBackwards = result.backward;
-    mWildCard = result.wildcard;
-    mReplaceAsk = !result.dontAsk;
-    mWholeFile = (result.scope == 1);
-    mReplaceScope = result.scope;
-
-    mReplaceSize = static_cast<POSITION_T>(mSearchText.length());
-
-    // mReplaceScope: 0=next, 1=entire file, 2=rest of file
-    if (mReplaceScope == 0)
-    {
-        ReplaceAgain();
-    }
-    else
-    {
-        if (mReplaceScope == 1)
-        {
-            if (mSearchBackwards)
-            {
-                mDocument->SetPosition(mDocument->GetTextSize() - 1);
-            }
-            else
-            {
-                mDocument->SetPosition(0);
-            }
-        }
-
-        CloseTypingGroup();
-        mDocument->BeginUndoGroup();
-        BeginBatchUpdate();
-        bool retval = false;
-        long count = -1;
-        while (retval == false)
-        {
-            count++;
-            retval = ReplaceAgain(true);
-        }
-        EndBatchUpdate();
-        mDocument->EndUndoGroup();
-
-        ShowMessage("Replace", "Replaced " + std::to_string(count) + " items");
-    }
+    request.text = result.find;
+    request.replace = result.replace;
+    request.wholeWord = result.wholeWord;
+    request.ignoreCase = result.ignoreCase;
+    request.backward = result.backward;
+    request.wildcard = result.wildcard;
+    request.dontAsk = result.dontAsk;
+    request.scope = result.scope;
+    return true;
 }
 
 
