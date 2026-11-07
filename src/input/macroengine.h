@@ -175,6 +175,7 @@ private:
     void EndFrame(void);
     void StopRunaway(const std::string& reason, size_t line);
     void StopUnanswered(eMacroException kind);
+    bool HasMoreToRun(void) const;
     void ApplySetting(const sMacroStatement& statement);
     void SaveSettings(void);
     void RestoreSettings(void);

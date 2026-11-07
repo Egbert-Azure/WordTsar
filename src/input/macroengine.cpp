@@ -1298,7 +1298,7 @@ bool cMacroEngine::Play(const std::vector<std::string>& lines, const std::string
 /// document. Runs the editor's after-key update after every key. A key fed
 /// to a sink without a document may load one; that does not stop playback.
 /// A key that raised a message or question no IfException answers stops
-/// the macro: "Macro NAME stopped at line N".
+/// the macro: "Macro NAME stopped at line N", unless nothing is left to run.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMacroEngine::Run(void)
@@ -1333,7 +1333,7 @@ void cMacroEngine::Run(void)
             }
 
             bool stop = (mCleared == true) || (mEditor.MacroStopRequested() == true);
-            bool unanswered = mUnanswered;
+            bool unanswered = (mUnanswered == true) && (HasMoreToRun() == true);
             mUnanswered = false;
             mEditor.AfterMacroKey();
             if ((unanswered == true) && (stop == false))
@@ -1880,6 +1880,54 @@ void cMacroEngine::StopUnanswered(eMacroException kind)
     mUnanswered = true;
     mStopText = "Macro " + ((name.empty() == true) ? std::string() : name + " ") + "stopped at line " +
                 std::to_string(mKeyLine);
+}
+
+
+// True if keys or statements other than the ends of subroutines,
+// macros and IfException clauses are left to run.
+bool cMacroEngine::HasMoreToRun(void) const
+{
+    if (mPending.empty() == false)
+    {
+        return true;
+    }
+    for (size_t index = mFrames.size(); index > 0; index--)
+    {
+        const sFrame& frame = mFrames[index - 1];
+        const std::vector<sMacroStatement>& statements = frame.script->Statements();
+        std::vector<size_t> calls = frame.calls;
+        size_t pc = frame.pc;
+        while (pc < statements.size())
+        {
+            const sMacroStatement& statement = statements[pc];
+            if ((statement.kind == MACRO_IF_EXCEPTION) || (statement.kind == MACRO_CLAUSE))
+            {
+                pc = statement.target + 1;
+            }
+            else if (statement.kind == MACRO_END_IF_EXCEPTION)
+            {
+                pc++;
+            }
+            else if ((statement.kind == MACRO_END_SUB) || (statement.kind == MACRO_RETURN))
+            {
+                if (calls.empty() == true)
+                {
+                    break;
+                }
+                pc = calls.back();
+                calls.pop_back();
+            }
+            else if (statement.kind == MACRO_STOP)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 

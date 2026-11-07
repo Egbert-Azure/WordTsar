@@ -1267,4 +1267,8 @@ TEST_CASE("Macro: SETUP fills BOOK.WS with dot commands hidden and stops at the 
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
     std::error_code ec;
     std::filesystem::remove_all(home, ec);
+
+    // A message raised by the last Key ends the macro normally
+    sPlayed last = PlayInlineMacro("LAST", "Key(\"^QFzzz{Enter}{Enter}\")\r\n", "text");
+    CHECK(last.status.find("stopped") == std::string::npos);
 }
