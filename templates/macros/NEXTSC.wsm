@@ -1,0 +1,13 @@
+REM NEXTSC: to the next centred # scene break. After the last one the
+REM cursor stays where it is. Dot command lines are hidden while it
+REM searches, so a # in .h1 or .tc is not found.
+Sub MAIN
+AutoRestore(ON)
+HideDots(ON)
+Key("^QF#^N{Enter}")
+Key("{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
+End Sub
+
