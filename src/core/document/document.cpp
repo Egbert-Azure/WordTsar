@@ -4704,13 +4704,25 @@ POSITION_T cDocument::GetNextWordPosition(POSITION_T pos)
 
     GetWordPositions(para, wordstarts) ;
 
+    bool found = false ;
     for(size_t loop = 0; loop < wordstarts.size(); loop++)
     {
         if(wordstarts[loop] > pos)
         {
             retpos = wordstarts[loop] ;
+            found = true ;
             break ;
         }
+    }
+
+    // Caret inside a paragraph with no word start left in it: go to the
+    // first word of the next paragraph, or to its start when it has no word
+    if(!found && para + 1 < static_cast<PARAGRAPH_T>(mParagraphData.size()) &&
+       GetParagraphFromPosition(pos - 1) == para)
+    {
+        std::vector<POSITION_T> nextstarts ;
+        GetWordPositions(para + 1, nextstarts) ;
+        retpos = nextstarts.empty() ? mParagraphData[para + 1].index : nextstarts.front() ;
     }
 
     return retpos ;

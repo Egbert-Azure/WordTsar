@@ -623,3 +623,47 @@ TEST_CASE("Macro: INDEX marks a word followed by punctuation without the punctua
     std::error_code ec;
     std::filesystem::remove_all(home, ec);
 }
+
+
+TEST_CASE("Macro: INDEX marks the last word of a paragraph followed by another paragraph")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    cMacroTestEditor editor;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("Alpha word.");
+    doc->Insert(HARD_RETURN);
+    doc->Insert("Beta gamma");
+    editor.LayoutDocument(true);
+
+    doc->SetPosition(8);
+    editor.Key(CharKeyStroke(static_cast<char>('F' - '@')));
+    CHECK(doc->GetPosition() == 12);
+
+    doc->SetPosition(8);
+    editor.mChoice = "INDEX";
+    Chord(editor, 'M', 'p');
+    editor.LayoutDocument(true);
+
+    std::string indexPath;
+    REQUIRE(cTOCIndexGenerator::GenerateIndex(&editor, (home / "source.ws").string(), indexPath));
+    tMacroTestEditorBase reader;
+    CHECK(tocindextest::Join(tocindextest::LoadGenerated(reader, indexPath)) == "word, 1");
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
