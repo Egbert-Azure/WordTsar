@@ -3,7 +3,7 @@ REM as the block. The cursor ends at the end of the block.
 Sub MAIN
 AutoRestore(ON)
 HideDots(OFF)
-Key("^QF^N{Enter}")
+Key("^QD^QF^N{Enter}")
 Key("B{Enter}")
 IfException
 ACK: Key("{Enter}^QR")

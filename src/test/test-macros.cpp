@@ -1069,3 +1069,50 @@ TEST_CASE("Macro: ^K, removes the block markers like ^K<, typed and played")
     CHECK(played.status.empty());
     CHECK(played.text.find("textx") == 0);
 }
+
+
+TEST_CASE("Macro: MARKPARA marks the paragraph the cursor starts")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    std::filesystem::create_directories(folder);
+    const std::filesystem::path source = std::filesystem::path(__FILE__).parent_path() / ".." / ".." / "templates" / "macros" / "MARKPARA.wsm";
+    REQUIRE(std::filesystem::exists(source));
+    std::filesystem::copy_file(source, folder / "MARKPARA.wsm");
+
+    cMacroTestEditor editor;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("One.");
+    doc->Insert(HARD_RETURN);
+    doc->Insert("Two.");
+    doc->Insert(HARD_RETURN);
+    doc->Insert("Three.");
+    editor.LayoutDocument(true);
+    doc->SetPosition(5);
+    editor.mChoice = "MARKPARA";
+    Chord(editor, 'M', 'p');
+
+    POSITION_T start = 0;
+    POSITION_T end = 0;
+    CHECK(doc->GetBlock(start, end) == true);
+    CHECK(start == 5);
+    CHECK(end == 10);
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
