@@ -23,6 +23,7 @@
 #include "src/core/document/document.h"
 #include "src/core/utils/config.h"
 #include "src/input/keystroke.h"
+#include "src/input/macroengine.h"
 #include "src/test/tocindexgen-testutil.h"
 
 #ifdef WORDTSAR_TUI_BUILD
@@ -841,6 +842,101 @@ TEST_CASE("Macro: a macro file named NAME.WSM is listed by ^MP and plays")
 
     CHECK(std::find(editor.mListed.begin(), editor.mListed.end(), "UPPER") != editor.mListed.end());
     CHECK(editor.GetDocument()->GetText().find("upper") == 0);
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
+
+
+namespace
+{
+
+// Key sink of a screen without a document: counts the keys it receives.
+class cCountingSink : public IMacroKeySink
+{
+public:
+    bool FeedMacroKey(const sKeyStroke& key) override
+    {
+        (void)key;
+        mKeys++;
+        return true;
+    }
+    bool EditsDocument(void) const override
+    {
+        return false;
+    }
+    int mKeys = 0;
+};
+
+
+void WriteMacro(const std::filesystem::path& folder, const std::string& name, const std::string& body)
+{
+    std::ofstream out(folder / (name + ".wsm"), std::ios::binary);
+    out << "Sub MAIN\r\n" << body << "End Sub\r\n\x1A";
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("Macro: keys to a screen without a document are checked, runaway macros stop, a setting keeps the answer key")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    std::filesystem::create_directories(folder);
+    WriteMacro(folder, "OPENKO", "Key(\"^KO\")\r\n");
+    WriteMacro(folder, "LOOP", "Again:\r\nGoto Again\r\n");
+    WriteMacro(folder, "SELF", "PlayMacro 'SELF'\r\n");
+    WriteMacro(folder, "DEEP", "Call Down\r\nEnd Sub\r\nSub Down\r\nKey(\"d\")\r\nCall Down\r\n");
+    WriteMacro(folder, "ANSWER", "Key(\"^QFzzz{Enter}{Enter}\")\r\nIfException\r\nACK: Insert(ON)\r\n"
+                                 "Key(\"{Enter}ok\")\r\nEnd IfException\r\n");
+
+    // A command WordTsar lacks is refused before any key reaches the sink.
+    {
+        cMacroTestEditor editor;
+        cCountingSink sink;
+        editor.SetMacroKeySink(&sink);
+        editor.mChoice = "OPENKO";
+        Chord(editor, 'M', 'p');
+        editor.SetMacroKeySink(nullptr);
+        CHECK(sink.mKeys == 0);
+        CHECK(editor.GetStatusMessage() == "Not supported in WordTsar: ^KO, line 2");
+    }
+
+    for (const char* name : { "LOOP", "SELF", "DEEP" })
+    {
+        CAPTURE(name);
+        cMacroTestEditor editor;
+        editor.mChoice = name;
+        Chord(editor, 'M', 'p');
+        CHECK(editor.IsMacroPlaying() == false);
+        CHECK(editor.GetStatusMessage().find("Macro stopped") == 0);
+    }
+
+    // The ACK clause starts with a setting; its first key still answers the message.
+    {
+        cMacroTestEditor editor;
+        editor.GetDocument()->Insert("text");
+        editor.GetDocument()->SetPosition(0);
+        editor.LayoutDocument(true);
+        editor.mChoice = "ANSWER";
+        Chord(editor, 'M', 'p');
+        CHECK(editor.GetDocument()->GetText().find("oktext") == 0);
+    }
 
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);

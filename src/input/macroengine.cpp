@@ -42,6 +42,9 @@ const char KEY_LINES_EXTENSION[] = ".txt";
 const char STATE_RECORDING[] = "Recording";
 const char STATE_PAUSED[] = "Type, then press Enter";
 const char STATE_PAUSED_KEY[] = "Press a key";
+const size_t MAX_MACRO_FRAMES = 32;                 // macros played inside each other
+const size_t MAX_MACRO_CALLS = 64;                  // Call depth in one macro
+const long MAX_STATEMENTS_WITHOUT_KEY = 100000;     // statements run without playing a key
 
 
 bool EndsWith(const std::string& text, const std::string& suffix)
@@ -546,6 +549,7 @@ cMacroEngine::cMacroEngine(cEditorBase& editor)
     , mJump(false)
     , mJumpTo(0)
     , mDropFirst(false)
+    , mStatementsWithoutKey(0)
     , mAutoRestore(false)
     , mSavedInsert(true)
     , mSavedShowControl(0)
@@ -1161,10 +1165,10 @@ void cMacroEngine::DeleteCommand(void)
 /////////////////////////////////////////////////////////////////////////////
 bool cMacroEngine::LoadScripts(const std::string& name, std::shared_ptr<cMacroScript> script, std::string& error)
 {
-    if ((Sink().EditsDocument() == true) && (script->CheckKeys() == false))
+    if (script->CheckKeys() == false)
     {
         error = script->Error();
-        if (name.empty() == false)
+        if (mScripts.empty() == false)
         {
             error += " (" + name + ")";
         }
@@ -1249,6 +1253,7 @@ bool cMacroEngine::Play(const std::vector<std::string>& lines, const std::string
     mCleared = false;
     mJump = false;
     mDropFirst = false;
+    mStatementsWithoutKey = 0;
     mAutoRestore = false;
     SaveSettings();
 
@@ -1295,6 +1300,7 @@ void cMacroEngine::Run(void)
         {
             sKeyStroke key = mPending.front();
             mPending.pop_front();
+            mStatementsWithoutKey = 0;
 
             bool editing = Sink().EditsDocument();
             bool feeding = mFeeding;
@@ -1345,6 +1351,13 @@ void cMacroEngine::Run(void)
         bool drop = mDropFirst;
         mDropFirst = false;
 
+        mStatementsWithoutKey++;
+        if (mStatementsWithoutKey > MAX_STATEMENTS_WITHOUT_KEY)
+        {
+            StopRunaway("no key in " + std::to_string(MAX_STATEMENTS_WITHOUT_KEY) + " statements", statement.line);
+            return;
+        }
+
         switch (statement.kind)
         {
             case MACRO_KEYS:
@@ -1367,6 +1380,7 @@ void cMacroEngine::Run(void)
                 mPauseEnd = statement.keys.empty() ? SpecialKeyStroke(SPECIAL_ENTER) : statement.keys.front();
                 mPauseMessage = statement.text;
                 mPauseTyped = 0;
+                mStatementsWithoutKey = 0;
                 mEditor.AfterMacroKey();
                 mEditor.Repaint();
                 return;
@@ -1380,6 +1394,11 @@ void cMacroEngine::Run(void)
 
             case MACRO_CALL:
             {
+                if (frame.calls.size() >= MAX_MACRO_CALLS)
+                {
+                    StopRunaway("Calls nested more than " + std::to_string(MAX_MACRO_CALLS) + " deep", statement.line);
+                    return;
+                }
                 frame.calls.push_back(frame.pc + 1);
                 frame.pc = statement.target;
                 break;
@@ -1420,6 +1439,12 @@ void cMacroEngine::Run(void)
                 {
                     mFrames.pop_back();
                 }
+                else if (mFrames.size() >= MAX_MACRO_FRAMES)
+                {
+                    StopRunaway("macros played inside each other more than " + std::to_string(MAX_MACRO_FRAMES) + " deep",
+                                statement.line);
+                    return;
+                }
                 mFrames.push_back({ script->second, script->second->Main(), {} });
                 break;
             }
@@ -1428,6 +1453,7 @@ void cMacroEngine::Run(void)
             {
                 frame.pc++;
                 ApplySetting(statement);
+                mDropFirst = drop;
                 break;
             }
 
@@ -1459,6 +1485,14 @@ void cMacroEngine::EndFrame(void)
     {
         Finish();
     }
+}
+
+
+// Ends a macro that does not finish: "Macro stopped: <reason>, line <n>".
+void cMacroEngine::StopRunaway(const std::string& reason, size_t line)
+{
+    mEditor.SetStatusMessage("Macro stopped: " + reason + ", line " + std::to_string(line), false, 60, true);
+    Finish();
 }
 
 

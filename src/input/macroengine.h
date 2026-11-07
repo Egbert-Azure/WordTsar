@@ -136,7 +136,7 @@ public:
     void RenameCommand(void);                                 // ^ME
     void CopyCommand(void);                                   // ^MO
     void DeleteCommand(void);                                 // ^MY
-    bool Play(const std::vector<std::string>& lines, const std::string& name = std::string());   // false if refused (status message)
+    bool Play(const std::vector<std::string>& lines, const std::string& name = std::string());   // false if refused (status message); a runaway macro is stopped
     void SetKeySink(IMacroKeySink* sink);                     // nullptr: the editor's FeedKey
 
     // Find and Replace prompts
@@ -169,6 +169,7 @@ private:
     void Run(void);
     void Finish(void);
     void EndFrame(void);
+    void StopRunaway(const std::string& reason, size_t line);
     void ApplySetting(const sMacroStatement& statement);
     void SaveSettings(void);
     void RestoreSettings(void);
@@ -205,6 +206,7 @@ private:
     bool mJump;                                               // an exception clause was chosen
     size_t mJumpTo;
     bool mDropFirst;                                          // the clause's first key answered the exception
+    long mStatementsWithoutKey;                               // statements run since the last played key
     std::unique_ptr<IInputHandler> mPlayInput;
 
     // Settings at the start, restored at the end after AutoRestore(ON)
