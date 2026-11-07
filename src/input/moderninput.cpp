@@ -166,15 +166,30 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
             return true ;
         }
 
-        // Alt+- macro pause, Alt+= end macro recording
+        // While recording Alt+- writes a macro pause and Alt+= ends the
+        // recording; otherwise they type an en dash and a not-equal sign.
         if (ch == '-')
         {
-            mEditor->MacroPause() ;
+            if (mEditor->IsMacroRecording() == true)
+            {
+                mEditor->MacroPause() ;
+            }
+            else
+            {
+                mEditor->InsertText("\xE2\x80\x93") ;
+            }
             return true ;
         }
         if (ch == '=')
         {
-            mEditor->MacroEndRecording() ;
+            if (mEditor->IsMacroRecording() == true)
+            {
+                mEditor->MacroEndRecording() ;
+            }
+            else
+            {
+                mEditor->InsertText("\xE2\x89\xA0") ;
+            }
             return true ;
         }
 

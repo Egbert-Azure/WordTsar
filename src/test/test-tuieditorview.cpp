@@ -1453,7 +1453,7 @@ TEST_CASE("cWSEditorView - an index mark shows K in the control code colours wit
 }
 
 
-TEST_CASE("cWSEditorView - Esc then - inserts nothing")
+TEST_CASE("cWSEditorView - Esc then - inserts an en dash, not a hyphen")
 {
     cWSEditorCtrl editor;
     cWSEditorView view(&editor);
@@ -1467,6 +1467,7 @@ TEST_CASE("cWSEditorView - Esc then - inserts nothing")
     event.alt = true;
     view.HandleEvent(event);
 
-    CHECK(editor.GetDocument()->GetTextSize() == before);
+    CHECK(editor.GetDocument()->GetTextSize() == before + 1);
+    CHECK(editor.GetDocument()->GetText().find("\xE2\x80\x93") != std::string::npos);
     CHECK(editor.GetDocument()->GetText().find('-') == std::string::npos);
 }

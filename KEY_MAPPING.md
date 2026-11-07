@@ -294,7 +294,7 @@ In `ws`, ^M arrives as Enter, so the chord there is Alt+M (the terminal sends `E
 |-----|----------|--------|-------------|
 | Record | ^M,R | Utilities > Macros > Record | Start recording. The status line says "Recording" |
 | Stop | ^M,R or Alt+= | Alt+= | Stop recording and ask for a name. The macro is saved as `<name>.txt` in the `macros` folder next to config.ini |
-| Pause | Alt+- | Alt+- | While recording, add a pause |
+| Pause | Alt+- | Alt+- | While recording, add a pause; otherwise Alt+- types – and Alt+= types ≠ |
 | Play | ^M,P | Utilities > Macros > Play... | List the macros in the `macros` folder next to the open document, then those in the `macros` folder next to config.ini, and play the chosen one |
 | Edit | ^M,D | Utilities > Macros > Edit... | Open the macro file as a text document |
 | Rename | ^M,E | Utilities > Macros > Rename... | Rename the macro in its folder |
@@ -315,8 +315,8 @@ A macro file is plain text, one key per line: a key name (^KB, Enter, Tab, Left)
 | Alt+P | Enter ^P chord mode | Enter Alt+P chord mode |
 | Alt+M | Enter ^M chord mode | -- |
 | Alt+U | Redo | -- (Modern uses Ctrl+Y) |
-| Alt+- | Macro pause while recording | Macro pause while recording |
-| Alt+= | Stop recording a macro | Stop recording a macro |
+| Alt+- | Macro pause while recording; otherwise types – | Macro pause while recording; otherwise types – |
+| Alt+= | Stop recording a macro; otherwise types ≠ | Stop recording a macro; otherwise types ≠ |
 
 **These Alt shortcuts are TUI-only, and need a terminal setting most terminal
 emulators don't enable by default.** `ws` detects Alt/Option the classic
@@ -608,8 +608,8 @@ These provide alternative entry to chord modes (useful in terminals where Ctrl i
 | Alt+P | Enter ^P chord mode | Yes |
 | Alt+M | Enter ^M chord mode | Yes |
 | Alt+U | Redo last action | Yes |
-| Alt+- | Macro pause while recording | Yes |
-| Alt+= | Stop recording a macro | Yes |
+| Alt+- | Macro pause while recording; otherwise types – | Yes |
+| Alt+= | Stop recording a macro; otherwise types ≠ | Yes |
 
 ### Special / Navigation Keys
 
@@ -871,8 +871,8 @@ These activate chord modes identical to WordStar's ^K, ^Q, ^O, ^P groups.
 | Alt+Q | Enter navigation/deletion chord mode | Yes |
 | Alt+O | Enter onscreen formatting chord mode | Yes |
 | Alt+P | Enter style/print chord mode | Yes |
-| Alt+- | Macro pause while recording | Yes |
-| Alt+= | Stop recording a macro | Yes |
+| Alt+- | Macro pause while recording; otherwise types – | Yes |
+| Alt+= | Stop recording a macro; otherwise types ≠ | Yes |
 
 ### Special / Navigation Keys (Modern)
 

@@ -338,6 +338,48 @@ TEST_CASE("Macro: a Find from the menu is recorded with ^QF and plays without ty
 }
 
 
+TEST_CASE("Macro: Alt+- and Alt+= type an en dash and a not-equal sign unless recording")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    cMacroTestEditor editor;
+    cDocument* doc = editor.GetDocument();
+
+    editor.Key(TextKeyStroke("-", false, false, true));
+    editor.Key(TextKeyStroke("=", false, false, true));
+    CHECK(doc->GetText().find("\xE2\x80\x93\xE2\x89\xA0") != std::string::npos);
+
+    Chord(editor, 'M', 'r');
+    const std::string recording = doc->GetText();
+    editor.Key(TextKeyStroke("-", false, false, true));
+    Special(editor, SPECIAL_ENTER);
+    editor.Key(TextKeyStroke("=", false, false, true));
+    CHECK(doc->GetText() == recording);
+    CHECK(editor.IsMacroRecording() == false);
+
+    const std::filesystem::path file = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.txt";
+    REQUIRE(std::filesystem::exists(file));
+    CHECK(ReadLines(file) == std::vector<std::string>{ "PAUSE" });
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
+
+
 TEST_CASE("Macro: a missing config macros folder is created with the default macros")
 {
     EnsureMacroTestApplication();
