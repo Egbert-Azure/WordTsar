@@ -1,8 +1,10 @@
 # Book template
 
-BOOK.WS is a manuscript template for a novel: a title page, a running header with the page number, a contents page layout block, two sample chapters with contents entries, one index mark and one index entry. The folder `macros` holds the macros that fill it in and add to it. Each macro is a plain text file, one key per line.
+BOOK.WS is a manuscript template for a novel: a title page, a running header with the page number, a contents page layout block, two sample chapters with contents entries, one index mark and one index entry. The folder `macros` holds the macros that fill it in and add to it. Each macro is a `.wsm` file in WordStar 7's macro language: `Key("...")` lines with the keys and a `PauseForInput` line where it stops for typing.
 
 ## Use
+
+In short: copy the templates folder, open BOOK.WS, then ^MP SETUP (in ws: Option+M, then P).
 
 1. Copy this folder (BOOK.WS and `macros`). Open BOOK.WS in WordTsar or in ws. ^MP lists the macros in the `macros` folder next to the open document first. In ws, type ^M as Option+M (set Option as Meta in the terminal, see KEY_MAPPING.md). In Modern mode, use Utilities > Macros > Play....
 2. ^MP SETUP. It asks, in this order: title, author's name, surname, street, city/state/ZIP, country, e-mail, phone. At each stop the status line says "Type, then press Enter". Type the value and press Enter.

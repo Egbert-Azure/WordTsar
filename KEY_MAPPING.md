@@ -286,14 +286,14 @@ The M chord has no Alt+letter equivalent in Modern mode, but Alt+M does work as 
 | Y | ^M,Y | Delete a macro |
 | S | ^M,S | Single-step a macro (not yet implemented) |
 
-In `ws`, ^M arrives as Enter, so the chord there is Alt+M (the terminal sends `ESC m`; see Additional Alt Shortcuts below).
+In `ws`, ^M arrives as Enter, so the chord there is Option+M (the terminal sends `ESC m`; see Additional Alt Shortcuts below).
 
 ### Macros
 
 | Key | WordStar | Modern | Description |
 |-----|----------|--------|-------------|
 | Record | ^M,R | Utilities > Macros > Record | Start recording. The status line says "Recording" |
-| Stop | ^M,R or Alt+= | Alt+= | Stop recording and ask for a name. The macro is saved as `<name>.txt` in the `macros` folder next to config.ini |
+| Stop | ^M,R or Alt+= | Alt+= | Stop recording and ask for a name. The macro is saved as `<name>.wsm` in the `macros` folder next to the open document if that folder exists, otherwise in the `macros` folder next to config.ini |
 | Pause | Alt+- | Alt+- | While recording, add a pause; otherwise Alt+- types – and Alt+= types ≠ |
 | Play | ^M,P | Utilities > Macros > Play... | List the macros in the `macros` folder next to the open document, then those in the `macros` folder next to config.ini, and play the chosen one |
 | Edit | ^M,D | Utilities > Macros > Edit... | Open the macro file as a text document |
@@ -303,7 +303,7 @@ In `ws`, ^M arrives as Enter, so the chord there is Alt+M (the terminal sends `E
 
 In the GUI, Alt is the Option key (Option+- and Option+=). In `ws`, Alt+- and Alt+= arrive as `ESC -` and `ESC =`.
 
-A macro file is plain text, one key per line: a key name (^KB, Enter, Tab, Left), the typed character, or PAUSE. Playback stops at a pause and the status line says "Type, then press Enter": what you type goes into the document, Enter continues the macro and Esc cancels it. One undo removes a whole playback. Menu commands and most dialogs are not recorded; the Find and Replace answers are.
+A macro file is WordStar 7 macro source: `Sub MAIN`, `Key("...")` lines, `PauseForInput("{Enter}", 'Type, then press Enter')` for a pause, `End Sub`, then one ^Z. In a key string, ^KB is a control key or a chord, {Enter}, {Tab}, {Left}, {Ctrl+Left} and {Alt+T} name keys, other characters are typed, and `""`, `{{`, `}}` and `^^` stand for one `"`, `{`, `}` or `^`. A `.txt` macro with one key per line in a `macros` folder is converted to `.wsm` the first time a macro list shows it. Playback stops at a pause and the status line says "Type, then press Enter": what you type goes into the document, Enter continues the macro and Esc cancels it. One undo removes a whole playback. Any other statement (IfException, Goto, a label, PlayMacro) stops playback with "Unsupported line N". Most menu commands and dialogs are not recorded; the Find and Replace answers are, and a Find or Replace from the menu is recorded as ^QF or ^QA (^F or ^H in Modern mode). Real WordStar 7 plays a WordTsar macro after it has been opened once in Macros > Edit/Create and saved.
 
 ### Additional Alt Shortcuts
 
