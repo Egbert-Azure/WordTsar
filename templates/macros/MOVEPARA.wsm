@@ -1,0 +1,9 @@
+REM MOVEPARA: marks the paragraph at the cursor, waits while you put the
+REM cursor at the start of the paragraph it goes before, then moves it
+REM there when you press Enter.
+Sub MAIN
+PlayMacro 'MARKPARA'
+PauseForInput("{Enter}", 'Cursor to the new place, then press Enter')
+Key("^KV")
+End Sub
+
