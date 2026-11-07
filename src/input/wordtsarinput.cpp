@@ -577,14 +577,15 @@ const char *LookupMChordHelp(char lower)
             return "^MR - Record macro\n\n"
                    "Starts recording keystrokes; the status line says \"Recording\". "
                    "^MR again, or Alt+=, stops recording and asks for a name; the macro "
-                   "is saved as <name>.txt in the macros folder next to config.ini. "
-                   "While recording, Alt+- adds a pause. Menu commands are not "
-                   "recorded." ;
+                   "is saved as <name>.wsm, WordStar 7 macro source, in the macros "
+                   "folder next to the document if it has one, otherwise in the one "
+                   "next to config.ini. While recording, Alt+- adds a pause. Menu "
+                   "commands are not recorded." ;
         case 'd' :
             return "^MD - Edit macro\n\n"
-                   "Opens the chosen macro file as a text document: one key per line, "
-                   "written as a key name (^KB, Enter, Tab, Left) or the typed "
-                   "character, and PAUSE for a pause." ;
+                   "Opens the chosen <name>.wsm file as a text document: WordStar 7 "
+                   "macro source, with the keys in Key(\"...\") lines written as typed "
+                   "text, ^KB or {Enter}, {Tab}, {Left}, and PauseForInput for a pause." ;
         case 's' :
             return "^MS - Single-step macro (not yet implemented)\n\n"
                    "Would play a macro back one command at a time, to help locate "
