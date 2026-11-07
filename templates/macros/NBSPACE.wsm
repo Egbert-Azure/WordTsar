@@ -1,0 +1,11 @@
+REM NBSPACE: replaces every non-breaking space in the document with an
+REM ordinary space.
+Sub MAIN
+AutoRestore(ON)
+Insert(ON)
+Key("^QA {Enter} {Enter}ng{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
+End Sub
+
