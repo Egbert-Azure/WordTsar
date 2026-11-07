@@ -166,6 +166,18 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
             return true ;
         }
 
+        // Alt+- macro pause, Alt+= end macro recording
+        if (ch == '-')
+        {
+            mEditor->MacroPause() ;
+            return true ;
+        }
+        if (ch == '=')
+        {
+            mEditor->MacroEndRecording() ;
+            return true ;
+        }
+
         // Other Alt combinations not handled in Modern mode
         return false ;
     }

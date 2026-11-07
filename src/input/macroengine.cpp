@@ -1,0 +1,843 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+// WordTsar - Wordstar clone for modern systems http://wordtsar.ca
+// Copyright (C) 2026 Egbert H. Schroeer
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+#include "src/input/macroengine.h"
+
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <system_error>
+
+#include "src/core/editor/editorbase.h"
+#include "src/core/utils/config.h"
+#include "src/input/moderninput.h"
+#include "src/input/wordtsarinput.h"
+
+
+namespace
+{
+
+const char MACRO_FOLDER[] = "macros";
+const char MACRO_EXTENSION[] = ".txt";
+const char MODERN_LINE[] = "Modern";
+const char STATE_RECORDING[] = "Recording";
+const char STATE_PAUSED[] = "Type, then press Enter";
+
+
+bool EndsWith(const std::string& text, const std::string& suffix)
+{
+    return (text.size() >= suffix.size()) &&
+           (text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0);
+}
+
+
+std::string StripLineEnd(const std::string& line)
+{
+    std::string text = line;
+    while ((text.empty() == false) && ((text.back() == '\r') || (text.back() == '\n')))
+    {
+        text.pop_back();
+    }
+    return text;
+}
+
+
+// Macro names (file names without ".txt") of the *.txt files in a folder.
+std::vector<std::string> ListFolder(const std::string& dir)
+{
+    std::vector<std::string> names;
+    if (dir.empty() == true)
+    {
+        return names;
+    }
+
+    std::error_code ec;
+    std::filesystem::directory_iterator it(dir, ec);
+    if (ec)
+    {
+        return names;
+    }
+
+    for (const std::filesystem::directory_entry& entry : it)
+    {
+        std::string file = entry.path().filename().string();
+        if ((entry.is_regular_file(ec) == true) && (EndsWith(file, MACRO_EXTENSION) == true) &&
+            (file.size() > 4) && (file[0] != '.'))
+        {
+            names.push_back(file.substr(0, file.size() - 4));
+        }
+    }
+
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+
+bool IsEnter(const sKeyStroke& key)
+{
+    return (key.kind == KEYSTROKE_SPECIAL) && (key.special == SPECIAL_ENTER);
+}
+
+
+bool IsEscape(const sKeyStroke& key)
+{
+    return (key.kind == KEYSTROKE_SPECIAL) && (key.special == SPECIAL_ESCAPE);
+}
+
+} // namespace
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  documentDir [in] folder of the open document, empty if untitled
+/// @param  configDir   [in] folder of config.ini
+///
+/////////////////////////////////////////////////////////////////////////////
+cMacroStore::cMacroStore(const std::string& documentDir, const std::string& configDir)
+{
+    if (documentDir.empty() == false)
+    {
+        mDocumentDir = (std::filesystem::path(documentDir) / MACRO_FOLDER).string();
+    }
+    if (configDir.empty() == false)
+    {
+        mConfigDir = (std::filesystem::path(configDir) / MACRO_FOLDER).string();
+    }
+}
+
+
+bool cMacroStore::IsValidName(const std::string& name)
+{
+    return (name.empty() == false) && (name[0] != '.') &&
+           (name.find('/') == std::string::npos) && (name.find(':') == std::string::npos);
+}
+
+
+std::string cMacroStore::FileName(const std::string& name)
+{
+    if (EndsWith(name, MACRO_EXTENSION) == true)
+    {
+        return name;
+    }
+    return name + MACRO_EXTENSION;
+}
+
+
+std::vector<std::string> cMacroStore::List(void) const
+{
+    std::vector<std::string> names = ListFolder(mDocumentDir);
+    size_t documentCount = names.size();
+
+    for (const std::string& name : ListFolder(mConfigDir))
+    {
+        if (std::find(names.begin(), names.begin() + static_cast<long>(documentCount), name) ==
+            names.begin() + static_cast<long>(documentCount))
+        {
+            names.push_back(name);
+        }
+    }
+    return names;
+}
+
+
+std::string cMacroStore::FindPath(const std::string& name) const
+{
+    std::error_code ec;
+    for (const std::string& dir : { mDocumentDir, mConfigDir })
+    {
+        if (dir.empty() == false)
+        {
+            std::filesystem::path path = std::filesystem::path(dir) / FileName(name);
+            if (std::filesystem::is_regular_file(path, ec) == true)
+            {
+                return path.string();
+            }
+        }
+    }
+    return std::string();
+}
+
+
+std::string cMacroStore::SavePath(const std::string& name) const
+{
+    return (std::filesystem::path(mConfigDir) / FileName(name)).string();
+}
+
+
+bool cMacroStore::Load(const std::string& name, std::vector<std::string>& lines) const
+{
+    std::string path = FindPath(name);
+    if (path.empty() == true)
+    {
+        return false;
+    }
+
+    std::ifstream in(path, std::ios::binary);
+    if (!in)
+    {
+        return false;
+    }
+
+    lines.clear();
+    std::string line;
+    while (std::getline(in, line))
+    {
+        lines.push_back(StripLineEnd(line));
+    }
+    return true;
+}
+
+
+bool cMacroStore::Save(const std::string& name, const std::vector<std::string>& lines) const
+{
+    if (mConfigDir.empty() == true)
+    {
+        return false;
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories(mConfigDir, ec);
+
+    std::ofstream out(SavePath(name), std::ios::binary | std::ios::trunc);
+    if (!out)
+    {
+        return false;
+    }
+    for (const std::string& line : lines)
+    {
+        out << line << '\n';
+    }
+    return out.good();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  editor [in] editor the keys are fed to
+///
+/////////////////////////////////////////////////////////////////////////////
+cMacroEngine::cMacroEngine(cEditorBase& editor)
+    : mEditor(editor)
+    , mRecording(false)
+    , mPauseTyping(false)
+    , mRecordMode(INPUT_WORDSTAR)
+    , mCurrentKey(-1)
+    , mDropKey(false)
+    , mPlaying(false)
+    , mPaused(false)
+    , mCleared(false)
+    , mNextLine(0)
+{
+}
+
+
+cMacroEngine::~cMacroEngine(void)
+{
+}
+
+
+bool cMacroEngine::IsRecording(void) const
+{
+    return mRecording;
+}
+
+
+bool cMacroEngine::IsPlaying(void) const
+{
+    return mPlaying;
+}
+
+
+std::string cMacroEngine::StateText(void) const
+{
+    if (mRecording == true)
+    {
+        return STATE_RECORDING;
+    }
+    if ((mPlaying == true) && (mPaused == true))
+    {
+        return STATE_PAUSED;
+    }
+    return std::string();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  key [in] key about to be dispatched
+///
+/// @return true if the key was used here and must not be dispatched
+///
+/// @brief
+/// At a playback pause Enter continues the macro and Esc cancels it. While
+/// recording, the Enter that ends the text typed after a pause ends the
+/// pause. Neither Enter is inserted or recorded.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cMacroEngine::InterceptKey(const sKeyStroke& key)
+{
+    if ((mPlaying == true) && (mPaused == true))
+    {
+        if (IsEnter(key) == true)
+        {
+            mPaused = false;
+            Run();
+            return true;
+        }
+        if (IsEscape(key) == true)
+        {
+            mEditor.SetStatusMessage("Macro stopped");
+            Finish();
+            return true;
+        }
+        return false;
+    }
+
+    if ((mRecording == true) && (mPauseTyping == true) && (IsEnter(key) == true))
+    {
+        mPauseTyping = false;
+        return true;
+    }
+
+    return false;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the input handler for a macro recorded in the other input mode
+///         while it plays, otherwise nullptr
+///
+/////////////////////////////////////////////////////////////////////////////
+IInputHandler* cMacroEngine::PlaybackInput(void)
+{
+    if (mPlaying == true)
+    {
+        return mPlayInput.get();
+    }
+    return nullptr;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  key [in] key about to be dispatched
+///
+/// @brief
+/// While recording, adds the key; EndKey removes it again if it was not
+/// handled or a command dropped it. Keys typed after a pause are not
+/// recorded. A key without a macro name is not recorded.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::BeginKey(const sKeyStroke& key)
+{
+    mCurrentKey = -1;
+    mDropKey = false;
+
+    if ((mRecording == false) || (mPauseTyping == true))
+    {
+        return;
+    }
+
+    if (KeysToLines(std::vector<sKeyStroke>{ key }, INPUT_MODERN).empty() == true)
+    {
+        mEditor.SetStatusMessage("Key not recorded");
+        return;
+    }
+
+    mCurrentKey = static_cast<long>(mRecorded.size());
+    mRecorded.push_back(key);
+}
+
+
+void cMacroEngine::EndKey(bool handled)
+{
+    if ((mCurrentKey >= 0) && (mCurrentKey < static_cast<long>(mRecorded.size())) &&
+        ((handled == false) || (mDropKey == true)))
+    {
+        mRecorded.erase(mRecorded.begin() + mCurrentKey);
+    }
+    mCurrentKey = -1;
+    mDropKey = false;
+}
+
+
+void cMacroEngine::DropCurrentKey(void)
+{
+    mDropKey = true;
+}
+
+
+cMacroStore cMacroEngine::MakeStore(void) const
+{
+    std::string documentDir;
+    if ((mEditor.mFileSet == true) && (mEditor.mFileDir.empty() == false))
+    {
+        documentDir = mEditor.mFileDir;
+    }
+    return cMacroStore(documentDir, cConfig::GetConfigDir());
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// ^MR starts recording; ^MR while recording stops it without recording
+/// the ^M R keys. Nothing while a macro plays.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::RecordCommand(void)
+{
+    if (mPlaying == true)
+    {
+        return;
+    }
+
+    if (mRecording == true)
+    {
+        // The chord prefix before this key is dropped here, this key in EndKey.
+        if ((mCurrentKey > 0) && (mCurrentKey <= static_cast<long>(mRecorded.size())))
+        {
+            mRecorded.erase(mRecorded.begin() + (mCurrentKey - 1));
+            mCurrentKey--;
+        }
+        DropCurrentKey();
+        StopRecording();
+        return;
+    }
+
+    mRecorded.clear();
+    mPauseTyping = false;
+    mRecordMode = (dynamic_cast<cModernInput*>(mEditor.GetInput()) != nullptr) ? INPUT_MODERN : INPUT_WORDSTAR;
+    mRecording = true;
+    mEditor.Repaint();
+}
+
+
+void cMacroEngine::EndRecordingCommand(void)
+{
+    if (mRecording == false)
+    {
+        return;
+    }
+    DropCurrentKey();
+    StopRecording();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Alt+- while recording writes a PAUSE line. Text typed afterwards goes
+/// into the document but is not recorded, up to and including the Enter
+/// that ends it.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::PauseCommand(void)
+{
+    if ((mRecording == false) || (mPauseTyping == true))
+    {
+        return;
+    }
+
+    DropCurrentKey();
+    mRecorded.push_back(PauseKeyStroke());
+    mPauseTyping = true;
+    mEditor.SetStatusMessage("Type, then press Enter");
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Ends recording, asks for a name and saves the macro.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::StopRecording(void)
+{
+    mRecording = false;
+    mPauseTyping = false;
+
+    // The key being dispatched is not part of the macro.
+    std::vector<sKeyStroke> keys = mRecorded;
+    if ((mCurrentKey >= 0) && (mCurrentKey < static_cast<long>(keys.size())))
+    {
+        keys.erase(keys.begin() + mCurrentKey);
+        mRecorded.erase(mRecorded.begin() + mCurrentKey);
+        mCurrentKey = -1;
+    }
+    mRecorded.clear();
+
+    std::vector<std::string> lines = KeysToLines(keys, mRecordMode);
+    if (mRecordMode == INPUT_MODERN)
+    {
+        lines.insert(lines.begin(), MODERN_LINE);
+    }
+
+    mEditor.Repaint();
+
+    std::string name = mEditor.PromptText("Save Macro", "Macro name:");
+    if (name.empty() == true)
+    {
+        mEditor.SetStatusMessage("Macro not saved");
+        return;
+    }
+    if (cMacroStore::IsValidName(name) == false)
+    {
+        mEditor.SetStatusMessage("Invalid macro name: " + name, false, 60, true);
+        return;
+    }
+
+    cMacroStore store = MakeStore();
+    std::error_code ec;
+    if ((std::filesystem::exists(store.SavePath(name), ec) == true) &&
+        (mEditor.AskYesNo("Save Macro", "Macro " + name + " exists. Replace it?") == false))
+    {
+        mEditor.SetStatusMessage("Macro not saved");
+        return;
+    }
+
+    if (store.Save(name, lines) == false)
+    {
+        mEditor.SetStatusMessage("Cannot save macro " + name, false, 60, true);
+        return;
+    }
+    mEditor.SetStatusMessage("Macro " + name + " saved");
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// ^MP: lists the macros and plays the chosen one. Nothing while a macro
+/// plays or is being recorded.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::PlayCommand(void)
+{
+    if ((mPlaying == true) || (mRecording == true))
+    {
+        return;
+    }
+
+    cMacroStore store = MakeStore();
+    std::vector<std::string> names = store.List();
+    if (names.empty() == true)
+    {
+        mEditor.SetStatusMessage("No macros");
+        return;
+    }
+
+    std::string name = mEditor.ChooseFromList("Play Macro", names);
+    if (name.empty() == true)
+    {
+        return;
+    }
+
+    std::vector<std::string> lines;
+    if (store.Load(name, lines) == false)
+    {
+        mEditor.SetStatusMessage("Cannot read macro " + name, false, 60, true);
+        return;
+    }
+
+    Play(lines);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  lines [in] macro file lines
+///
+/// @brief
+/// Plays the lines through FeedKey as one undo step, up to the end or the
+/// first PAUSE.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::Play(const std::vector<std::string>& lines)
+{
+    if ((mPlaying == true) || (mRecording == true))
+    {
+        return;
+    }
+
+    mLines = lines;
+    mNextLine = 0;
+    mPending.clear();
+    mPaused = false;
+    mCleared = false;
+
+    bool modern = (mLines.empty() == false) && (mLines[0] == MODERN_LINE);
+    if (modern == true)
+    {
+        mNextLine = 1;
+    }
+
+    bool currentModern = (dynamic_cast<cModernInput*>(mEditor.GetInput()) != nullptr);
+    mPlayInput.reset();
+    if (modern != currentModern)
+    {
+        if (modern == true)
+        {
+            mPlayInput = std::make_unique<cModernInput>(&mEditor);
+        }
+        else
+        {
+            mPlayInput = std::make_unique<cWordStarInput>(&mEditor);
+        }
+    }
+
+    mPlaying = true;
+    mEditor.BeginMacroUndo();
+    Run();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Feeds keys until the macro ends, pauses, fails or a key closes the
+/// document. Runs the editor's after-key update after every key.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::Run(void)
+{
+    while ((mPlaying == true) && (mPaused == false))
+    {
+        sKeyStroke key;
+        eNext next = NextKey(key);
+        if (next != NEXT_KEY)
+        {
+            Finish();
+            return;
+        }
+
+        if (key.kind == KEYSTROKE_PAUSE)
+        {
+            mPaused = true;
+            mEditor.AfterMacroKey();
+            mEditor.Repaint();
+            return;
+        }
+
+        mEditor.FeedKey(key);
+
+        bool stop = (mCleared == true) || (mEditor.MacroStopRequested() == true);
+        mEditor.AfterMacroKey();
+        if (stop == true)
+        {
+            Finish();
+            return;
+        }
+    }
+}
+
+
+void cMacroEngine::Finish(void)
+{
+    if (mPlaying == false)
+    {
+        return;
+    }
+
+    mPlaying = false;
+    mPaused = false;
+    mPending.clear();
+    mLines.clear();
+    mPlayInput.reset();
+    mEditor.EndMacroUndo(mCleared == false);
+    mEditor.Repaint();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  key [out] next key of the macro
+///
+/// @return NEXT_KEY, NEXT_END at the end, NEXT_ERROR after an unknown key
+///         name (with a status message)
+///
+/////////////////////////////////////////////////////////////////////////////
+cMacroEngine::eNext cMacroEngine::NextKey(sKeyStroke& key)
+{
+    while (mPending.empty() == true)
+    {
+        if (mNextLine >= mLines.size())
+        {
+            return NEXT_END;
+        }
+
+        std::string line = StripLineEnd(mLines[mNextLine]);
+        mNextLine++;
+        if (line.empty() == true)
+        {
+            continue;
+        }
+
+        std::vector<sKeyStroke> keys;
+        if (NameToKeys(line, keys) == false)
+        {
+            mEditor.SetStatusMessage("Unknown key on line " + std::to_string(mNextLine), false, 60, true);
+            return NEXT_ERROR;
+        }
+        mPending.insert(mPending.end(), keys.begin(), keys.end());
+    }
+
+    key = mPending.front();
+    mPending.pop_front();
+    return NEXT_KEY;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  text [out] typed text of one prompt field
+///
+/// @return 1 for Enter, 0 for Esc, -1 at the end of the macro or a pause
+///
+/////////////////////////////////////////////////////////////////////////////
+int cMacroEngine::ReadField(std::string& text)
+{
+    text.clear();
+
+    while (true)
+    {
+        sKeyStroke key;
+        if (NextKey(key) != NEXT_KEY)
+        {
+            mNextLine = mLines.size();
+            return -1;
+        }
+
+        if (key.kind == KEYSTROKE_PAUSE)
+        {
+            mPending.push_front(key);
+            return -1;
+        }
+        if (IsEnter(key) == true)
+        {
+            return 1;
+        }
+        if (IsEscape(key) == true)
+        {
+            return 0;
+        }
+        if ((key.kind == KEYSTROKE_SPECIAL) && (key.special == SPECIAL_BACKSPACE))
+        {
+            while ((text.empty() == false) && ((static_cast<unsigned char>(text.back()) & 0xC0U) == 0x80U))
+            {
+                text.pop_back();
+            }
+            if (text.empty() == false)
+            {
+                text.pop_back();
+            }
+            continue;
+        }
+        if ((key.kind == KEYSTROKE_TEXT) && (key.ctrl == false) && (key.alt == false))
+        {
+            text += key.utf8;
+        }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  request [in,out] current values on entry, the answer on return
+/// @param  replace [in]     true for Find and Replace
+///
+/// @return false if the macro cancels the prompt (Esc) or ends inside it
+///
+/// @brief
+/// Reads the prompt answer from the macro: text, Enter, (replacement,
+/// Enter,) option letters, Enter.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cMacroEngine::ReadPrompt(sFindRequest& request, bool replace)
+{
+    std::string text;
+    if (ReadField(text) != 1)
+    {
+        return false;
+    }
+
+    std::string replacement;
+    if ((replace == true) && (ReadField(replacement) != 1))
+    {
+        return false;
+    }
+
+    std::string letters;
+    if (ReadField(letters) != 1)
+    {
+        return false;
+    }
+
+    request.text = text;
+    request.replace = replacement;
+    ApplyFindOptionLetters(letters, request);
+    return true;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  request [in] the prompt answer
+/// @param  replace [in] true for Find and Replace
+/// @param  ok      [in] false if the prompt was cancelled
+///
+/// @brief
+/// While recording, writes the answer as the keys typed at the WS7
+/// prompts; a cancelled prompt is written as Esc.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::RecordPrompt(const sFindRequest& request, bool replace, bool ok)
+{
+    if ((mRecording == false) || (mPauseTyping == true))
+    {
+        return;
+    }
+
+    if (ok == false)
+    {
+        mRecorded.push_back(SpecialKeyStroke(SPECIAL_ESCAPE));
+        return;
+    }
+
+    mRecorded.push_back(TextKeyStroke(request.text));
+    mRecorded.push_back(SpecialKeyStroke(SPECIAL_ENTER));
+    if (replace == true)
+    {
+        mRecorded.push_back(TextKeyStroke(request.replace));
+        mRecorded.push_back(SpecialKeyStroke(SPECIAL_ENTER));
+    }
+    mRecorded.push_back(TextKeyStroke(FindOptionLetters(request)));
+    mRecorded.push_back(SpecialKeyStroke(SPECIAL_ENTER));
+}
+
+
+void cMacroEngine::OnDocumentCleared(void)
+{
+    if (mPlaying == true)
+    {
+        mCleared = true;
+    }
+}

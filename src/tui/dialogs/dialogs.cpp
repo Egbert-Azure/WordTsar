@@ -1622,6 +1622,76 @@ bool SelectPrinterDialog(iWSDialogHost* host, const std::vector<std::string>& pr
     return false;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  iWSDialogHost* host [in] dialog host
+/// @param  title    [in] dialog title
+/// @param  items    [in] choices
+/// @param  selected [out] chosen item when OK is pressed
+///
+/// @return true when OK was pressed
+///
+/// @brief
+/// Modal list to choose one item from, at most 15 rows high.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool ChooseFromListDialog(iWSDialogHost* host, const std::string& title,
+                          const std::vector<std::string>& items, std::string& selected)
+{
+    int width = 40;
+    int height = std::min(static_cast<int>(items.size()), 15) + 5;
+
+    sRect rect = CenteredRect(host, height, width);
+    cDialog dialog(rect, title);
+
+    sRect listRect;
+    listRect.row = rect.row + 1;
+    listRect.col = rect.col + 2;
+    listRect.rows = rect.rows - 4;
+    listRect.cols = rect.cols - 4;
+    if (listRect.rows < 1)
+    {
+        listRect.rows = 1;
+    }
+
+    auto list = std::make_unique<cListBox>(listRect);
+    list->SetItems(items);
+    list->SetSelectedIndex(0);
+    cListBox* listPtr = list.get();
+    dialog.AddWidget(std::move(list));
+
+    cDialog* dialogPtr = &dialog;
+
+    sRect okRect;
+    okRect.rows = 1;
+    okRect.cols = 10;
+    okRect.row = rect.row + rect.rows - 2;
+    okRect.col = rect.col + ((rect.cols - 24) / 2);
+    dialog.AddWidget(std::make_unique<cButton>(okRect, "OK", [dialogPtr]() {
+        dialogPtr->SetResult(DIALOG_RESULT_OK);
+    }));
+
+    sRect cancelRect;
+    cancelRect.rows = 1;
+    cancelRect.cols = 10;
+    cancelRect.row = okRect.row;
+    cancelRect.col = okRect.col + 12;
+    dialog.AddWidget(std::make_unique<cButton>(cancelRect, "Cancel", [dialogPtr]() {
+        dialogPtr->SetResult(DIALOG_RESULT_CANCEL);
+    }));
+
+    dialog.FocusFirst();
+    host->HostRunModal(dialog);
+
+    if (dialog.GetResult() == DIALOG_RESULT_OK)
+    {
+        selected = listPtr->GetSelectedText();
+        return true;
+    }
+
+    return false;
+}
+
 bool SelectFontDialog(iWSDialogHost* host, const std::vector<std::string>& families,
                       const std::string& currentFamily, const std::string& currentSize,
                       std::string& family, std::string& size)

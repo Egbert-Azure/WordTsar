@@ -303,6 +303,11 @@ int cWSWordTsar::Run(int argc, char* argv[])
 {
     mEditor->SetDialogHost(this);
     mEditor->SetPreferencesHook([this](void) { OpenPreferences(); });
+    mEditor->SetMacroKeyHook([this](void)
+    {
+        mView->EnsureCaretVisible();
+        CheckCommandSignals();
+    });
 
     // Load persisted settings and apply them before opening any file.
     cConfig startupConfig;
@@ -3091,6 +3096,10 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
     // background layout is in progress.
     std::string message = mEditor->GetStatusMessage();
     mEditor->TickStatusMessage();
+    if (status.macroState.empty() == false)
+    {
+        message = (message.empty() == true) ? status.macroState : (status.macroState + "  " + message);
+    }
     if (message.empty() == false)
     {
         screen.PutText(row, 1, " " + message + " ", style);

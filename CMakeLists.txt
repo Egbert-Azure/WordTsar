@@ -485,6 +485,7 @@ if(BUILD_TUI)
         src/test/test-tuistartup.cpp
         src/test/test-tuitocindexgenerator.cpp
         src/test/test-isolation.cpp
+        src/test/test-macros.cpp
         src/tui/print/tuiprintout.cpp
         ${WORDTSAR_WSTUI_SOURCES_NO_MAIN}
         ${WORDTSAR_CORE_SOURCES}

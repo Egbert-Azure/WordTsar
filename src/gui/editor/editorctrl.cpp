@@ -3897,6 +3897,13 @@ bool cEditorCtrl::KeyEventToStroke(QKeyEvent* event, sKeyStroke& stroke) const
         default:                break ;
     }
 
+    // Option+- and Option+= (macro pause and end of recording)
+    if (alt && !ctrl && ((key == Qt::Key_Minus) || (key == Qt::Key_Equal)))
+    {
+        stroke = TextKeyStroke((key == Qt::Key_Minus) ? "-" : "=", shift, false, true) ;
+        return true ;
+    }
+
     if ((ctrl || alt) && key >= Qt::Key_A && key <= Qt::Key_Z)
     {
         if (ctrl)
@@ -4801,6 +4808,65 @@ bool cEditorCtrl::AskYesNo(const std::string& title, const std::string& question
 {
     return QMessageBox::question(this, QString::fromStdString(title), QString::fromStdString(question),
                                  QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  title [in] dialog title
+/// @param  label [in] prompt text
+///
+/// @return the entered text, empty if cancelled or under QT_TESTING=1
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorCtrl::PromptText(const std::string& title, const std::string& label)
+{
+    const char* qtTesting = std::getenv("QT_TESTING");
+    if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
+    {
+        return std::string();
+    }
+
+    bool ok = false;
+    QString text = QInputDialog::getText(this, QString::fromStdString(title), QString::fromStdString(label),
+                                         QLineEdit::Normal, QString(), &ok);
+    if (ok == false)
+    {
+        return std::string();
+    }
+    return text.trimmed().toStdString();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  title [in] dialog title
+/// @param  items [in] choices
+///
+/// @return the chosen item, empty if cancelled or under QT_TESTING=1
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorCtrl::ChooseFromList(const std::string& title, const std::vector<std::string>& items)
+{
+    const char* qtTesting = std::getenv("QT_TESTING");
+    if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
+    {
+        return std::string();
+    }
+
+    QStringList list;
+    for (const std::string& item : items)
+    {
+        list << QString::fromStdString(item);
+    }
+
+    bool ok = false;
+    QString choice = QInputDialog::getItem(this, QString::fromStdString(title), QString(), list, 0, false, &ok);
+    if (ok == false)
+    {
+        return std::string();
+    }
+    return choice.toStdString();
 }
 
 

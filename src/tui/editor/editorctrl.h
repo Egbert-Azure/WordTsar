@@ -72,6 +72,8 @@ public:
     void ShowError(const std::string& title, const std::string& message) override;
     void ShowMessage(const std::string& title, const std::string& message) override;
     bool AskYesNo(const std::string& title, const std::string& question) override;
+    std::string PromptText(const std::string& title, const std::string& label) override;
+    std::string ChooseFromList(const std::string& title, const std::vector<std::string>& items) override;
     void About(void) override;
     void Quit(void) override;
     void AbandonFile(void) override;
@@ -161,6 +163,11 @@ public:
 
     // ---- Preferences hook (screen-settings dialog; provided by the app) ----
     void SetPreferencesHook(std::function<void()> hook);
+
+    // ---- Macro playback: the app's after-key update, run after each played key ----
+    void SetMacroKeyHook(std::function<void()> hook);
+    void AfterMacroKey(void) override;
+    bool MacroStopRequested(void) override;
 
     // ---- Relayout / background layout ----
     void RelayoutAndRedraw(void);
@@ -283,6 +290,9 @@ private:
 
     // Preferences hook (invoked by Preferences() -- shows the app's dialog)
     std::function<void()> mPreferencesHook;
+
+    // After-key update during macro playback (invoked by AfterMacroKey)
+    std::function<void()> mMacroKeyHook;
 
     // Cached clipboard tool (0=none, detected on first use)
     int mClipboardTool;

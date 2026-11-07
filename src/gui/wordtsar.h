@@ -383,6 +383,7 @@ private:
     int          mStatusHelpCounter = 0 ;
     eHelpDisplay mStatusLastHelp = HELP_MAIN ;
     std::string  mStatusOldStr ;
+    bool         mStatusNoteShown = false ;   // mStatText shows the macro state or an editor status message
     bool         mStatusPrevChange = false ;
     bool         mStatusPrevBold = false ;
     bool         mStatusPrevItalic = false ;

@@ -51,6 +51,10 @@ int ThreeChoice(iWSDialogHost* host, const std::string& title, const std::string
 bool InputBox(iWSDialogHost* host, const std::string& title, const std::string& prompt,
               std::string& value);
 
+// Pick one item from a list. Returns true on OK with selected set to the item.
+bool ChooseFromListDialog(iWSDialogHost* host, const std::string& title,
+                          const std::vector<std::string>& items, std::string& selected);
+
 // File open/save browser. Returns true on OK (result = chosen path), false on cancel.
 bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
                  const std::string& startPath, std::string& result);

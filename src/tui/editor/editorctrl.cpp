@@ -1754,6 +1754,44 @@ bool cWSEditorCtrl::AskYesNo(const std::string& title, const std::string& questi
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  title [in] dialog title
+/// @param  label [in] prompt text
+///
+/// @return the entered text, empty if cancelled or there is no dialog host
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cWSEditorCtrl::PromptText(const std::string& title, const std::string& label)
+{
+    std::string value;
+    if ((!mHost) || (wsdialogs::InputBox(mHost, title, label, value) == false))
+    {
+        return std::string();
+    }
+    return value;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  title [in] dialog title
+/// @param  items [in] choices
+///
+/// @return the chosen item, empty if cancelled or there is no dialog host
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cWSEditorCtrl::ChooseFromList(const std::string& title, const std::vector<std::string>& items)
+{
+    std::string selected;
+    if ((!mHost) || (wsdialogs::ChooseFromListDialog(mHost, title, items, selected) == false))
+    {
+        return std::string();
+    }
+    return selected;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
@@ -1904,6 +1942,48 @@ void cWSEditorCtrl::OnSaveAndClose(void)
 void cWSEditorCtrl::SetPreferencesHook(std::function<void()> hook)
 {
     mPreferencesHook = hook;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  hook [in] after-key update run after each played macro key
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::SetMacroKeyHook(std::function<void()> hook)
+{
+    mMacroKeyHook = hook;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// After a played key: one layout pass, as a screen update does between
+/// typed keys, then the app's after-key update.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::AfterMacroKey(void)
+{
+    if (HasPendingLayout() == true)
+    {
+        IdleLayout();
+    }
+    if (mMacroKeyHook)
+    {
+        mMacroKeyHook();
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true when a played key asked to quit or to close the document
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSEditorCtrl::MacroStopRequested(void)
+{
+    return mQuit || mReturnToOpening;
 }
 
 /////////////////////////////////////////////////////////////////////////////

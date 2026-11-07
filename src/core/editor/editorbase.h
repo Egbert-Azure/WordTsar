@@ -31,6 +31,7 @@
 #include <vector>
 
 class IInputHandler;
+class cMacroEngine;
 struct sKeyStroke;
 
 /////////////////////////////////////////////////////////////////////////////
@@ -69,6 +70,7 @@ struct sStatus
     bool blockSet;                  // Whether a block selection is active
     bool backgroundBusy;            // Whether background layout is in progress
     std::string markers;            // Active place markers (e.g. "150" if markers 1, 5, 0 are set)
+    std::string macroState;         // "Recording", "Type, then press Enter" (macro pause) or empty
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -239,6 +241,21 @@ public:
     bool FeedKey(const sKeyStroke& key);
     virtual void BeforeKey(const sKeyStroke& /*key*/) {}      // Front-end work before a key (default none)
     virtual void AfterKey(const sKeyStroke& /*key*/) {}       // Front-end update after a handled key (default none)
+
+    // Macros: ^MR record, ^MP play, Alt+- pause, Alt+= end recording
+    void MacroRecord(void);
+    void MacroPlay(void);
+    void MacroPause(void);
+    void MacroEndRecording(void);
+    bool IsMacroRecording(void) const;
+    bool IsMacroPlaying(void) const;
+    void BeginMacroUndo(void);                                // Open the undo step of a playback
+    void EndMacroUndo(bool sameDocument);                     // Close it; sameDocument false after the document was cleared
+    virtual void AfterMacroKey(void) {}                       // Front-end update after each played key (default none)
+    virtual bool MacroStopRequested(void) { return false; }   // True when a played key quits or closes the document
+    virtual std::string PromptText(const std::string& title, const std::string& label) = 0;   // Text prompt; empty on cancel
+    virtual std::string ChooseFromList(const std::string& title,
+                                       const std::vector<std::string>& items) = 0;          // List choice; empty on cancel
 
     // Dirty State
     void ResetDocumentDirty(void) ;
@@ -609,6 +626,9 @@ protected:
 
     // Undo Grouping
     bool mTypingGroupActive;              // tracks whether we're accumulating typed characters
+
+    // Macros
+    cMacroEngine* mMacro;                 // macro recorder and player (owned)
 
     // Background Layout State
     bool mLayoutInt;                          // Layout interrupted by user input?

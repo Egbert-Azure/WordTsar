@@ -208,6 +208,8 @@ public:
     void ShowError(const std::string& title, const std::string& message) override;
     void ShowMessage(const std::string& title, const std::string& message) override;
     bool AskYesNo(const std::string& title, const std::string& question) override;
+    std::string PromptText(const std::string& title, const std::string& label) override;
+    std::string ChooseFromList(const std::string& title, const std::vector<std::string>& items) override;
     void Quit(void) override;
     void SetEnabled(bool enabled) override;
 

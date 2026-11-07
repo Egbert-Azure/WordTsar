@@ -80,6 +80,7 @@
 #include "editorbase.h"
 #include "src/files/wordstar/wordstarfile.h"
 #include "src/input/keydispatch.h"
+#include "src/input/macroengine.h"
 #include "SimpleIni.h"
 #include <algorithm>
 #include <cmath>
@@ -186,6 +187,7 @@ cEditorBase::cEditorBase(void)
     , mDrawnCaret(false)
     , mDoDrawCaret(false)
     , mTypingGroupActive(false)
+    , mMacro(nullptr)
     , mLayoutInt(false)
     , mLayoutRest(false)
     , mLayoutParagraph(0)
@@ -211,6 +213,8 @@ cEditorBase::cEditorBase(void)
     , mStatusBusy(false)
     , mStatusError(false)
 {
+    mMacro = new cMacroEngine(*this);
+
     // sDisplaySettings constructor already sets defaults:
     // - mode = DISPLAY_CONTINUOUS
     // - showControl = SHOW_DOT
@@ -248,6 +252,7 @@ cEditorBase::cEditorBase(void)
 /////////////////////////////////////////////////////////////////////////////
 cEditorBase::~cEditorBase(void)
 {
+    delete mMacro;
 }
 
 
@@ -291,6 +296,10 @@ void cEditorBase::OnDocumentChanged(PARAGRAPH_T fromParagraph)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::OnDocumentCleared(void)
 {
+    if (mMacro != nullptr)
+    {
+        mMacro->OnDocumentCleared() ;
+    }
     mDocumentDirty = true ;
     mDirtyFromParagraph = 0 ;
 }
@@ -482,19 +491,130 @@ void cEditorBase::PerformPostCommandUpdate(void)
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::FeedKey(const sKeyStroke& key)
 {
-    IInputHandler* input = GetInput() ;
+    if (mMacro->InterceptKey(key) == true)
+    {
+        AfterKey(key) ;
+        return true ;
+    }
+
+    IInputHandler* input = mMacro->PlaybackInput() ;
+    if (input == nullptr)
+    {
+        input = GetInput() ;
+    }
     if (input == nullptr)
     {
         return false ;
     }
 
     BeforeKey(key) ;
+    mMacro->BeginKey(key) ;
     bool handled = DispatchKey(*this, *input, key) ;
+    mMacro->EndKey(handled) ;
     if (handled == true)
     {
         AfterKey(key) ;
     }
     return handled ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// ^MR: starts recording, or stops it and saves the macro.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::MacroRecord(void)
+{
+    mMacro->RecordCommand() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// ^MP: chooses a macro and plays it.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::MacroPlay(void)
+{
+    mMacro->PlayCommand() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Alt+-: writes a pause into the macro being recorded.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::MacroPause(void)
+{
+    mMacro->PauseCommand() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Alt+=: stops recording and saves the macro.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::MacroEndRecording(void)
+{
+    mMacro->EndRecordingCommand() ;
+}
+
+
+bool cEditorBase::IsMacroRecording(void) const
+{
+    return mMacro->IsRecording() ;
+}
+
+
+bool cEditorBase::IsMacroPlaying(void) const
+{
+    return mMacro->IsPlaying() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Closes the typing group and opens the undo group of a playback.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::BeginMacroUndo(void)
+{
+    if (mDocument == nullptr)
+    {
+        return ;
+    }
+    CloseTypingGroup() ;
+    mDocument->BeginUndoGroup() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  sameDocument [in] false if the document was cleared during playback
+///
+/// @brief
+/// Closes the typing group and the undo group of a playback.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::EndMacroUndo(bool sameDocument)
+{
+    if (mDocument == nullptr)
+    {
+        return ;
+    }
+    CloseTypingGroup() ;
+    if (sameDocument == true)
+    {
+        mDocument->EndUndoGroup() ;
+    }
 }
 
 
@@ -2129,11 +2249,14 @@ void ApplyFindOptionLetters(const std::string& letters, sFindRequest& request)
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::RequestFind(sFindRequest& request, bool replace)
 {
-    if (replace == true)
+    if (mMacro->IsPlaying() == true)
     {
-        return PromptReplace(request);
+        return mMacro->ReadPrompt(request, replace);
     }
-    return PromptFind(request);
+
+    bool ok = (replace == true) ? PromptReplace(request) : PromptFind(request);
+    mMacro->RecordPrompt(request, replace, ok);
+    return ok;
 }
 
 
@@ -5519,6 +5642,7 @@ void cEditorBase::GetStatus(sStatus& status)
 {
     // File information
     status.filename = mFileName;
+    status.macroState = mMacro->StateText();
 
     // Column -- count visible graphemes only (control codes excluded, tabs counted)
     long visualCol = 1;

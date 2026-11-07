@@ -707,6 +707,18 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
             return true ;
         }
 
+        // Alt+- macro pause, Alt+= end macro recording
+        if (ch == '-')
+        {
+            mEditor->MacroPause() ;
+            return true ;
+        }
+        if (ch == '=')
+        {
+            mEditor->MacroEndRecording() ;
+            return true ;
+        }
+
         // Other Alt combinations not handled in WordStar mode
         return false ;
     }
@@ -1281,11 +1293,17 @@ void cWordStarInput::OnControlMChar(char ch)
             }
 
 
+        case 'p' :
+            mEditor->MacroPlay() ;
+            break ;
+
+        case 'r' :
+            mEditor->MacroRecord() ;
+            break ;
+
         case '=' :
         case '#' :
         case '$' :
-        case 'p' :
-        case 'r' :
         case 'd' :
         case 's' :
         case 'e' :

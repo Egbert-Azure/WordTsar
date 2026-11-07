@@ -880,6 +880,29 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
         mStatusOldStr = combined ;
     }
 
+    // Macro state and editor status messages
+    std::string note = cstatus.macroState ;
+    std::string message = editor->GetStatusMessage() ;
+    editor->TickStatusMessage() ;
+    if (message.empty() == false)
+    {
+        note = note.empty() ? message : note + "  " + message ;
+    }
+    if (note.empty() == false)
+    {
+        QString text = QString::fromStdString(note) ;
+        if (mStatText->text() != text)
+        {
+            mStatText->setText(text) ;
+        }
+        mStatusNoteShown = true ;
+    }
+    else if (mStatusNoteShown == true)
+    {
+        mStatText->setText(" ") ;
+        mStatusNoteShown = false ;
+    }
+
     mStatStyle->setText(cstatus.style.c_str()) ;
     mStatFont->setText(cstatus.font.c_str()) ;
 
