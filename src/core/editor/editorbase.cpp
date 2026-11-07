@@ -79,6 +79,7 @@
 
 #include "editorbase.h"
 #include "src/files/wordstar/wordstarfile.h"
+#include "src/input/keydispatch.h"
 #include "SimpleIni.h"
 #include <algorithm>
 #include <cmath>
@@ -464,6 +465,36 @@ void cEditorBase::PerformPostCommandUpdate(void)
 
     // Caret, scroll, paint (platform-specific)
     PerformVisualUpdate() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  key [in] key stroke
+///
+/// @return true if the key was handled
+///
+/// @brief
+/// Single entry point for keys typed in either front end. Runs the front
+/// end's BeforeKey, the shared DispatchKey, and the front end's AfterKey
+/// when the key was handled.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::FeedKey(const sKeyStroke& key)
+{
+    IInputHandler* input = GetInput() ;
+    if (input == nullptr)
+    {
+        return false ;
+    }
+
+    BeforeKey(key) ;
+    bool handled = DispatchKey(*this, *input, key) ;
+    if (handled == true)
+    {
+        AfterKey(key) ;
+    }
+    return handled ;
 }
 
 

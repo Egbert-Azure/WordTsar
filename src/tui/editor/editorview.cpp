@@ -27,6 +27,7 @@
 #include "src/core/layout/layoutstructs.h"
 #include "src/core/document/document.h"
 #include "src/input/inputhandler.h"
+#include "src/input/keystroke.h"
 #include "src/core/include/config.h"
 
 #include <algorithm>
@@ -1726,27 +1727,18 @@ bool cWSEditorView::HandleEvent(const sInputEvent& event)
         return true;
     }
 
-    IInputHandler* input = mEditor->GetInput();
-    if (input == nullptr)
+    if (mEditor->GetInput() == nullptr)
     {
         return false;
     }
 
-    bool handled = false;
-
-    // 1. Control characters (^A..^Z) route to the engine first, matching the
-    //    WordStar diamond/chord model. 0x0D (Enter) is delivered as a special
-    //    key below.
+    // Control characters ^A..^Z (0x0D is Enter, delivered as a special key).
     if ((event.type == wordstartui::INPUT_TYPE_CONTROL) && (event.controlCode >= 1) && (event.controlCode <= 26) && (event.controlCode != 13))
     {
-        handled = input->HandleKey(static_cast<char>(event.controlCode), event.shift, false);
-        if (handled == true)
-        {
-            return true;
-        }
+        return mEditor->FeedKey(CharKeyStroke(static_cast<char>(event.controlCode), event.shift, false));
     }
 
-    // 2. Named special keys.
+    // Named special keys.
     if (event.type == wordstartui::INPUT_TYPE_SPECIAL)
     {
         eSpecialKey key = SPECIAL_ESCAPE;
@@ -1770,54 +1762,47 @@ bool cWSEditorView::HandleEvent(const sInputEvent& event)
             default:                                   mapped = false;          break;
         }
 
-        if (mapped == true)
+        if (mapped == false)
         {
-            handled = input->HandleSpecialKey(key, event.shift, event.ctrl, event.alt);
+            return false;
         }
 
-        if (handled == true)
-        {
-            return true;
-        }
+        return mEditor->FeedKey(SpecialKeyStroke(key, event.shift, event.ctrl, event.alt));
     }
 
-    // 3. Function keys.
+    // Function keys.
     if (event.type == wordstartui::INPUT_TYPE_FUNCTION)
     {
         if ((event.functionKey >= 1) && (event.functionKey <= 12))
         {
             eSpecialKey key = static_cast<eSpecialKey>(SPECIAL_F1 + (event.functionKey - 1));
-            handled = input->HandleSpecialKey(key, event.shift, event.ctrl, event.alt);
-            if (handled == true)
-            {
-                return true;
-            }
+            return mEditor->FeedKey(SpecialKeyStroke(key, event.shift, event.ctrl, event.alt));
         }
+        return false;
     }
 
-    // 4. Printable text.
+    // Printable text.
     if ((event.type == wordstartui::INPUT_TYPE_TEXT) && (event.textUtf8.empty() == false))
     {
         unsigned char first = static_cast<unsigned char>(event.textUtf8[0]);
 
         if (first >= 0x20)
         {
+            sKeyStroke stroke = TextKeyStroke(event.textUtf8, event.shift, false, event.alt);
             if (event.textUtf8.size() == 1)
             {
-                handled = input->HandleKey(event.textUtf8[0], event.shift, event.alt);
-                if (handled == false)
-                {
-                    mEditor->InsertText(event.textUtf8);
-                    handled = true;
-                }
+                stroke.ch = event.textUtf8[0];
             }
-            else
+
+            bool handled = mEditor->FeedKey(stroke);
+            if ((handled == false) && (event.alt == true))
             {
                 mEditor->InsertText(event.textUtf8);
                 handled = true;
             }
+            return handled;
         }
     }
 
-    return handled;
+    return false;
 }

@@ -109,6 +109,7 @@
 #include "ui_systempreferences.h"
 #include "src/gui/ruler/rulerctrl.h"
 #include "src/gui/wordtsar.h"
+#include "src/input/keystroke.h"
 #include "src/gui/dialogs/colordialog.h"
 
 // File I/O handlers
@@ -3723,89 +3724,34 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
     try
     {
 
-    // Reset listener flag -- will be set by OnDocumentChanged if a mutation occurs
-    mListenerHandledUpdate = false ;
-
-    // If background layout is active, interrupt it and save current position
-    PARAGRAPH_T totalParagraphs = mDocument->GetNumberofParagraphs();
-    if (mLayoutParagraph < totalParagraphs)
-    {
-        // Background layout was in progress - interrupt it
-        mLayoutInt = true;
-
-        // REQUIREMENT #3: SAVE POSITION FOR MULTI-LAYER RESUMPTION
-        // Save current background layout position to interrupt stack
-        mInterruptStack.push_back(mLayoutParagraph);
-
-        // Restart background layout from edited paragraph
-        // (will be set after keystroke is processed)
-    }
-
     bool handled = false;
+    sKeyStroke stroke;
 
-    // Clear search highlighting on any keypress (same as mouse click behavior)
-    // Find/FindAgain will re-set these inside HandleKey if needed
-    mSearchBlockSet = false;
-    mStartSearchBlock = 0;
-    mEndSearchBlock = 0;
-
-    // Get modifier keys
-    Qt::KeyboardModifiers modifiers = event->modifiers();
-    int key = event->key();
-
-    // If WordStar handler is in a control sequence mode (e.g., Ctrl+Q waiting
-    // for next key), translate special keys to their character equivalents and
-    // pass through to the handler instead of processing them here
-    if (mInput && mInput->CheckControlMode())
+    if (KeyEventToStroke(event, stroke) == true)
     {
-        char translated = 0;
-        switch (key)
-        {
-            case Qt::Key_Delete:
-            {
-                translated = 0x7F;  // DEL character (CP/M Delete key)
-                break;
-            }
-            case Qt::Key_Backspace:
-            {
-                translated = 0x08;  // BS character (Ctrl+H)
-                break;
-            }
-        }
-        if (translated != 0)
-        {
-            bool shift = (modifiers & Qt::ShiftModifier) != 0;
-            mInput->HandleKey(translated, shift);
-            handled = true;
-        }
+        handled = FeedKey(stroke);
     }
-
-    // Route all keys through the input handler (thin translator pattern).
-    // Special keys go through HandleSpecialKey(), character keys through HandleKey().
-    if (!handled)
+    else
     {
-        bool shift = (modifiers & Qt::ShiftModifier) != 0 ;
+        // Keys that run a GUI action directly instead of going to the input handler
+        BeforeKey(stroke);
+
+        Qt::KeyboardModifiers modifiers = event->modifiers();
+        int key = event->key();
         bool ctrl = (modifiers & Qt::ControlModifier) != 0 ;
         bool alt = (modifiers & Qt::AltModifier) != 0 ;
         bool meta = (modifiers & Qt::MetaModifier) != 0 ;   // physical Cmd key (AA_MacDontSwapCtrlAndMeta)
+        bool postUpdate = true;
 
         // macOS-idiomatic shortcuts for commands this app also puts on bare
         // F-keys (F1/F3/F11). macOS reserves those for brightness, Mission
         // Control, and Show Desktop at the OS level, so they never reliably
-        // reach any app; these Cmd-chords are the primary path here. F1 is
-        // WordStar 7's own real Help key (see cWordStarInput::HandleSpecialKey),
-        // so Preferences moved fully to Cmd+, rather than sharing F1 with it.
+        // reach any app; these Cmd-chords are the primary path here.
+        // Preferences is on Cmd+, (F1 is WordStar 7's Help key).
         if (meta && !ctrl && !alt && key == Qt::Key_Comma)
         {
             SystemPreferences() ;
             handled = true ;
-        }
-        else if (meta && !ctrl && !alt && key == Qt::Key_Slash)
-        {
-            // Cmd+/ mirrors F1: "press it, then press the command you want
-            // help with" -- route through the same shared-handler state
-            // machine rather than duplicating it here.
-            handled = mInput->HandleSpecialKey(SPECIAL_F1, shift, ctrl, alt) ;
         }
         else if (meta && ctrl && !alt && key == Qt::Key_F)
         {
@@ -3824,287 +3770,39 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
             ExitApplication() ;
             handled = true ;
         }
-        else
-        switch (key)
+#ifdef DEBUG
+        // Debug overlay toggles (these call update() themselves)
+        else if (key == Qt::Key_F3)
         {
-            // --- Special keys: route through HandleSpecialKey ---
-            case Qt::Key_Up:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_UP, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_Down:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_DOWN, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_Left:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_LEFT, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_Right:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_RIGHT, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_Home:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_HOME, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_End:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_END, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_PageUp:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_PAGE_UP, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_PageDown:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_PAGE_DOWN, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_Delete:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_DELETE, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_Backspace:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_BACKSPACE, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_Tab:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_TAB, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_Return:
-            case Qt::Key_Enter:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_ENTER, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_Escape:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_ESCAPE, shift, ctrl, alt) ;
-                break ;
-            }
-
-            // --- Function keys ---
-            case Qt::Key_F1:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_F1, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_F2:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_F2, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_F3:
-            {
-#ifdef DEBUG
-                // Debug overlay toggle (temporary -- will be removed when debug keys removed)
-                SetShowViewportDebug(!GetShowViewportDebug()) ;
-                update() ;
-                handled = true ;
-#else
-                // Release builds: real command (Modern mode = Find Next; best-effort,
-                // since macOS reserves bare F3 for Mission Control system-wide).
-                handled = mInput->HandleSpecialKey(SPECIAL_F3, shift, ctrl, alt) ;
+            SetShowViewportDebug(!GetShowViewportDebug()) ;
+            update() ;
+            handled = true ;
+            postUpdate = false ;
+        }
+        else if (key == Qt::Key_F4)
+        {
+            SetShowBoxStats(!GetShowBoxStats()) ;
+            update() ;
+            handled = true ;
+            postUpdate = false ;
+        }
+        else if (key == Qt::Key_F5)
+        {
+            SetShowBoxOutlines(!GetShowBoxOutlines()) ;
+            update() ;
+            handled = true ;
+            postUpdate = false ;
+        }
 #endif
-                break ;
-            }
 
-            case Qt::Key_F4:
-            {
-#ifdef DEBUG
-                // Debug overlay toggle (temporary)
-                SetShowBoxStats(!GetShowBoxStats()) ;
-                update() ;
-                handled = true ;
-#else
-                handled = mInput->HandleSpecialKey(SPECIAL_F4, shift, ctrl, alt) ;
-#endif
-                break ;
-            }
-
-            case Qt::Key_F5:
-            {
-#ifdef DEBUG
-                // Debug overlay toggle (temporary)
-                SetShowBoxOutlines(!GetShowBoxOutlines()) ;
-                update() ;
-                handled = true ;
-#else
-                handled = mInput->HandleSpecialKey(SPECIAL_F5, shift, ctrl, alt) ;
-#endif
-                break ;
-            }
-
-            case Qt::Key_F6:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_F6, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_F7:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_F7, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_F8:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_F8, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_F9:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_F9, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_F10:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_F10, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_F11:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_F11, shift, ctrl, alt) ;
-                break ;
-            }
-
-            case Qt::Key_F12:
-            {
-                handled = mInput->HandleSpecialKey(SPECIAL_F12, shift, ctrl, alt) ;
-                break ;
-            }
-
-            default:
-            {
-                // --- Alt+letter: route to HandleKey with alt=true ---
-                if (alt && !ctrl && key >= Qt::Key_A && key <= Qt::Key_Z)
-                {
-                    char letter = static_cast<char>(tolower(key - Qt::Key_A + 'a')) ;
-                    handled = mInput->HandleKey(letter, shift, true) ;
-                    break ;
-                }
-
-                // --- Ctrl+Alt+letter: route to HandleKey with alt=true ---
-                // Derived directly from the key code (same approach as the Alt+letter
-                // branch above), not from event->text(): Qt6 on macOS returns an empty
-                // text() whenever Control is held, which silently dropped every
-                // Ctrl+letter combination -- the core of WordStar's own command set.
-                if (alt && ctrl && key >= Qt::Key_A && key <= Qt::Key_Z)
-                {
-                    char ch = static_cast<char>(key - Qt::Key_A + 1) ;   // Ctrl+A=1 .. Ctrl+Z=26
-                    handled = mInput->HandleKey(ch, shift, true) ;
-                    break ;
-                }
-
-                // --- Ctrl+letter: route to HandleKey with alt=false ---
-                // Same reasoning as above: derive the control character from the key
-                // code, not event->text(), which Qt6 leaves empty on macOS whenever
-                // Control is held.
-                if (ctrl && !alt && key >= Qt::Key_A && key <= Qt::Key_Z)
-                {
-                    char ch = static_cast<char>(key - Qt::Key_A + 1) ;   // Ctrl+A=1 .. Ctrl+Z=26
-                    handled = mInput->HandleKey(ch, shift, false) ;
-                    break ;
-                }
-
-                // --- printable characters ---
-                QString text = event->text() ;
-
-                // Skip if no text (modifier-only keys)
-                if (text.isEmpty())
-                {
-                    break ;
-                }
-
-                // Get character code
-                CHAR_T ch = text.at(0).unicode() ;
-
-                // Delegate to input handler (handles control sequences and CUA bindings)
-                bool handledByInput = mInput->HandleKey(static_cast<char>(ch), shift, false) ;
-
-                if (!handledByInput)
-                {
-                    // Input handler didn't handle it -- insert as regular text
-                    // Only insert if no control modifiers (except Shift and AltGr)
-                    if (!ctrl && !alt)
-                    {
-                        std::string utf8Text = text.toStdString() ;
-                        InsertText(utf8Text) ;
-                        handled = true ;
-                    }
-                }
-                else
-                {
-                    handled = true ;
-                }
-                break ;
-            }
+        if (handled)
+        {
+            FinishKey(postUpdate);
         }
     }
 
-    // SINGLE UPDATE POINT - handles visual updates for ALL keys
     if (handled)
     {
-        // Skip update for F2 (already handled) and, in debug builds only, F3/F4/F5
-        // (the debug overlay toggles above call update() themselves). In release
-        // builds F3/F4/F5 are real commands routed through HandleSpecialKey like
-        // F6-F10, so they need the normal post-command update too.
-#ifdef DEBUG
-        if (key != Qt::Key_F2 && key != Qt::Key_F3 && key != Qt::Key_F4 && key != Qt::Key_F5)
-#else
-        if (key != Qt::Key_F2)
-#endif
-        {
-            // Incremental layout of visible range + caret + scroll + paint
-            PerformPostCommandUpdate() ;
-            mDoDrawCaret = false ;  // Force full repaint (not caret-only blink shortcut)
-        }
-
-        // If we interrupted background layout, restart from edited paragraph
-        if (mLayoutInt)
-        {
-            POSITION_T editPosition = mDocument->GetPosition();
-            PARAGRAPH_T editedPara = mDocument->GetParagraphFromPosition(editPosition);
-
-            // Restart from edited paragraph (or earlier if interrupt stack has earlier position)
-            // Note: We already saved the old position to mInterruptStack above
-            mLayoutParagraph = editedPara;
-        }
-
-        // Trigger idle layout after keypress (matches old editorctrl.cpp line 477)
-        // Uses 1ms delay to allow screen redraw to complete first
-        // OnIdle() will reschedule itself with 0ms while work remains
-        QTimer::singleShot(1, this, SLOT(OnIdle()));
-
         event->accept();
     }
     else
@@ -4121,6 +3819,207 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
         ShowError("Fatal Error", "Out of memory. Your file has been emergency-saved.");
         Quit();
     }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  event  [in]  key event
+/// @param  stroke [out] the key in front-end neutral form
+///
+/// @return true if the event is a key for the input handler, false for a
+///         GUI action key (Cmd+, Cmd+Ctrl+F Cmd+G Cmd+Q, debug F3-F5) or a
+///         key without text (modifier keys)
+///
+/// @brief
+/// Ctrl and Alt letters are taken from the key code, not event->text():
+/// Qt6 on macOS returns an empty text() whenever Control is held.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorCtrl::KeyEventToStroke(QKeyEvent* event, sKeyStroke& stroke) const
+{
+    Qt::KeyboardModifiers modifiers = event->modifiers();
+    int key = event->key();
+    bool shift = (modifiers & Qt::ShiftModifier) != 0 ;
+    bool ctrl = (modifiers & Qt::ControlModifier) != 0 ;
+    bool alt = (modifiers & Qt::AltModifier) != 0 ;
+    bool meta = (modifiers & Qt::MetaModifier) != 0 ;   // physical Cmd key (AA_MacDontSwapCtrlAndMeta)
+
+    if (meta && !ctrl && !alt && ((key == Qt::Key_Comma) || (key == Qt::Key_G) || (key == Qt::Key_Q)))
+    {
+        return false ;
+    }
+    if (meta && ctrl && !alt && key == Qt::Key_F)
+    {
+        return false ;
+    }
+    if (meta && !ctrl && !alt && key == Qt::Key_Slash)
+    {
+        // Cmd+/ is F1: "press it, then press the command you want help with"
+        stroke = SpecialKeyStroke(SPECIAL_F1, shift, ctrl, alt) ;
+        return true ;
+    }
+
+    switch (key)
+    {
+        case Qt::Key_Up:        stroke = SpecialKeyStroke(SPECIAL_UP, shift, ctrl, alt) ;        return true ;
+        case Qt::Key_Down:      stroke = SpecialKeyStroke(SPECIAL_DOWN, shift, ctrl, alt) ;      return true ;
+        case Qt::Key_Left:      stroke = SpecialKeyStroke(SPECIAL_LEFT, shift, ctrl, alt) ;      return true ;
+        case Qt::Key_Right:     stroke = SpecialKeyStroke(SPECIAL_RIGHT, shift, ctrl, alt) ;     return true ;
+        case Qt::Key_Home:      stroke = SpecialKeyStroke(SPECIAL_HOME, shift, ctrl, alt) ;      return true ;
+        case Qt::Key_End:       stroke = SpecialKeyStroke(SPECIAL_END, shift, ctrl, alt) ;       return true ;
+        case Qt::Key_PageUp:    stroke = SpecialKeyStroke(SPECIAL_PAGE_UP, shift, ctrl, alt) ;   return true ;
+        case Qt::Key_PageDown:  stroke = SpecialKeyStroke(SPECIAL_PAGE_DOWN, shift, ctrl, alt) ; return true ;
+        case Qt::Key_Delete:    stroke = SpecialKeyStroke(SPECIAL_DELETE, shift, ctrl, alt) ;    return true ;
+        case Qt::Key_Backspace: stroke = SpecialKeyStroke(SPECIAL_BACKSPACE, shift, ctrl, alt) ; return true ;
+        case Qt::Key_Tab:       stroke = SpecialKeyStroke(SPECIAL_TAB, shift, ctrl, alt) ;       return true ;
+        case Qt::Key_Return:
+        case Qt::Key_Enter:     stroke = SpecialKeyStroke(SPECIAL_ENTER, shift, ctrl, alt) ;     return true ;
+        case Qt::Key_Escape:    stroke = SpecialKeyStroke(SPECIAL_ESCAPE, shift, ctrl, alt) ;    return true ;
+        case Qt::Key_F1:        stroke = SpecialKeyStroke(SPECIAL_F1, shift, ctrl, alt) ;        return true ;
+        case Qt::Key_F2:        stroke = SpecialKeyStroke(SPECIAL_F2, shift, ctrl, alt) ;        return true ;
+#ifdef DEBUG
+        case Qt::Key_F3:
+        case Qt::Key_F4:
+        case Qt::Key_F5:        return false ;   // debug overlay toggles
+#else
+        case Qt::Key_F3:        stroke = SpecialKeyStroke(SPECIAL_F3, shift, ctrl, alt) ;        return true ;
+        case Qt::Key_F4:        stroke = SpecialKeyStroke(SPECIAL_F4, shift, ctrl, alt) ;        return true ;
+        case Qt::Key_F5:        stroke = SpecialKeyStroke(SPECIAL_F5, shift, ctrl, alt) ;        return true ;
+#endif
+        case Qt::Key_F6:        stroke = SpecialKeyStroke(SPECIAL_F6, shift, ctrl, alt) ;        return true ;
+        case Qt::Key_F7:        stroke = SpecialKeyStroke(SPECIAL_F7, shift, ctrl, alt) ;        return true ;
+        case Qt::Key_F8:        stroke = SpecialKeyStroke(SPECIAL_F8, shift, ctrl, alt) ;        return true ;
+        case Qt::Key_F9:        stroke = SpecialKeyStroke(SPECIAL_F9, shift, ctrl, alt) ;        return true ;
+        case Qt::Key_F10:       stroke = SpecialKeyStroke(SPECIAL_F10, shift, ctrl, alt) ;       return true ;
+        case Qt::Key_F11:       stroke = SpecialKeyStroke(SPECIAL_F11, shift, ctrl, alt) ;       return true ;
+        case Qt::Key_F12:       stroke = SpecialKeyStroke(SPECIAL_F12, shift, ctrl, alt) ;       return true ;
+        default:                break ;
+    }
+
+    if ((ctrl || alt) && key >= Qt::Key_A && key <= Qt::Key_Z)
+    {
+        if (ctrl)
+        {
+            // Ctrl+A=1 .. Ctrl+Z=26, with or without Alt
+            stroke = CharKeyStroke(static_cast<char>(key - Qt::Key_A + 1), shift, alt) ;
+        }
+        else
+        {
+            // Alt+letter
+            stroke = TextKeyStroke(std::string(1, static_cast<char>(key - Qt::Key_A + 'a')), shift, false, true) ;
+            stroke.ch = stroke.utf8[0] ;
+        }
+        return true ;
+    }
+
+    // Printable characters
+    QString text = event->text() ;
+    if (text.isEmpty())
+    {
+        return false ;
+    }
+
+    stroke = TextKeyStroke(text.toStdString(), shift, ctrl, alt) ;
+    stroke.ch = static_cast<char>(text.at(0).unicode()) ;
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the active input handler
+///
+/////////////////////////////////////////////////////////////////////////////
+IInputHandler* cEditorCtrl::GetInput(void) const
+{
+    return mInput ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  key [in] key about to be handled (unused)
+///
+/// @brief
+/// Clears the listener flag and search highlighting, and interrupts
+/// background layout.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::BeforeKey(const sKeyStroke& key)
+{
+    UNUSED_ARGUMENT(key) ;
+
+    // Reset listener flag -- will be set by OnDocumentChanged if a mutation occurs
+    mListenerHandledUpdate = false ;
+
+    // If background layout is active, interrupt it and save current position
+    PARAGRAPH_T totalParagraphs = mDocument->GetNumberofParagraphs();
+    if (mLayoutParagraph < totalParagraphs)
+    {
+        // Background layout was in progress - interrupt it
+        mLayoutInt = true;
+
+        // Save current background layout position to interrupt stack;
+        // AfterKey restarts layout from the edited paragraph.
+        mInterruptStack.push_back(mLayoutParagraph);
+    }
+
+    // Clear search highlighting on any keypress (same as mouse click behavior)
+    // Find/FindAgain will re-set these inside HandleKey if needed
+    mSearchBlockSet = false;
+    mStartSearchBlock = 0;
+    mEndSearchBlock = 0;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  key [in] key that was handled
+///
+/// @brief
+/// Visual update after a handled key; F2 updates the view itself.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::AfterKey(const sKeyStroke& key)
+{
+    bool f2 = (key.kind == KEYSTROKE_SPECIAL) && (key.special == SPECIAL_F2) ;
+    FinishKey(f2 == false) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  postUpdate [in] run the incremental layout and full repaint
+///
+/// @brief
+/// Restarts background layout from the edited paragraph and schedules
+/// idle layout.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::FinishKey(bool postUpdate)
+{
+    if (postUpdate)
+    {
+        // Incremental layout of visible range + caret + scroll + paint
+        PerformPostCommandUpdate() ;
+        mDoDrawCaret = false ;  // Force full repaint (not caret-only blink shortcut)
+    }
+
+    // If we interrupted background layout, restart from edited paragraph
+    if (mLayoutInt)
+    {
+        POSITION_T editPosition = mDocument->GetPosition();
+        PARAGRAPH_T editedPara = mDocument->GetParagraphFromPosition(editPosition);
+
+        // Restart from edited paragraph (the old position is on mInterruptStack)
+        mLayoutParagraph = editedPara;
+    }
+
+    // Trigger idle layout after keypress
+    // Uses 1ms delay to allow screen redraw to complete first
+    // OnIdle() will reschedule itself with 0ms while work remains
+    QTimer::singleShot(1, this, SLOT(OnIdle()));
 }
 
 

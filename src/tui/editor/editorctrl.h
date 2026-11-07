@@ -130,7 +130,7 @@ public:
     // ---- Accessors (expose protected base members) ----
     cLayoutBase* GetLayout(void) const;
     cDocument* GetDocument(void) const;
-    IInputHandler* GetInput(void) const;
+    IInputHandler* GetInput(void) const override;
 
     // ---- Input mode (Strategy Pattern) ----
     void SetInputMode(eInputMode mode);

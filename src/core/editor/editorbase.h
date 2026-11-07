@@ -30,6 +30,9 @@
 #include <thread>
 #include <vector>
 
+class IInputHandler;
+struct sKeyStroke;
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @struct sStatus
@@ -202,6 +205,13 @@ public:
 
     // Post-Command Update
     void PerformPostCommandUpdate(void);
+
+    // Keyboard input: every typed key goes through FeedKey, which runs
+    // BeforeKey, DispatchKey and, if the key was handled, AfterKey.
+    virtual IInputHandler* GetInput(void) const = 0;          // Active input handler
+    bool FeedKey(const sKeyStroke& key);
+    virtual void BeforeKey(const sKeyStroke& /*key*/) {}      // Front-end work before a key (default none)
+    virtual void AfterKey(const sKeyStroke& /*key*/) {}       // Front-end update after a handled key (default none)
 
     // Dirty State
     void ResetDocumentDirty(void) ;

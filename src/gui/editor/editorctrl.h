@@ -257,6 +257,11 @@ public:
     void SetInputMode(eInputMode mode);
     eInputMode GetInputMode(void) const;
 
+    // --- Key path (see cEditorBase::FeedKey) ---
+    IInputHandler* GetInput(void) const override;
+    void BeforeKey(const sKeyStroke& key) override;
+    void AfterKey(const sKeyStroke& key) override;
+
 signals:
 
 public slots:
@@ -277,6 +282,10 @@ protected:
     virtual eSaveQuestion AskSaveBeforeGenerate(const std::string& filename);
 
 private:
+    // --- Key path helpers ---
+    bool KeyEventToStroke(QKeyEvent* event, sKeyStroke& stroke) const;
+    void FinishKey(bool postUpdate);
+
     // --- Initialization helper ---
     // Common initialization shared by both constructors
     void Init(void) ;

@@ -59,7 +59,7 @@ enum eKeyStrokeKind
 struct sKeyStroke
 {
     eKeyStrokeKind kind = KEYSTROKE_TEXT;
-    char ch = 0;                            ///< KEYSTROKE_CHAR: 1..26
+    char ch = 0;                            ///< KEYSTROKE_CHAR: 1..26; KEYSTROKE_TEXT: byte for HandleKey, 0 for none
     eSpecialKey special = SPECIAL_ESCAPE;   ///< KEYSTROKE_SPECIAL
     bool shift = false;
     bool ctrl = false;
