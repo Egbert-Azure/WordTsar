@@ -20,6 +20,8 @@ In short: copy the templates folder, open BOOK.WS, then ^MP SETUP (in ws: Option
 
 ^MD opens a macro as a text file. New macros are recorded with ^MR, see KEY_MAPPING.md.
 
+If you have the Sawyer archive, copy its .WSM files into your `macros` folder. ^MP does not run a macro that uses a command WordTsar does not have; the status line names the command and the line.
+
 ## Table of contents and index
 
 The `.tc` and `.ix` lines and the index marks do not print.
