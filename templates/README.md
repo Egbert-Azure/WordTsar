@@ -19,6 +19,7 @@ In short: copy the templates folder, open BOOK.WS, then ^MP SETUP (in ws: Option
 - NEXTCH and PREVCH: jump to the start of the next or previous chapter. After the last or before the first chapter the cursor stays.
 - NEXTSC: jumps to the next centred # scene break. After the last one the cursor stays.
 - PREVSC: jumps to the previous centred # scene break. Before the first one the cursor stays.
+- CHWORDS: marks the chapter at the cursor as the block, from its .lh 54pt line to the next .pa or the end, and shows its word count.
 
 ^MD opens a macro as a text file. New macros are recorded with ^MR, see KEY_MAPPING.md.
 

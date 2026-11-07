@@ -1,0 +1,21 @@
+REM CHWORDS: marks the chapter at the cursor as the block and shows its
+REM word count. The chapter runs from its .lh 54pt line to the .pa line
+REM of the next chapter, or to the end of the document.
+Sub MAIN
+AutoRestore(ON)
+HideDots(OFF)
+Key("^QD^QF.lh 54pt{Enter}")
+Key("B{Enter}")
+IfException
+ACK: Key("{Enter}")
+Stop
+End IfException
+Key("^KB^QF.pa^N{Enter}")
+Key("{Enter}")
+IfException
+ACK: Key("{Enter}^QC^KK^K?")
+Stop
+End IfException
+Key("^KK^K?")
+End Sub
+
