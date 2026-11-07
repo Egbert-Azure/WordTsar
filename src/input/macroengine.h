@@ -132,6 +132,7 @@ public:
     void SetKeySink(IMacroKeySink* sink);                     // nullptr: the editor's FeedKey
 
     // Find and Replace prompts
+    bool AnswersPrompt(void) const;                           // true while a played key runs
     bool ReadPrompt(sFindRequest& request, bool replace);     // answer from the playing macro
     void RecordPrompt(const sFindRequest& request, bool replace, bool ok);
 
@@ -162,12 +163,14 @@ private:
     std::vector<sKeyStroke> mRecorded;
     long mCurrentKey;                                         // index of the key being dispatched, -1 none
     bool mDropKey;                                            // drop the key being dispatched
+    int mKeyDepth;                                            // FeedKey calls in progress
 
     // Playback
     bool mPlaying;
     bool mPaused;
     bool mCleared;                                            // document cleared during playback
     bool mUndoOpen;                                           // the playback undo group is open
+    bool mFeeding;                                            // a played key is being dispatched
     std::vector<std::string> mLines;
     size_t mNextLine;
     std::deque<sKeyStroke> mPending;

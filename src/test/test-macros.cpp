@@ -283,6 +283,61 @@ TEST_CASE("Macro: record typing, a block, a find and a pause, then play it back 
 }
 
 
+TEST_CASE("Macro: a Find from the menu is recorded with ^QF and plays without typing its answer")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    cMacroTestEditor recorder;
+    recorder.GetDocument()->Insert("the quick brown fox");
+    recorder.GetDocument()->SetPosition(0);
+    recorder.LayoutDocument(true);
+
+    Chord(recorder, 'M', 'r');
+    recorder.Find();
+    recorder.Key(TextKeyStroke("-", false, false, true));
+    Special(recorder, SPECIAL_ENTER);
+    recorder.Key(TextKeyStroke("=", false, false, true));
+
+    const std::filesystem::path file = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.txt";
+    REQUIRE(std::filesystem::exists(file));
+    CHECK(ReadLines(file) == std::vector<std::string>{ "^QF", "f", "o", "x", "Enter", "U", "Enter", "PAUSE" });
+
+    cMacroTestEditor player;
+    cDocument* playDoc = player.GetDocument();
+    playDoc->Insert("the quick brown fox");
+    playDoc->SetPosition(0);
+    player.LayoutDocument(true);
+    const std::string before = playDoc->GetText();
+
+    Chord(player, 'M', 'p');
+    CHECK(playDoc->GetText() == before);
+    CHECK(playDoc->GetPosition() != 0);
+    CHECK(player.mFindPrompts == 0);
+
+    player.Find();
+    CHECK(player.mFindPrompts == 1);
+    Special(player, SPECIAL_ENTER);
+    CHECK(player.IsMacroPlaying() == false);
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
+
+
 TEST_CASE("Macro: a missing config macros folder is created with the default macros")
 {
     EnsureMacroTestApplication();

@@ -346,10 +346,12 @@ cMacroEngine::cMacroEngine(cEditorBase& editor)
     , mRecordMode(INPUT_WORDSTAR)
     , mCurrentKey(-1)
     , mDropKey(false)
+    , mKeyDepth(0)
     , mPlaying(false)
     , mPaused(false)
     , mCleared(false)
     , mUndoOpen(false)
+    , mFeeding(false)
     , mNextLine(0)
 {
 }
@@ -472,6 +474,7 @@ IInputHandler* cMacroEngine::PlaybackInput(void)
 /////////////////////////////////////////////////////////////////////////////
 void cMacroEngine::BeginKey(const sKeyStroke& key)
 {
+    mKeyDepth++;
     mCurrentKey = -1;
     mDropKey = false;
 
@@ -493,6 +496,10 @@ void cMacroEngine::BeginKey(const sKeyStroke& key)
 
 void cMacroEngine::EndKey(bool handled)
 {
+    if (mKeyDepth > 0)
+    {
+        mKeyDepth--;
+    }
     if ((mCurrentKey >= 0) && (mCurrentKey < static_cast<long>(mRecorded.size())) &&
         ((handled == false) || (mDropKey == true)))
     {
@@ -944,7 +951,10 @@ void cMacroEngine::Run(void)
         }
 
         bool editing = Sink().EditsDocument();
+        bool feeding = mFeeding;
+        mFeeding = true;
         Sink().FeedMacroKey(key);
+        mFeeding = feeding;
         if (editing == false)
         {
             mCleared = false;
@@ -1081,6 +1091,18 @@ int cMacroEngine::ReadField(std::string& text)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return true if the Find or Replace prompt is answered from the macro:
+///         the command came from a key the player feeds
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cMacroEngine::AnswersPrompt(void) const
+{
+    return (mPlaying == true) && (mFeeding == true);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  request [in,out] current values on entry, the answer on return
 /// @param  replace [in]     true for Find and Replace
 ///
@@ -1126,7 +1148,9 @@ bool cMacroEngine::ReadPrompt(sFindRequest& request, bool replace)
 ///
 /// @brief
 /// While recording, writes the answer as the keys typed at the WS7
-/// prompts; a cancelled prompt is written as Esc.
+/// prompts; a cancelled prompt is written as Esc. A prompt opened outside
+/// FeedKey (a menu command) is preceded by its command key: ^QF or ^QA,
+/// in a Modern recording ^F or ^H.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMacroEngine::RecordPrompt(const sFindRequest& request, bool replace, bool ok)
@@ -1134,6 +1158,24 @@ void cMacroEngine::RecordPrompt(const sFindRequest& request, bool replace, bool 
     if ((mRecording == false) || (mPauseTyping == true))
     {
         return;
+    }
+
+    if (mKeyDepth == 0)
+    {
+        std::string command;
+        if (mRecordMode == INPUT_MODERN)
+        {
+            command = (replace == true) ? "^H" : "^F";
+        }
+        else
+        {
+            command = (replace == true) ? "^QA" : "^QF";
+        }
+        std::vector<sKeyStroke> keys;
+        if (NameToKeys(command, keys) == true)
+        {
+            mRecorded.insert(mRecorded.end(), keys.begin(), keys.end());
+        }
     }
 
     if (ok == false)

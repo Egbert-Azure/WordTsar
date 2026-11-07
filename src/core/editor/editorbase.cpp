@@ -2352,7 +2352,7 @@ void ApplyFindOptionLetters(const std::string& letters, sFindRequest& request)
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::RequestFind(sFindRequest& request, bool replace)
 {
-    if (mMacro->IsPlaying() == true)
+    if (mMacro->AnswersPrompt() == true)
     {
         return mMacro->ReadPrompt(request, replace);
     }
