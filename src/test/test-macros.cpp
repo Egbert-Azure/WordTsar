@@ -35,6 +35,7 @@ typedef cWSEditorCtrl tMacroTestEditorBase;
 typedef cEditorCtrl tMacroTestEditorBase;
 #endif
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -807,5 +808,42 @@ TEST_CASE("Macro: Sawyer's TRIM and TITLES do what their REM lines say")
 
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::filesystem::remove_all(home, ec);
+}
+
+
+TEST_CASE("Macro: a macro file named NAME.WSM is listed by ^MP and plays")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    std::filesystem::create_directories(folder);
+    {
+        std::ofstream out(folder / "UPPER.WSM", std::ios::binary);
+        out << "Sub MAIN\r\nKey(\"upper\")\r\nEnd Sub\r\n\x1A";
+    }
+
+    cMacroTestEditor editor;
+    editor.mChoice = "UPPER";
+    Chord(editor, 'M', 'p');
+
+    CHECK(std::find(editor.mListed.begin(), editor.mListed.end(), "UPPER") != editor.mListed.end());
+    CHECK(editor.GetDocument()->GetText().find("upper") == 0);
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
     std::filesystem::remove_all(home, ec);
 }

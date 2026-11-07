@@ -98,7 +98,8 @@ std::string StripLineEnd(const std::string& line)
 }
 
 
-// Macro names (file names without ".wsm") of the *.wsm files in a folder.
+// Macro names (file names without ".wsm") of the *.wsm files in a folder; the
+// extension in any case.
 std::vector<std::string> ListFolder(const std::string& dir)
 {
     std::vector<std::string> names;
@@ -117,7 +118,7 @@ std::vector<std::string> ListFolder(const std::string& dir)
     for (const std::filesystem::directory_entry& entry : it)
     {
         std::string file = entry.path().filename().string();
-        if ((entry.is_regular_file(ec) == true) && (EndsWith(file, MACRO_EXTENSION) == true) &&
+        if ((entry.is_regular_file(ec) == true) && (EndsWith(Lower(file), MACRO_EXTENSION) == true) &&
             (file.size() > 4) && (file[0] != '.'))
         {
             names.push_back(file.substr(0, file.size() - 4));
