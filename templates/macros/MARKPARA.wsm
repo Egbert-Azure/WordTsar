@@ -1,0 +1,22 @@
+REM MARKPARA: marks the paragraph at the cursor, with its hard return,
+REM as the block. The cursor ends at the end of the block.
+Sub MAIN
+AutoRestore(ON)
+HideDots(OFF)
+Key("^QF^N{Enter}")
+Key("B{Enter}")
+IfException
+ACK: Key("{Enter}^QR")
+Goto Start
+End IfException
+Key("^D")
+Start: Key("^KB^QF^N{Enter}")
+Key("{Enter}")
+IfException
+ACK: Key("{Enter}^QC^KK")
+Goto Done
+End IfException
+Key("^D^KK")
+Done:
+End Sub
+
