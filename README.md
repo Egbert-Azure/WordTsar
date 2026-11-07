@@ -21,7 +21,7 @@ This is version **0.17.0**, macOS only.
 
 ## Install
 
-Download `WordTsar.zip` from the [Releases page](https://github.com/Egbert-Azure/WordTsar/releases) and unzip it.
+Download `WordTsar.dmg` from the [Releases page](https://github.com/Egbert-Azure/WordTsar/releases), open it, and drag `WordTsar` onto `Applications`.
 
 The build is self-signed, so macOS warns about an unidentified developer. Right-click `WordTsar.app`, choose Open, then confirm.
 
