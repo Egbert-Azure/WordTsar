@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <system_error>
 
 #include "src/core/editor/editorbase.h"
@@ -36,8 +37,8 @@ namespace
 {
 
 const char MACRO_FOLDER[] = "macros";
-const char MACRO_EXTENSION[] = ".txt";
-const char MODERN_LINE[] = "Modern";
+const char MACRO_EXTENSION[] = ".wsm";
+const char MODERN_LINE[] = "REM Modern";
 const char STATE_RECORDING[] = "Recording";
 const char STATE_PAUSED[] = "Type, then press Enter";
 
@@ -46,6 +47,55 @@ bool EndsWith(const std::string& text, const std::string& suffix)
 {
     return (text.size() >= suffix.size()) &&
            (text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0);
+}
+
+
+std::string Lower(const std::string& text)
+{
+    std::string lower = text;
+    for (char& c : lower)
+    {
+        c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    }
+    return lower;
+}
+
+
+std::string Trim(const std::string& text)
+{
+    const char* blanks = " \t";
+    size_t first = text.find_first_not_of(blanks);
+    if (first == std::string::npos)
+    {
+        return std::string();
+    }
+    size_t last = text.find_last_not_of(blanks);
+    return text.substr(first, last - first + 1);
+}
+
+
+// Extension of a file name: the text after the last '.', 1 to 4 letters and
+// digits starting with a letter; empty if there is none.
+std::string Extension(const std::string& name)
+{
+    size_t dot = name.rfind('.');
+    if ((dot == std::string::npos) || (dot == 0))
+    {
+        return std::string();
+    }
+    std::string ext = name.substr(dot + 1);
+    if ((ext.empty() == true) || (ext.size() > 4) || (isalpha(static_cast<unsigned char>(ext[0])) == 0))
+    {
+        return std::string();
+    }
+    for (char c : ext)
+    {
+        if (isalnum(static_cast<unsigned char>(c)) == 0)
+        {
+            return std::string();
+        }
+    }
+    return Lower(ext);
 }
 
 
@@ -60,7 +110,32 @@ std::string StripLineEnd(const std::string& line)
 }
 
 
-// Macro names (file names without ".txt") of the *.txt files in a folder.
+// True if the first line after Sub MAIN is REM Modern.
+bool IsModernSource(const std::vector<std::string>& lines)
+{
+    bool inMain = false;
+    for (const std::string& line : lines)
+    {
+        std::string text = Trim(StripLineEnd(line));
+        if (text.empty() == true)
+        {
+            continue;
+        }
+        if (inMain == true)
+        {
+            return text == MODERN_LINE;
+        }
+        if (Lower(text) != "sub main")
+        {
+            return false;
+        }
+        inMain = true;
+    }
+    return false;
+}
+
+
+// Macro names (file names without ".wsm") of the *.wsm files in a folder.
 std::vector<std::string> ListFolder(const std::string& dir)
 {
     std::vector<std::string> names;
@@ -139,8 +214,10 @@ cMacroStore::cMacroStore(const std::string& documentDir, const std::string& conf
 
 bool cMacroStore::IsValidName(const std::string& name)
 {
+    std::string ext = Extension(name);
     return (name.empty() == false) && (name[0] != '.') &&
-           (name.find('/') == std::string::npos) && (name.find(':') == std::string::npos);
+           (name.find('/') == std::string::npos) && (name.find(':') == std::string::npos) &&
+           ((ext.empty() == true) || (ext == "wsm"));
 }
 
 
@@ -159,7 +236,7 @@ std::string cMacroStore::TrimName(const std::string& name)
 
 std::string cMacroStore::FileName(const std::string& name)
 {
-    if (EndsWith(name, MACRO_EXTENSION) == true)
+    if (Extension(name) == "wsm")
     {
         return name;
     }
@@ -269,17 +346,30 @@ bool cMacroStore::Load(const std::string& name, std::vector<std::string>& lines)
         return false;
     }
 
-    lines.clear();
-    std::string line;
-    while (std::getline(in, line))
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    size_t end = text.find('\x1A');
+    if (end != std::string::npos)
     {
-        lines.push_back(StripLineEnd(line));
+        text.erase(end);
+    }
+
+    lines.clear();
+    size_t start = 0;
+    while (start < text.size())
+    {
+        size_t newline = text.find('\n', start);
+        if (newline == std::string::npos)
+        {
+            newline = text.size();
+        }
+        lines.push_back(StripLineEnd(text.substr(start, newline - start)));
+        start = newline + 1;
     }
     return true;
 }
 
 
-bool cMacroStore::Save(const std::string& name, const std::vector<std::string>& lines) const
+bool cMacroStore::Save(const std::string& name, const std::string& source) const
 {
     std::string path = SavePath(name);
     if (path.empty() == true)
@@ -299,10 +389,7 @@ bool cMacroStore::Save(const std::string& name, const std::vector<std::string>& 
     {
         return false;
     }
-    for (const std::string& line : lines)
-    {
-        out << line << '\n';
-    }
+    out.write(source.data(), static_cast<std::streamsize>(source.size()));
     return out.good();
 }
 
@@ -517,7 +604,7 @@ void cMacroEngine::BeginKey(const sKeyStroke& key)
         return;
     }
 
-    if (KeysToLines(std::vector<sKeyStroke>{ key }, INPUT_MODERN).empty() == true)
+    if (KeyToKeyString(key).empty() == true)
     {
         mEditor.SetStatusMessage("Key not recorded");
         return;
@@ -650,11 +737,7 @@ void cMacroEngine::StopRecording(void)
     }
     mRecorded.clear();
 
-    std::vector<std::string> lines = KeysToLines(keys, mRecordMode);
-    if (mRecordMode == INPUT_MODERN)
-    {
-        lines.insert(lines.begin(), MODERN_LINE);
-    }
+    std::string source = KeysToMacroSource(keys, mRecordMode);
 
     mEditor.Repaint();
 
@@ -680,7 +763,7 @@ void cMacroEngine::StopRecording(void)
         return;
     }
 
-    if (store.Save(name, lines) == false)
+    if (store.Save(name, source) == false)
     {
         mEditor.SetStatusMessage("Cannot save macro " + name, false, 60, true);
         return;
@@ -904,7 +987,7 @@ void cMacroEngine::DeleteCommand(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  lines [in] macro file lines
+/// @param  lines [in] macro source lines
 ///
 /// @brief
 /// Plays the lines through the key sink as one undo step, up to the end or
@@ -925,11 +1008,7 @@ void cMacroEngine::Play(const std::vector<std::string>& lines)
     mPaused = false;
     mCleared = false;
 
-    bool modern = (mLines.empty() == false) && (mLines[0] == MODERN_LINE);
-    if (modern == true)
-    {
-        mNextLine = 1;
-    }
+    bool modern = IsModernSource(mLines);
 
     bool currentModern = (dynamic_cast<cModernInput*>(mEditor.GetInput()) != nullptr);
     mPlayInput.reset();
@@ -1035,8 +1114,9 @@ void cMacroEngine::Finish(void)
 ///
 /// @param  key [out] next key of the macro
 ///
-/// @return NEXT_KEY, NEXT_END at the end, NEXT_ERROR after an unknown key
-///         name (with a status message)
+/// @return NEXT_KEY, NEXT_END at the end or End Sub, NEXT_ERROR after an
+///         unknown key name or an unsupported statement (with a status
+///         message)
 ///
 /////////////////////////////////////////////////////////////////////////////
 cMacroEngine::eNext cMacroEngine::NextKey(sKeyStroke& key)
@@ -1048,18 +1128,22 @@ cMacroEngine::eNext cMacroEngine::NextKey(sKeyStroke& key)
             return NEXT_END;
         }
 
-        std::string line = StripLineEnd(mLines[mNextLine]);
-        mNextLine++;
-        if (line.empty() == true)
-        {
-            continue;
-        }
-
         std::vector<sKeyStroke> keys;
-        if (NameToKeys(line, keys) == false)
+        eMacroLine kind = ParseMacroLine(mLines[mNextLine], keys);
+        mNextLine++;
+        if (kind == MACRO_LINE_BAD_KEY)
         {
             mEditor.SetStatusMessage("Unknown key on line " + std::to_string(mNextLine), false, 60, true);
             return NEXT_ERROR;
+        }
+        if (kind == MACRO_LINE_UNSUPPORTED)
+        {
+            mEditor.SetStatusMessage("Unsupported line " + std::to_string(mNextLine), false, 60, true);
+            return NEXT_ERROR;
+        }
+        if (kind == MACRO_LINE_END)
+        {
+            mNextLine = mLines.size();
         }
         mPending.insert(mPending.end(), keys.begin(), keys.end());
     }
@@ -1206,7 +1290,7 @@ void cMacroEngine::RecordPrompt(const sFindRequest& request, bool replace, bool 
             command = (replace == true) ? "^QA" : "^QF";
         }
         std::vector<sKeyStroke> keys;
-        if (NameToKeys(command, keys) == true)
+        if (KeyStringToKeys(command, keys) == true)
         {
             mRecorded.insert(mRecorded.end(), keys.begin(), keys.end());
         }

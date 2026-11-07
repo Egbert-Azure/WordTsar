@@ -163,19 +163,6 @@ void Special(cMacroTestEditor& editor, eSpecialKey key)
 }
 
 
-std::vector<std::string> ReadLines(const std::filesystem::path& path)
-{
-    std::vector<std::string> lines;
-    std::ifstream in(path);
-    std::string line;
-    while (std::getline(in, line))
-    {
-        lines.push_back(line);
-    }
-    return lines;
-}
-
-
 std::string ReadBytes(const std::filesystem::path& path)
 {
     std::ifstream in(path, std::ios::binary);
@@ -238,17 +225,19 @@ TEST_CASE("Macro: record typing, a block, a find and a pause, then play it back 
     const std::string recorded = recDoc->GetText();
     CHECK(recorded.find("the quick brown red foxendthe.") != std::string::npos);
 
-    const std::filesystem::path file = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.txt";
+    const std::filesystem::path file = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.wsm";
     REQUIRE(std::filesystem::exists(file));
 
-    const std::vector<std::string> expected =
-    {
-        "t", "h", "e", "Space", "q", "u", "i", "c", "k", "Space", "b", "r", "o", "w", "n", "Space", "f", "o", "x",
-        "Home", "^KB", "Right", "Right", "Right", "^KK", "End", "^KC", "Home",
-        "^QF", "f", "o", "x", "Enter", "U", "Enter",
-        "PAUSE", "End", "."
-    };
-    CHECK(ReadLines(file) == expected);
+    const std::string expected =
+        "Sub MAIN\r\n"
+        "Key(\"the quick brown fox{Home}^KB{Right}{Right}{Right}^KK{End}^KC\")\r\n"
+        "Key(\"{Home}^QFfox{Enter}\")\r\n"
+        "Key(\"U{Enter}\")\r\n"
+        "PauseForInput(\"{Enter}\", 'Type, then press Enter')\r\n"
+        "Key(\"{End}.\")\r\n"
+        "End Sub\r\n"
+        "\x1A";
+    CHECK(ReadBytes(file) == expected);
 
     // Play in a second editor
     cMacroTestEditor player;
@@ -284,6 +273,71 @@ TEST_CASE("Macro: record typing, a block, a find and a pause, then play it back 
 }
 
 
+TEST_CASE("Macro: a recording is saved as WordStar 7 macro source and a .txt macro is converted")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    cMacroTestEditor recorder;
+    Chord(recorder, 'M', 'r');
+    TypeText(recorder, "say \"hi\" {ok}");
+    Special(recorder, SPECIAL_HOME);
+    Chord(recorder, 'K', 'b');
+    Special(recorder, SPECIAL_END);
+    Chord(recorder, 'K', 'k');
+    Special(recorder, SPECIAL_ENTER);
+    recorder.Key(TextKeyStroke("-", false, false, true));
+    TypeText(recorder, "name");
+    Special(recorder, SPECIAL_ENTER);
+    TypeText(recorder, "!");
+    recorder.Key(TextKeyStroke("=", false, false, true));
+    const std::string recorded = recorder.GetDocument()->GetText();
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    const std::filesystem::path file = folder / "t1.wsm";
+    REQUIRE(std::filesystem::exists(file));
+    const std::string source =
+        "Sub MAIN\r\n"
+        "Key(\"say \"\"hi\"\" {{ok}}{Home}^KB{End}^KK{Enter}\")\r\n"
+        "PauseForInput(\"{Enter}\", 'Type, then press Enter')\r\n"
+        "Key(\"!\")\r\n"
+        "End Sub\r\n"
+        "\x1A";
+    CHECK(ReadBytes(file) == source);
+
+    cMacroTestEditor player;
+    Chord(player, 'M', 'p');
+    TypeText(player, "who");
+    Special(player, SPECIAL_ENTER);
+    std::string played = recorded;
+    played.replace(played.find("name"), 4, "who");
+    CHECK(player.GetDocument()->GetText() == played);
+
+    // ^MD opens the file as a text document; saving it keeps the bytes.
+    cMacroTestEditor edit;
+    REQUIRE(edit.LoadFile(file.string()));
+    CHECK(edit.GetDocument()->IsTextFile());
+    REQUIRE(edit.SaveFile((folder / "t2.wsm").string()));
+    CHECK(ReadBytes(folder / "t2.wsm") == source);
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
+
+
 TEST_CASE("Macro: a Find from the menu is recorded with ^QF and plays without typing its answer")
 {
     EnsureMacroTestApplication();
@@ -311,9 +365,14 @@ TEST_CASE("Macro: a Find from the menu is recorded with ^QF and plays without ty
     Special(recorder, SPECIAL_ENTER);
     recorder.Key(TextKeyStroke("=", false, false, true));
 
-    const std::filesystem::path file = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.txt";
+    const std::filesystem::path file = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.wsm";
     REQUIRE(std::filesystem::exists(file));
-    CHECK(ReadLines(file) == std::vector<std::string>{ "^QF", "f", "o", "x", "Enter", "U", "Enter", "PAUSE" });
+    CHECK(ReadBytes(file) == "Sub MAIN\r\n"
+                             "Key(\"^QFfox{Enter}\")\r\n"
+                             "Key(\"U{Enter}\")\r\n"
+                             "PauseForInput(\"{Enter}\", 'Type, then press Enter')\r\n"
+                             "End Sub\r\n"
+                             "\x1A");
 
     cMacroTestEditor player;
     cDocument* playDoc = player.GetDocument();
@@ -370,9 +429,12 @@ TEST_CASE("Macro: Alt+- and Alt+= type an en dash and a not-equal sign unless re
     CHECK(doc->GetText() == recording);
     CHECK(editor.IsMacroRecording() == false);
 
-    const std::filesystem::path file = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.txt";
+    const std::filesystem::path file = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.wsm";
     REQUIRE(std::filesystem::exists(file));
-    CHECK(ReadLines(file) == std::vector<std::string>{ "PAUSE" });
+    CHECK(ReadBytes(file) == "Sub MAIN\r\n"
+                             "PauseForInput(\"{Enter}\", 'Type, then press Enter')\r\n"
+                             "End Sub\r\n"
+                             "\x1A");
 
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
@@ -401,7 +463,7 @@ TEST_CASE("Macro: a recording is saved in the macros folder next to the document
     setenv("HOME", home.c_str(), 1);
     setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
 
-    const std::filesystem::path config = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.txt";
+    const std::filesystem::path config = std::filesystem::path(cConfig::GetConfigDir()) / "macros" / "t1.wsm";
 
     cMacroTestEditor editor;
     editor.mFileSet = true;
@@ -409,7 +471,7 @@ TEST_CASE("Macro: a recording is saved in the macros folder next to the document
     Chord(editor, 'M', 'r');
     TypeText(editor, "a");
     editor.Key(TextKeyStroke("=", false, false, true));
-    CHECK(std::filesystem::exists(withMacros / "macros" / "t1.txt"));
+    CHECK(std::filesystem::exists(withMacros / "macros" / "t1.wsm"));
     CHECK(std::filesystem::exists(config) == false);
 
     editor.mFileDir = withoutMacros.string();
@@ -449,8 +511,8 @@ TEST_CASE("Macro: spaces around a macro name are trimmed")
     editor.Key(TextKeyStroke("=", false, false, true));
 
     const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
-    CHECK(std::filesystem::exists(folder / "mac.txt"));
-    CHECK(std::filesystem::exists(folder / "  mac  .txt") == false);
+    CHECK(std::filesystem::exists(folder / "mac.wsm"));
+    CHECK(std::filesystem::exists(folder / "  mac  .wsm") == false);
 
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
@@ -484,11 +546,11 @@ TEST_CASE("Macro: a missing config macros folder is created with the default mac
     CHECK(editor.mListed == std::vector<std::string>{ "CHAPTER", "INDEX", "NEXTCH", "PREVCH", "SCENE" });
     for (const char* name : { "CHAPTER", "INDEX", "NEXTCH", "PREVCH", "SCENE" })
     {
-        const std::filesystem::path file = folder / (std::string(name) + ".txt");
+        const std::filesystem::path file = folder / (std::string(name) + ".wsm");
         REQUIRE(std::filesystem::exists(file));
-        CHECK(ReadBytes(file) == ReadBytes(std::filesystem::path("../templates/macros") / (std::string(name) + ".txt")));
+        CHECK(ReadBytes(file) == ReadBytes(std::filesystem::path("../templates/macros") / (std::string(name) + ".wsm")));
     }
-    CHECK(std::filesystem::exists(folder / "SETUP.txt") == false);
+    CHECK(std::filesystem::exists(folder / "SETUP.wsm") == false);
 
     editor.mChoice = "INDEX";
     Chord(editor, 'M', 'y');
@@ -499,13 +561,13 @@ TEST_CASE("Macro: a missing config macros folder is created with the default mac
 
     for (const char* name : { "CHAPTER", "NEXTCH", "PREVCH", "SCENE" })
     {
-        std::filesystem::remove(folder / (std::string(name) + ".txt"));
+        std::filesystem::remove(folder / (std::string(name) + ".wsm"));
     }
     editor.mListed.clear();
     Chord(editor, 'M', 'p');
     CHECK(editor.mListed.empty());
     CHECK(editor.GetStatusMessage() == "No macros yet. Record one with ^MR.");
-    CHECK(std::filesystem::exists(folder / "CHAPTER.txt") == false);
+    CHECK(std::filesystem::exists(folder / "CHAPTER.wsm") == false);
 
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);

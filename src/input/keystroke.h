@@ -77,15 +77,46 @@ sKeyStroke PauseKeyStroke(void);
 // Empty when the key has no name.
 std::string KeyToName(const sKeyStroke& key);
 
-// Parse one macro line into keys. A Classic chord line such as "^KB" or "^P^B"
-// gives two keys. Returns false when the line is not a key name.
+// Parse one line of a one-key-per-line macro into keys. A Classic chord line
+// such as "^KB" or "^P^B" gives two keys. Returns false when the line is not a
+// key name.
 bool NameToKeys(const std::string& line, std::vector<sKeyStroke>& keys);
 
-// Macro lines for a key sequence, one key per line. In INPUT_WORDSTAR a chord
-// prefix (^K ^Q ^O ^P ^M) shares its line with the key that follows it.
-// Text of several characters gives one line per character. Keys without a
-// name are left out.
-std::vector<std::string> KeysToLines(const std::vector<sKeyStroke>& keys, eInputMode mode);
+// WordStar 7 key string of one key ("^K", "{Enter}", "{Alt+t}", "a", "{{");
+// text of several characters gives one entry per character. Empty when the
+// key has none (a pause, a control character as text).
+std::string KeyToKeyString(const sKeyStroke& key);
+
+// Keys of a WordStar 7 key string: characters, ^X control keys, {Name} keys
+// with Shift/Ctrl/Alt and "+", "-" or " ", and the doubled {{ }} ^^ for a
+// literal brace or caret. Returns false on an unknown name or a stray brace
+// or caret.
+bool KeyStringToKeys(const std::string& text, std::vector<sKeyStroke>& keys);
+
+// WordStar 7 macro source: Sub MAIN, REM Modern for INPUT_MODERN, Key("...")
+// lines, PauseForInput("{Enter}", 'Type, then press Enter') for a pause,
+// End Sub, CRLF line ends, one 0x1A at the end. In INPUT_WORDSTAR a chord
+// prefix (^K ^Q ^O ^P ^M) is followed by its key in upper case. A Key line
+// ends after {Enter} and before it would pass 60 characters.
+std::string KeysToMacroSource(const std::vector<sKeyStroke>& keys, eInputMode mode);
+
+enum eMacroLine
+{
+    MACRO_LINE_KEYS,            ///< keys (possibly none) to play
+    MACRO_LINE_END,             ///< End Sub: the keys before it, then the end
+    MACRO_LINE_UNSUPPORTED,     ///< a statement other than the supported subset
+    MACRO_LINE_BAD_KEY          ///< a Key() string with an unknown key
+};
+
+// One line of macro source. Plays Key("...") and Key('...'), PauseForInput()
+// as a pause; skips blank lines, REM and ' comments, Sub MAIN and the editor
+// settings AutoRestore, Insert, CmdTags, HideDots, ColMode, ColReplace,
+// SetHelpLevel, WSQuiet. Statements are separated by ':'.
+eMacroLine ParseMacroLine(const std::string& line, std::vector<sKeyStroke>& keys);
+
+// Macro source for a one-key-per-line macro (first line "Modern" for a
+// Modern recording). Returns false on a line that is not a key name.
+bool KeyLinesToMacroSource(const std::vector<std::string>& lines, std::string& source);
 
 /// @}
 

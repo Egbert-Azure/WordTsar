@@ -40,7 +40,8 @@ struct sFindRequest;
 /// @class cMacroStore
 ///
 /// @brief
-/// Macro files <name>.txt in the "macros" folder next to the document and
+/// Macro files <name>.wsm (WordStar 7 macro source, see KeysToMacroSource)
+/// in the "macros" folder next to the document and
 /// in the "macros" folder next to config.ini. Lists the document folder
 /// first; on equal names the document folder wins. New macros are saved in
 /// the document folder if it exists, otherwise in the config folder, which
@@ -53,16 +54,16 @@ class cMacroStore
 public:
     cMacroStore(const std::string& documentDir, const std::string& configDir);
 
-    static bool IsValidName(const std::string& name);       // not empty, no / or :, not starting with '.'
+    static bool IsValidName(const std::string& name);       // not empty, no / or :, not starting with '.', no extension but .wsm
     static std::string TrimName(const std::string& name);    // without spaces and tabs at both ends
-    static std::string FileName(const std::string& name);    // name with ".txt"
+    static std::string FileName(const std::string& name);    // name with ".wsm"
 
     void CreateDefaults(void) const;                          // config folder with the default macros, if missing
-    std::vector<std::string> List(void) const;               // macro names without ".txt"
+    std::vector<std::string> List(void) const;               // macro names without ".wsm"
     std::string FindPath(const std::string& name) const;     // file of a listed macro, empty if none
     std::string SavePath(const std::string& name) const;     // file a new macro is saved to, empty if none
-    bool Load(const std::string& name, std::vector<std::string>& lines) const;
-    bool Save(const std::string& name, const std::vector<std::string>& lines) const;
+    bool Load(const std::string& name, std::vector<std::string>& lines) const;   // lines up to the first 0x1A
+    bool Save(const std::string& name, const std::string& source) const;
     std::string SiblingPath(const std::string& name, const std::string& newName) const;  // newName in the folder of name
     bool Rename(const std::string& name, const std::string& newName) const;   // in place, replaces an existing target
     bool Copy(const std::string& name, const std::string& newName) const;     // same folder, replaces an existing target

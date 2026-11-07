@@ -1,0 +1,4 @@
+Sub MAIN
+Key("{Right}{Right}^A^PK^F{Left}^PK")
+End Sub
+

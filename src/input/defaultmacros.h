@@ -26,7 +26,7 @@
 /// @ingroup Input
 /// @{
 
-/// One default macro file: name without ".txt" and the file bytes.
+/// One default macro file: name without ".wsm" and the file bytes.
 struct sDefaultMacro
 {
     const char* name;

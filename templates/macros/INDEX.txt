@@ -1,7 +1,0 @@
-Right
-Right
-^A
-^PK
-^F
-Left
-^PK

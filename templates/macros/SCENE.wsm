@@ -1,0 +1,7 @@
+Sub MAIN
+Key("{Enter}")
+Key(".cp 4{Enter}")
+Key("^OC#{Enter}")
+Key("{Tab}")
+End Sub
+

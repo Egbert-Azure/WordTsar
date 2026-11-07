@@ -1,0 +1,5 @@
+Sub MAIN
+Key("^QF.lh 54pt{Enter}")
+Key("B{Enter}")
+End Sub
+

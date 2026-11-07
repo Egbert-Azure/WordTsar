@@ -470,28 +470,431 @@ bool NameToKeys(const std::string& line, std::vector<sKeyStroke>& keys)
 }
 
 
+namespace
+{
+
+const size_t KEY_LINE_LENGTH = 60;
+const char CRLF[] = "\r\n";
+const char ENTER_KEY_STRING[] = "{Enter}";
+const char PAUSE_LINE[] = "PauseForInput(\"{Enter}\", 'Type, then press Enter')";
+const char MODERN_LINE[] = "Modern";
+const char MODERN_REM_LINE[] = "REM Modern";
+
+// Editor settings statements of a WordStar 7 recording; played as no-ops.
+const char* const SETTING_STATEMENTS[] =
+{
+    "autorestore", "insert", "cmdtags", "hidedots", "colmode", "colreplace", "sethelplevel", "wsquiet"
+};
+
+
+std::string Lower(const std::string& text)
+{
+    std::string lower = text;
+    for (char& c : lower)
+    {
+        c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    }
+    return lower;
+}
+
+
+std::string Trim(const std::string& text)
+{
+    const char* blanks = " \t\r\n";
+    size_t first = text.find_first_not_of(blanks);
+    if (first == std::string::npos)
+    {
+        return std::string();
+    }
+    size_t last = text.find_last_not_of(blanks);
+    return text.substr(first, last - first + 1);
+}
+
+
+std::string Modifiers(bool shift, bool ctrl, bool alt)
+{
+    std::string text;
+    if (shift == true)
+    {
+        text += "Shift+";
+    }
+    if (ctrl == true)
+    {
+        text += "Ctrl+";
+    }
+    if (alt == true)
+    {
+        text += "Alt+";
+    }
+    return text;
+}
+
+
+// A typed character in a Key("...") string: " { } ^ doubled.
+std::string LiteralKeyString(const std::string& piece)
+{
+    if ((piece == "\"") || (piece == "{") || (piece == "}") || (piece == "^"))
+    {
+        return piece + piece;
+    }
+    return piece;
+}
+
+
+std::string SpecialKeyName(eSpecialKey special)
+{
+    if (special == SPECIAL_BACKSPACE)
+    {
+        return "BkSp";
+    }
+    for (const sSpecialName& entry : SPECIAL_NAMES)
+    {
+        if (entry.key == special)
+        {
+            return entry.name;
+        }
+    }
+    return std::string();
+}
+
+
+// Key string of a key whose text is at most one character.
+std::string OneKeyString(const sKeyStroke& key)
+{
+    switch (key.kind)
+    {
+        case KEYSTROKE_PAUSE:
+        {
+            return std::string();
+        }
+
+        case KEYSTROKE_CHAR:
+        {
+            if ((key.ch < 1) || (key.ch > 26))
+            {
+                return std::string();
+            }
+            char letter = static_cast<char>(key.ch + '@');
+            if ((key.shift == false) && (key.alt == false))
+            {
+                return std::string("^") + letter;
+            }
+            return "{" + Modifiers(key.shift, true, key.alt) + letter + "}";
+        }
+
+        case KEYSTROKE_SPECIAL:
+        {
+            std::string name = SpecialKeyName(key.special);
+            if (name.empty() == true)
+            {
+                return std::string();
+            }
+            return "{" + Modifiers(key.shift, key.ctrl, key.alt) + name + "}";
+        }
+
+        case KEYSTROKE_TEXT:
+        {
+            if ((key.utf8.empty() == true) || (IsControlText(key.utf8) == true))
+            {
+                return std::string();
+            }
+            if ((key.ctrl == false) && (key.alt == false))
+            {
+                return LiteralKeyString(key.utf8);
+            }
+            std::string base = (key.utf8 == "\"") ? std::string("\"\"") : key.utf8;
+            return "{" + Modifiers(key.shift, key.ctrl, key.alt) + base + "}";
+        }
+    }
+    return std::string();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// The key named between braces: Shift, Ctrl and Alt joined to the key by
+/// "+", "-" or " " in any case; a key name, a letter with Ctrl, ^X, or one
+/// character. (Name) and [Name] stand for Name.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool BracedKey(const std::string& name, std::vector<sKeyStroke>& keys)
+{
+    std::string rest = name;
+    bool shift = false;
+    bool ctrl = false;
+    bool alt = false;
+    bool more = true;
+
+    while (more == true)
+    {
+        more = false;
+        const char* prefixes[] = { "shift", "ctrl", "alt" };
+        bool* flags[] = { &shift, &ctrl, &alt };
+        for (size_t i = 0; i < 3; i++)
+        {
+            std::string prefix = prefixes[i];
+            if ((rest.size() > (prefix.size() + 1)) && (Lower(rest.substr(0, prefix.size())) == prefix) &&
+                ((rest[prefix.size()] == '+') || (rest[prefix.size()] == '-') || (rest[prefix.size()] == ' ')))
+            {
+                *flags[i] = true;
+                rest = rest.substr(prefix.size() + 1);
+                more = true;
+            }
+        }
+    }
+
+    if ((rest.size() > 2) &&
+        (((rest.front() == '(') && (rest.back() == ')')) || ((rest.front() == '[') && (rest.back() == ']'))))
+    {
+        rest = rest.substr(1, rest.size() - 2);
+    }
+    if (rest.empty() == true)
+    {
+        return false;
+    }
+
+    char ch = 0;
+    if (ParseControlName(rest, ch) == true)
+    {
+        keys.push_back(CharKeyStroke(ch, shift, alt));
+        return true;
+    }
+    if ((ctrl == true) && (rest.size() == 1) && (isalpha(static_cast<unsigned char>(rest[0])) != 0))
+    {
+        keys.push_back(CharKeyStroke(static_cast<char>(toupper(static_cast<unsigned char>(rest[0])) - '@'), shift, alt));
+        return true;
+    }
+
+    std::string lower = Lower(rest);
+    for (const sSpecialName& entry : SPECIAL_NAMES)
+    {
+        if (lower == Lower(entry.name))
+        {
+            keys.push_back(SpecialKeyStroke(entry.key, shift, ctrl, alt));
+            return true;
+        }
+    }
+    if (lower == "backtab")
+    {
+        keys.push_back(SpecialKeyStroke(SPECIAL_TAB, true, ctrl, alt));
+        return true;
+    }
+    if (lower == "space")
+    {
+        keys.push_back(TextKeyStroke(" ", shift, ctrl, alt));
+        return true;
+    }
+    if ((IsControlText(rest) == false) && (SplitCharacters(rest).size() == 1))
+    {
+        keys.push_back(TextKeyStroke(rest, shift, ctrl, alt));
+        return true;
+    }
+    return false;
+}
+
+
+// The string of a "(" string ")" argument list; '' or "" inside stands for
+// one delimiter.
+bool StringArgument(const std::string& args, std::string& text)
+{
+    std::string rest = Trim(args);
+    if ((rest.size() < 4) || (rest.front() != '(') || (rest.back() != ')'))
+    {
+        return false;
+    }
+    rest = Trim(rest.substr(1, rest.size() - 2));
+    if (rest.size() < 2)
+    {
+        return false;
+    }
+
+    char quote = rest[0];
+    if (((quote != '"') && (quote != '\'')) || (rest.back() != quote))
+    {
+        return false;
+    }
+
+    text.clear();
+    for (size_t pos = 1; pos < (rest.size() - 1); pos++)
+    {
+        if (rest[pos] == quote)
+        {
+            if ((pos + 1 < (rest.size() - 1)) && (rest[pos + 1] == quote))
+            {
+                pos++;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        text += rest[pos];
+    }
+    return true;
+}
+
+} // namespace
+
+
+std::string KeyToKeyString(const sKeyStroke& key)
+{
+    if ((key.kind != KEYSTROKE_TEXT) || (key.utf8.empty() == true))
+    {
+        return OneKeyString(key);
+    }
+
+    std::string text;
+    for (const std::string& piece : SplitCharacters(key.utf8))
+    {
+        sKeyStroke one = key;
+        one.utf8 = piece;
+        text += OneKeyString(one);
+    }
+    return text;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  text [in]  key string, delimiters of the Key() argument removed
+/// @param  keys [out] the keys are appended here
+///
+/// @return false on an unknown key name or a stray brace or caret
+///
+/////////////////////////////////////////////////////////////////////////////
+bool KeyStringToKeys(const std::string& text, std::vector<sKeyStroke>& keys)
+{
+    size_t pos = 0;
+    while (pos < text.size())
+    {
+        char c = text[pos];
+        char next = ((pos + 1) < text.size()) ? text[pos + 1] : '\0';
+
+        if (((c == '{') || (c == '}') || (c == '^')) && (next == c))
+        {
+            keys.push_back(TextKeyStroke(std::string(1, c)));
+            pos += 2;
+            continue;
+        }
+
+        if (c == '{')
+        {
+            size_t close = text.find('}', pos + 1);
+            if (close == std::string::npos)
+            {
+                return false;
+            }
+            std::string name = text.substr(pos + 1, close - pos - 1);
+            if ((name.empty() == false) && ((name.back() == '+') || (name.back() == '-') || (name.back() == ' ')) &&
+                ((close + 1) < text.size()) && (text[close + 1] == '}'))
+            {
+                name += '}';
+                close++;
+            }
+            if (BracedKey(name, keys) == false)
+            {
+                return false;
+            }
+            pos = close + 1;
+            continue;
+        }
+
+        if (c == '^')
+        {
+            char ch = 0;
+            if (ParseControlName(text.substr(pos, 2), ch) == false)
+            {
+                return false;
+            }
+            keys.push_back(CharKeyStroke(ch));
+            pos += 2;
+            continue;
+        }
+
+        if ((c == '}') || (IsControlText(std::string(1, c)) == true))
+        {
+            return false;
+        }
+
+        size_t end = text.find_first_of("{}^", pos);
+        if (end == std::string::npos)
+        {
+            end = text.size();
+        }
+        for (const std::string& piece : SplitCharacters(text.substr(pos, end - pos)))
+        {
+            if (IsControlText(piece) == true)
+            {
+                return false;
+            }
+            keys.push_back(TextKeyStroke(piece));
+        }
+        pos = end;
+    }
+    return true;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @param  keys [in] key sequence
 /// @param  mode [in] input mode the keys were typed in
 ///
-/// @return one macro line per key, chord lines combined in INPUT_WORDSTAR
+/// @return the macro file bytes
 ///
 /////////////////////////////////////////////////////////////////////////////
-std::vector<std::string> KeysToLines(const std::vector<sKeyStroke>& keys, eInputMode mode)
+std::string KeysToMacroSource(const std::vector<sKeyStroke>& keys, eInputMode mode)
 {
-    std::vector<std::string> lines;
+    std::string source = std::string("Sub MAIN") + CRLF;
+    if (mode == INPUT_MODERN)
+    {
+        source += std::string(MODERN_REM_LINE) + CRLF;
+    }
+
+    std::string line;
+    auto flush = [&](void)
+    {
+        if (line.empty() == false)
+        {
+            source += "Key(\"" + line + "\")" + CRLF;
+            line.clear();
+        }
+    };
+    auto add = [&](const std::string& token)
+    {
+        if (token.empty() == true)
+        {
+            return;
+        }
+        if ((line.empty() == false) && ((line.size() + token.size()) > KEY_LINE_LENGTH))
+        {
+            flush();
+        }
+        line += token;
+        if (token == ENTER_KEY_STRING)
+        {
+            flush();
+        }
+    };
 
     for (size_t i = 0; i < keys.size(); i++)
     {
         const sKeyStroke& key = keys[i];
+
+        if (key.kind == KEYSTROKE_PAUSE)
+        {
+            flush();
+            source += std::string(PAUSE_LINE) + CRLF;
+            continue;
+        }
 
         if ((mode == INPUT_WORDSTAR) && (IsChordPrefix(key) == true) && ((i + 1) < keys.size()))
         {
             std::string follow = ChordFollowName(keys[i + 1]);
             if (follow.empty() == false)
             {
-                lines.push_back(KeyToName(key) + follow);
+                add(OneKeyString(key) + ((follow.size() == 1) ? LiteralKeyString(follow) : follow));
                 i++;
                 continue;
             }
@@ -503,21 +906,209 @@ std::vector<std::string> KeysToLines(const std::vector<sKeyStroke>& keys, eInput
             {
                 sKeyStroke one = key;
                 one.utf8 = piece;
-                std::string name = KeyToName(one);
-                if (name.empty() == false)
-                {
-                    lines.push_back(name);
-                }
+                add(OneKeyString(one));
             }
             continue;
         }
 
-        std::string name = KeyToName(key);
-        if (name.empty() == false)
+        add(OneKeyString(key));
+    }
+
+    flush();
+    source += std::string("End Sub") + CRLF;
+    source += '\x1A';
+    return source;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  line [in]  one line of macro source
+/// @param  keys [out] keys of the line are appended here
+///
+/// @return what the line holds
+///
+/////////////////////////////////////////////////////////////////////////////
+eMacroLine ParseMacroLine(const std::string& line, std::vector<sKeyStroke>& keys)
+{
+    std::string text = Trim(line);
+    std::string lower = Lower(text);
+    if ((text.empty() == true) ||
+        ((lower.compare(0, 3, "rem") == 0) && ((text.size() == 3) || (text[3] == ' ') || (text[3] == '\t'))))
+    {
+        return MACRO_LINE_KEYS;
+    }
+
+    // Statements separated by ':' outside strings; ' outside parentheses
+    // starts a comment.
+    std::vector<std::string> statements;
+    std::string current;
+    char quote = '\0';
+    int depth = 0;
+    for (size_t i = 0; i < text.size(); i++)
+    {
+        char c = text[i];
+        if (quote != '\0')
         {
-            lines.push_back(name);
+            current += c;
+            if (c == quote)
+            {
+                if (((i + 1) < text.size()) && (text[i + 1] == quote))
+                {
+                    current += c;
+                    i++;
+                }
+                else
+                {
+                    quote = '\0';
+                }
+            }
+            continue;
+        }
+        if ((c == '"') || ((c == '\'') && (depth > 0)))
+        {
+            quote = c;
+            current += c;
+            continue;
+        }
+        if (c == '\'')
+        {
+            break;
+        }
+        if (c == '(')
+        {
+            depth++;
+        }
+        else if ((c == ')') && (depth > 0))
+        {
+            depth--;
+        }
+        else if ((c == ':') && (depth == 0))
+        {
+            statements.push_back(current);
+            current.clear();
+            continue;
+        }
+        current += c;
+    }
+    if (quote != '\0')
+    {
+        return MACRO_LINE_UNSUPPORTED;
+    }
+    statements.push_back(current);
+
+    for (const std::string& raw : statements)
+    {
+        std::string statement = Trim(raw);
+        if (statement.empty() == true)
+        {
+            continue;
+        }
+
+        size_t length = 0;
+        while ((length < statement.size()) &&
+               ((isalnum(static_cast<unsigned char>(statement[length])) != 0) || (statement[length] == '_')))
+        {
+            length++;
+        }
+        if (length == 0)
+        {
+            return MACRO_LINE_UNSUPPORTED;
+        }
+
+        std::string word = Lower(statement.substr(0, length));
+        std::string rest = Trim(statement.substr(length));
+        bool call = (rest.empty() == true) || (rest[0] == '(');
+
+        if (word == "rem")
+        {
+            break;
+        }
+        if (word == "sub")
+        {
+            if (Lower(rest) != "main")
+            {
+                return MACRO_LINE_UNSUPPORTED;
+            }
+            continue;
+        }
+        if (word == "end")
+        {
+            return (Lower(rest) == "sub") ? MACRO_LINE_END : MACRO_LINE_UNSUPPORTED;
+        }
+        if (word == "key")
+        {
+            std::string keyString;
+            if (StringArgument(rest, keyString) == false)
+            {
+                return MACRO_LINE_UNSUPPORTED;
+            }
+            if (KeyStringToKeys(keyString, keys) == false)
+            {
+                return MACRO_LINE_BAD_KEY;
+            }
+            continue;
+        }
+        if ((word == "pauseforinput") && (call == true))
+        {
+            keys.push_back(PauseKeyStroke());
+            continue;
+        }
+
+        bool setting = false;
+        for (const char* name : SETTING_STATEMENTS)
+        {
+            if (word == name)
+            {
+                setting = true;
+            }
+        }
+        if ((setting == true) && (call == true))
+        {
+            continue;
+        }
+        return MACRO_LINE_UNSUPPORTED;
+    }
+
+    return MACRO_LINE_KEYS;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  lines  [in]  lines of a one-key-per-line macro
+/// @param  source [out] the macro source
+///
+/// @return false if a line is not a key name
+///
+/////////////////////////////////////////////////////////////////////////////
+bool KeyLinesToMacroSource(const std::vector<std::string>& lines, std::string& source)
+{
+    std::vector<sKeyStroke> keys;
+    eInputMode mode = INPUT_WORDSTAR;
+
+    for (size_t i = 0; i < lines.size(); i++)
+    {
+        std::string line = lines[i];
+        while ((line.empty() == false) && ((line.back() == '\r') || (line.back() == '\n')))
+        {
+            line.pop_back();
+        }
+        if ((i == 0) && (line == MODERN_LINE))
+        {
+            mode = INPUT_MODERN;
+            continue;
+        }
+        if (line.empty() == true)
+        {
+            continue;
+        }
+        if (NameToKeys(line, keys) == false)
+        {
+            return false;
         }
     }
 
-    return lines;
+    source = KeysToMacroSource(keys, mode);
+    return true;
 }

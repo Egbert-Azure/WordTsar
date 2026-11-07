@@ -33,7 +33,7 @@ file(GLOB WORDTSAR_INPUT_SOURCES
 # Default macros: the files in templates/macros listed below, compiled in
 # as byte arrays (src/input/defaultmacros.h). The source is written to the
 # build folder at configure time; a changed template re-runs configure.
-# SETUP.txt is not included.
+# SETUP.wsm is not included.
 # ------------------------------------------------------------------------
 set(WS_DEFAULT_MACRO_DIR "${WS_SRC_DIR}/../templates/macros")
 set(WS_DEFAULT_MACROS CHAPTER INDEX NEXTCH PREVCH SCENE)
@@ -44,7 +44,7 @@ string(APPEND _dm_text "// Copyright (C) 2026 Egbert H. Schroeer\n\n")
 string(APPEND _dm_text "#include \"src/input/defaultmacros.h\"\n\n")
 set(_dm_table "")
 foreach(_dm_name IN LISTS WS_DEFAULT_MACROS)
-    set(_dm_file "${WS_DEFAULT_MACRO_DIR}/${_dm_name}.txt")
+    set(_dm_file "${WS_DEFAULT_MACRO_DIR}/${_dm_name}.wsm")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_dm_file}")
     file(READ "${_dm_file}" _dm_hex HEX)
     string(LENGTH "${_dm_hex}" _dm_len)

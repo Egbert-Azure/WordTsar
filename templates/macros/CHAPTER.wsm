@@ -1,0 +1,15 @@
+Sub MAIN
+Key("{Enter}")
+Key(".pa{Enter}")
+Key(".lh 54pt{Enter}")
+Key("{Enter}")
+Key(".lh 24pt{Enter}")
+Key(".tc ")
+PauseForInput("{Enter}", 'Type, then press Enter')
+Key("^KK{Home}{Right}{Right}{Right}{Right}^KB{End} . . . #{Enter}")
+Key("{Enter}")
+Key("^KC^KH{Home}^OC{End}{Enter}")
+Key("{Enter}")
+Key("{Tab}")
+End Sub
+
