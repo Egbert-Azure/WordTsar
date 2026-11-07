@@ -1451,3 +1451,22 @@ TEST_CASE("cWSEditorView - an index mark shows K in the control code colours wit
         }
     }
 }
+
+
+TEST_CASE("cWSEditorView - Esc then - inserts nothing")
+{
+    cWSEditorCtrl editor;
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 30, 120});
+    POSITION_T before = editor.GetDocument()->GetTextSize();
+
+    wordstartui::sInputEvent event{};
+    event.type = wordstartui::INPUT_TYPE_TEXT;
+    event.textUtf8 = "-";
+    event.codepoint = '-';
+    event.alt = true;
+    view.HandleEvent(event);
+
+    CHECK(editor.GetDocument()->GetTextSize() == before);
+    CHECK(editor.GetDocument()->GetText().find('-') == std::string::npos);
+}
