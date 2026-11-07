@@ -1,0 +1,12 @@
+^QF
+.
+l
+h
+Space
+5
+4
+p
+t
+Enter
+B
+Enter

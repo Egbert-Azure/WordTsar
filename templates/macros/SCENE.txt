@@ -1,0 +1,11 @@
+Enter
+.
+c
+p
+Space
+4
+Enter
+^OC
+#
+Enter
+Tab
