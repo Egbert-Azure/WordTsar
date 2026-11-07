@@ -1116,3 +1116,65 @@ TEST_CASE("Macro: MARKPARA marks the paragraph the cursor starts")
     std::error_code ec;
     std::filesystem::remove_all(home, ec);
 }
+
+
+TEST_CASE("Macro: every template macro runs on BOOK.WS without being refused")
+{
+    EnsureMacroTestApplication();
+
+    const std::filesystem::path templates = std::filesystem::path(__FILE__).parent_path() / ".." / ".." / "templates";
+    REQUIRE(std::filesystem::exists(templates / "BOOK.WS"));
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    std::filesystem::create_directories(folder);
+    std::vector<std::string> names;
+    for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(templates / "macros"))
+    {
+        std::string file = entry.path().filename().string();
+        if ((file.size() > 4) && (file.substr(file.size() - 4) == ".wsm"))
+        {
+            std::filesystem::copy_file(entry.path(), folder / file);
+            names.push_back(file.substr(0, file.size() - 4));
+        }
+    }
+    CHECK(names.empty() == false);
+
+    for (const std::string& name : names)
+    {
+        CAPTURE(name);
+        const std::filesystem::path book = home / "BOOK.WS";
+        std::filesystem::copy_file(templates / "BOOK.WS", book, std::filesystem::copy_options::overwrite_existing);
+
+        cMacroTestEditor editor;
+        REQUIRE(editor.LoadFile(book.string()) == true);
+        editor.LayoutDocument(true);
+        editor.GetDocument()->SetPosition(editor.GetDocument()->GetTextSize() / 2);
+        editor.mChoice = name;
+        Chord(editor, 'M', 'p');
+
+        for (int pause = 0; (pause < 20) && (editor.IsMacroPlaying() == true); pause++)
+        {
+            Special(editor, SPECIAL_ENTER);
+        }
+
+        CHECK(editor.GetStatusMessage().find("Not supported") == std::string::npos);
+        CHECK(editor.IsMacroPlaying() == false);
+    }
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
