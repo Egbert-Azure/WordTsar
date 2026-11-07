@@ -1,0 +1,7 @@
+REM DELPARA: deletes the paragraph at the cursor with its hard return.
+REM ^U brings it back.
+Sub MAIN
+PlayMacro 'MARKPARA'
+Key("^KY")
+End Sub
+
