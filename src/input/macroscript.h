@@ -146,6 +146,11 @@ public:
 
     static std::string MacroName(const std::string& reference);   // PlayMacro name without folder and .wsm
 
+    // Keys at the start of a clause that answer the exception: one for a
+    // message (ACK, DEF); for a question (QRY) those up to and including the
+    // first Enter, F10, ^K or Esc, or one if there is none.
+    static size_t AnswerLength(const std::vector<sKeyStroke>& keys, eMacroException kind);
+
 private:
     bool Refuse(const std::string& command, size_t line);
 

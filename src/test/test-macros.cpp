@@ -1021,3 +1021,13 @@ TEST_CASE("Macro: ^B is accepted and changes nothing")
     CHECK(played.status.empty());
     CHECK(played.text.find("abctext") == 0);
 }
+
+
+TEST_CASE("Macro: a QRY clause typing a dialog answer up to F10 answers the question")
+{
+    EnsureMacroTestApplication();
+    sPlayed played = PlayInlineMacro("ASKED", "Key(\"^KQ\")\r\nIfException\r\nQRY: Key(\"no.ws{F10}x\")\r\n"
+                                              "End IfException\r\n", "text");
+    CHECK(played.status.empty());
+    CHECK(played.text.find("xtext") == 0);
+}

@@ -912,6 +912,30 @@ std::string cMacroScript::MacroName(const std::string& reference)
 }
 
 
+size_t cMacroScript::AnswerLength(const std::vector<sKeyStroke>& keys, eMacroException kind)
+{
+    if (keys.empty() == true)
+    {
+        return 0;
+    }
+    if (kind == MACRO_EXCEPTION_QRY)
+    {
+        for (size_t i = 0; i < keys.size(); i++)
+        {
+            const sKeyStroke& key = keys[i];
+            bool closes = ((key.kind == KEYSTROKE_SPECIAL) &&
+                           ((key.special == SPECIAL_ENTER) || (key.special == SPECIAL_F10) || (key.special == SPECIAL_ESCAPE))) ||
+                          ((key.kind == KEYSTROKE_CHAR) && (key.ch == 'K' - '@') && (key.alt == false));
+            if (closes == true)
+            {
+                return i + 1;
+            }
+        }
+    }
+    return 1;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @param  lines [in] macro source lines, code page 437 if not UTF-8
@@ -1299,8 +1323,8 @@ bool cMacroScript::Parse(const std::vector<std::string>& lines)
 /// @brief
 /// Follows the statements in source order. The keys of consecutive Key
 /// statements may continue a chord or a Find dialog. Each IfException
-/// clause starts from the editing screen; the first key of an ACK, QRY or
-/// DEF clause answers the message and is not a command. A statement other
+/// clause starts from the editing screen; the keys that answer the
+/// exception (AnswerLength) are not commands. A statement other
 /// than a Key or a setting while a Find dialog is open is refused.
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -1315,6 +1339,7 @@ bool cMacroScript::CheckKeys(void)
     cKeyChecker checker;
     std::vector<cKeyChecker> saved;
     bool dropFirst = false;
+    eMacroException answerKind = MACRO_EXCEPTION_ACK;
 
     for (const sMacroStatement& st : mStatements)
     {
@@ -1325,12 +1350,9 @@ bool cMacroScript::CheckKeys(void)
         {
             case MACRO_KEYS:
             {
-                for (size_t i = 0; i < st.keys.size(); i++)
+                size_t answer = (drop == true) ? AnswerLength(st.keys, answerKind) : 0;
+                for (size_t i = answer; i < st.keys.size(); i++)
                 {
-                    if ((i == 0) && (drop == true))
-                    {
-                        continue;
-                    }
                     std::string refused;
                     if (checker.Feed(st.keys[i], refused) == false)
                     {
@@ -1360,6 +1382,7 @@ bool cMacroScript::CheckKeys(void)
             {
                 checker.Reset();
                 dropFirst = (st.text != "NCM");
+                answerKind = (st.text == "QRY") ? MACRO_EXCEPTION_QRY : MACRO_EXCEPTION_ACK;
                 break;
             }
 

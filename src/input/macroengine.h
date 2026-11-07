@@ -145,7 +145,8 @@ public:
     void RecordPrompt(const sFindRequest& request, bool replace, bool ok);
 
     // Exceptions of a played key: true if the IfException after the Key
-    // statement answers it; then no dialog is shown
+    // statement answers it; then no dialog is shown. For QRY, yes is the
+    // answer: see AnswerException.
     bool AnswerException(eMacroException kind, bool* yes = nullptr);
 
     void OnDocumentCleared(void);
@@ -205,7 +206,8 @@ private:
     std::deque<sKeyStroke> mPending;                          // rest of the Key statement
     bool mJump;                                               // an exception clause was chosen
     size_t mJumpTo;
-    bool mDropFirst;                                          // the clause's first key answered the exception
+    bool mDropFirst;                                          // the clause's first keys answered the exception
+    eMacroException mAnswerKind;                              // how many keys answered it, see cMacroScript::AnswerLength
     long mStatementsWithoutKey;                               // statements run since the last played key
     std::unique_ptr<IInputHandler> mPlayInput;
 

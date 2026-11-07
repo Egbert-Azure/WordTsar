@@ -549,6 +549,7 @@ cMacroEngine::cMacroEngine(cEditorBase& editor)
     , mJump(false)
     , mJumpTo(0)
     , mDropFirst(false)
+    , mAnswerKind(MACRO_EXCEPTION_ACK)
     , mStatementsWithoutKey(0)
     , mAutoRestore(false)
     , mSavedInsert(true)
@@ -1363,11 +1364,8 @@ void cMacroEngine::Run(void)
             case MACRO_KEYS:
             {
                 frame.pc++;
-                mPending.assign(statement.keys.begin(), statement.keys.end());
-                if ((drop == true) && (mPending.empty() == false))
-                {
-                    mPending.pop_front();
-                }
+                size_t answer = (drop == true) ? cMacroScript::AnswerLength(statement.keys, mAnswerKind) : 0;
+                mPending.assign(statement.keys.begin() + static_cast<long>(answer), statement.keys.end());
                 break;
             }
 
@@ -1705,8 +1703,9 @@ bool cMacroEngine::ReadPrompt(sFindRequest& request, bool replace)
 /// @param  yes  [out] for QRY, the answer
 ///
 /// @return true if the IfException after the playing Key statement has a
-///         clause for kind (or DEF); the clause runs after the key and its
-///         first key, the answer, is not played
+///         clause for kind (or DEF); the clause runs after the key and the
+///         keys that answer the exception (cMacroScript::AnswerLength) are
+///         not played
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cMacroEngine::AnswerException(eMacroException kind, bool* yes)
@@ -1752,15 +1751,32 @@ bool cMacroEngine::AnswerException(eMacroException kind, bool* yes)
         return false;
     }
 
+    eMacroException answerKind = ((start > 0) && (statements[start - 1].kind == MACRO_CLAUSE) &&
+                                  (statements[start - 1].text == "QRY")) ? MACRO_EXCEPTION_QRY : MACRO_EXCEPTION_ACK;
     if (yes != nullptr)
     {
+        // One key: Enter or Y is yes. Several keys: yes if they end with
+        // Enter, F10 or ^K and do not start with N.
         *yes = false;
         if ((start < statements.size()) && (statements[start].kind == MACRO_KEYS) &&
             (statements[start].keys.empty() == false))
         {
-            const sKeyStroke& answer = statements[start].keys.front();
-            *yes = (IsEnter(answer) == true) ||
-                   ((answer.kind == KEYSTROKE_TEXT) && (Lower(answer.utf8) == "y"));
+            const std::vector<sKeyStroke>& keys = statements[start].keys;
+            size_t length = cMacroScript::AnswerLength(keys, answerKind);
+            const sKeyStroke& first = keys.front();
+            const sKeyStroke& last = keys[length - 1];
+            bool firstNo = (first.kind == KEYSTROKE_TEXT) && (Lower(first.utf8) == "n");
+            if (length == 1)
+            {
+                *yes = (IsEnter(first) == true) || ((first.kind == KEYSTROKE_TEXT) && (Lower(first.utf8) == "y"));
+            }
+            else
+            {
+                *yes = (firstNo == false) &&
+                       ((IsEnter(last) == true) ||
+                        ((last.kind == KEYSTROKE_SPECIAL) && (last.special == SPECIAL_F10)) ||
+                        ((last.kind == KEYSTROKE_CHAR) && (last.ch == 'K' - '@')));
+            }
         }
     }
 
@@ -1768,6 +1784,7 @@ bool cMacroEngine::AnswerException(eMacroException kind, bool* yes)
     mJump = true;
     mJumpTo = start;
     mDropFirst = (kind != MACRO_EXCEPTION_NCM);
+    mAnswerKind = answerKind;
     return true;
 }
 
