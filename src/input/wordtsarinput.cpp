@@ -625,7 +625,7 @@ const sCommandKeys COMMAND_KEYS[] =
     { WSCMD_ALT,     WSCMD_PREFIX,          "kqopm" },
     { WSCMD_ALT,     WSCMD_RUNS,            "\x15-=" },
 
-    { 'k',           WSCMD_RUNS,            "bkcvy\"'.<h[]?udsxq" },
+    { 'k',           WSCMD_RUNS,            "bkcvy\"'.<,h[]?udsxq" },
     { 'k',           WSCMD_RUNS,            DIGITS },
     { 'k',           WSCMD_SUBKEY,          "z" },
     { 'k',           WSCMD_FILE,            "r" },
@@ -1764,6 +1764,7 @@ bool cWordStarInput::OnControlKChar(char ch)
             break ;
 
         case '<' :          // unset block
+        case ',' :          // ^K< without Shift
             mEditor->UnSetBlock() ;
             break ;
 

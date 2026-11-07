@@ -1040,3 +1040,32 @@ TEST_CASE("Macro: ^KR reads the file name from the macro")
     CHECK(played.status.empty());
     CHECK(played.text.find("inserted text") == 0);
 }
+
+
+TEST_CASE("Macro: ^K, removes the block markers like ^K<, typed and played")
+{
+    EnsureMacroTestApplication();
+
+    // Typed: ^K then a comma
+    {
+        cMacroTestEditor editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Insert("some text");
+        editor.LayoutDocument(true);
+        doc->SetPosition(0);
+        Chord(editor, 'K', 'b');
+        doc->SetPosition(4);
+        Chord(editor, 'K', 'k');
+        POSITION_T start = 0;
+        POSITION_T end = 0;
+        REQUIRE(doc->GetBlock(start, end) == true);
+        Chord(editor, 'K', ',');
+        CHECK(doc->GetBlock(start, end) == false);
+        CHECK(doc->GetText().find("some text") == 0);
+    }
+
+    // Played: the check accepts ^K, and the block is unmarked
+    sPlayed played = PlayInlineMacro("UNMARK", "Key(\"^KB{End}^KK^K,x\")\r\n", "text");
+    CHECK(played.status.empty());
+    CHECK(played.text.find("textx") == 0);
+}
