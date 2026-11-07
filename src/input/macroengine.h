@@ -54,6 +54,7 @@ public:
     cMacroStore(const std::string& documentDir, const std::string& configDir);
 
     static bool IsValidName(const std::string& name);       // not empty, no / or :, not starting with '.'
+    static std::string TrimName(const std::string& name);    // without spaces and tabs at both ends
     static std::string FileName(const std::string& name);    // name with ".txt"
 
     void CreateDefaults(void) const;                          // config folder with the default macros, if missing

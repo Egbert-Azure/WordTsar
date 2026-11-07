@@ -114,7 +114,7 @@ public:
     {
         (void)title;
         (void)label;
-        return "t1";
+        return mName;
     }
 
     std::string ChooseFromList(const std::string& title, const std::vector<std::string>& items) override
@@ -132,6 +132,7 @@ public:
     }
 
     int mFindPrompts = 0;
+    std::string mName = "t1";
     std::string mChoice = "t1";
     std::vector<std::string> mListed;
 #ifdef WORDTSAR_TUI_BUILD
@@ -417,6 +418,39 @@ TEST_CASE("Macro: a recording is saved in the macros folder next to the document
     editor.Key(TextKeyStroke("=", false, false, true));
     CHECK(std::filesystem::exists(config));
     CHECK(std::filesystem::exists(withoutMacros / "macros") == false);
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
+
+
+TEST_CASE("Macro: spaces around a macro name are trimmed")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    cMacroTestEditor editor;
+    editor.mName = "  mac  ";
+    Chord(editor, 'M', 'r');
+    TypeText(editor, "a");
+    editor.Key(TextKeyStroke("=", false, false, true));
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    CHECK(std::filesystem::exists(folder / "mac.txt"));
+    CHECK(std::filesystem::exists(folder / "  mac  .txt") == false);
 
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);

@@ -144,6 +144,19 @@ bool cMacroStore::IsValidName(const std::string& name)
 }
 
 
+std::string cMacroStore::TrimName(const std::string& name)
+{
+    const char* blanks = " \t";
+    size_t first = name.find_first_not_of(blanks);
+    if (first == std::string::npos)
+    {
+        return std::string();
+    }
+    size_t last = name.find_last_not_of(blanks);
+    return name.substr(first, last - first + 1);
+}
+
+
 std::string cMacroStore::FileName(const std::string& name)
 {
     if (EndsWith(name, MACRO_EXTENSION) == true)
@@ -645,7 +658,7 @@ void cMacroEngine::StopRecording(void)
 
     mEditor.Repaint();
 
-    std::string name = mEditor.PromptText("Save Macro", "Macro name:");
+    std::string name = cMacroStore::TrimName(mEditor.PromptText("Save Macro", "Macro name:"));
     if (name.empty() == true)
     {
         mEditor.SetStatusMessage("Macro not saved");
@@ -794,8 +807,8 @@ void cMacroEngine::CopyOrRename(bool rename)
         return;
     }
 
-    std::string newName = mEditor.PromptText(title, (rename == true) ? "New name for " + name + ":"
-                                                                      : "Copy " + name + " to:");
+    std::string newName = cMacroStore::TrimName(
+        mEditor.PromptText(title, (rename == true) ? "New name for " + name + ":" : "Copy " + name + " to:"));
     if (newName.empty() == true)
     {
         mEditor.SetStatusMessage(notDone);

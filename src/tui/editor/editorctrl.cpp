@@ -72,6 +72,7 @@
 #include "src/tui/print/tuiprintout.h"
 
 // Input handlers (Strategy Pattern)
+#include "src/input/macroengine.h"
 #include "src/input/wordtsarinput.h"
 #include "src/input/moderninput.h"
 
@@ -1757,7 +1758,8 @@ bool cWSEditorCtrl::AskYesNo(const std::string& title, const std::string& questi
 /// @param  title [in] dialog title
 /// @param  label [in] prompt text
 ///
-/// @return the entered text, empty if cancelled or there is no dialog host
+/// @return the entered text without spaces and tabs at both ends, empty if
+///         cancelled or there is no dialog host
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cWSEditorCtrl::PromptText(const std::string& title, const std::string& label)
@@ -1767,7 +1769,7 @@ std::string cWSEditorCtrl::PromptText(const std::string& title, const std::strin
     {
         return std::string();
     }
-    return value;
+    return cMacroStore::TrimName(value);
 }
 
 
