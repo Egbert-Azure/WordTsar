@@ -27,6 +27,7 @@
 
 #include "src/core/editor/editorbase.h"
 #include "src/core/utils/config.h"
+#include "src/input/defaultmacros.h"
 #include "src/input/moderninput.h"
 #include "src/input/wordtsarinput.h"
 
@@ -140,8 +141,38 @@ std::string cMacroStore::FileName(const std::string& name)
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Creates the config macros folder with the default macros if the folder
+/// does not exist. An existing folder, even an empty one, is left alone.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroStore::CreateDefaults(void) const
+{
+    std::error_code ec;
+    if ((mConfigDir.empty() == true) || (std::filesystem::exists(mConfigDir, ec) == true) || ec)
+    {
+        return;
+    }
+    if (std::filesystem::create_directories(mConfigDir, ec) == false)
+    {
+        return;
+    }
+
+    for (size_t i = 0; i < kDefaultMacroCount; i++)
+    {
+        const sDefaultMacro& macro = kDefaultMacros[i];
+        std::ofstream out((std::filesystem::path(mConfigDir) / FileName(macro.name)).string(),
+                          std::ios::binary | std::ios::trunc);
+        out.write(macro.data, static_cast<std::streamsize>(macro.size));
+    }
+}
+
+
 std::vector<std::string> cMacroStore::List(void) const
 {
+    CreateDefaults();
     std::vector<std::string> names = ListFolder(mDocumentDir);
     size_t documentCount = names.size();
 
@@ -212,6 +243,7 @@ bool cMacroStore::Save(const std::string& name, const std::vector<std::string>& 
         return false;
     }
 
+    CreateDefaults();
     std::error_code ec;
     std::filesystem::create_directories(mConfigDir, ec);
 
@@ -565,6 +597,7 @@ void cMacroEngine::StopRecording(void)
     }
 
     cMacroStore store = MakeStore();
+    store.CreateDefaults();
     std::error_code ec;
     if ((std::filesystem::exists(store.SavePath(name), ec) == true) &&
         (mEditor.AskYesNo("Save Macro", "Macro " + name + " exists. Replace it?") == false))

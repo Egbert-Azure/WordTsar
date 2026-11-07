@@ -30,6 +30,38 @@ file(GLOB WORDTSAR_INPUT_SOURCES
 )
 
 # ------------------------------------------------------------------------
+# Default macros: the files in templates/macros listed below, compiled in
+# as byte arrays (src/input/defaultmacros.h). The source is written to the
+# build folder at configure time; a changed template re-runs configure.
+# SETUP.txt is not included.
+# ------------------------------------------------------------------------
+set(WS_DEFAULT_MACRO_DIR "${WS_SRC_DIR}/../templates/macros")
+set(WS_DEFAULT_MACROS CHAPTER INDEX NEXTCH PREVCH SCENE)
+set(WS_DEFAULT_MACRO_SOURCE "${CMAKE_BINARY_DIR}/generated/defaultmacros.cpp")
+
+set(_dm_text "// Generated from templates/macros by cmake/sources.cmake. Do not edit.\n")
+string(APPEND _dm_text "// Copyright (C) 2026 Egbert H. Schroeer\n\n")
+string(APPEND _dm_text "#include \"src/input/defaultmacros.h\"\n\n")
+set(_dm_table "")
+foreach(_dm_name IN LISTS WS_DEFAULT_MACROS)
+    set(_dm_file "${WS_DEFAULT_MACRO_DIR}/${_dm_name}.txt")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_dm_file}")
+    file(READ "${_dm_file}" _dm_hex HEX)
+    string(LENGTH "${_dm_hex}" _dm_len)
+    math(EXPR _dm_size "${_dm_len} / 2")
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "\\\\x\\1" _dm_escaped "${_dm_hex}")
+    string(APPEND _dm_text "static const char k${_dm_name}[] = \"${_dm_escaped}\";\n")
+    string(APPEND _dm_table "    { \"${_dm_name}\", k${_dm_name}, ${_dm_size} },\n")
+endforeach()
+list(LENGTH WS_DEFAULT_MACROS _dm_count)
+string(APPEND _dm_text "\nconst sDefaultMacro kDefaultMacros[] =\n{\n${_dm_table}};\n\n")
+string(APPEND _dm_text "const size_t kDefaultMacroCount = ${_dm_count};\n")
+
+file(WRITE "${WS_DEFAULT_MACRO_SOURCE}.tmp" "${_dm_text}")
+configure_file("${WS_DEFAULT_MACRO_SOURCE}.tmp" "${WS_DEFAULT_MACRO_SOURCE}" COPYONLY)
+list(APPEND WORDTSAR_INPUT_SOURCES "${WS_DEFAULT_MACRO_SOURCE}")
+
+# ------------------------------------------------------------------------
 # File format readers/writers (WordStar, RTF, DOCX, plain text).
 # ------------------------------------------------------------------------
 file(GLOB_RECURSE WORDTSAR_FILE_SOURCES

@@ -43,7 +43,9 @@ struct sFindRequest;
 /// Macro files <name>.txt in the "macros" folder next to the document and
 /// in the "macros" folder next to config.ini. Lists the document folder
 /// first; on equal names the document folder wins. New macros are saved in
-/// the config folder, which is created on demand.
+/// the config folder, which is created on demand. A missing config folder
+/// is created with the default macros when the list is read or a macro is
+/// saved.
 ///
 /////////////////////////////////////////////////////////////////////////////
 class cMacroStore
@@ -54,6 +56,7 @@ public:
     static bool IsValidName(const std::string& name);       // not empty, no / or :, not starting with '.'
     static std::string FileName(const std::string& name);    // name with ".txt"
 
+    void CreateDefaults(void) const;                          // config folder with the default macros, if missing
     std::vector<std::string> List(void) const;               // macro names without ".txt"
     std::string FindPath(const std::string& name) const;     // file of a listed macro, empty if none
     std::string SavePath(const std::string& name) const;     // file a new macro is saved to

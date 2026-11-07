@@ -37,6 +37,7 @@ typedef cEditorCtrl tMacroTestEditorBase;
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <vector>
@@ -120,7 +121,7 @@ public:
     {
         (void)title;
         mListed = items;
-        return "t1";
+        return mChoice;
     }
 
     bool AskYesNo(const std::string& title, const std::string& question) override
@@ -131,6 +132,7 @@ public:
     }
 
     int mFindPrompts = 0;
+    std::string mChoice = "t1";
     std::vector<std::string> mListed;
 #ifdef WORDTSAR_TUI_BUILD
     std::unique_ptr<cWSEditorView> mView;
@@ -170,6 +172,13 @@ std::vector<std::string> ReadLines(const std::filesystem::path& path)
         lines.push_back(line);
     }
     return lines;
+}
+
+
+std::string ReadBytes(const std::filesystem::path& path)
+{
+    std::ifstream in(path, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }
 
 }   // anonymous namespace
@@ -250,7 +259,7 @@ TEST_CASE("Macro: record typing, a block, a find and a pause, then play it back 
     const std::string before = playDoc->GetText();
 
     Chord(player, 'M', 'p');
-    CHECK(player.mListed == std::vector<std::string>{ "t1" });
+    CHECK(player.mListed == std::vector<std::string>{ "CHAPTER", "INDEX", "NEXTCH", "PREVCH", "SCENE", "t1" });
     player.GetStatus(status);
     CHECK(status.macroState == "Type, then press Enter");
 
@@ -266,6 +275,51 @@ TEST_CASE("Macro: record typing, a block, a find and a pause, then play it back 
 
     CHECK(player.Undo() == true);
     CHECK(playDoc->GetText() == before);
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
+
+
+TEST_CASE("Macro: a missing config macros folder is created with the default macros")
+{
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    REQUIRE(std::filesystem::exists(folder) == false);
+
+    cMacroTestEditor editor;
+    editor.mChoice.clear();
+    Chord(editor, 'M', 'p');
+    CHECK(editor.mListed == std::vector<std::string>{ "CHAPTER", "INDEX", "NEXTCH", "PREVCH", "SCENE" });
+    for (const char* name : { "CHAPTER", "INDEX", "NEXTCH", "PREVCH", "SCENE" })
+    {
+        const std::filesystem::path file = folder / (std::string(name) + ".txt");
+        REQUIRE(std::filesystem::exists(file));
+        CHECK(ReadBytes(file) == ReadBytes(std::filesystem::path("../templates/macros") / (std::string(name) + ".txt")));
+    }
+    CHECK(std::filesystem::exists(folder / "SETUP.txt") == false);
+
+    editor.mChoice = "INDEX";
+    Chord(editor, 'M', 'y');
+    editor.mChoice.clear();
+    editor.mListed.clear();
+    Chord(editor, 'M', 'p');
+    CHECK(editor.mListed == std::vector<std::string>{ "CHAPTER", "NEXTCH", "PREVCH", "SCENE" });
 
     setenv("HOME", oldHome.c_str(), 1);
     setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
