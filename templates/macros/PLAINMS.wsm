@@ -1,0 +1,32 @@
+REM PLAINMS: plain manuscript text that keeps in a WordStar file: em
+REM dashes become two hyphens, ellipsis characters three periods, and
+REM curly quotes straight ones, in the whole document.
+Sub MAIN
+AutoRestore(ON)
+Insert(ON)
+Key("^QA—{Enter}--{Enter}ng{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
+Key("^QA…{Enter}...{Enter}ng{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
+Key("^QA“{Enter}""{Enter}ng{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
+Key("^QA”{Enter}""{Enter}ng{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
+Key("^QA‘{Enter}'{Enter}ng{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
+Key("^QA’{Enter}'{Enter}ng{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
+End Sub
+
