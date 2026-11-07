@@ -1,0 +1,23 @@
+REM SCWORDS: marks the scene at the cursor as the block and shows its
+REM word count. A scene starts after a # scene break or after the .tc
+REM line of its chapter (both end in #) and runs to the next one or to
+REM the end of the document.
+Sub MAIN
+AutoRestore(ON)
+HideDots(OFF)
+Key("^QD^QF#^N{Enter}")
+Key("B{Enter}")
+IfException
+ACK: Key("{Enter}^QR")
+Goto Start
+End IfException
+Key("^X^QS")
+Start: Key("^KB^QF#^N{Enter}")
+Key("{Enter}")
+IfException
+ACK: Key("{Enter}^QC^KK^K?")
+Stop
+End IfException
+Key("^KK^K?")
+End Sub
+
