@@ -66,6 +66,7 @@
 #include "src/core/include/version.h"
 #include "src/gui/debugreport/debugreport.h"
 #include "src/gui/utils/terminatesignal.h"
+#include "src/gui/utils/maceditmenu.h"
 
 
 #include "chillout/chillout.h"
@@ -160,6 +161,9 @@ private:
 /////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
+    // AppKit reads these when the QApplication builds the menu bar
+    RegisterMacEditMenuDefaults();
+
     cWordTsarApplication app(argc, argv);
 
     // install crash handler

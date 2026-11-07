@@ -380,6 +380,7 @@ set(SOURCES
     src/gui/print/pdfpreviewwindow.mm
     src/gui/utils/maclookup.mm
     src/gui/utils/macwriteblock.mm
+    src/gui/utils/maceditmenu.mm
 )
 
 if(BUILD_GUI)
