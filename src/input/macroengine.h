@@ -22,11 +22,13 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include <deque>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "src/input/keystroke.h"
+#include "src/input/macroscript.h"
 
 class cEditorBase;
 struct sFindRequest;
@@ -104,7 +106,9 @@ public:
 /// Records the keys fed to cEditorBase::FeedKey and plays macro files back
 /// through the key sink (FeedKey by default). Find and Replace prompt
 /// answers are recorded as the keys typed at the WS7 prompts and read back
-/// from the macro without a dialog.
+/// from the macro without a dialog. A macro and the macros it plays are
+/// parsed and checked as a whole before the first key (cMacroScript); a
+/// refused macro does not run.
 ///
 /////////////////////////////////////////////////////////////////////////////
 class cMacroEngine
@@ -132,7 +136,7 @@ public:
     void RenameCommand(void);                                 // ^ME
     void CopyCommand(void);                                   // ^MO
     void DeleteCommand(void);                                 // ^MY
-    void Play(const std::vector<std::string>& lines);
+    bool Play(const std::vector<std::string>& lines, const std::string& name = std::string());   // false if refused (status message)
     void SetKeySink(IMacroKeySink* sink);                     // nullptr: the editor's FeedKey
 
     // Find and Replace prompts
@@ -140,10 +144,19 @@ public:
     bool ReadPrompt(sFindRequest& request, bool replace);     // answer from the playing macro
     void RecordPrompt(const sFindRequest& request, bool replace, bool ok);
 
+    // Exceptions of a played key: true if the IfException after the Key
+    // statement answers it; then no dialog is shown
+    bool AnswerException(eMacroException kind, bool* yes = nullptr);
+
     void OnDocumentCleared(void);
 
 private:
-    enum eNext { NEXT_KEY, NEXT_END, NEXT_ERROR };
+    struct sFrame
+    {
+        std::shared_ptr<const cMacroScript> script;
+        size_t pc;                                            // next statement
+        std::vector<size_t> calls;                            // return statements of Call
+    };
 
     IMacroKeySink& Sink(void);
     cMacroStore MakeStore(void) const;
@@ -152,10 +165,15 @@ private:
     void CopyOrRename(bool rename);
     void DropCurrentKey(void);
     void StopRecording(void);
+    bool LoadScripts(const std::string& name, std::shared_ptr<cMacroScript> script, std::string& error);
     void Run(void);
     void Finish(void);
-    eNext NextKey(sKeyStroke& key);
-    int ReadField(std::string& text);                         // 1 Enter, 0 Esc, -1 end of macro
+    void EndFrame(void);
+    void ApplySetting(const sMacroStatement& statement);
+    void SaveSettings(void);
+    void RestoreSettings(void);
+    bool NextDialogKey(sKeyStroke& key);
+    bool IsPauseEnd(const sKeyStroke& key) const;
 
     cEditorBase& mEditor;
     std::unique_ptr<IMacroKeySink> mEditorSink;
@@ -172,14 +190,29 @@ private:
 
     // Playback
     bool mPlaying;
-    bool mPaused;
+    bool mPaused;                                             // at PauseForInput or PauseForKey
+    bool mPauseForKey;                                        // at PauseForKey
+    bool mResumeAfterKey;                                     // run on after the PauseForKey key
+    sKeyStroke mPauseEnd;                                     // PauseForInput end key
+    std::string mPauseMessage;
+    long mPauseTyped;                                         // keys typed at PauseForInput
     bool mCleared;                                            // document cleared during playback
     bool mUndoOpen;                                           // the playback undo group is open
     bool mFeeding;                                            // a played key is being dispatched
-    std::vector<std::string> mLines;
-    size_t mNextLine;
-    std::deque<sKeyStroke> mPending;
+    std::map<std::string, std::shared_ptr<const cMacroScript>> mScripts;   // macro and those it plays, by lower case name
+    std::vector<sFrame> mFrames;                              // playing macros, innermost last
+    std::deque<sKeyStroke> mPending;                          // rest of the Key statement
+    bool mJump;                                               // an exception clause was chosen
+    size_t mJumpTo;
+    bool mDropFirst;                                          // the clause's first key answered the exception
     std::unique_ptr<IInputHandler> mPlayInput;
+
+    // Settings at the start, restored at the end after AutoRestore(ON)
+    bool mAutoRestore;
+    bool mSavedInsert;
+    int mSavedShowControl;
+    bool mSavedShowDot;
+    int mSavedHelpLevel;
 };
 
 /// @}

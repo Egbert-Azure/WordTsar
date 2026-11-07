@@ -684,6 +684,34 @@ bool cEditorBase::MacroInterceptKey(const sKeyStroke& key)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return true if a played key raised the message and the IfException
+///         after its Key statement has an ACK or DEF clause; the caller
+///         shows no dialog
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::MacroAcknowledges(void)
+{
+    return mMacro->AnswerException(MACRO_EXCEPTION_ACK) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  yes [out] the answer: the clause's first key is Enter or Y
+///
+/// @return true if a played key raised the question and the IfException
+///         after its Key statement has a QRY or DEF clause; the caller
+///         shows no dialog
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::MacroAnswersQuestion(bool& yes)
+{
+    return mMacro->AnswerException(MACRO_EXCEPTION_QRY, &yes) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @brief
 /// Closes the typing group and opens the undo group of a playback.
 ///

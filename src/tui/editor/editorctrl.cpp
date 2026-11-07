@@ -1723,6 +1723,10 @@ void cWSEditorCtrl::ShowError(const std::string& title, const std::string& messa
 /////////////////////////////////////////////////////////////////////////////
 void cWSEditorCtrl::ShowMessage(const std::string& title, const std::string& message)
 {
+    if (MacroAcknowledges() == true)
+    {
+        return;
+    }
     if (!mHost)
     {
         return;
@@ -1745,6 +1749,11 @@ void cWSEditorCtrl::ShowMessage(const std::string& title, const std::string& mes
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::AskYesNo(const std::string& title, const std::string& question)
 {
+    bool yes = false;
+    if (MacroAnswersQuestion(yes) == true)
+    {
+        return yes;
+    }
     if (!mHost)
     {
         return false;

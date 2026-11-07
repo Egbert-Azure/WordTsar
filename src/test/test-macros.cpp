@@ -667,3 +667,145 @@ TEST_CASE("Macro: INDEX marks the last word of a paragraph followed by another p
     std::error_code ec;
     std::filesystem::remove_all(home, ec);
 }
+
+
+namespace
+{
+
+// The file in dir or a folder below it whose name is name.WSM in any case.
+std::filesystem::path FindArchiveMacro(const std::filesystem::path& dir, const std::string& name)
+{
+    std::error_code ec;
+    std::string wanted = name + ".wsm";
+    for (char& c : wanted)
+    {
+        c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    }
+    for (std::filesystem::recursive_directory_iterator it(dir, std::filesystem::directory_options::skip_permission_denied, ec), end;
+         (ec.value() == 0) && (it != end); it.increment(ec))
+    {
+        std::string file = it->path().filename().string();
+        for (char& c : file)
+        {
+            c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        }
+        std::error_code fileEc;
+        if ((file == wanted) && (it->is_regular_file(fileEc) == true))
+        {
+            return it->path();
+        }
+    }
+    return std::filesystem::path();
+}
+
+
+// Document text with control codes as ^B, ^Y, ... and hard returns as |.
+std::string MarkedText(cDocument* doc)
+{
+    std::string text;
+    POSITION_T size = doc->GetTextSize();
+    for (POSITION_T pos = 0; pos < size; pos++)
+    {
+        std::string grapheme = doc->GetCharNoAdvance(pos);
+        if ((grapheme.empty() == false) && (grapheme[0] == static_cast<char>(MARKER_CHAR)))
+        {
+            text += std::string("^") + static_cast<char>('@' + doc->GetControlChar(pos));
+        }
+        else if (grapheme == std::string(1, static_cast<char>(HARD_RETURN)))
+        {
+            text += "|";
+        }
+        else
+        {
+            text += grapheme;
+        }
+    }
+    return text;
+}
+
+}   // anonymous namespace
+
+
+TEST_CASE("Macro: Sawyer's TRIM and TITLES do what their REM lines say")
+{
+    const char* archiveEnv = std::getenv("WORDTSAR_SAWYER_DIR");
+    std::error_code ec;
+    if ((archiveEnv == nullptr) || (std::filesystem::is_directory(archiveEnv, ec) == false))
+    {
+        MESSAGE("WORDTSAR_SAWYER_DIR not set or missing: Sawyer macro test skipped");
+        return;
+    }
+    const std::filesystem::path trimSource = FindArchiveMacro(archiveEnv, "TRIM");
+    const std::filesystem::path titlesSource = FindArchiveMacro(archiveEnv, "TITLES");
+    if ((trimSource.empty() == true) || (titlesSource.empty() == true))
+    {
+        MESSAGE("TRIM.WSM or TITLES.WSM not in WORDTSAR_SAWYER_DIR: Sawyer macro test skipped");
+        return;
+    }
+
+    EnsureMacroTestApplication();
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    std::filesystem::create_directories(folder);
+    std::filesystem::copy_file(trimSource, folder / "TRIM.wsm");
+    std::filesystem::copy_file(titlesSource, folder / "TITLES.wsm");
+
+    // TRIM: "Trims (most of the) excess spaces at ends of lines"; with
+    // HideDots(ON) a comment dot command keeps its spaces.
+    {
+        cMacroTestEditor editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Insert("Alpha   ");
+        doc->Insert(HARD_RETURN);
+        doc->Insert(".. note  ");
+        doc->Insert(HARD_RETURN);
+        doc->Insert("Beta ");
+        doc->Insert(HARD_RETURN);
+        doc->Insert("Gamma");
+        doc->SetPosition(3);
+        editor.LayoutDocument(true);
+        const eShowControl show = editor.GetShowControls();
+
+        editor.mChoice = "TRIM";
+        Chord(editor, 'M', 'p');
+
+        CHECK(editor.IsMacroPlaying() == false);
+        const std::string trimmed = "Alpha|.. note  |Beta|Gamma";
+        CHECK(MarkedText(doc).substr(0, trimmed.size()) == trimmed);
+        CHECK(doc->GetPosition() == 0);
+        CHECK(editor.GetShowControls() == show);
+    }
+
+    // TITLES: "Converts my recent book titles, whether plain text or all
+    // caps, to bold italics"
+    {
+        cMacroTestEditor editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Insert("Books: Red Planet Blues and QUANTUM NIGHT.");
+        doc->SetPosition(0);
+        editor.LayoutDocument(true);
+
+        editor.mChoice = "TITLES";
+        Chord(editor, 'M', 'p');
+
+        CHECK(editor.IsMacroPlaying() == false);
+        const std::string titled = "Books: ^B^YRed Planet Blues^B^Y and ^B^YQuantum Night^B^Y.";
+        CHECK(MarkedText(doc).substr(0, titled.size()) == titled);
+    }
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::filesystem::remove_all(home, ec);
+}

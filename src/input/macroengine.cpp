@@ -39,9 +39,9 @@ namespace
 const char MACRO_FOLDER[] = "macros";
 const char MACRO_EXTENSION[] = ".wsm";
 const char KEY_LINES_EXTENSION[] = ".txt";
-const char MODERN_LINE[] = "REM Modern";
 const char STATE_RECORDING[] = "Recording";
 const char STATE_PAUSED[] = "Type, then press Enter";
+const char STATE_PAUSED_KEY[] = "Press a key";
 
 
 bool EndsWith(const std::string& text, const std::string& suffix)
@@ -59,19 +59,6 @@ std::string Lower(const std::string& text)
         c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
     }
     return lower;
-}
-
-
-std::string Trim(const std::string& text)
-{
-    const char* blanks = " \t";
-    size_t first = text.find_first_not_of(blanks);
-    if (first == std::string::npos)
-    {
-        return std::string();
-    }
-    size_t last = text.find_last_not_of(blanks);
-    return text.substr(first, last - first + 1);
 }
 
 
@@ -108,31 +95,6 @@ std::string StripLineEnd(const std::string& line)
         text.pop_back();
     }
     return text;
-}
-
-
-// True if the first line after Sub MAIN is REM Modern.
-bool IsModernSource(const std::vector<std::string>& lines)
-{
-    bool inMain = false;
-    for (const std::string& line : lines)
-    {
-        std::string text = Trim(StripLineEnd(line));
-        if (text.empty() == true)
-        {
-            continue;
-        }
-        if (inMain == true)
-        {
-            return text == MODERN_LINE;
-        }
-        if (Lower(text) != "sub main")
-        {
-            return false;
-        }
-        inMain = true;
-    }
-    return false;
 }
 
 
@@ -574,10 +536,20 @@ cMacroEngine::cMacroEngine(cEditorBase& editor)
     , mKeyDepth(0)
     , mPlaying(false)
     , mPaused(false)
+    , mPauseForKey(false)
+    , mResumeAfterKey(false)
+    , mPauseTyped(0)
     , mCleared(false)
     , mUndoOpen(false)
     , mFeeding(false)
-    , mNextLine(0)
+    , mJump(false)
+    , mJumpTo(0)
+    , mDropFirst(false)
+    , mAutoRestore(false)
+    , mSavedInsert(true)
+    , mSavedShowControl(0)
+    , mSavedShowDot(true)
+    , mSavedHelpLevel(0)
 {
 }
 
@@ -624,7 +596,19 @@ std::string cMacroEngine::StateText(void) const
     }
     if ((mPlaying == true) && (mPaused == true))
     {
-        return STATE_PAUSED;
+        if (mPauseForKey == true)
+        {
+            return STATE_PAUSED_KEY;
+        }
+        if (mPauseMessage.empty() == false)
+        {
+            return mPauseMessage;
+        }
+        if (IsEnter(mPauseEnd) == true)
+        {
+            return STATE_PAUSED;
+        }
+        return "Type, then press " + KeyToKeyString(mPauseEnd);
     }
     return std::string();
 }
@@ -637,18 +621,44 @@ std::string cMacroEngine::StateText(void) const
 /// @return true if the key was used here and must not be dispatched
 ///
 /// @brief
-/// At a playback pause Enter continues the macro and Esc cancels it. While
-/// recording, the Enter that ends the text typed after a pause ends the
-/// pause. Neither Enter is inserted or recorded.
+/// At PauseForInput the end key continues the macro and Esc cancels it;
+/// other keys are dispatched. At PauseForKey the key is dispatched and the
+/// macro continues after it. While recording, the Enter that ends the text
+/// typed after a pause ends the pause. Neither end key is inserted or
+/// recorded.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cMacroEngine::InterceptKey(const sKeyStroke& key)
 {
     if ((mPlaying == true) && (mPaused == true))
     {
-        if (IsEnter(key) == true)
+        if (mPauseForKey == true)
         {
             mPaused = false;
+            mPauseForKey = false;
+            mResumeAfterKey = true;
+            return false;
+        }
+        if (IsPauseEnd(key) == true)
+        {
+            mPaused = false;
+            if ((mPauseTyped == 0) && (mFrames.empty() == false))
+            {
+                // NCM: nothing typed before the end key
+                sFrame& frame = mFrames.back();
+                const std::vector<sMacroStatement>& statements = frame.script->Statements();
+                if ((frame.pc < statements.size()) && (statements[frame.pc].kind == MACRO_IF_EXCEPTION))
+                {
+                    for (const auto& clause : statements[frame.pc].clauses)
+                    {
+                        if (clause.first == "NCM")
+                        {
+                            frame.pc = clause.second;
+                            break;
+                        }
+                    }
+                }
+            }
             Run();
             return true;
         }
@@ -658,6 +668,7 @@ bool cMacroEngine::InterceptKey(const sKeyStroke& key)
             Finish();
             return true;
         }
+        mPauseTyped++;
         return false;
     }
 
@@ -667,6 +678,25 @@ bool cMacroEngine::InterceptKey(const sKeyStroke& key)
         return true;
     }
 
+    return false;
+}
+
+
+// True for the PauseForInput end key.
+bool cMacroEngine::IsPauseEnd(const sKeyStroke& key) const
+{
+    const sKeyStroke& end = mPauseEnd;
+    if ((key.kind != end.kind) || (key.alt != end.alt))
+    {
+        return false;
+    }
+    switch (key.kind)
+    {
+        case KEYSTROKE_CHAR:    return key.ch == end.ch;
+        case KEYSTROKE_SPECIAL: return (key.special == end.special) && (key.ctrl == end.ctrl) && (key.shift == end.shift);
+        case KEYSTROKE_TEXT:    return Lower(key.utf8) == Lower(end.utf8);
+        case KEYSTROKE_PAUSE:   return false;
+    }
     return false;
 }
 
@@ -732,6 +762,12 @@ void cMacroEngine::EndKey(bool handled)
     }
     mCurrentKey = -1;
     mDropKey = false;
+
+    if ((mResumeAfterKey == true) && (mKeyDepth == 0))
+    {
+        mResumeAfterKey = false;
+        Run();
+    }
 }
 
 
@@ -916,7 +952,7 @@ void cMacroEngine::PlayCommand(void)
         return;
     }
 
-    Play(lines);
+    Play(lines, name);
 }
 
 
@@ -1111,29 +1147,111 @@ void cMacroEngine::DeleteCommand(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  lines [in] macro source lines
+/// @param  name   [in]     macro name, as PlayMacro names it
+/// @param  script [in]     the parsed macro
+/// @param  error  [out]    why a macro is refused
+///
+/// @return false if this macro or one it plays is refused or missing
 ///
 /// @brief
-/// Plays the lines through the key sink as one undo step, up to the end or
-/// the first PAUSE. The undo step starts when the keys first reach a
-/// document.
+/// Checks the keys of the macro and loads, parses and checks each macro it
+/// plays or chains to, once per name.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cMacroEngine::Play(const std::vector<std::string>& lines)
+bool cMacroEngine::LoadScripts(const std::string& name, std::shared_ptr<cMacroScript> script, std::string& error)
+{
+    if ((Sink().EditsDocument() == true) && (script->CheckKeys() == false))
+    {
+        error = script->Error();
+        if (name.empty() == false)
+        {
+            error += " (" + name + ")";
+        }
+        return false;
+    }
+    mScripts[Lower(name)] = script;
+
+    cMacroStore store = MakeStore();
+    for (const sMacroStatement& statement : script->Statements())
+    {
+        if ((statement.kind != MACRO_PLAY_MACRO) && (statement.kind != MACRO_CHAIN_MACRO))
+        {
+            continue;
+        }
+        if (mScripts.find(Lower(statement.text)) != mScripts.end())
+        {
+            continue;
+        }
+
+        std::vector<std::string> lines;
+        if (store.Load(statement.text, lines) == false)
+        {
+            error = "Cannot find macro " + statement.text + ", line " + std::to_string(statement.line);
+            return false;
+        }
+        auto other = std::make_shared<cMacroScript>();
+        if (other->Parse(lines) == false)
+        {
+            error = other->Error() + " (" + statement.text + ")";
+            return false;
+        }
+        if (LoadScripts(statement.text, other, error) == false)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  lines [in] macro source lines
+/// @param  name  [in] macro name, empty if it has none
+///
+/// @return false if the macro is refused (status message
+///         "Not supported in WordTsar: ...")
+///
+/// @brief
+/// Parses and checks the macro and the macros it plays, then plays it
+/// through the key sink as one undo step. The undo step starts when the
+/// keys first reach a document.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cMacroEngine::Play(const std::vector<std::string>& lines, const std::string& name)
 {
     if ((mPlaying == true) || (mRecording == true))
     {
-        return;
+        return false;
     }
 
-    mLines = lines;
-    mNextLine = 0;
+    auto script = std::make_shared<cMacroScript>();
+    std::string error;
+    mScripts.clear();
+    if ((script->Parse(lines) == false) || (LoadScripts(name, script, error) == false))
+    {
+        if (error.empty() == true)
+        {
+            error = script->Error();
+        }
+        mScripts.clear();
+        mEditor.SetStatusMessage(error, false, 60, true);
+        return false;
+    }
+
+    mFrames.clear();
+    mFrames.push_back({ script, script->Main(), {} });
     mPending.clear();
     mPaused = false;
+    mPauseForKey = false;
+    mResumeAfterKey = false;
     mCleared = false;
+    mJump = false;
+    mDropFirst = false;
+    mAutoRestore = false;
+    SaveSettings();
 
-    bool modern = IsModernSource(mLines);
-
+    bool modern = script->IsModern();
     bool currentModern = (dynamic_cast<cModernInput*>(mEditor.GetInput()) != nullptr);
     mPlayInput.reset();
     if (modern != currentModern)
@@ -1156,13 +1274,14 @@ void cMacroEngine::Play(const std::vector<std::string>& lines)
         mUndoOpen = true;
     }
     Run();
+    return true;
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @brief
-/// Feeds keys until the macro ends, pauses, fails or a key closes the
+/// Runs statements until the macro ends, pauses, stops or a key closes the
 /// document. Runs the editor's after-key update after every key. A key fed
 /// to a sink without a document may load one; that does not stop playback.
 ///
@@ -1171,44 +1290,173 @@ void cMacroEngine::Run(void)
 {
     while ((mPlaying == true) && (mPaused == false))
     {
-        sKeyStroke key;
-        eNext next = NextKey(key);
-        if (next != NEXT_KEY)
+        if (mPending.empty() == false)
+        {
+            sKeyStroke key = mPending.front();
+            mPending.pop_front();
+
+            bool editing = Sink().EditsDocument();
+            bool feeding = mFeeding;
+            mFeeding = true;
+            Sink().FeedMacroKey(key);
+            mFeeding = feeding;
+            if (editing == false)
+            {
+                mCleared = false;
+                if ((Sink().EditsDocument() == true) && (mUndoOpen == false))
+                {
+                    mEditor.BeginMacroUndo();
+                    mUndoOpen = true;
+                }
+            }
+
+            if ((mJump == true) && (mFrames.empty() == false))
+            {
+                mJump = false;
+                mFrames.back().pc = mJumpTo;
+            }
+
+            bool stop = (mCleared == true) || (mEditor.MacroStopRequested() == true);
+            mEditor.AfterMacroKey();
+            if (stop == true)
+            {
+                Finish();
+                return;
+            }
+            continue;
+        }
+
+        if (mFrames.empty() == true)
         {
             Finish();
             return;
         }
 
-        if (key.kind == KEYSTROKE_PAUSE)
+        sFrame& frame = mFrames.back();
+        const std::vector<sMacroStatement>& statements = frame.script->Statements();
+        if (frame.pc >= statements.size())
         {
-            mPaused = true;
-            mEditor.AfterMacroKey();
-            mEditor.Repaint();
-            return;
+            EndFrame();
+            continue;
         }
 
-        bool editing = Sink().EditsDocument();
-        bool feeding = mFeeding;
-        mFeeding = true;
-        Sink().FeedMacroKey(key);
-        mFeeding = feeding;
-        if (editing == false)
+        const sMacroStatement& statement = statements[frame.pc];
+        bool drop = mDropFirst;
+        mDropFirst = false;
+
+        switch (statement.kind)
         {
-            mCleared = false;
-            if ((Sink().EditsDocument() == true) && (mUndoOpen == false))
+            case MACRO_KEYS:
             {
-                mEditor.BeginMacroUndo();
-                mUndoOpen = true;
+                frame.pc++;
+                mPending.assign(statement.keys.begin(), statement.keys.end());
+                if ((drop == true) && (mPending.empty() == false))
+                {
+                    mPending.pop_front();
+                }
+                break;
+            }
+
+            case MACRO_PAUSE_INPUT:
+            case MACRO_PAUSE_KEY:
+            {
+                frame.pc++;
+                mPaused = true;
+                mPauseForKey = (statement.kind == MACRO_PAUSE_KEY);
+                mPauseEnd = statement.keys.empty() ? SpecialKeyStroke(SPECIAL_ENTER) : statement.keys.front();
+                mPauseMessage = statement.text;
+                mPauseTyped = 0;
+                mEditor.AfterMacroKey();
+                mEditor.Repaint();
+                return;
+            }
+
+            case MACRO_GOTO:
+            {
+                frame.pc = statement.target;
+                break;
+            }
+
+            case MACRO_CALL:
+            {
+                frame.calls.push_back(frame.pc + 1);
+                frame.pc = statement.target;
+                break;
+            }
+
+            case MACRO_RETURN:
+            case MACRO_END_SUB:
+            {
+                if (frame.calls.empty() == false)
+                {
+                    frame.pc = frame.calls.back();
+                    frame.calls.pop_back();
+                }
+                else
+                {
+                    EndFrame();
+                }
+                break;
+            }
+
+            case MACRO_STOP:
+            {
+                Finish();
+                return;
+            }
+
+            case MACRO_PLAY_MACRO:
+            case MACRO_CHAIN_MACRO:
+            {
+                frame.pc++;
+                auto script = mScripts.find(Lower(statement.text));
+                if (script == mScripts.end())
+                {
+                    Finish();
+                    return;
+                }
+                if (statement.kind == MACRO_CHAIN_MACRO)
+                {
+                    mFrames.pop_back();
+                }
+                mFrames.push_back({ script->second, script->second->Main(), {} });
+                break;
+            }
+
+            case MACRO_SETTING:
+            {
+                frame.pc++;
+                ApplySetting(statement);
+                break;
+            }
+
+            case MACRO_IF_EXCEPTION:
+            case MACRO_CLAUSE:
+            {
+                frame.pc = statement.target + 1;
+                break;
+            }
+
+            case MACRO_END_IF_EXCEPTION:
+            {
+                frame.pc++;
+                break;
             }
         }
+    }
+}
 
-        bool stop = (mCleared == true) || (mEditor.MacroStopRequested() == true);
-        mEditor.AfterMacroKey();
-        if (stop == true)
-        {
-            Finish();
-            return;
-        }
+
+// The macro played by PlayMacro or the whole playback ends.
+void cMacroEngine::EndFrame(void)
+{
+    if (mFrames.empty() == false)
+    {
+        mFrames.pop_back();
+    }
+    if (mFrames.empty() == true)
+    {
+        Finish();
     }
 }
 
@@ -1222,9 +1470,16 @@ void cMacroEngine::Finish(void)
 
     mPlaying = false;
     mPaused = false;
+    mPauseForKey = false;
+    mResumeAfterKey = false;
     mPending.clear();
-    mLines.clear();
+    mFrames.clear();
+    mScripts.clear();
     mPlayInput.reset();
+    if (mAutoRestore == true)
+    {
+        RestoreSettings();
+    }
     if (mUndoOpen == true)
     {
         mUndoOpen = false;
@@ -1234,100 +1489,125 @@ void cMacroEngine::Finish(void)
 }
 
 
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @param  key [out] next key of the macro
-///
-/// @return NEXT_KEY, NEXT_END at the end or End Sub, NEXT_ERROR after an
-///         unknown key name or an unsupported statement (with a status
-///         message)
-///
-/////////////////////////////////////////////////////////////////////////////
-cMacroEngine::eNext cMacroEngine::NextKey(sKeyStroke& key)
+void cMacroEngine::SaveSettings(void)
 {
-    while (mPending.empty() == true)
+    mSavedInsert = mEditor.mInsertMode;
+    mSavedShowControl = static_cast<int>(mEditor.GetShowControls());
+    mSavedShowDot = mEditor.GetShowDot();
+    mSavedHelpLevel = mEditor.mHelpLevel;
+}
+
+
+void cMacroEngine::RestoreSettings(void)
+{
+    mEditor.mInsertMode = mSavedInsert;
+    mEditor.mHelpLevel = mSavedHelpLevel;
+    mEditor.SetShowDot(mSavedShowDot);
+    if (static_cast<int>(mEditor.GetShowControls()) != mSavedShowControl)
     {
-        if (mNextLine >= mLines.size())
-        {
-            return NEXT_END;
-        }
-
-        std::vector<sKeyStroke> keys;
-        eMacroLine kind = ParseMacroLine(mLines[mNextLine], keys);
-        mNextLine++;
-        if (kind == MACRO_LINE_BAD_KEY)
-        {
-            mEditor.SetStatusMessage("Unknown key on line " + std::to_string(mNextLine), false, 60, true);
-            return NEXT_ERROR;
-        }
-        if (kind == MACRO_LINE_UNSUPPORTED)
-        {
-            mEditor.SetStatusMessage("Unsupported line " + std::to_string(mNextLine), false, 60, true);
-            return NEXT_ERROR;
-        }
-        if (kind == MACRO_LINE_END)
-        {
-            mNextLine = mLines.size();
-        }
-        mPending.insert(mPending.end(), keys.begin(), keys.end());
+        mEditor.SetShowControls(static_cast<eShowControl>(mSavedShowControl));
+        mEditor.LayoutDocument(true);
     }
-
-    key = mPending.front();
-    mPending.pop_front();
-    return NEXT_KEY;
+    mEditor.CalculateCaretPosition();
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  text [out] typed text of one prompt field
+/// @param  statement [in] a MACRO_SETTING statement
 ///
-/// @return 1 for Enter, 0 for Esc, -1 at the end of the macro or a pause
+/// @brief
+/// Insert sets insert mode. CmdTags and HideDots set the control display:
+/// dot commands hidden shows nothing (SHOW_NONE), otherwise command tags
+/// show all (SHOW_ALL) or dot commands only (SHOW_DOT). SetHelpLevel 0-4
+/// sets the help level 0-3. ColMode, ColReplace and WSQuiet have no
+/// WordTsar setting.
 ///
 /////////////////////////////////////////////////////////////////////////////
-int cMacroEngine::ReadField(std::string& text)
+void cMacroEngine::ApplySetting(const sMacroStatement& statement)
 {
-    text.clear();
+    eShowControl show = mEditor.GetShowControls();
+    bool tags = (show == SHOW_ALL);
+    bool hideDots = (show == SHOW_NONE);
 
-    while (true)
+    switch (statement.setting)
     {
-        sKeyStroke key;
-        if (NextKey(key) != NEXT_KEY)
-        {
-            mNextLine = mLines.size();
-            return -1;
-        }
+        case MACRO_SETTING_AUTO_RESTORE:
+            mAutoRestore = (statement.value != 0);
+            return;
 
-        if (key.kind == KEYSTROKE_PAUSE)
+        case MACRO_SETTING_INSERT:
+            mEditor.mInsertMode = (statement.value != 0);
+            mEditor.CalculateCaretPosition();
+            return;
+
+        case MACRO_SETTING_HELP_LEVEL:
+            mEditor.mHelpLevel = (statement.value > 0) ? (statement.value - 1) : 0;
+            return;
+
+        case MACRO_SETTING_CMD_TAGS:
+            tags = (statement.value != 0);
+            break;
+
+        case MACRO_SETTING_HIDE_DOTS:
+            hideDots = (statement.value != 0);
+            break;
+
+        case MACRO_SETTING_IGNORED:
+            return;
+    }
+
+    eShowControl wanted = (hideDots == true) ? SHOW_NONE : ((tags == true) ? SHOW_ALL : SHOW_DOT);
+    mEditor.SetShowDot(hideDots == false);
+    if (wanted != show)
+    {
+        mEditor.SetShowControls(wanted);
+        mEditor.LayoutDocument(true);
+        mEditor.CalculateCaretPosition();
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  key [out] next key for a Find or Replace dialog
+///
+/// @return false if the macro has no more keys before a statement other
+///         than Key or a setting
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cMacroEngine::NextDialogKey(sKeyStroke& key)
+{
+    while (mPending.empty() == true)
+    {
+        if (mFrames.empty() == true)
         {
-            mPending.push_front(key);
-            return -1;
+            return false;
         }
-        if (IsEnter(key) == true)
+        sFrame& frame = mFrames.back();
+        const std::vector<sMacroStatement>& statements = frame.script->Statements();
+        if (frame.pc >= statements.size())
         {
-            return 1;
+            return false;
         }
-        if (IsEscape(key) == true)
+        const sMacroStatement& statement = statements[frame.pc];
+        if (statement.kind == MACRO_SETTING)
         {
-            return 0;
-        }
-        if ((key.kind == KEYSTROKE_SPECIAL) && (key.special == SPECIAL_BACKSPACE))
-        {
-            while ((text.empty() == false) && ((static_cast<unsigned char>(text.back()) & 0xC0U) == 0x80U))
-            {
-                text.pop_back();
-            }
-            if (text.empty() == false)
-            {
-                text.pop_back();
-            }
+            frame.pc++;
+            ApplySetting(statement);
             continue;
         }
-        if ((key.kind == KEYSTROKE_TEXT) && (key.ctrl == false) && (key.alt == false))
+        if (statement.kind != MACRO_KEYS)
         {
-            text += key.utf8;
+            return false;
         }
+        frame.pc++;
+        mPending.assign(statement.keys.begin(), statement.keys.end());
     }
+
+    key = mPending.front();
+    mPending.pop_front();
+    return true;
 }
 
 
@@ -1348,36 +1628,111 @@ bool cMacroEngine::AnswersPrompt(void) const
 /// @param  request [in,out] current values on entry, the answer on return
 /// @param  replace [in]     true for Find and Replace
 ///
-/// @return false if the macro cancels the prompt (Esc) or ends inside it
+/// @return false if the macro cancels the prompt (Esc) or has no more keys
+///         for it
 ///
 /// @brief
-/// Reads the prompt answer from the macro: text, Enter, (replacement,
-/// Enter,) option letters, Enter.
+/// Reads the dialog keys from the macro, see cMacroDialog. A recorded
+/// answer is text, Enter, (replacement, Enter,) option letters, Enter.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cMacroEngine::ReadPrompt(sFindRequest& request, bool replace)
 {
-    std::string text;
-    if (ReadField(text) != 1)
+    cMacroDialog dialog(replace);
+    while (true)
+    {
+        sKeyStroke key;
+        if (NextDialogKey(key) == false)
+        {
+            return false;
+        }
+        cMacroDialog::eResult result = dialog.Feed(key);
+        if (result == cMacroDialog::DIALOG_CANCEL)
+        {
+            return false;
+        }
+        if (result == cMacroDialog::DIALOG_OK)
+        {
+            break;
+        }
+    }
+
+    request.text = dialog.Text();
+    request.replace = dialog.Replacement();
+    ApplyFindOptionLetters(dialog.Options(), request);
+    return true;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  kind [in]  ACK for a message, QRY for a question
+/// @param  yes  [out] for QRY, the answer
+///
+/// @return true if the IfException after the playing Key statement has a
+///         clause for kind (or DEF); the clause runs after the key and its
+///         first key, the answer, is not played
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cMacroEngine::AnswerException(eMacroException kind, bool* yes)
+{
+    if ((mPlaying == false) || (mFeeding == false) || (mFrames.empty() == true))
     {
         return false;
     }
 
-    std::string replacement;
-    if ((replace == true) && (ReadField(replacement) != 1))
+    sFrame& frame = mFrames.back();
+    const std::vector<sMacroStatement>& statements = frame.script->Statements();
+    if ((frame.pc >= statements.size()) || (statements[frame.pc].kind != MACRO_IF_EXCEPTION))
     {
         return false;
     }
 
-    std::string letters;
-    if (ReadField(letters) != 1)
+    const std::string name = (kind == MACRO_EXCEPTION_ACK) ? "ACK" : ((kind == MACRO_EXCEPTION_QRY) ? "QRY" : "NCM");
+    size_t start = 0;
+    bool found = false;
+    for (const auto& clause : statements[frame.pc].clauses)
+    {
+        if (clause.first == name)
+        {
+            start = clause.second;
+            found = true;
+            break;
+        }
+    }
+    if ((found == false) && (kind != MACRO_EXCEPTION_NCM))
+    {
+        for (const auto& clause : statements[frame.pc].clauses)
+        {
+            if (clause.first == "DEF")
+            {
+                start = clause.second;
+                found = true;
+                break;
+            }
+        }
+    }
+    if (found == false)
     {
         return false;
     }
 
-    request.text = text;
-    request.replace = replacement;
-    ApplyFindOptionLetters(letters, request);
+    if (yes != nullptr)
+    {
+        *yes = false;
+        if ((start < statements.size()) && (statements[start].kind == MACRO_KEYS) &&
+            (statements[start].keys.empty() == false))
+        {
+            const sKeyStroke& answer = statements[start].keys.front();
+            *yes = (IsEnter(answer) == true) ||
+                   ((answer.kind == KEYSTROKE_TEXT) && (Lower(answer.utf8) == "y"));
+        }
+    }
+
+    mPending.clear();
+    mJump = true;
+    mJumpTo = start;
+    mDropFirst = (kind != MACRO_EXCEPTION_NCM);
     return true;
 }
 

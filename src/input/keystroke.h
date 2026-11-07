@@ -87,11 +87,12 @@ bool NameToKeys(const std::string& line, std::vector<sKeyStroke>& keys);
 // key has none (a pause, a control character as text).
 std::string KeyToKeyString(const sKeyStroke& key);
 
-// Keys of a WordStar 7 key string: characters, ^X control keys, {Name} keys
-// with Shift/Ctrl/Alt and "+", "-" or " ", and the doubled {{ }} ^^ for a
-// literal brace or caret. Returns false on an unknown name or a stray brace
-// or caret.
-bool KeyStringToKeys(const std::string& text, std::vector<sKeyStroke>& keys);
+// Keys of a WordStar 7 key string: characters, ^X control keys, ^[ (Esc),
+// ^\ and ^], {Name} keys with Shift/Ctrl/Alt and "+", "-" or " ", {Insert}
+// as ^V, ESC c FS for the character c, and the doubled {{ }} ^^ for a
+// literal brace or caret. Returns false on an unknown name or a stray brace,
+// caret or control character; bad, if not nullptr, receives that part.
+bool KeyStringToKeys(const std::string& text, std::vector<sKeyStroke>& keys, std::string* bad = nullptr);
 
 // WordStar 7 macro source: Sub MAIN, REM Modern for INPUT_MODERN, Key("...")
 // lines, PauseForInput("{Enter}", 'Type, then press Enter') for a pause,
@@ -99,20 +100,6 @@ bool KeyStringToKeys(const std::string& text, std::vector<sKeyStroke>& keys);
 // prefix (^K ^Q ^O ^P ^M) is followed by its key in upper case. A Key line
 // ends after {Enter} and before it would pass 60 characters.
 std::string KeysToMacroSource(const std::vector<sKeyStroke>& keys, eInputMode mode);
-
-enum eMacroLine
-{
-    MACRO_LINE_KEYS,            ///< keys (possibly none) to play
-    MACRO_LINE_END,             ///< End Sub: the keys before it, then the end
-    MACRO_LINE_UNSUPPORTED,     ///< a statement other than the supported subset
-    MACRO_LINE_BAD_KEY          ///< a Key() string with an unknown key
-};
-
-// One line of macro source. Plays Key("...") and Key('...'), PauseForInput()
-// as a pause; skips blank lines, REM and ' comments, Sub MAIN and the editor
-// settings AutoRestore, Insert, CmdTags, HideDots, ColMode, ColReplace,
-// SetHelpLevel, WSQuiet. Statements are separated by ':'.
-eMacroLine ParseMacroLine(const std::string& line, std::vector<sKeyStroke>& keys);
 
 // Macro source for a one-key-per-line macro (first line "Modern" for a
 // Modern recording). Returns false on a line that is not a key name.

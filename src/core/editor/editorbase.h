@@ -258,6 +258,8 @@ public:
     std::string MacroStateText(void) const;                   // sStatus::macroState
     void SetMacroKeySink(IMacroKeySink* sink);                // Receiver of played keys; nullptr for FeedKey
     bool MacroInterceptKey(const sKeyStroke& key);            // Enter/Esc at a playback pause outside FeedKey
+    bool MacroAcknowledges(void);                             // Message while a played key runs: true if the macro's IfException answers it (no dialog)
+    bool MacroAnswersQuestion(bool& yes);                     // Yes/no question while a played key runs: as MacroAcknowledges, yes the answer
     void BeginMacroUndo(void);                                // Open the undo step of a playback
     void EndMacroUndo(bool sameDocument);                     // Close it; sameDocument false after the document was cleared
     virtual void AfterMacroKey(void) {}                       // Front-end update after each played key (default none)

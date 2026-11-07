@@ -4715,6 +4715,11 @@ void cEditorCtrl::DrawHighlights(QPainter& painter)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::NotImplemented(const std::string& command)
 {
+    if (MacroAcknowledges() == true)
+    {
+        return;
+    }
+
     const char* qtTesting = std::getenv("QT_TESTING");
     if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
     {
@@ -4782,6 +4787,11 @@ void cEditorCtrl::ShowError(const std::string& title, const std::string& message
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::ShowMessage(const std::string& title, const std::string& message)
 {
+    if (MacroAcknowledges() == true)
+    {
+        return;
+    }
+
     const char* qtTesting = std::getenv("QT_TESTING");
     if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
     {
@@ -4806,6 +4816,12 @@ void cEditorCtrl::ShowMessage(const std::string& title, const std::string& messa
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorCtrl::AskYesNo(const std::string& title, const std::string& question)
 {
+    bool yes = false;
+    if (MacroAnswersQuestion(yes) == true)
+    {
+        return yes;
+    }
+
     return QMessageBox::question(this, QString::fromStdString(title), QString::fromStdString(question),
                                  QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes;
 }
@@ -5219,7 +5235,7 @@ void cEditorCtrl::FindAgain(void)
         {
             // Not found - reached end of document
             const char* qtTesting = std::getenv("QT_TESTING");
-            if (qtTesting == nullptr || std::strcmp(qtTesting, "1") != 0)
+            if ((MacroAcknowledges() == false) && (qtTesting == nullptr || std::strcmp(qtTesting, "1") != 0))
             {
                 QString temp = string_sprintf("Search word: %s  not found.", mSearchText.c_str()).c_str();
                 QMessageBox msgBox(QMessageBox::Information, "Not found", temp, QMessageBox::Ok, this);
@@ -5255,7 +5271,7 @@ void cEditorCtrl::FindAgain(void)
         {
             // Not found - reached start of document
             const char* qtTesting = std::getenv("QT_TESTING");
-            if (qtTesting == nullptr || std::strcmp(qtTesting, "1") != 0)
+            if ((MacroAcknowledges() == false) && (qtTesting == nullptr || std::strcmp(qtTesting, "1") != 0))
             {
                 QString temp = string_sprintf("Search word: %s  not found.", mSearchText.c_str()).c_str();
                 QMessageBox msgBox(QMessageBox::Information, "Not found", temp, QMessageBox::Ok, this);
@@ -5334,7 +5350,8 @@ bool cEditorCtrl::ReplaceAgain(bool noquery)
         {
             // At end of document - no more matches
             const char* qtTesting = std::getenv("QT_TESTING");
-            if (mReplaceAsk == true && (qtTesting == nullptr || std::strcmp(qtTesting, "1") != 0))
+            if ((mReplaceAsk == true) && (MacroAcknowledges() == false) &&
+                (qtTesting == nullptr || std::strcmp(qtTesting, "1") != 0))
             {
                 QString temp = "At end of document.";
                 QMessageBox msgBox(QMessageBox::Information, "Not Found", temp, QMessageBox::Ok, this);
@@ -5431,7 +5448,8 @@ bool cEditorCtrl::ReplaceAgain(bool noquery)
         {
             // At start of document - no more matches
             const char* qtTesting = std::getenv("QT_TESTING");
-            if (mReplaceAsk == true && (qtTesting == nullptr || std::strcmp(qtTesting, "1") != 0))
+            if ((mReplaceAsk == true) && (MacroAcknowledges() == false) &&
+                (qtTesting == nullptr || std::strcmp(qtTesting, "1") != 0))
             {
                 QString temp = "At start of document.";
                 QMessageBox msgBox(QMessageBox::Information, "Not Found", temp, QMessageBox::Ok, this);
