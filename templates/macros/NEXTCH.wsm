@@ -1,5 +1,10 @@
+REM NEXTCH: to the start of the next chapter. After the last chapter
+REM the cursor stays where it is.
 Sub MAIN
 Key("^QF.lh 54pt{Enter}")
 Key("{Enter}")
+IfException
+ACK: Key("{Enter}")
+End IfException
 End Sub
 
