@@ -567,6 +567,84 @@ void cEditorBase::MacroEndRecording(void)
 }
 
 
+void cEditorBase::MacroEdit(void)
+{
+    mMacro->EditCommand() ;
+}
+
+
+void cEditorBase::MacroRename(void)
+{
+    mMacro->RenameCommand() ;
+}
+
+
+void cEditorBase::MacroCopy(void)
+{
+    mMacro->CopyCommand() ;
+}
+
+
+void cEditorBase::MacroDelete(void)
+{
+    mMacro->DeleteCommand() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  path [in] file to open
+///
+/// @return true if the file was loaded
+///
+/// @brief
+/// Replaces the document with a file. A modified document is saved first
+/// (Save As for an untitled one); No or a failed save leaves the document
+/// open and loads nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::OpenDocument(const std::string& path)
+{
+    if ((mDocument != nullptr) && (mDocument->IsModified() == true))
+    {
+        std::string name = (mFileSet == true) ? mFileName : std::string("the document") ;
+        std::string file = std::filesystem::path(path).filename().string() ;
+        if (AskYesNo("Open", "Save " + name + " and open " + file + "?") == false)
+        {
+            return false ;
+        }
+
+        std::string savePath ;
+        if (mFileSet == true)
+        {
+            savePath = (std::filesystem::path(mFileDir) / mFileName).string() ;
+        }
+        else
+        {
+            savePath = PromptForSaveFile() ;
+            if (savePath.empty() == true)
+            {
+                return false ;
+            }
+        }
+
+        if (SaveFile(savePath) == false)
+        {
+            ShowError("Error", "Cannot save " + savePath) ;
+            return false ;
+        }
+        MarkDocumentSaved() ;
+    }
+
+    if (LoadFile(path) == false)
+    {
+        ShowError("Error", "Cannot open " + path) ;
+        return false ;
+    }
+    return true ;
+}
+
+
 bool cEditorBase::IsMacroRecording(void) const
 {
     return mMacro->IsRecording() ;

@@ -1301,14 +1301,26 @@ void cWordStarInput::OnControlMChar(char ch)
             mEditor->MacroRecord() ;
             break ;
 
+        case 'd' :
+            mEditor->MacroEdit() ;
+            break ;
+
+        case 'e' :
+            mEditor->MacroRename() ;
+            break ;
+
+        case 'o' :
+            mEditor->MacroCopy() ;
+            break ;
+
+        case 'y' :
+            mEditor->MacroDelete() ;
+            break ;
+
         case '=' :
         case '#' :
         case '$' :
-        case 'd' :
         case 's' :
-        case 'e' :
-        case 'o' :
-        case 'y' :
             {
                 std::string t = string_sprintf("^M-%c", ch) ;
                 mEditor->NotImplemented(t) ;

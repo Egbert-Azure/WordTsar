@@ -59,6 +59,10 @@ public:
     std::string SavePath(const std::string& name) const;     // file a new macro is saved to
     bool Load(const std::string& name, std::vector<std::string>& lines) const;
     bool Save(const std::string& name, const std::vector<std::string>& lines) const;
+    std::string SiblingPath(const std::string& name, const std::string& newName) const;  // newName in the folder of name
+    bool Rename(const std::string& name, const std::string& newName) const;   // in place, replaces an existing target
+    bool Copy(const std::string& name, const std::string& newName) const;     // same folder, replaces an existing target
+    bool Delete(const std::string& name) const;
 
 private:
     std::string mDocumentDir;   // empty for an untitled document
@@ -97,6 +101,10 @@ public:
     void EndRecordingCommand(void);                           // Alt+=: stop recording
     void PauseCommand(void);                                  // Alt+-: write a pause
     void PlayCommand(void);                                   // ^MP: choose a macro and play it
+    void EditCommand(void);                                   // ^MD: open a macro file as a text document
+    void RenameCommand(void);                                 // ^ME
+    void CopyCommand(void);                                   // ^MO
+    void DeleteCommand(void);                                 // ^MY
     void Play(const std::vector<std::string>& lines);
 
     // Find and Replace prompts
@@ -109,6 +117,8 @@ private:
     enum eNext { NEXT_KEY, NEXT_END, NEXT_ERROR };
 
     cMacroStore MakeStore(void) const;
+    std::string ChooseMacro(const cMacroStore& store, const std::string& title);   // empty if none or cancelled
+    void CopyOrRename(bool rename);
     void DropCurrentKey(void);
     void StopRecording(void);
     void Run(void);

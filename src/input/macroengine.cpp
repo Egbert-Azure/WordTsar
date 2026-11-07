@@ -228,6 +228,65 @@ bool cMacroStore::Save(const std::string& name, const std::vector<std::string>& 
 }
 
 
+std::string cMacroStore::SiblingPath(const std::string& name, const std::string& newName) const
+{
+    std::string path = FindPath(name);
+    if (path.empty() == true)
+    {
+        return std::string();
+    }
+    return (std::filesystem::path(path).parent_path() / FileName(newName)).string();
+}
+
+
+bool cMacroStore::Rename(const std::string& name, const std::string& newName) const
+{
+    std::string source = FindPath(name);
+    std::string target = SiblingPath(name, newName);
+    if ((source.empty() == true) || (target.empty() == true))
+    {
+        return false;
+    }
+
+    std::error_code ec;
+    std::filesystem::rename(source, target, ec);
+    return !ec;
+}
+
+
+bool cMacroStore::Copy(const std::string& name, const std::string& newName) const
+{
+    std::string source = FindPath(name);
+    std::string target = SiblingPath(name, newName);
+    if ((source.empty() == true) || (target.empty() == true))
+    {
+        return false;
+    }
+
+    std::error_code ec;
+    if (std::filesystem::equivalent(source, target, ec) == true)
+    {
+        return false;
+    }
+    ec.clear();
+    std::filesystem::copy_file(source, target, std::filesystem::copy_options::overwrite_existing, ec);
+    return !ec;
+}
+
+
+bool cMacroStore::Delete(const std::string& name) const
+{
+    std::string path = FindPath(name);
+    if (path.empty() == true)
+    {
+        return false;
+    }
+
+    std::error_code ec;
+    return (std::filesystem::remove(path, ec) == true) && !ec;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///
 /// @param  editor [in] editor the keys are fed to
@@ -559,6 +618,180 @@ void cMacroEngine::PlayCommand(void)
     }
 
     Play(lines);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  store [in] macro folders
+/// @param  title [in] list title
+///
+/// @return the chosen macro name; empty if there are none (status "No
+///         macros") or the list was cancelled
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cMacroEngine::ChooseMacro(const cMacroStore& store, const std::string& title)
+{
+    std::vector<std::string> names = store.List();
+    if (names.empty() == true)
+    {
+        mEditor.SetStatusMessage("No macros");
+        return std::string();
+    }
+    return mEditor.ChooseFromList(title, names);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// ^MD: opens the chosen macro file as a text document. Nothing while a
+/// macro plays.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::EditCommand(void)
+{
+    if (mPlaying == true)
+    {
+        return;
+    }
+
+    cMacroStore store = MakeStore();
+    std::string name = ChooseMacro(store, "Edit Macro");
+    if (name.empty() == true)
+    {
+        return;
+    }
+
+    std::string path = store.FindPath(name);
+    if (path.empty() == true)
+    {
+        mEditor.ShowError("Edit Macro", "Cannot find " + cMacroStore::FileName(name));
+        return;
+    }
+    mEditor.OpenDocument(path);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  rename [in] true for ^ME (rename in place), false for ^MO (copy
+///                     into the same folder)
+///
+/// @brief
+/// Asks for the macro and the new name. An existing target is replaced only
+/// after AskYesNo. Nothing while a macro plays.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::CopyOrRename(bool rename)
+{
+    if (mPlaying == true)
+    {
+        return;
+    }
+
+    const std::string title = (rename == true) ? "Rename Macro" : "Copy Macro";
+    const std::string notDone = (rename == true) ? "Macro not renamed" : "Macro not copied";
+
+    cMacroStore store = MakeStore();
+    std::string name = ChooseMacro(store, title);
+    if (name.empty() == true)
+    {
+        return;
+    }
+
+    std::string newName = mEditor.PromptText(title, (rename == true) ? "New name for " + name + ":"
+                                                                      : "Copy " + name + " to:");
+    if (newName.empty() == true)
+    {
+        mEditor.SetStatusMessage(notDone);
+        return;
+    }
+    if (cMacroStore::IsValidName(newName) == false)
+    {
+        mEditor.SetStatusMessage("Invalid macro name: " + newName, false, 60, true);
+        return;
+    }
+
+    std::string source = store.FindPath(name);
+    std::string target = store.SiblingPath(name, newName);
+    if (source.empty() == true)
+    {
+        mEditor.ShowError(title, "Cannot find " + cMacroStore::FileName(name));
+        return;
+    }
+
+    std::error_code ec;
+    bool exists = std::filesystem::exists(target, ec);
+    bool same = exists && std::filesystem::equivalent(source, target, ec);
+    if ((same == true) && ((rename == false) ||
+                           (std::filesystem::path(source).filename() == std::filesystem::path(target).filename())))
+    {
+        mEditor.SetStatusMessage(notDone);
+        return;
+    }
+    if ((exists == true) && (same == false) &&
+        (mEditor.AskYesNo(title, "Macro " + newName + " exists. Replace it?") == false))
+    {
+        mEditor.SetStatusMessage(notDone);
+        return;
+    }
+
+    bool ok = (rename == true) ? store.Rename(name, newName) : store.Copy(name, newName);
+    if (ok == false)
+    {
+        mEditor.ShowError(title, ((rename == true) ? "Cannot rename " : "Cannot copy ") + source);
+        return;
+    }
+    mEditor.SetStatusMessage("Macro " + name + ((rename == true) ? " renamed to " : " copied to ") + newName);
+}
+
+
+void cMacroEngine::RenameCommand(void)
+{
+    CopyOrRename(true);
+}
+
+
+void cMacroEngine::CopyCommand(void)
+{
+    CopyOrRename(false);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// ^MY: deletes the chosen macro after AskYesNo. Nothing while a macro
+/// plays.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cMacroEngine::DeleteCommand(void)
+{
+    if (mPlaying == true)
+    {
+        return;
+    }
+
+    cMacroStore store = MakeStore();
+    std::string name = ChooseMacro(store, "Delete Macro");
+    if (name.empty() == true)
+    {
+        return;
+    }
+
+    if (mEditor.AskYesNo("Delete Macro", "Delete macro " + name + "?") == false)
+    {
+        return;
+    }
+
+    std::string path = store.FindPath(name);
+    if (store.Delete(name) == false)
+    {
+        mEditor.ShowError("Delete Macro", "Cannot delete " + ((path.empty() == true) ? cMacroStore::FileName(name) : path));
+        return;
+    }
+    mEditor.SetStatusMessage("Macro " + name + " deleted");
 }
 
 

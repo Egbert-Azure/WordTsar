@@ -242,9 +242,14 @@ public:
     virtual void BeforeKey(const sKeyStroke& /*key*/) {}      // Front-end work before a key (default none)
     virtual void AfterKey(const sKeyStroke& /*key*/) {}       // Front-end update after a handled key (default none)
 
-    // Macros: ^MR record, ^MP play, Alt+- pause, Alt+= end recording
+    // Macros: ^MR record, ^MP play, Alt+- pause, Alt+= end recording,
+    // ^MD edit, ^ME rename, ^MO copy, ^MY delete
     void MacroRecord(void);
     void MacroPlay(void);
+    void MacroEdit(void);
+    void MacroRename(void);
+    void MacroCopy(void);
+    void MacroDelete(void);
     void MacroPause(void);
     void MacroEndRecording(void);
     bool IsMacroRecording(void) const;
@@ -256,6 +261,7 @@ public:
     virtual std::string PromptText(const std::string& title, const std::string& label) = 0;   // Text prompt; empty on cancel
     virtual std::string ChooseFromList(const std::string& title,
                                        const std::vector<std::string>& items) = 0;          // List choice; empty on cancel
+    virtual bool OpenDocument(const std::string& path);       // Replace the document with a file, saving a modified one first
 
     // Dirty State
     void ResetDocumentDirty(void) ;
