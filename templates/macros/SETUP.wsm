@@ -1,4 +1,7 @@
 Sub MAIN
+AutoRestore(ON)
+HideDots(OFF)
+CmdTags(ON)
 Key("^QR^QFTITLE{Enter}")
 Key("{Enter}")
 Key("{Del}{Del}{Del}{Del}{Del}")

@@ -1178,3 +1178,93 @@ TEST_CASE("Macro: every template macro runs on BOOK.WS without being refused")
     std::error_code ec;
     std::filesystem::remove_all(home, ec);
 }
+
+
+TEST_CASE("Macro: SETUP fills BOOK.WS with dot commands hidden and stops at the first not-found on the filled file")
+{
+    EnsureMacroTestApplication();
+
+    const std::filesystem::path templates = std::filesystem::path(__FILE__).parent_path() / ".." / ".." / "templates";
+    REQUIRE(std::filesystem::exists(templates / "BOOK.WS"));
+
+    std::string pattern = (std::filesystem::temp_directory_path() / "wordtsar-macro-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    const std::filesystem::path home = pattern;
+    std::filesystem::create_directories(home / ".config");
+
+    const char* oldHomeEnv = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldHome = (oldHomeEnv != nullptr) ? oldHomeEnv : "";
+    const std::string oldXdg = (oldXdgEnv != nullptr) ? oldXdgEnv : "";
+    setenv("HOME", home.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (home / ".config").c_str(), 1);
+
+    const std::filesystem::path folder = std::filesystem::path(cConfig::GetConfigDir()) / "macros";
+    std::filesystem::create_directories(folder);
+    std::filesystem::copy_file(templates / "macros" / "SETUP.wsm", folder / "SETUP.wsm");
+    const std::filesystem::path book = home / "BOOK.WS";
+    std::filesystem::copy_file(templates / "BOOK.WS", book);
+
+    auto plainText = [](cDocument* doc)
+    {
+        std::string text = doc->GetText();
+        text.erase(std::remove(text.begin(), text.end(), static_cast<char>(MARKER_CHAR)), text.end());
+        return text;
+    };
+
+    // First run: a value typed at each pause
+    const std::vector<std::string> values = { "The Long Road", "Jane Doe", "Doe", "12 Elm Street",
+                                              "Springfield, IL 62701", "USA", "jane@doe.net", "(217) 555-0199" };
+    {
+        cMacroTestEditor editor;
+        REQUIRE(editor.LoadFile(book.string()) == true);
+        editor.SetShowControls(SHOW_NONE);
+        editor.LayoutDocument(true);
+        editor.mChoice = "SETUP";
+        Chord(editor, 'M', 'p');
+
+        for (const std::string& value : values)
+        {
+            CAPTURE(value);
+            REQUIRE(editor.IsMacroPlaying() == true);
+            TypeText(editor, value);
+            Special(editor, SPECIAL_ENTER);
+        }
+        CHECK(editor.IsMacroPlaying() == false);
+
+        std::string text = plainText(editor.GetDocument());
+        for (const std::string placeholder : { "TITLE", "Your Name", "Surname", "Street Address", "City, State ZIP",
+                                               "Country", "you@example.com", "(555) 555-0100" })
+        {
+            CAPTURE(placeholder);
+            CHECK(text.find(placeholder) == std::string::npos);
+        }
+        for (const std::string& value : values)
+        {
+            CAPTURE(value);
+            CHECK(text.find(value) != std::string::npos);
+        }
+        CHECK(text.find("by Jane Doe") != std::string::npos);
+        CHECK(text.find(".h1 Doe / The Long Road / #") != std::string::npos);
+        REQUIRE(editor.SaveFile(book.string()) == true);
+    }
+
+    // Second run on the filled file: stops at the first not-found
+    {
+        cMacroTestEditor editor;
+        REQUIRE(editor.LoadFile(book.string()) == true);
+        editor.SetShowControls(SHOW_NONE);
+        editor.LayoutDocument(true);
+        const std::string before = editor.GetDocument()->GetText();
+        editor.mChoice = "SETUP";
+        Chord(editor, 'M', 'p');
+        CHECK(editor.IsMacroPlaying() == false);
+        CHECK(editor.GetStatusMessage() == "Macro SETUP stopped at line 6");
+        CHECK(editor.GetDocument()->GetText() == before);
+    }
+
+    setenv("HOME", oldHome.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    std::error_code ec;
+    std::filesystem::remove_all(home, ec);
+}
