@@ -764,8 +764,8 @@ TEST_CASE("Macro: Sawyer's TRIM and TITLES do what their REM lines say")
     std::filesystem::copy_file(trimSource, folder / "TRIM.wsm");
     std::filesystem::copy_file(titlesSource, folder / "TITLES.wsm");
 
-    // TRIM: "Trims (most of the) excess spaces at ends of lines"; with
-    // HideDots(ON) a comment dot command keeps its spaces.
+    // TRIM removes spaces at the ends of lines; a comment dot command,
+    // hidden by the macro while it runs, keeps them.
     {
         cMacroTestEditor editor;
         cDocument* doc = editor.GetDocument();
@@ -790,8 +790,8 @@ TEST_CASE("Macro: Sawyer's TRIM and TITLES do what their REM lines say")
         CHECK(editor.GetShowControls() == show);
     }
 
-    // TITLES: "Converts my recent book titles, whether plain text or all
-    // caps, to bold italics"
+    // TITLES turns the titles written in the macro into bold italics,
+    // whatever their case; the sample holds two of them.
     {
         cMacroTestEditor editor;
         cDocument* doc = editor.GetDocument();
