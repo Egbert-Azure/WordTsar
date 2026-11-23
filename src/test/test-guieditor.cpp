@@ -35,6 +35,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QTimer>
+#include <QFontDialog>
 #include <QMetaObject>
 #include <QPaintEvent>
 #include <QMimeData>
@@ -7904,18 +7905,36 @@ TEST_CASE("cColorDialog - default sentinel and explicit color")
 }
 
 
-TEST_CASE("P3.1: SelectFont - API Test")
+TEST_CASE("P3.1: SelectFont opens the non-native dialog at the cursor font")
 {
     ensureQApplication();
 
-    // Smoke test - verifies SelectFont() exists and can be called
     cEditorCtrl editor;
-    cDocument* doc = editor.GetDocument();  // Get reference for direct document access
-    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());  // Get reference for direct layout access
-    layout->SetDocument(doc);
-// Just verify the method exists and compiles
-    // editor.SelectFont();  // Don't call - would show dialog
-    CHECK(true);  // Method exists and compiles
+    editor.SetFont("Courier New|14.0|0|0|0|0|0");
+    editor.LayoutDocument(false);
+
+    bool found = false;
+    bool nonNative = false;
+    QString family;
+    qreal size = 0;
+    QTimer::singleShot(0, [&]()
+    {
+        QFontDialog* dlg = qobject_cast<QFontDialog*>(QApplication::activeModalWidget());
+        if (dlg)
+        {
+            found = true;
+            nonNative = dlg->testOption(QFontDialog::DontUseNativeDialog);
+            family = dlg->currentFont().family();
+            size = dlg->currentFont().pointSizeF();
+            dlg->reject();
+        }
+    });
+    editor.SelectFont();
+
+    CHECK(found);
+    CHECK(nonNative);
+    CHECK(family == QString("Courier New"));
+    CHECK(size == doctest::Approx(14.0));
 }
 
 TEST_CASE("P3.1: PrintPreview - API Test")

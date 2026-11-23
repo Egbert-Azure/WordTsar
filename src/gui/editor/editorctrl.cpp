@@ -6533,10 +6533,37 @@ void cEditorCtrl::Print(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::SelectFont(void)
 {
-    // *** COPIED FROM OLD SYSTEM - editorctrl.cpp::SelectFont() ***
+    // Font in effect at the caret: the segment under it, else the base font
+    std::string startFont = GetFont();
+    if (mLayout)
+    {
+        const sLineLayout* line = mLayout->GetLineByRawLineNumber(GetCaretLine());
+        if (line && !line->segments.empty())
+        {
+            POSITION_T offset = GetCaretDocumentPosition() - line->documentPosition;
+            const sSegmentLayout* chosen = &line->segments.back();
+            POSITION_T consumed = 0;
+            for (const auto& seg : line->segments)
+            {
+                consumed += seg.length;
+                if (offset < consumed)
+                {
+                    chosen = &seg;
+                    break;
+                }
+            }
+            if (!chosen->font.empty())
+            {
+                startFont = chosen->font;
+            }
+        }
+    }
 
-    bool ok;
-    QFont font = QFontDialog::getFont(&ok, this);
+    // Qt's own dialog: the native macOS font panel has no OK/Cancel on macOS 27
+    QFontDialog dlg(FontUtils::FontFromDescriptor(startFont), this);
+    dlg.setOption(QFontDialog::DontUseNativeDialog, true);
+    bool ok = (dlg.exec() == QDialog::Accepted);
+    QFont font = dlg.selectedFont();
 
     if (ok)
     {
