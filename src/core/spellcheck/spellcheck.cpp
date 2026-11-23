@@ -442,16 +442,34 @@ std::vector<sSpellWord> FindSpellWords(const std::vector<std::string> &graphemes
 /// @return number of graphemes from wordEnd on that the replacement ends with
 ///
 /// @brief
-/// Find the text after a word that a replacement already ends with, so
-/// replacing the word with it does not double that text.
+/// Find the punctuation after a word that a replacement already ends with,
+/// so replacing the word with it does not double that punctuation. Only
+/// graphemes without letters, digits or whitespace are counted.
 ///
 /////////////////////////////////////////////////////////////////////////////
 size_t SpellTrailingCount(const std::vector<std::string> &graphemes, size_t wordEnd,
                           const std::string &replacement)
 {
+    auto isPunctuation = [](const std::string &grapheme)
+    {
+        std::u32string codepoints = unicode::utf8::decode(grapheme);
+        if (codepoints.empty())
+        {
+            return false;
+        }
+        for (char32_t codepoint : codepoints)
+        {
+            if (unicode::is_alphabetic(codepoint) || unicode::is_number(codepoint) || unicode::is_white_space(codepoint))
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+
     size_t trailingCount = 0;
     std::string trailing;
-    for (size_t next = wordEnd; next < graphemes.size(); ++next)
+    for (size_t next = wordEnd; next < graphemes.size() && isPunctuation(graphemes[next]); ++next)
     {
         trailing += graphemes[next];
         if (trailing.size() >= replacement.size())

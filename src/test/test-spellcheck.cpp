@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <deque>
 #include <QApplication>
+#include <QCheckBox>
 #include <QTimer>
 
 /////////////////////////////////////////////////////////////////////////////
@@ -289,6 +290,150 @@ TEST_CASE("cSpellCheck - Picking a suggestion replaces the word and keeps the pu
     text = text.substr(0, text.find('\x7F'));
     CHECK(dialog.mRuns >= 1);
     CHECK(text == before + wanted + expectedAfter);
+}
+
+namespace {
+const int kToggleGlobal = -1 ;      // scripted code: press G in the dialog
+
+// cScriptedSpellCheck that presses G for kToggleGlobal and records the
+// Global Replacement label after each press.
+class cGlobalScriptedSpellCheck : public cScriptedSpellCheck
+{
+public:
+    cGlobalScriptedSpellCheck(cEditorCtrl *parent, eSpellMode mode) : cScriptedSpellCheck(parent, mode) {}
+
+    std::vector<std::string> mGlobalLabels ;
+
+protected:
+    int RunDialog(void) override
+    {
+        while (mCodes.empty() == false && mCodes.front() == kToggleGlobal)
+        {
+            mCodes.pop_front() ;
+            QKeyEvent press(QEvent::KeyPress, Qt::Key_G, Qt::NoModifier, "g") ;
+            keyPressEvent(&press) ;
+            QCheckBox *global = findChild<QCheckBox *>("global") ;
+            mGlobalLabels.push_back(global != nullptr ? global->text().toStdString() : std::string()) ;
+        }
+        return cScriptedSpellCheck::RunDialog() ;
+    }
+} ;
+
+std::string DocumentText(cDocument *doc)
+{
+    std::string text = doc->GetText() ;
+    text = text.substr(0, text.find('\x1A')) ;
+    return text.substr(0, text.find('\x7F')) ;
+}
+
+// Push the codes that pick the suggestion at index, one More per page.
+void PickSuggestion(std::deque<int> &codes, size_t index)
+{
+    for (size_t page = 0; page < index / 5; ++page)
+    {
+        codes.push_back(SPELLMORE) ;
+    }
+    codes.push_back(static_cast<int>(index % 5) + 1) ;
+}
+
+size_t SuggestionIndex(const std::vector<std::string> &suggestions, const std::string &wanted)
+{
+    auto found = std::find(suggestions.begin(), suggestions.end(), wanted) ;
+    REQUIRE(found != suggestions.end()) ;
+    return static_cast<size_t>(found - suggestions.begin()) ;
+}
+}
+
+TEST_CASE("cSpellCheck - Replacements change only the misspelled word and keep a marked block on its text")
+{
+    ensureQApplication();
+
+    const std::string language = "en_US";
+    cSpellChecker checker(language);
+
+    cEditorCtrl editor;
+    editor.mSpellCheckLanguage = language;
+    cDocument* doc = editor.GetDocument();
+    cGlobalScriptedSpellCheck dialog(&editor, SPELLCHECKDOCUMENT);
+    dialog.mDoc = doc;
+
+    auto start = [&](const std::string &text)
+    {
+        doc->Insert(text);
+        editor.GetLayout()->LayoutDocument(doc);
+        doc->SetPosition(0);
+        editor.CalculateCaretPosition();
+    };
+
+    SUBCASE("a multi-word suggestion keeps the text after the word")
+    {
+        REQUIRE(checker.CheckWord("eachother") == false);
+        size_t index = SuggestionIndex(checker.suggestions("eachother"), "each other");
+
+        start("We help eachother other days.");
+        PickSuggestion(dialog.mCodes, index);
+        dialog.CheckDocument();
+
+        CHECK(DocumentText(doc) == "We help each other other days.");
+    }
+
+    SUBCASE("Global Replacement corrects a later occurrence of the same word and nothing else")
+    {
+        REQUIRE(checker.CheckWord("recieve") == false);
+        REQUIRE(checker.CheckWord("wrold") == false);
+        size_t index = SuggestionIndex(checker.suggestions("recieve"), "receive");
+
+        start("I recieve one, you recieve two, wrold.");
+        dialog.mCodes.push_back(kToggleGlobal);
+        PickSuggestion(dialog.mCodes, index);
+        dialog.CheckDocument();
+
+        CHECK(dialog.mGlobalLabels == std::vector<std::string>{ "&Global Replacement is on" });
+        CHECK(dialog.mBadWords == std::vector<std::string>{ "recieve", "wrold" });
+        CHECK(DocumentText(doc) == "I receive one, you receive two, wrold.");
+    }
+
+    SUBCASE("after More, 1 takes the sixth suggestion")
+    {
+        REQUIRE(checker.CheckWord("hte") == false);
+        std::vector<std::string> suggestions = checker.suggestions("hte");
+        REQUIRE(suggestions.size() > 5);
+
+        start("See hte dog.");
+        dialog.mCodes.push_back(SPELLMORE);
+        dialog.mCodes.push_back(1);
+        dialog.CheckDocument();
+
+        CHECK(DocumentText(doc) == "See " + suggestions[5] + " dog.");
+    }
+
+    SUBCASE("a marked block covers the same text after a replacement before it")
+    {
+        REQUIRE(checker.CheckWord("eachother") == false);
+        REQUIRE(checker.CheckWord("hte") == false);
+        size_t index = SuggestionIndex(checker.suggestions("eachother"), "each other");
+        std::vector<std::string> suggestions = checker.suggestions("hte");
+        REQUIRE(suggestions.empty() == false);
+
+        start("They saw eachother and hte dog ran.");
+        doc->SetPosition(23);
+        doc->SetBeginBlock();
+        doc->SetPosition(30);
+        doc->SetEndBlock();
+        POSITION_T blockStart = 0, blockEnd = 0;
+        REQUIRE(doc->GetBlock(blockStart, blockEnd));
+        REQUIRE(doc->GetBlockText(blockStart, blockEnd) == "hte dog");
+        doc->SetPosition(0);
+        editor.CalculateCaretPosition();
+
+        PickSuggestion(dialog.mCodes, index);
+        dialog.mCodes.push_back(1);
+        dialog.CheckDocument();
+
+        CHECK(DocumentText(doc) == "They saw each other and " + suggestions[0] + " dog ran.");
+        REQUIRE(doc->GetBlock(blockStart, blockEnd));
+        CHECK(doc->GetBlockText(blockStart, blockEnd) == suggestions[0] + " dog");
+    }
 }
 
 TEST_CASE("P2.6 Spell Check - Document state handling")

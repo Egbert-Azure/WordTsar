@@ -214,6 +214,10 @@ void cSpellCheck::CheckDocument(void)
                                 resume = found.start ;
                                 rescan = true ;
                             }
+                            else
+                            {
+                                cont = true ;
+                            }
                             break ;
                         }
 
@@ -460,7 +464,11 @@ void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWo
             {
                 // Replace word in document with selected suggestion
                 size_t suggIdx = index + static_cast<size_t>(ecode) - 1 ;
-                if (hasDocPosition && suggIdx < suggestions.size())
+                if (suggIdx >= suggestions.size())
+                {
+                    cont = true ;
+                }
+                else if (hasDocPosition)
                 {
                     ReplaceWord(docWordStart, docWordEnd, suggestions[suggIdx]) ;
                 }
@@ -521,8 +529,9 @@ void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWo
 /// @return nothing
 ///
 /// @brief
-/// Replace the word with the given text. Text right after the word that
-/// the replacement already ends with is replaced too.
+/// Replace the word with the given text. Punctuation right after the word
+/// that the replacement already ends with is replaced too. The saved block
+/// follows the change.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cSpellCheck::ReplaceWord(POSITION_T docWordStart, POSITION_T docWordEnd, const std::string &replacement)
@@ -539,15 +548,19 @@ void cSpellCheck::ReplaceWord(POSITION_T docWordStart, POSITION_T docWordEnd, co
     doc->GetParagraphStartandEnd(para, paraStart, paraEnd) ;
 
     size_t trailing = SpellTrailingCount(graphemes, static_cast<size_t>(docWordEnd - paraStart), replacement) ;
+    POSITION_T replacedEnd = docWordEnd + static_cast<POSITION_T>(trailing) ;
+    POSITION_T sizeBefore = doc->GetTextSize() ;
 
     doc->SetPosition(docWordStart) ;
     doc->SetBeginBlock() ;
-    doc->SetPosition(docWordEnd + static_cast<POSITION_T>(trailing)) ;
+    doc->SetPosition(replacedEnd) ;
     doc->SetEndBlock() ;
 
     mEditor->DeleteBlock() ;
     doc->SetPosition(docWordStart) ;
     mEditor->InsertWordStarString(replacement) ;
+
+    doc->AdjustSavedBlocks(replacedEnd, doc->GetTextSize() - sizeBefore) ;
 }
 
 

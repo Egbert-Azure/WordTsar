@@ -5654,6 +5654,40 @@ void cDocument::RestoreBlocks(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  end     [IN] - position just past the replaced text
+/// @param  delta   [IN] - length of the new text minus that of the replaced text
+///
+/// @return none
+///
+/// @brief Moves the saved block positions after text that ends at end was
+///        replaced. Positions at or after end move by delta; positions inside
+///        the replaced text stay, but no further than the end of the new text.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::AdjustSavedBlocks(POSITION_T end, POSITION_T delta)
+{
+    POSITION_T newEnd = end + delta ;
+
+    for (POSITION_T &saved : mSavedBlocks)
+    {
+        if (saved == NOT_SET)
+        {
+            continue ;
+        }
+        if (saved >= end)
+        {
+            saved += delta ;
+        }
+        else if (saved > newEnd)
+        {
+            saved = newEnd ;
+        }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  needle      [IN} - the string we are looking for
 /// @param  start       [IN] - the position in the buffer to start the search
 /// @param  wildcard    [IN] - allow wildcard search (brute force, ascii only)

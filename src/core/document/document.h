@@ -372,6 +372,7 @@ public:
     bool GetPreviousBlock(POSITION_T &start, POSITION_T &end) ;
     void SaveBlocks(void) ;;
     void RestoreBlocks(void) ;
+    void AdjustSavedBlocks(POSITION_T end, POSITION_T delta) ;
     void SetBeginBlock(void) ;
     void SetEndBlock(void) ;
     void SetPreviousBlock(void) ;

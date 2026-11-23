@@ -3127,6 +3127,8 @@ void cWSEditorCtrl::SpellCheckDocument(void)
     PARAGRAPH_T total = mDocument->GetNumberofParagraphs();
     int misspelled = 0;
 
+    mDocument->SaveBlocks();
+
     for (PARAGRAPH_T para = 0; para < total; ++para)
     {
         bool rescan = true;
@@ -3181,6 +3183,7 @@ void cWSEditorCtrl::SpellCheckDocument(void)
 
                     if (action == wsdialogs::SPELL_DIALOG_CANCEL)
                     {
+                        mDocument->RestoreBlocks();
                         return;
                     }
                     else if (action == wsdialogs::SPELL_DIALOG_IGNORE)
@@ -3189,13 +3192,16 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                     }
                     else if (action == wsdialogs::SPELL_DIALOG_REPLACE)
                     {
-                        // Also replace text after the word that the replacement ends with.
+                        // Also replace punctuation after the word that the replacement ends with.
                         size_t trailingCount = SpellTrailingCount(graphemes, index, replacement);
 
                         POSITION_T pos = paraStart + static_cast<POSITION_T>(wordStart);
+                        POSITION_T replacedEnd = pos + static_cast<POSITION_T>(wordGraphemeCount + trailingCount);
+                        POSITION_T sizeBefore = mDocument->GetTextSize();
                         mDocument->SetPosition(pos);
                         Delete(pos, static_cast<POSITION_T>(wordGraphemeCount + trailingCount));
                         InsertText(replacement);
+                        mDocument->AdjustSavedBlocks(replacedEnd, mDocument->GetTextSize() - sizeBefore);
                         LayoutDocument(false);
                         resume = wordStart;
                         if (known != corrections.end())
@@ -3216,6 +3222,8 @@ void cWSEditorCtrl::SpellCheckDocument(void)
             }
         }
     }
+
+    mDocument->RestoreBlocks();
 
     ShowMessage("Spell Check", "Spell check complete. " + std::to_string(misspelled) + " misspelled word(s) found.");
 }
