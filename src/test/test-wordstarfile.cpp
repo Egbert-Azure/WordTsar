@@ -474,6 +474,42 @@ TEST_CASE("cWordstarFile::LoadFile - colour sequences: palette index range")
 }
 
 
+TEST_CASE("cWordstarFile - &?& and &%& are variables again after save and load")
+{
+    ensureQApplication();
+    cEditorCtrl source;
+    cDocument* doc = source.GetDocument();
+    doc->Insert("Words ");
+    doc->InsertVariable(VAR_WORD_COUNT);
+    doc->Insert(" pages ");
+    doc->InsertVariable(VAR_PAGE_COUNT);
+    doc->Insert("\r");
+
+    std::filesystem::path path = TempPath();
+    cWordstarFile saver(&source);
+    REQUIRE(saver.SaveFile(path.string(), doc->GetTextSize()));
+
+    cEditorCtrl target;
+    cWordstarFile loader;
+    loader.mDocument = target.GetDocument();
+    REQUIRE(loader.LoadFile(path.string()));
+    std::filesystem::remove(path);
+
+    std::vector<eVariableType> found;
+    POSITION_T size = target.GetDocument()->GetTextSize();
+    for (POSITION_T pos = 0; pos < size; ++pos)
+    {
+        if (target.GetDocument()->GetControlChar(pos) == STYLE_VARIABLE)
+        {
+            found.push_back(target.GetDocument()->GetVariable(pos));
+        }
+    }
+    REQUIRE(found.size() == 2);
+    CHECK(found[0] == VAR_WORD_COUNT);
+    CHECK(found[1] == VAR_PAGE_COUNT);
+}
+
+
 TEST_CASE("cWordstarFile::SaveFile - returns false when the file cannot be written")
 {
     ensureQApplication();

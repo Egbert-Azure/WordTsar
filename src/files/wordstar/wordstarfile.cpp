@@ -1399,60 +1399,7 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
                     {
                         // Write variable as &X& sequence
                         eVariableType varType = mDocument->GetVariable(loop);
-                        char varChar = '?';
-                        switch (varType)
-                        {
-                            case VAR_DATE:
-                            {
-                                varChar = '@';
-                                break;
-                            }
-                            case VAR_TIME:
-                            {
-                                varChar = '!';
-                                break;
-                            }
-                            case VAR_PAGE_NUMBER:
-                            {
-                                varChar = '#';
-                                break;
-                            }
-                            case VAR_LINE_NUMBER:
-                            {
-                                varChar = '_';
-                                break;
-                            }
-                            case VAR_FILENAME:
-                            {
-                                varChar = '*';
-                                break;
-                            }
-                            case VAR_DRIVE:
-                            {
-                                varChar = ':';
-                                break;
-                            }
-                            case VAR_DIRECTORY:
-                            {
-                                varChar = '.';
-                                break;
-                            }
-                            case VAR_FULLPATH:
-                            {
-                                varChar = '\\';
-                                break;
-                            }
-                            case VAR_WORD_COUNT:
-                            {
-                                varChar = '?';
-                                break;
-                            }
-                            case VAR_PAGE_COUNT:
-                            {
-                                varChar = '%';
-                                break;
-                            }
-                        }
+                        char varChar = VariableCharFromType(varType);
                         out += static_cast<char>('&');
                         out += static_cast<char>(varChar);
                         out += static_cast<char>('&');
@@ -1948,8 +1895,8 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
         if (mVariableChar == 0)
         {
             // State 1: check if this is a valid variable character
-            static const std::string validVarChars = "@!#_*:.\\?";
-            if (validVarChars.find(static_cast<char>(c)) != std::string::npos)
+            eVariableType probe;
+            if (VariableTypeFromChar(static_cast<char>(c), probe))
             {
                 mVariableChar = c;
                 last = c;
@@ -1970,65 +1917,8 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
             if (c == '&')
             {
                 // Complete variable found -- insert it
-                eVariableType varType;
-                switch (mVariableChar)
-                {
-                    case '@':
-                    {
-                        varType = VAR_DATE;
-                        break;
-                    }
-                    case '!':
-                    {
-                        varType = VAR_TIME;
-                        break;
-                    }
-                    case '#':
-                    {
-                        varType = VAR_PAGE_NUMBER;
-                        break;
-                    }
-                    case '_':
-                    {
-                        varType = VAR_LINE_NUMBER;
-                        break;
-                    }
-                    case '*':
-                    {
-                        varType = VAR_FILENAME;
-                        break;
-                    }
-                    case ':':
-                    {
-                        varType = VAR_DRIVE;
-                        break;
-                    }
-                    case '.':
-                    {
-                        varType = VAR_DIRECTORY;
-                        break;
-                    }
-                    case '\\':
-                    {
-                        varType = VAR_FULLPATH;
-                        break;
-                    }
-                    case '?':
-                    {
-                        varType = VAR_WORD_COUNT;
-                        break;
-                    }
-                    case '%':
-                    {
-                        varType = VAR_PAGE_COUNT;
-                        break;
-                    }
-                    default:
-                    {
-                        varType = VAR_DATE;
-                        break;
-                    }
-                }
+                eVariableType varType = VAR_DATE;
+                VariableTypeFromChar(static_cast<char>(mVariableChar), varType);
 
                 mDocument->InsertVariable(varType);
                 mInVariable = false;

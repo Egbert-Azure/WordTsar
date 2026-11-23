@@ -7092,64 +7092,10 @@ void cEditorBase::CheckAndReplaceVariable(void)
         return;
     }
 
-    // Map variable character to type
     eVariableType varType;
-    switch (ch2[0])
+    if (!VariableTypeFromChar(ch2[0], varType))
     {
-        case '@':
-        {
-            varType = VAR_DATE;
-            break;
-        }
-        case '!':
-        {
-            varType = VAR_TIME;
-            break;
-        }
-        case '#':
-        {
-            varType = VAR_PAGE_NUMBER;
-            break;
-        }
-        case '_':
-        {
-            varType = VAR_LINE_NUMBER;
-            break;
-        }
-        case '*':
-        {
-            varType = VAR_FILENAME;
-            break;
-        }
-        case ':':
-        {
-            varType = VAR_DRIVE;
-            break;
-        }
-        case '.':
-        {
-            varType = VAR_DIRECTORY;
-            break;
-        }
-        case '\\':
-        {
-            varType = VAR_FULLPATH;
-            break;
-        }
-        case '?':
-        {
-            varType = VAR_WORD_COUNT;
-            break;
-        }
-        case '%':
-        {
-            varType = VAR_PAGE_COUNT;
-            break;
-        }
-        default:
-        {
-            return;  // Not a valid variable character
-        }
+        return;  // Not a valid variable character
     }
 
     // Variable expansion is its own undo unit.

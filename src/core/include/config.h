@@ -191,6 +191,56 @@ enum eVariableType
 
 
 ///////////////////////////////////////////////////////////////////////
+/// The character between the ampersands for each variable type. Typing,
+/// loading and saving all read this table.
+///////////////////////////////////////////////////////////////////////
+struct sVariableChar
+{
+    char ch;
+    eVariableType type;
+};
+
+static const sVariableChar VARIABLE_CHARS[] =
+{
+    { '@',  VAR_DATE },
+    { '!',  VAR_TIME },
+    { '#',  VAR_PAGE_NUMBER },
+    { '_',  VAR_LINE_NUMBER },
+    { '*',  VAR_FILENAME },
+    { ':',  VAR_DRIVE },
+    { '.',  VAR_DIRECTORY },
+    { '\\', VAR_FULLPATH },
+    { '?',  VAR_WORD_COUNT },
+    { '%',  VAR_PAGE_COUNT },
+};
+
+static inline bool VariableTypeFromChar(char ch, eVariableType& type)
+{
+    for (const sVariableChar& entry : VARIABLE_CHARS)
+    {
+        if (entry.ch == ch)
+        {
+            type = entry.type;
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline char VariableCharFromType(eVariableType type)
+{
+    for (const sVariableChar& entry : VARIABLE_CHARS)
+    {
+        if (entry.type == type)
+        {
+            return entry.ch;
+        }
+    }
+    return '?';
+}
+
+
+///////////////////////////////////////////////////////////////////////
 /// @enum eModifiers
 ///
 /// @note Basic original wordstar styles (order is important)
