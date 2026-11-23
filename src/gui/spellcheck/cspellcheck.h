@@ -83,7 +83,7 @@ protected:
     void showEvent(QShowEvent *e) ;
 
 private:
-    bool PrepareText(PARAGRAPH_T para, std::string &text, std::vector<POSITION_T> &wordstarts, std::vector<POSITION_T> &modwordstarts, POSITION_T &start) ;
+    bool PrepareText(PARAGRAPH_T para, std::vector<std::string> &graphemes, POSITION_T &start) ;
     void AddWord(std::string word) ;
     void EnterWord(std::string &word) ;
 

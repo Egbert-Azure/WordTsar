@@ -112,12 +112,20 @@ public:
     cScriptedSpellCheck(cEditorCtrl *parent, eSpellMode mode) : cSpellCheck(parent, mode) {}
 
     std::deque<int> mCodes ;
+    std::vector<std::string> mBadWords ;
+    cDocument* mDoc = nullptr ;
     int mRuns = 0 ;
 
 protected:
     int RunDialog(void) override
     {
         mRuns++ ;
+        POSITION_T start = 0, end = 0 ;
+        cDocument* doc = mDoc ;
+        if (doc != nullptr && doc->GetBlock(start, end))
+        {
+            mBadWords.push_back(doc->GetBlockText(start, end)) ;
+        }
         if (mCodes.empty())
         {
             return QDialog::Rejected ;
@@ -166,6 +174,41 @@ TEST_CASE("cSpellCheck - Replace with a suggestion that ends in the following pe
     CHECK(dialog.mRuns >= 1);
     CHECK(doc->IsModified());
     CHECK(text == "evtl.");
+}
+
+TEST_CASE("cSpellCheck - Document check after an em dash and a curly apostrophe replaces only the misspelled word")
+{
+    ensureQApplication();
+
+    const std::string language = "en_US";
+    cSpellChecker checker(language);
+    REQUIRE(checker.CheckWord("subjct") == false);
+    std::vector<std::string> suggestions = checker.suggestions("subjct");
+    REQUIRE(suggestions.empty() == false);
+
+    cEditorCtrl editor;
+    editor.mSpellCheckLanguage = language;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("He said \xE2\x80\x94 don\xE2\x80\x99t doubt the subjct, ok.");
+    editor.GetLayout()->LayoutDocument(doc);
+    doc->SetPosition(0);
+    editor.CalculateCaretPosition();
+    doc->MarkSaved();
+
+    cScriptedSpellCheck dialog(&editor, SPELLCHECKDOCUMENT);
+    dialog.mDoc = doc;
+    dialog.mCodes.push_back(1);
+    dialog.CheckDocument();
+
+    std::string text = doc->GetText();
+    text = text.substr(0, text.find('\x1A'));
+    text = text.substr(0, text.find('\x7F'));
+    CHECK(dialog.mBadWords.empty() == false);
+    if (dialog.mBadWords.empty() == false)
+    {
+        CHECK(dialog.mBadWords[0].substr(0, 6) == "subjct");
+    }
+    CHECK(text == "He said \xE2\x80\x94 don\xE2\x80\x99t doubt the " + suggestions[0] + ", ok.");
 }
 
 TEST_CASE("P2.6 Spell Check - Document state handling")

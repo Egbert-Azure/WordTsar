@@ -62,6 +62,7 @@
 
 #include "src/core/include/utils.h"
 
+#include "src/core/spellcheck/spellcheck.h"
 #include "cspellcheck.h"
 
 
@@ -106,152 +107,140 @@ void cSpellCheck::CheckDocument(void)
 
     PARAGRAPH_T para = mEditor->GetDocument()->GetNumberofParagraphs() ;
     PARAGRAPH_T currentpara = mEditor->GetDocument()->GetParagraphFromPosition(mEditor->GetCaretDocumentPosition()) ;
+    bool quit = false ;
 
-    for(PARAGRAPH_T ploop = currentpara; ploop < para; ploop++)
+    for(PARAGRAPH_T ploop = currentpara; ploop < para && quit == false; ploop++)
     {
-        bool quit = false ;
-        std::string text ;
-        std::vector<POSITION_T> wordstarts, modwordstarts ;
-        POSITION_T pstart ;
+        size_t resume = 0 ;     // grapheme index the next scan starts at
+        bool rescan = true ;
 
-        bool good = PrepareText(ploop, text, wordstarts, modwordstarts, pstart) ;
-        if(good == false)
+        while(rescan == true && quit == false)
         {
-            continue ;
-        }
+            rescan = false ;
 
-        POSITION_T startpos = modwordstarts[0] ;    // strt startpos in the last word in para index
-        for(size_t wordloop = 1; wordloop < modwordstarts.size(); wordloop++)
-        {
-            POSITION_T wstart = modwordstarts[wordloop] ;   // start position of current word in para index
-            std::string word = text.substr(startpos, wstart - startpos);  // wrong math here
+            std::vector<std::string> graphemes ;
+            POSITION_T pstart = 0 ;
 
-            if(word.length() != 0)
-            {
-                int countspaces = trimandcheck(word) ;
-
-                POSITION_T docwordstart = startpos + pstart + countspaces ;
-                
-                if(word.length() != 0)
-                {
-                    size_t index = 0 ;
-                    if(spelling.CheckWord(word) == false)
-                    {
-                        std::vector<std::string> suggestions = spelling.suggestions(word) ;
-
-                        mEditor->GetDocument()->SetPosition(docwordstart) ;
-                        mEditor->GetDocument()->SetBeginBlock() ;
-                        mEditor->GetDocument()->SetPosition(docwordstart + word.length() + 1) ;
-                        mEditor->GetDocument()->SetEndBlock() ;
-                        mEditor->ScrollIntoView() ;
-                        mEditor->Repaint() ;
-
-                        bool cont = false ;
-                        do
-                        {
-                            cont = false ;
-
-                            // put in 5 words at a time
-                            for(size_t wordcount = index; wordcount < index + 5; wordcount++)
-                            {
-                                if(wordcount < suggestions.size())
-                                {
-                                    std::string entry ;
-                                    entry = string_sprintf("%ld. %s", wordcount - index + 1, suggestions[wordcount].c_str()) ;
-                                    spellcheck.suggestions->addItem(entry.c_str()) ;
-                                }
-                            }
-
-                            spellcheck.badword->setText(word.c_str()) ;
-                            restoreGeometry(mGeometry);
-                            int ecode = RunDialog() ;
-
-                            spellcheck.suggestions->clear() ;
-
-                            switch(ecode)
-                            {
-                                case 1 :
-                                case 2 :
-                                case 3 :
-                                case 4 :
-                                case 5 :
-                                    if(ecode < (int)suggestions.size())
-                                    {
-                                        mEditor->DeleteBlock() ;
-                                        mEditor->GetDocument()->SetPosition(docwordstart) ;
-                                        mEditor->InsertWordStarString(suggestions[ecode - 1]) ;
-
-                                        PrepareText(ploop, text, wordstarts, modwordstarts, pstart) ;
-                                        wordloop-- ;
-                                        wstart = modwordstarts[wordloop] ;
-                                    }
-                                    break ;
-
-                                case QDialog::Rejected :
-                                    quit = true ;
-                                    break ;
-
-                                case SPELLADD :
-                                    AddWord(word) ;
-                                    break ;
-
-                                case SPELLIGNORE :
-                                    // add the word to dictionary, withoy adding it to file
-                                    spelling.AddWord(word) ;
-                                    break ;
-
-                                case SPELLMORE :
-                                    index += 5 ;
-                                    if(index >= suggestions.size())
-                                    {
-                                        index = 0 ;
-                                    }
-                                    cont = true ;
-                                    break ;
-
-                                case SPELLENTER :
-                                    {
-                                        std::string newword ;
-                                        EnterWord(newword) ;
-
-                                        if(newword.length() != 0)
-                                        {
-                                            mEditor->DeleteBlock() ;
-                                            mEditor->GetDocument()->SetPosition(docwordstart) ;
-                                            mEditor->InsertWordStarString(newword) ;
-
-                                            PrepareText(ploop, text, wordstarts, modwordstarts, pstart) ;
-                                            wordloop-- ;
-                                            wstart = modwordstarts[wordloop] ;
-                                        }
-                                    }
-                                    break ;
-
-                            }
-                        } while(cont == true) ;
-                    }
-                }
-            }
-            startpos = wstart ;
-
-            if(quit)
+            if(PrepareText(ploop, graphemes, pstart) == false)
             {
                 break ;
             }
-        }
 
-        if(quit)
-        {
-            break ;
-        }
+            std::vector<sSpellWord> words = FindSpellWords(graphemes) ;
+            for(const sSpellWord &found : words)
+            {
+                if(found.start < resume)
+                {
+                    continue ;
+                }
 
+                const std::string word = found.text ;
+                if(spelling.CheckWord(word) == true)
+                {
+                    continue ;
+                }
+
+                std::vector<std::string> suggestions = spelling.suggestions(word) ;
+                POSITION_T docwordstart = pstart + static_cast<POSITION_T>(found.start) ;
+                POSITION_T docwordend = pstart + static_cast<POSITION_T>(found.end) ;
+
+                mEditor->GetDocument()->SetPosition(docwordstart) ;
+                mEditor->GetDocument()->SetBeginBlock() ;
+                mEditor->GetDocument()->SetPosition(docwordend) ;
+                mEditor->GetDocument()->SetEndBlock() ;
+                mEditor->ScrollIntoView() ;
+                mEditor->Repaint() ;
+
+                size_t index = 0 ;
+                bool cont = false ;
+                do
+                {
+                    cont = false ;
+
+                    // put in 5 words at a time
+                    for(size_t wordcount = index; wordcount < index + 5; wordcount++)
+                    {
+                        if(wordcount < suggestions.size())
+                        {
+                            std::string entry ;
+                            entry = string_sprintf("%ld. %s", wordcount - index + 1, suggestions[wordcount].c_str()) ;
+                            spellcheck.suggestions->addItem(entry.c_str()) ;
+                        }
+                    }
+
+                    spellcheck.badword->setText(word.c_str()) ;
+                    restoreGeometry(mGeometry);
+                    int ecode = RunDialog() ;
+
+                    spellcheck.suggestions->clear() ;
+
+                    switch(ecode)
+                    {
+                        case 1 :
+                        case 2 :
+                        case 3 :
+                        case 4 :
+                        case 5 :
+                            if(ecode <= (int)suggestions.size())
+                            {
+                                mEditor->DeleteBlock() ;
+                                mEditor->GetDocument()->SetPosition(docwordstart) ;
+                                mEditor->InsertWordStarString(suggestions[ecode - 1]) ;
+                                resume = found.start ;
+                                rescan = true ;
+                            }
+                            break ;
+
+                        case QDialog::Rejected :
+                            quit = true ;
+                            break ;
+
+                        case SPELLADD :
+                            AddWord(word) ;
+                            break ;
+
+                        case SPELLIGNORE :
+                            // add the word to dictionary, without adding it to file
+                            spelling.AddWord(word) ;
+                            break ;
+
+                        case SPELLMORE :
+                            index += 5 ;
+                            if(index >= suggestions.size())
+                            {
+                                index = 0 ;
+                            }
+                            cont = true ;
+                            break ;
+
+                        case SPELLENTER :
+                            {
+                                std::string newword ;
+                                EnterWord(newword) ;
+
+                                if(newword.length() != 0)
+                                {
+                                    mEditor->DeleteBlock() ;
+                                    mEditor->GetDocument()->SetPosition(docwordstart) ;
+                                    mEditor->InsertWordStarString(newword) ;
+                                    resume = found.start ;
+                                    rescan = true ;
+                                }
+                            }
+                            break ;
+                    }
+                } while(cont == true) ;
+
+                if(quit == true || rescan == true)
+                {
+                    break ;
+                }
+            }
+        }
     }
 
     mEditor->GetDocument()->RestoreBlocks() ;
 }
-
-
-
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -599,104 +588,56 @@ void cSpellCheck::suggestiondoubleclicked(QListWidgetItem *item)
 }
 
 
-bool cSpellCheck::PrepareText(PARAGRAPH_T para, std::string &text, std::vector<POSITION_T> &wordstarts, std::vector<POSITION_T> &modwordstarts, POSITION_T &pstart)
+bool cSpellCheck::PrepareText(PARAGRAPH_T para, std::vector<std::string> &graphemes, POSITION_T &pstart)
 {
-    wordstarts.clear() ;
-    modwordstarts.clear() ;
+    std::vector<POSITION_T> offsets ;
+    mEditor->GetDocument()->GetParagraphGraphemes(para, graphemes, offsets) ;
 
-    text = mEditor->GetDocument()->GetParagraphText(para) ;
     POSITION_T end ;
     mEditor->GetDocument()->GetParagraphStartandEnd(para, pstart, end) ;
 
-    // strip punctuation and special characters
-    std::string replace = "\\()[]{};:?+-*=/&~|\"<>!\r\n#$%^&\177" ;
-
-    // Handle dot command and comment lines
-    if (text.size() >= 2 && text[0] == '.')
+    if(graphemes.size() < 2 || graphemes[0] != ".")
     {
-        if (!mSpellCheckDotCommands)
-        {
-            // Skip all dot-prefixed lines when option is off
-            return false ;
-        }
-
-        // Spell checking enabled -- blank out the command portion
-        if (text[1] == '.')
-        {
-            // Comment line (..) -- blank the two-dot prefix
-            text[0] = ' ' ;
-            text[1] = ' ' ;
-        }
-        else if (text.size() >= 3 && (text.substr(0, 3) == ".ig" || text.substr(0, 3) == ".IG"))
-        {
-            // Ignore/comment line (.ig) -- blank the .ig prefix
-            text[0] = ' ' ;
-            text[1] = ' ' ;
-            text[2] = ' ' ;
-        }
-        else
-        {
-            // Dot command (.HE, .FO, .LM, etc.) -- blank everything up to first space
-            size_t cmdEnd = text.find(' ') ;
-            if (cmdEnd != std::string::npos)
-            {
-                for (size_t i = 0; i < cmdEnd; i++)
-                {
-                    text[i] = ' ' ;
-                }
-            }
-            else
-            {
-                // No text after the command -- nothing to spell check
-                return false ;
-            }
-        }
+        return graphemes.empty() == false ;
     }
-    
-    // this works since the ascii chars are part of UTF8
-    // and now a loop for control charcaters and contractions
-    for(size_t loop = 0; loop < text.length(); loop++)
+
+    if(!mSpellCheckDotCommands)
     {
-        // replace chars we can't match with space
-        if (replace.find(text[loop]) != std::string::npos)
+        // Skip all dot-prefixed lines when option is off
+        return false ;
+    }
+
+    // Spell checking enabled -- blank out the command portion
+    size_t blank = 0 ;
+    if(graphemes[1] == ".")
+    {
+        // Comment line (..) -- blank the two-dot prefix
+        blank = 2 ;
+    }
+    else if(graphemes.size() >= 3 && (graphemes[1] == "i" || graphemes[1] == "I") && (graphemes[2] == "g" || graphemes[2] == "G"))
+    {
+        // Ignore/comment line (.ig) -- blank the .ig prefix
+        blank = 3 ;
+    }
+    else
+    {
+        // Dot command (.HE, .FO, .LM, etc.) -- blank everything up to first space
+        while(blank < graphemes.size() && graphemes[blank] != " ")
         {
-            text[loop] = ' ';
+            blank++ ;
         }
 
-        // Hunspell doesn't like apostropies around words, but want's them in contractions, so run a special check
-        if(text[loop] == '\'')
+        if(blank == graphemes.size())
         {
-            if(loop != 0)
-            {
-                // if the apostrophe is not surround by text (non white space), replace it
-                if(text[loop - 1] == ' ' || text[loop + 1] == ' ')
-                {
-                    text[loop] = ' ' ;
-                }
-            }
-        }
-
-        // if a period or a comma is surround by numbers, then leave it, else replace with space
-        if (text[loop] == '.' || text[loop] == ',') 
-        {
-            if (loop == 0 || loop == text.length() - 1 || !std::isdigit(text[loop - 1]) || !std::isdigit(text[loop + 1])) 
-            {
-            text[loop] = ' ';
-            }
+            // No text after the command -- nothing to spell check
+            return false ;
         }
     }
 
-        mEditor->GetDocument()->GetWordPositions(text, wordstarts) ;
-        if(wordstarts.empty())
-        {
-            return false ;
-        }
-
-        modwordstarts = wordstarts ;
-        for (auto &pos : wordstarts)
-        {
-            pos += pstart;
-        }
+    for(size_t i = 0; i < blank; i++)
+    {
+        graphemes[i] = " " ;
+    }
 
     return true ;
 }

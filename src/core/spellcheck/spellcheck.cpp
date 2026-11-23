@@ -58,6 +58,9 @@
 
 #include <iostream>
 
+#include "unicodelib.h"
+#include "unicodelib_encodings.h"
+
 #include "spellcheck.h"
 
 #ifdef _WIN32
@@ -356,4 +359,75 @@ bool cSpellChecker::AddWord(const std::string &word)
     reinterpret_cast<Hunspell*>(hunspell)->add(word.c_str());
     return true;
 #endif
+}
+
+std::vector<sSpellWord> FindSpellWords(const std::vector<std::string> &graphemes)
+{
+    std::vector<sSpellWord> words;
+    size_t runStart = 0;
+    bool inRun = false;
+    bool hasDigit = false;
+
+    for (size_t index = 0; index <= graphemes.size(); ++index)
+    {
+        bool isWordChar = false;
+        bool isDigit = false;
+
+        if (index < graphemes.size())
+        {
+            const std::string &grapheme = graphemes[index];
+            char32_t codepoint = 0;
+            if (unicode::utf8::decode_codepoint(grapheme.data(), grapheme.size(), codepoint) > 0)
+            {
+                isDigit = (unicode::is_number(codepoint) != 0);
+                isWordChar = isDigit || (codepoint == U'\'') || (codepoint == 0x2019) || (unicode::is_alphabetic(codepoint) != 0);
+            }
+        }
+
+        if (isWordChar)
+        {
+            if (inRun == false)
+            {
+                inRun = true;
+                runStart = index;
+                hasDigit = false;
+            }
+            hasDigit = hasDigit || isDigit;
+            continue;
+        }
+
+        if (inRun)
+        {
+            inRun = false;
+
+            size_t start = runStart;
+            size_t end = index;
+            auto isApostrophe = [&graphemes](size_t at)
+            {
+                return graphemes[at] == "'" || graphemes[at] == "\xE2\x80\x99";
+            };
+            while (start < end && isApostrophe(start))
+            {
+                ++start;
+            }
+            while (end > start && isApostrophe(end - 1))
+            {
+                --end;
+            }
+
+            if (hasDigit == false && end - start > 1)
+            {
+                sSpellWord word;
+                word.start = start;
+                word.end = end;
+                for (size_t at = start; at < end; ++at)
+                {
+                    word.text += graphemes[at];
+                }
+                words.push_back(word);
+            }
+        }
+    }
+
+    return words;
 }

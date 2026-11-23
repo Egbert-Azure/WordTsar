@@ -31,6 +31,20 @@
 #include <string>
 #include <vector>
 
+// A word found in a paragraph, as a range of grapheme indexes.
+struct sSpellWord
+{
+    size_t start;       // index of the first grapheme
+    size_t end;         // index one past the last grapheme
+    std::string text;   // the word as UTF-8
+};
+
+// Walks a paragraph's graphemes and returns the words to spell check.
+// Letters, the ASCII apostrophe and the curly apostrophe (U+2019) belong to a
+// word; apostrophes at either end do not. Runs of one grapheme and runs that
+// touch a digit are skipped.
+std::vector<sSpellWord> FindSpellWords(const std::vector<std::string> &graphemes);
+
 class cSpellChecker
 {
 public:

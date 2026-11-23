@@ -3140,44 +3140,16 @@ void cWSEditorCtrl::SpellCheckDocument(void)
             POSITION_T paraEnd = 0;
             mDocument->GetParagraphStartandEnd(para, paraStart, paraEnd);
 
-            std::string word;
-            size_t wordStart = 0;
+            std::vector<sSpellWord> words = FindSpellWords(graphemes);
 
-            for (size_t index = 0; index <= graphemes.size(); ++index)
+            for (const sSpellWord& found : words)
             {
-                bool isWordChar = false;
+                const std::string& word = found.text;
+                size_t wordStart = found.start;
+                size_t index = found.end;
+                size_t wordGraphemeCount = found.end - found.start;
 
-                if (index < graphemes.size())
-                {
-                    const std::string& grapheme = graphemes[index];
-                    if (grapheme == "'")
-                    {
-                        isWordChar = true;
-                    }
-                    else
-                    {
-                        char32_t codepoint = 0;
-                        if ((unicode::utf8::decode_codepoint(grapheme.data(), grapheme.size(), codepoint) > 0)
-                            && (unicode::is_alphabetic(codepoint) != 0))
-                        {
-                            isWordChar = true;
-                        }
-                    }
-                }
-
-                if (isWordChar == true)
-                {
-                    if (word.empty() == true)
-                    {
-                        wordStart = index;
-                    }
-                    word += graphemes[index];
-                    continue;
-                }
-
-                size_t wordGraphemeCount = word.empty() ? 0 : (index - wordStart);
-
-                if ((wordGraphemeCount > 1) && (ignored.count(word) == 0) && (checker.CheckWord(word) == false))
+                if ((ignored.count(word) == 0) && (checker.CheckWord(word) == false))
                 {
                     misspelled++;
                     std::vector<std::string> suggestions = checker.suggestions(word);
@@ -3229,8 +3201,6 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                         ignored.insert(word);
                     }
                 }
-
-                word.clear();
             }
         }
     }
