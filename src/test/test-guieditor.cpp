@@ -36,6 +36,7 @@
 #include <QClipboard>
 #include <QTimer>
 #include <QFontDialog>
+#include "src/core/utils/config.h"
 #include <QMetaObject>
 #include <QPaintEvent>
 #include <QMimeData>
@@ -7904,6 +7905,48 @@ TEST_CASE("cColorDialog - default sentinel and explicit color")
     CHECK(dlg.GetSelectedColor().IsDefault() == false);
 }
 
+
+TEST_CASE("Recent Files gets a file opened through cEditorCtrl::LoadFile and one saved under a new name")
+{
+    ensureQApplication();
+
+    // Keep the real config untouched: point HOME at a scratch directory
+    std::filesystem::path scratch = std::filesystem::temp_directory_path() / "wt-recent-files-test";
+    std::filesystem::remove_all(scratch);
+    std::filesystem::create_directories(scratch);
+    const char* oldHome = std::getenv("HOME");
+    std::string savedHome = oldHome ? oldHome : "";
+    setenv("HOME", scratch.c_str(), 1);
+
+    std::filesystem::path opened = scratch / "opened.txt";
+    std::filesystem::path saved = scratch / "saved.ws";
+    {
+        std::ofstream out(opened);
+        out << "hello\n";
+    }
+
+    cEditorCtrl editor;
+    REQUIRE(editor.LoadFile(opened.string()));
+    {
+        cConfig config;
+        config.Load();
+        CHECK(config.mRecentFiles[0] == std::filesystem::absolute(opened).string());
+    }
+
+    REQUIRE(editor.SaveFile(saved.string()));
+    {
+        cConfig config;
+        config.Load();
+        CHECK(config.mRecentFiles[0] == std::filesystem::absolute(saved).string());
+        CHECK(config.mRecentFiles[1] == std::filesystem::absolute(opened).string());
+    }
+
+    if (oldHome)
+    {
+        setenv("HOME", savedHome.c_str(), 1);
+    }
+    std::filesystem::remove_all(scratch);
+}
 
 TEST_CASE("P3.1: SelectFont opens the non-native dialog at the cursor font")
 {

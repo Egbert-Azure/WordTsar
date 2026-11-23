@@ -666,13 +666,6 @@ void cWordTsar::LoadFile(QString name)
             ToggleRevealCodes() ;
         }
 
-        // Record in recent files list
-        cConfig config ;
-        config.Load() ;
-        config.AddRecentFile(QFileInfo(name).absoluteFilePath().toStdString()) ;
-        config.Save() ;
-        UpdateRecentFilesMenu() ;
-
         // Restore reveal codes pane if the loaded file state calls for it.
         // Only valid in continuous mode (reveal codes is not shown in page mode).
         if (mEditor->mRevealCodesVisible && mEditor->GetDisplayMode() == DISPLAY_CONTINUOUS)
@@ -1573,6 +1566,7 @@ void cWordTsar::CreateMenus(void)
     filemenu->addAction(SaveandCloseAction) ;
     filemenu->addSeparator() ;
     mRecentFilesMenu = filemenu->addMenu("Recent &Files") ;
+    connect(mRecentFilesMenu, &QMenu::aboutToShow, this, &cWordTsar::UpdateRecentFilesMenu) ;
     UpdateRecentFilesMenu() ;
     filemenu->addSeparator() ;
     filemenu->addAction(PrintAction) ;

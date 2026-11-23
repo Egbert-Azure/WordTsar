@@ -1140,11 +1140,7 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
             (filepath.stem().string() + "-bak.ws");
         mBackupFileName = backupPath.string();
 
-        // Record the opened file in the recent-files list (mirrors the GUI).
-        cConfig recentConfig;
-        recentConfig.Load();
-        recentConfig.AddRecentFile(filepath.string());
-        recentConfig.Save();
+        RecordRecentFile(filepath.string());
     }
 
     return success;
@@ -1358,6 +1354,11 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
         }
         mLayout->SetFilename(mFileName);
         mLayout->SetFileDir(mFileDir);
+
+        if (isExport == false && silent == false)
+        {
+            RecordRecentFile(filepath.string());
+        }
 
         SetTitle(mFileName);
 

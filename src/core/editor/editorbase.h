@@ -471,6 +471,9 @@ protected:
     void LoadFileState(const std::string& filepath);
     void SaveFileState(const std::string& filepath);
 
+    // Recent Files list
+    void RecordRecentFile(const std::string& filepath);
+
 private:
     /////////////////////////////////////////////////////////////////////////
     ///

@@ -6940,6 +6940,8 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
         // regardless of original file format, to avoid issues with RTF/DOCX loading
         mBackupFileName = (fi.path() + "/" + fi.completeBaseName() + "-bak.ws").toStdString();
 
+        RecordRecentFile(filename);
+
         // Emit signal for file loaded (signal not yet implemented)
         // emit FileLoaded(qfilename);
     }
@@ -7139,6 +7141,11 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
         mFileDir = saveInfo.path().toStdString();
         mLayout->SetFilename(mFileName);
         mLayout->SetFileDir(mFileDir);
+
+        if (isExport == false)
+        {
+            RecordRecentFile(filename);
+        }
 
         // Update window title with new filename
         SetTitle(mFileName);

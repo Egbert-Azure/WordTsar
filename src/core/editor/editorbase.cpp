@@ -86,6 +86,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include "src/core/utils/config.h"
 #include <fstream>
 #include <iterator>
 #include <limits>
@@ -6328,6 +6329,30 @@ void cEditorBase::LoadFileState(const std::string& filepath)
 /// Saves cursor position, 10 saved positions, block selection,
 /// display mode (page vs continuous), and reveal codes pane visibility.
 /// Silently does nothing if the companion file can't be written.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::RecordRecentFile(const std::string& filepath)
+{
+    if (filepath.empty())
+    {
+        return;
+    }
+
+    cConfig config;
+    config.Load();
+    config.AddRecentFile(std::filesystem::absolute(filepath).string());
+    config.Save();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filepath [in] - path of the document file
+///
+/// @return nothing
+///
+/// @brief
+/// Save per-file editor state (see below).
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::SaveFileState(const std::string& filepath)
