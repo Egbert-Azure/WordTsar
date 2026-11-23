@@ -150,9 +150,18 @@ sColorResult SelectColorDialog(iWSDialogHost* host, int red, int green, int blue
 
 // ---- Spell check ----
 
-// Returns 0 = ignore, 1 = replace (selectedIndex set), 2 = add, -1 = cancel/stop.
+enum eSpellDialogAction
+{
+    SPELL_DIALOG_CANCEL = -1,   // stop the check
+    SPELL_DIALOG_IGNORE = 0,    // ignore the word throughout the check
+    SPELL_DIALOG_REPLACE = 1,   // replace the word with replacement
+    SPELL_DIALOG_ADD = 2,       // add the word to the personal dictionary
+    SPELL_DIALOG_BYPASS = 3     // leave this occurrence, stop at later ones
+};
+
+// Spelling Check dialog; returns an eSpellDialogAction.
 int SpellCheckDialog(iWSDialogHost* host, const std::string& word,
-                     const std::vector<std::string>& suggestions, int& selectedIndex);
+                     const std::vector<std::string>& suggestions, std::string& replacement);
 
 // ---- System preferences ----
 

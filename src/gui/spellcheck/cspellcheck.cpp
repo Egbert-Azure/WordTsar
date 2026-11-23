@@ -34,8 +34,9 @@
  * @section spellcheck_ui Dialog Interface
  * - Misspelled word display with context from the surrounding text
  * - Suggestion list populated by the cSpellChecker engine
- * - Action buttons: Replace, Replace All, Ignore, Ignore All, Add to Dictionary
- * - Manual replacement text field for custom corrections
+ * - Options: 1-5 or double-click replaces the word, Ignore/Check Next Word,
+ *   Add to Personal Dictionary, Display More Suggestions, Enter Correction,
+ *   Bypass This Time Only, Cancel
  *
  * @section spellcheck_dictionary Custom Dictionary
  * Manages a user dictionary stored at ~/.Wordtsar_custom_dictionary. Words
@@ -79,6 +80,7 @@ cSpellCheck::cSpellCheck(cEditorCtrl *parent, eSpellMode mode) : QDialog(parent)
     connect(spellcheck.addbutton, SIGNAL(clicked()), this, SLOT(addbuttonclicked())) ;
     connect(spellcheck.enterbutton, SIGNAL(clicked()), this, SLOT(enterbuttonclicked())) ;
     connect(spellcheck.morebutton, SIGNAL(clicked()), this, SLOT(morebuttonclicked())) ;
+    connect(spellcheck.bypassbutton, SIGNAL(clicked()), this, SLOT(bypassbuttonclicked())) ;
     connect(spellcheck.cancelbutton, SIGNAL(clicked()), this, SLOT(cancelbuttonclicked())) ;
     connect(spellcheck.suggestions, SIGNAL(itemDoubleClicked(QListWidgetItem *)), this, SLOT(suggestiondoubleclicked(QListWidgetItem *)));
 
@@ -205,6 +207,10 @@ void cSpellCheck::CheckDocument(void)
                             spelling.AddWord(word) ;
                             break ;
 
+                        case SPELLBYPASS :
+                            // leave this occurrence and stop at later ones
+                            break ;
+
                         case SPELLMORE :
                             index += 5 ;
                             if(index >= suggestions.size())
@@ -217,7 +223,7 @@ void cSpellCheck::CheckDocument(void)
                         case SPELLENTER :
                             {
                                 std::string newword ;
-                                EnterWord(newword) ;
+                                EnterWord(newword, "Spelling Correction", "Correction:") ;
 
                                 if(newword.length() != 0)
                                 {
@@ -372,7 +378,8 @@ void cSpellCheck::CheckEnteredWord(void)
 /// Displays suggestions 5 at a time with all button options:
 /// 1-5 pick suggestion (replaces word in document if positions valid),
 /// Ignore (add to session dictionary), Add (add to custom dictionary file),
-/// Enter (type replacement word), More (next 5 suggestions), Cancel.
+/// Enter Correction (type replacement word), More (next 5 suggestions),
+/// Bypass and Cancel (leave the word as it is).
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWordStart, POSITION_T docWordEnd)
@@ -459,7 +466,7 @@ void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWo
             {
                 // Enter a replacement word
                 std::string newword ;
-                EnterWord(newword) ;
+                EnterWord(newword, "Spelling Correction", "Correction:") ;
 
                 if (!newword.empty() && hasDocPosition)
                 {
@@ -567,6 +574,10 @@ void cSpellCheck::keyPressEvent(QKeyEvent *event)
             done(SPELLMORE);
             break;
 
+        case Qt::Key_B:
+            done(SPELLBYPASS);
+            break;
+
         case Qt::Key_C:
         case Qt::Key_Escape:
             done(QDialog::Rejected) ;
@@ -604,6 +615,11 @@ void cSpellCheck::enterbuttonclicked(void)
 void cSpellCheck::morebuttonclicked(void)
 {
     done(SPELLMORE);
+}
+
+void cSpellCheck::bypassbuttonclicked(void)
+{
+    done(SPELLBYPASS);
 }
 
 void cSpellCheck::cancelbuttonclicked(void)
@@ -703,12 +719,13 @@ void cSpellCheck::AddWord(std::string word)
 }
 
 
-void cSpellCheck::EnterWord(std::string &word)
+void cSpellCheck::EnterWord(std::string &word, const QString &title, const QString &prompt)
 {
     QDialog dialog(mEditor);
+    dialog.setWindowTitle(title);
     QVBoxLayout layout(&dialog);
 
-    QLabel label("Enter Word:");
+    QLabel label(prompt);
     layout.addWidget(&label);
 
     QLineEdit lineEdit;

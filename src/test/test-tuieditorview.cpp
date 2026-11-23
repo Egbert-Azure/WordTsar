@@ -951,6 +951,14 @@ public:
         mEvents.push_back(event);
     }
 
+    void QueueText(const std::string& text)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_TEXT;
+        event.textUtf8 = text;
+        mEvents.push_back(event);
+    }
+
     void HostRunModal(wordstartui::cDialog& dialog) override
     {
         mModals = mModals + 1;
@@ -971,12 +979,25 @@ public:
         const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
         const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
     {
-        (void)draw;
+        mModals = mModals + 1;
+        wordstartui::cScreen screen;
+        screen.Resize(40, 120);
+        draw(screen, mTheme);
         wordstartui::sInputEvent escape{};
         escape.type = wordstartui::INPUT_TYPE_SPECIAL;
         escape.special = wordstartui::SPECIAL_KEY_ESCAPE;
-        while (handle(escape) == true)
+        while (true)
         {
+            wordstartui::sInputEvent event = escape;
+            if (mEvents.empty() == false)
+            {
+                event = mEvents.front();
+                mEvents.pop_front();
+            }
+            if (handle(event) == false)
+            {
+                break;
+            }
         }
     }
 
@@ -1038,14 +1059,12 @@ TEST_CASE("cWSEditorCtrl - spell check Replace with a suggestion that ends in th
     doc->Insert("evtl.");
     editor.LayoutDocument(true);
 
-    // List has focus: move to the suggestion, Tab past Ignore to Replace.
-    for (size_t step = 0; step < index; ++step)
+    // M shows the next five suggestions, a digit picks one on the page.
+    for (size_t page = 0; page < index / 5; ++page)
     {
-        host.QueueSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN);
+        host.QueueText("M");
     }
-    host.QueueSpecial(wordstartui::SPECIAL_KEY_TAB);
-    host.QueueSpecial(wordstartui::SPECIAL_KEY_TAB);
-    host.QueueSpecial(wordstartui::SPECIAL_KEY_ENTER);
+    host.QueueText(std::to_string(index % 5 + 1));
 
     editor.SpellCheckDocument();
 

@@ -3127,6 +3127,7 @@ void cWSEditorCtrl::SpellCheckDocument(void)
     for (PARAGRAPH_T para = 0; para < total; ++para)
     {
         bool rescan = true;
+        size_t resume = 0;      // grapheme index the next scan starts at
 
         while (rescan == true)
         {
@@ -3149,40 +3150,41 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                 size_t index = found.end;
                 size_t wordGraphemeCount = found.end - found.start;
 
+                if (wordStart < resume)
+                {
+                    continue;
+                }
+
                 if ((ignored.count(word) == 0) && (checker.CheckWord(word) == false))
                 {
                     misspelled++;
                     std::vector<std::string> suggestions = checker.suggestions(word);
-                    int selected = 0;
-                    int action = wsdialogs::SpellCheckDialog(mHost, word, suggestions, selected);
+                    std::string replacement;
+                    int action = wsdialogs::SpellCheckDialog(mHost, word, suggestions, replacement);
 
-                    if (action == -1)
+                    if (action == wsdialogs::SPELL_DIALOG_CANCEL)
                     {
                         return;
                     }
-                    else if (action == 0)
+                    else if (action == wsdialogs::SPELL_DIALOG_IGNORE)
                     {
                         ignored.insert(word);
                     }
-                    else if (action == 1)
+                    else if (action == wsdialogs::SPELL_DIALOG_REPLACE)
                     {
-                        if ((selected >= 0) && (selected < static_cast<int>(suggestions.size())))
-                        {
-                            const std::string& replacement = suggestions[static_cast<size_t>(selected)];
+                        // Also replace text after the word that the replacement ends with.
+                        size_t trailingCount = SpellTrailingCount(graphemes, index, replacement);
 
-                            // Also replace text after the word that the suggestion ends with.
-                            size_t trailingCount = SpellTrailingCount(graphemes, index, replacement);
-
-                            POSITION_T pos = paraStart + static_cast<POSITION_T>(wordStart);
-                            mDocument->SetPosition(pos);
-                            Delete(pos, static_cast<POSITION_T>(wordGraphemeCount + trailingCount));
-                            InsertText(replacement);
-                            LayoutDocument(false);
-                            rescan = true;
-                            break;
-                        }
+                        POSITION_T pos = paraStart + static_cast<POSITION_T>(wordStart);
+                        mDocument->SetPosition(pos);
+                        Delete(pos, static_cast<POSITION_T>(wordGraphemeCount + trailingCount));
+                        InsertText(replacement);
+                        LayoutDocument(false);
+                        resume = wordStart;
+                        rescan = true;
+                        break;
                     }
-                    else if (action == 2)
+                    else if (action == wsdialogs::SPELL_DIALOG_ADD)
                     {
                         checker.AddWord(word);
                         ignored.insert(word);

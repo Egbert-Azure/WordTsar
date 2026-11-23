@@ -33,6 +33,7 @@ const int SPELLIGNORE = 100 ;
 const int SPELLADD = 200 ;
 const int SPELLENTER = 300 ;
 const int SPELLMORE = 400 ;
+const int SPELLBYPASS = 500 ;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -74,6 +75,7 @@ public slots:
     void addbuttonclicked(void) ;
     void enterbuttonclicked(void) ;
     void morebuttonclicked(void) ;
+    void bypassbuttonclicked(void) ;
     void cancelbuttonclicked(void) ;
     void suggestiondoubleclicked(QListWidgetItem *item) ;
 
@@ -85,7 +87,7 @@ protected:
 private:
     bool PrepareText(PARAGRAPH_T para, std::vector<std::string> &graphemes, POSITION_T &start) ;
     void AddWord(std::string word) ;
-    void EnterWord(std::string &word) ;
+    void EnterWord(std::string &word, const QString &title = "Spell Check", const QString &prompt = "Enter Word:") ;
 
     int trimandcheck(std::string &s) ;
     void ShowSingleWordDialog(const std::string &word, POSITION_T docWordStart, POSITION_T docWordEnd) ;

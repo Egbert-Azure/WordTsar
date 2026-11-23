@@ -2054,108 +2054,157 @@ sColorResult SelectColorDialog(iWSDialogHost* host, int red, int green, int blue
 /// @param  iWSDialogHost* host [in] dialog host
 /// @param  const std::string& word [in] misspelled word
 /// @param  const std::vector<std::string>& suggestions [in] suggestions
-/// @param  int& selectedIndex [out] chosen suggestion index for replace
+/// @param  std::string& replacement [out] the chosen or typed correction
 ///
-/// @return 0 ignore, 1 replace, 2 add, -1 cancel
+/// @return SPELL_DIALOG_CANCEL, SPELL_DIALOG_IGNORE, SPELL_DIALOG_REPLACE
+///         (replacement set), SPELL_DIALOG_ADD or SPELL_DIALOG_BYPASS
 ///
 /// @brief
-/// Display the spell check action dialog.
+/// Display the Spelling Check dialog. Suggestions are shown five at a time;
+/// 1-5 picks one, M shows the next five, E opens the Spelling Correction
+/// box, I ignores the word, A adds it to the personal dictionary, B
+/// bypasses this occurrence, C or Esc cancels.
 ///
 /////////////////////////////////////////////////////////////////////////////
 int SpellCheckDialog(iWSDialogHost* host, const std::string& word,
-                     const std::vector<std::string>& suggestions, int& selectedIndex)
+                     const std::vector<std::string>& suggestions, std::string& replacement)
 {
+    const size_t pageSize = 5;
     int width = 50;
-    int height = 18;
+    int height = 21;
 
     sRect rect = CenteredRect(host, height, width);
-    cDialog dialog(rect, "Spelling");
+    sStyle dialogStyle = host->HostTheme().GetStyle(THEME_ROLE_DIALOG);
+    sStyle titleStyle = host->HostTheme().GetStyle(THEME_ROLE_DIALOG_TITLE);
+    int textCols = rect.cols - 4;
 
-    sRect wordLabelRect;
-    wordLabelRect.row = rect.row + 2;
-    wordLabelRect.col = rect.col + 2;
-    wordLabelRect.rows = 1;
-    wordLabelRect.cols = rect.cols - 4;
-    dialog.AddWidget(std::make_unique<cLabel>(wordLabelRect, "Not found: " + word));
+    size_t index = 0;
 
-    sRect listRect;
-    listRect.row = rect.row + 4;
-    listRect.col = rect.col + 2;
-    listRect.rows = rect.rows - 8;
-    listRect.cols = rect.cols - 4;
-
-    if (listRect.rows < 1)
+    while (true)
     {
-        listRect.rows = 1;
+        int action = SPELL_DIALOG_CANCEL;
+        bool enter = false;
+
+        auto draw = [&](cScreen& screen, const cTheme& theme)
+        {
+            (void)theme;
+            int col = rect.col + 2;
+            screen.FillRect(rect, " ", dialogStyle);
+            screen.DrawBox(rect, dialogStyle);
+            screen.PutText(rect.row, rect.col + 2, " Spelling Check ", titleStyle);
+            screen.PutText(rect.row + 2, col, cUtf8Helper::FitWidth("Word: " + word, textCols), dialogStyle);
+            screen.PutText(rect.row + 4, col, "Suggestions:", dialogStyle);
+
+            if (suggestions.empty() == true)
+            {
+                screen.PutText(rect.row + 5, col + 2, "(none)", dialogStyle);
+            }
+            for (size_t line = 0; (line < pageSize) && (index + line < suggestions.size()); ++line)
+            {
+                std::string entry = std::to_string(line + 1) + ". " + suggestions[index + line];
+                screen.PutText(rect.row + 5 + static_cast<int>(line), col + 2,
+                               cUtf8Helper::FitWidth(entry, textCols - 2), dialogStyle);
+            }
+            screen.PutText(rect.row + 11, col, "1-5: replace the word", dialogStyle);
+
+            static const char* const options[] =
+            {
+                "I    Ignore/Check Next Word",
+                "A    Add to Personal Dictionary",
+                "M    Display More Suggestions",
+                "E    Enter Correction",
+                "B    Bypass This Time Only",
+                "Esc  Cancel",
+            };
+            int row = rect.row + 13;
+            for (const char* option : options)
+            {
+                screen.PutText(row, col, option, dialogStyle);
+                row++;
+            }
+        };
+
+        auto handle = [&](const sInputEvent& event) -> bool
+        {
+            if (IsEscape(event) == true)
+            {
+                action = SPELL_DIALOG_CANCEL;
+                return false;
+            }
+
+            if ((event.type != INPUT_TYPE_TEXT) || (event.textUtf8.size() != 1))
+            {
+                return true;
+            }
+
+            char key = event.textUtf8[0];
+            if ((key >= '1') && (key <= '5'))
+            {
+                size_t pick = index + static_cast<size_t>(key - '1');
+                if (pick < suggestions.size())
+                {
+                    replacement = suggestions[pick];
+                    action = SPELL_DIALOG_REPLACE;
+                    return false;
+                }
+                return true;
+            }
+
+            switch (key)
+            {
+                case 'i':
+                case 'I':
+                    action = SPELL_DIALOG_IGNORE;
+                    return false;
+
+                case 'a':
+                case 'A':
+                    action = SPELL_DIALOG_ADD;
+                    return false;
+
+                case 'b':
+                case 'B':
+                    action = SPELL_DIALOG_BYPASS;
+                    return false;
+
+                case 'c':
+                case 'C':
+                    action = SPELL_DIALOG_CANCEL;
+                    return false;
+
+                case 'e':
+                case 'E':
+                    enter = true;
+                    return false;
+
+                case 'm':
+                case 'M':
+                    index += pageSize;
+                    if (index >= suggestions.size())
+                    {
+                        index = 0;
+                    }
+                    return true;
+
+                default:
+                    return true;
+            }
+        };
+
+        host->HostRunModalRaw(draw, handle);
+
+        if (enter == false)
+        {
+            return action;
+        }
+
+        std::string typed = word;
+        if ((InputBox(host, "Spelling Correction", "Correction:", typed) == true) && (typed.empty() == false))
+        {
+            replacement = typed;
+            return SPELL_DIALOG_REPLACE;
+        }
     }
-
-    auto list = std::make_unique<cListBox>(listRect);
-    list->SetItems(suggestions);
-    cListBox* listPtr = list.get();
-    dialog.AddWidget(std::move(list));
-
-    cDialog* dialogPtr = &dialog;
-    int action = -1;
-    int* actionPtr = &action;
-
-    int buttonWidth = 10;
-    int buttonRow = rect.row + rect.rows - 2;
-    int startCol = rect.col + 2;
-
-    sRect ignoreRect;
-    ignoreRect.rows = 1;
-    ignoreRect.cols = buttonWidth;
-    ignoreRect.row = buttonRow;
-    ignoreRect.col = startCol;
-    dialog.AddWidget(std::make_unique<cButton>(ignoreRect, "Ignore", [dialogPtr, actionPtr]() {
-        *actionPtr = 0;
-        dialogPtr->SetResult(DIALOG_RESULT_OK);
-    }));
-
-    sRect replaceRect;
-    replaceRect.rows = 1;
-    replaceRect.cols = buttonWidth;
-    replaceRect.row = buttonRow;
-    replaceRect.col = startCol + (buttonWidth + 1);
-    dialog.AddWidget(std::make_unique<cButton>(replaceRect, "Replace", [dialogPtr, actionPtr]() {
-        *actionPtr = 1;
-        dialogPtr->SetResult(DIALOG_RESULT_OK);
-    }));
-
-    sRect addRect;
-    addRect.rows = 1;
-    addRect.cols = buttonWidth;
-    addRect.row = buttonRow;
-    addRect.col = startCol + (2 * (buttonWidth + 1));
-    dialog.AddWidget(std::make_unique<cButton>(addRect, "Add", [dialogPtr, actionPtr]() {
-        *actionPtr = 2;
-        dialogPtr->SetResult(DIALOG_RESULT_OK);
-    }));
-
-    sRect cancelRect;
-    cancelRect.rows = 1;
-    cancelRect.cols = buttonWidth;
-    cancelRect.row = buttonRow;
-    cancelRect.col = startCol + (3 * (buttonWidth + 1));
-    dialog.AddWidget(std::make_unique<cButton>(cancelRect, "Cancel", [dialogPtr, actionPtr]() {
-        *actionPtr = -1;
-        dialogPtr->SetResult(DIALOG_RESULT_CANCEL);
-    }));
-
-    dialog.FocusFirst();
-    host->HostRunModal(dialog);
-
-    if (dialog.GetResult() == DIALOG_RESULT_CANCEL)
-    {
-        return -1;
-    }
-
-    if (action == 1)
-    {
-        selectedIndex = listPtr->GetSelectedIndex();
-    }
-
-    return action;
 }
 
 /////////////////////////////////////////////////////////////////////////////
