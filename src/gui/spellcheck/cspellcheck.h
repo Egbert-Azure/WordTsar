@@ -78,6 +78,7 @@ public slots:
     void bypassbuttonclicked(void) ;
     void cancelbuttonclicked(void) ;
     void suggestiondoubleclicked(QListWidgetItem *item) ;
+    void globaltoggled(bool checked) ;
 
 protected:
     virtual int RunDialog(void) ;          // shows the dialog and returns its result code

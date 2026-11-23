@@ -2055,6 +2055,7 @@ sColorResult SelectColorDialog(iWSDialogHost* host, int red, int green, int blue
 /// @param  const std::string& word [in] misspelled word
 /// @param  const std::vector<std::string>& suggestions [in] suggestions
 /// @param  std::string& replacement [out] the chosen or typed correction
+/// @param  bool& global [in,out] Global Replacement setting
 ///
 /// @return SPELL_DIALOG_CANCEL, SPELL_DIALOG_IGNORE, SPELL_DIALOG_REPLACE
 ///         (replacement set), SPELL_DIALOG_ADD or SPELL_DIALOG_BYPASS
@@ -2063,15 +2064,16 @@ sColorResult SelectColorDialog(iWSDialogHost* host, int red, int green, int blue
 /// Display the Spelling Check dialog. Suggestions are shown five at a time;
 /// 1-5 picks one, M shows the next five, E opens the Spelling Correction
 /// box, I ignores the word, A adds it to the personal dictionary, B
-/// bypasses this occurrence, C or Esc cancels.
+/// bypasses this occurrence, G toggles Global Replacement, C or Esc cancels.
 ///
 /////////////////////////////////////////////////////////////////////////////
 int SpellCheckDialog(iWSDialogHost* host, const std::string& word,
-                     const std::vector<std::string>& suggestions, std::string& replacement)
+                     const std::vector<std::string>& suggestions, std::string& replacement,
+                     bool& global)
 {
     const size_t pageSize = 5;
     int width = 50;
-    int height = 21;
+    int height = 22;
 
     sRect rect = CenteredRect(host, height, width);
     sStyle dialogStyle = host->HostTheme().GetStyle(THEME_ROLE_DIALOG);
@@ -2117,6 +2119,9 @@ int SpellCheckDialog(iWSDialogHost* host, const std::string& word,
                 "Esc  Cancel",
             };
             int row = rect.row + 13;
+            screen.PutText(row, col, (global == true) ? "G    Global Replacement is on"
+                                                      : "G    Global Replacement is off", dialogStyle);
+            row++;
             for (const char* option : options)
             {
                 screen.PutText(row, col, option, dialogStyle);
@@ -2176,6 +2181,11 @@ int SpellCheckDialog(iWSDialogHost* host, const std::string& word,
                 case 'E':
                     enter = true;
                     return false;
+
+                case 'g':
+                case 'G':
+                    global = !global;
+                    return true;
 
                 case 'm':
                 case 'M':

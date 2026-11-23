@@ -46,6 +46,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -3121,6 +3122,8 @@ void cWSEditorCtrl::SpellCheckDocument(void)
 
     cSpellChecker checker(mSpellCheckLanguage);
     std::set<std::string> ignored;
+    std::map<std::string, std::string> corrections;     // Global Replacement: word -> correction
+    bool global = false;
     PARAGRAPH_T total = mDocument->GetNumberofParagraphs();
     int misspelled = 0;
 
@@ -3158,9 +3161,23 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                 if ((ignored.count(word) == 0) && (checker.CheckWord(word) == false))
                 {
                     misspelled++;
-                    std::vector<std::string> suggestions = checker.suggestions(word);
+
                     std::string replacement;
-                    int action = wsdialogs::SpellCheckDialog(mHost, word, suggestions, replacement);
+                    int action = wsdialogs::SPELL_DIALOG_REPLACE;
+                    auto known = corrections.find(word);
+                    if (known != corrections.end())
+                    {
+                        replacement = known->second;
+                    }
+                    else
+                    {
+                        std::vector<std::string> suggestions = checker.suggestions(word);
+                        action = wsdialogs::SpellCheckDialog(mHost, word, suggestions, replacement, global);
+                        if ((action == wsdialogs::SPELL_DIALOG_REPLACE) && (global == true))
+                        {
+                            corrections[word] = replacement;
+                        }
+                    }
 
                     if (action == wsdialogs::SPELL_DIALOG_CANCEL)
                     {
@@ -3181,6 +3198,12 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                         InsertText(replacement);
                         LayoutDocument(false);
                         resume = wordStart;
+                        if (known != corrections.end())
+                        {
+                            // continue after a correction applied without asking
+                            std::vector<POSITION_T> replacementOffsets;
+                            resume = wordStart + mDocument->GraphemeCount(replacement, replacementOffsets);
+                        }
                         rescan = true;
                         break;
                     }

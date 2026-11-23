@@ -159,9 +159,11 @@ enum eSpellDialogAction
     SPELL_DIALOG_BYPASS = 3     // leave this occurrence, stop at later ones
 };
 
-// Spelling Check dialog; returns an eSpellDialogAction.
+// Spelling Check dialog; returns an eSpellDialogAction. global holds the
+// Global Replacement setting, which G toggles.
 int SpellCheckDialog(iWSDialogHost* host, const std::string& word,
-                     const std::vector<std::string>& suggestions, std::string& replacement);
+                     const std::vector<std::string>& suggestions, std::string& replacement,
+                     bool& global);
 
 // ---- System preferences ----
 

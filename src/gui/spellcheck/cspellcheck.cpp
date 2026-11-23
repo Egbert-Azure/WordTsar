@@ -37,6 +37,8 @@
  * - Options: 1-5 or double-click replaces the word, Ignore/Check Next Word,
  *   Add to Personal Dictionary, Display More Suggestions, Enter Correction,
  *   Bypass This Time Only, Cancel
+ * - Global Replacement (document check only): a correction is used for every
+ *   later occurrence of the same word without asking again
  *
  * @section spellcheck_dictionary Custom Dictionary
  * Manages a user dictionary stored at ~/.Wordtsar_custom_dictionary. Words
@@ -53,6 +55,7 @@
  */
 
 #include <fstream>
+#include <map>
 
 #include <QMessageBox>
 #include <QDir>
@@ -83,6 +86,10 @@ cSpellCheck::cSpellCheck(cEditorCtrl *parent, eSpellMode mode) : QDialog(parent)
     connect(spellcheck.bypassbutton, SIGNAL(clicked()), this, SLOT(bypassbuttonclicked())) ;
     connect(spellcheck.cancelbutton, SIGNAL(clicked()), this, SLOT(cancelbuttonclicked())) ;
     connect(spellcheck.suggestions, SIGNAL(itemDoubleClicked(QListWidgetItem *)), this, SLOT(suggestiondoubleclicked(QListWidgetItem *)));
+    connect(spellcheck.global, SIGNAL(toggled(bool)), this, SLOT(globaltoggled(bool))) ;
+
+    // Global Replacement applies to the document check only
+    spellcheck.global->setVisible(mMode == SPELLCHECKDOCUMENT) ;
 
     // Get our local words list
     std::string homeDir = QDir::homePath().toStdString() ;
@@ -110,6 +117,7 @@ void cSpellCheck::CheckDocument(void)
     PARAGRAPH_T para = mEditor->GetDocument()->GetNumberofParagraphs() ;
     PARAGRAPH_T currentpara = mEditor->GetDocument()->GetParagraphFromPosition(mEditor->GetCaretDocumentPosition()) ;
     bool quit = false ;
+    std::map<std::string, std::string> corrections ;   // Global Replacement: word -> correction
 
     for(PARAGRAPH_T ploop = currentpara; ploop < para && quit == false; ploop++)
     {
@@ -145,6 +153,17 @@ void cSpellCheck::CheckDocument(void)
                 std::vector<std::string> suggestions = spelling.suggestions(word) ;
                 POSITION_T docwordstart = pstart + static_cast<POSITION_T>(found.start) ;
                 POSITION_T docwordend = pstart + static_cast<POSITION_T>(found.end) ;
+
+                auto known = corrections.find(word) ;
+                if(known != corrections.end())
+                {
+                    // replace silently and continue after the correction
+                    ReplaceWord(docwordstart, docwordend, known->second) ;
+                    std::vector<POSITION_T> offsets ;
+                    resume = found.start + mEditor->GetDocument()->GraphemeCount(known->second, offsets) ;
+                    rescan = true ;
+                    break ;
+                }
 
                 mEditor->GetDocument()->SetPosition(docwordstart) ;
                 mEditor->GetDocument()->SetBeginBlock() ;
@@ -188,6 +207,10 @@ void cSpellCheck::CheckDocument(void)
                             if(suggIdx < suggestions.size())
                             {
                                 ReplaceWord(docwordstart, docwordend, suggestions[suggIdx]) ;
+                                if(spellcheck.global->isChecked())
+                                {
+                                    corrections[word] = suggestions[suggIdx] ;
+                                }
                                 resume = found.start ;
                                 rescan = true ;
                             }
@@ -228,6 +251,10 @@ void cSpellCheck::CheckDocument(void)
                                 if(newword.length() != 0)
                                 {
                                     ReplaceWord(docwordstart, docwordend, newword) ;
+                                    if(spellcheck.global->isChecked())
+                                    {
+                                        corrections[word] = newword ;
+                                    }
                                     resume = found.start ;
                                     rescan = true ;
                                 }
@@ -578,6 +605,13 @@ void cSpellCheck::keyPressEvent(QKeyEvent *event)
             done(SPELLBYPASS);
             break;
 
+        case Qt::Key_G:
+            if (mMode == SPELLCHECKDOCUMENT)
+            {
+                spellcheck.global->setChecked(!spellcheck.global->isChecked());
+            }
+            break;
+
         case Qt::Key_C:
         case Qt::Key_Escape:
             done(QDialog::Rejected) ;
@@ -635,6 +669,12 @@ void cSpellCheck::suggestiondoubleclicked(QListWidgetItem *item)
     {
         done(suggestionIndex);
     }
+}
+
+
+void cSpellCheck::globaltoggled(bool checked)
+{
+    spellcheck.global->setText(checked ? "&Global Replacement is on" : "&Global Replacement is off") ;
 }
 
 

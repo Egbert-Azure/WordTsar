@@ -211,7 +211,7 @@
     <enum>Qt::FocusPolicy::NoFocus</enum>
    </property>
    <property name="text">
-    <string>Global</string>
+    <string>&amp;Global Replacement is off</string>
    </property>
   </widget>
  </widget>
