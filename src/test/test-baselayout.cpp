@@ -13347,6 +13347,35 @@ TEST_CASE("Reveal codes: the end-of-file marker is never displayed")
     }
 }
 
+TEST_CASE("&%& in a header shows the total page count on every page")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    doc->Insert(".he Title ");
+    doc->InsertVariable(VAR_PAGE_NUMBER);
+    doc->Insert(" of ");
+    doc->InsertVariable(VAR_PAGE_COUNT);
+    doc->Insert("\r");
+    for (int i = 0; i < 150; i++)
+    {
+        doc->Insert("Body text for the page count test.\r");
+    }
+    layout->LayoutDocument(doc);
+    PAGE_T pages = layout->GetNumberOfPages();
+    REQUIRE(pages >= 3);
+
+    for (PAGE_T page = 2; page <= pages; ++page)
+    {
+        CAPTURE(page);
+        std::string headers = HeaderFooterText(layout->GetPageHeaders(page));
+        CHECK(headers.find(std::to_string(page) + " of " + std::to_string(pages)) != std::string::npos);
+    }
+}
+
+
 TEST_CASE("Headers and footers survive re-layout")
 {
     ensureQApplication();

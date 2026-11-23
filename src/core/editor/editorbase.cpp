@@ -7116,6 +7116,11 @@ void cEditorBase::CheckAndReplaceVariable(void)
             varType = VAR_WORD_COUNT;
             break;
         }
+        case '%':
+        {
+            varType = VAR_PAGE_COUNT;
+            break;
+        }
         default:
         {
             return;  // Not a valid variable character

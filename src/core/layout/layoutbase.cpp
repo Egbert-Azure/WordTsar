@@ -2744,6 +2744,10 @@ std::string cLayoutBase::GetVariableExpansion(eVariableType type) const
             }
             return "0";
         }
+        case VAR_PAGE_COUNT:
+        {
+            return std::to_string(std::max<PAGE_T>(GetNumberOfPages(), 1));
+        }
     }
 
     return "?";

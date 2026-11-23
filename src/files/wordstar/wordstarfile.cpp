@@ -1447,6 +1447,11 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
                                 varChar = '?';
                                 break;
                             }
+                            case VAR_PAGE_COUNT:
+                            {
+                                varChar = '%';
+                                break;
+                            }
                         }
                         out += static_cast<char>('&');
                         out += static_cast<char>(varChar);
@@ -2011,6 +2016,11 @@ void cWordstarFile::HandleChar(unsigned char c, size_t loop)
                     case '?':
                     {
                         varType = VAR_WORD_COUNT;
+                        break;
+                    }
+                    case '%':
+                    {
+                        varType = VAR_PAGE_COUNT;
                         break;
                     }
                     default:

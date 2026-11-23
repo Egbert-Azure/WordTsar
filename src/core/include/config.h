@@ -186,6 +186,7 @@ enum eVariableType
     VAR_DIRECTORY,      // &.& - current directory
     VAR_FULLPATH,       // &\& - full path and filename
     VAR_WORD_COUNT,     // &?& - document word count (non-standard)
+    VAR_PAGE_COUNT,     // &%& - total page count (non-standard)
 };
 
 
