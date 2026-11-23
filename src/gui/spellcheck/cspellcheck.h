@@ -89,6 +89,7 @@ private:
 
     int trimandcheck(std::string &s) ;
     void ShowSingleWordDialog(const std::string &word, POSITION_T docWordStart, POSITION_T docWordEnd) ;
+    void ReplaceWord(POSITION_T docWordStart, POSITION_T docWordEnd, const std::string &replacement) ;
 
     // =================================================================
     // MEMBER VARIABLES

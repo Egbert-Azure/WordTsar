@@ -431,3 +431,38 @@ std::vector<sSpellWord> FindSpellWords(const std::vector<std::string> &graphemes
 
     return words;
 }
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  graphemes   [in] the paragraph's graphemes
+/// @param  wordEnd     [in] grapheme index one past the word
+/// @param  replacement [in] the text that replaces the word
+///
+/// @return number of graphemes from wordEnd on that the replacement ends with
+///
+/// @brief
+/// Find the text after a word that a replacement already ends with, so
+/// replacing the word with it does not double that text.
+///
+/////////////////////////////////////////////////////////////////////////////
+size_t SpellTrailingCount(const std::vector<std::string> &graphemes, size_t wordEnd,
+                          const std::string &replacement)
+{
+    size_t trailingCount = 0;
+    std::string trailing;
+    for (size_t next = wordEnd; next < graphemes.size(); ++next)
+    {
+        trailing += graphemes[next];
+        if (trailing.size() >= replacement.size())
+        {
+            break;
+        }
+        if (replacement.compare(replacement.size() - trailing.size(), trailing.size(), trailing) == 0)
+        {
+            trailingCount = next - wordEnd + 1;
+        }
+    }
+
+    return trailingCount;
+}

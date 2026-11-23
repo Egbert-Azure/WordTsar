@@ -211,6 +211,86 @@ TEST_CASE("cSpellCheck - Document check after an em dash and a curly apostrophe 
     CHECK(text == "He said \xE2\x80\x94 don\xE2\x80\x99t doubt the " + suggestions[0] + ", ok.");
 }
 
+TEST_CASE("cSpellCheck - Picking a suggestion replaces the word and keeps the punctuation after it")
+{
+    ensureQApplication();
+
+    std::string language = "en_US";
+    std::string misspelled = "subjct";
+    std::string wanted;                 // empty: the only suggestion
+    std::string before = "the ";
+    std::string after = ", ok";
+    std::string expectedAfter = ", ok";
+    eSpellMode mode = SPELLCHECKDOCUMENT;
+    POSITION_T caret = 0;
+
+    SUBCASE("document check")
+    {
+    }
+    SUBCASE("word at the cursor")
+    {
+        mode = SPELLCHECKWORD;
+        caret = 6;
+    }
+    SUBCASE("document check, suggestion ends in the following period")
+    {
+        language = "de_DE";
+        misspelled = "evtl";
+        wanted = "evtl.";
+        before = "";
+        after = ".";
+        expectedAfter = "";
+    }
+
+    cSpellChecker checker(language);
+    REQUIRE(checker.CheckWord(misspelled) == false);
+    std::vector<std::string> suggestions = checker.suggestions(misspelled);
+    size_t index = 0;
+    if (wanted.empty() == true)
+    {
+        REQUIRE(suggestions.size() == 1);
+        wanted = suggestions[0];
+    }
+    else
+    {
+        auto found = std::find(suggestions.begin(), suggestions.end(), wanted);
+        REQUIRE(found != suggestions.end());
+        index = static_cast<size_t>(found - suggestions.begin());
+    }
+
+    cEditorCtrl editor;
+    editor.mSpellCheckLanguage = language;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert(before + misspelled + after);
+    editor.GetLayout()->LayoutDocument(doc);
+    doc->MarkSaved();
+    doc->SetPosition(caret);
+    editor.CalculateCaretPosition();
+    REQUIRE(editor.GetCaretDocumentPosition() == caret);
+
+    cScriptedSpellCheck dialog(&editor, mode);
+    dialog.mDoc = doc;
+    for (size_t page = 0; page < index / 5; ++page)
+    {
+        dialog.mCodes.push_back(SPELLMORE);
+    }
+    dialog.mCodes.push_back(static_cast<int>(index % 5) + 1);
+    if (mode == SPELLCHECKDOCUMENT)
+    {
+        dialog.CheckDocument();
+    }
+    else
+    {
+        dialog.CheckWord();
+    }
+
+    std::string text = doc->GetText();
+    text = text.substr(0, text.find('\x1A'));
+    text = text.substr(0, text.find('\x7F'));
+    CHECK(dialog.mRuns >= 1);
+    CHECK(text == before + wanted + expectedAfter);
+}
+
 TEST_CASE("P2.6 Spell Check - Document state handling")
 {
     ensureQApplication();

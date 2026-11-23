@@ -181,15 +181,16 @@ void cSpellCheck::CheckDocument(void)
                         case 3 :
                         case 4 :
                         case 5 :
-                            if(ecode <= (int)suggestions.size())
+                        {
+                            size_t suggIdx = index + static_cast<size_t>(ecode) - 1 ;
+                            if(suggIdx < suggestions.size())
                             {
-                                mEditor->DeleteBlock() ;
-                                mEditor->GetDocument()->SetPosition(docwordstart) ;
-                                mEditor->InsertWordStarString(suggestions[ecode - 1]) ;
+                                ReplaceWord(docwordstart, docwordend, suggestions[suggIdx]) ;
                                 resume = found.start ;
                                 rescan = true ;
                             }
                             break ;
+                        }
 
                         case QDialog::Rejected :
                             quit = true ;
@@ -220,9 +221,7 @@ void cSpellCheck::CheckDocument(void)
 
                                 if(newword.length() != 0)
                                 {
-                                    mEditor->DeleteBlock() ;
-                                    mEditor->GetDocument()->SetPosition(docwordstart) ;
-                                    mEditor->InsertWordStarString(newword) ;
+                                    ReplaceWord(docwordstart, docwordend, newword) ;
                                     resume = found.start ;
                                     rescan = true ;
                                 }
@@ -387,7 +386,7 @@ void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWo
         mEditor->GetDocument()->SaveBlocks() ;
         mEditor->GetDocument()->SetPosition(docWordStart) ;
         mEditor->GetDocument()->SetBeginBlock() ;
-        mEditor->GetDocument()->SetPosition(docWordEnd + 1) ;
+        mEditor->GetDocument()->SetPosition(docWordEnd) ;
         mEditor->GetDocument()->SetEndBlock() ;
         mEditor->ScrollIntoView() ;
         mEditor->Repaint() ;
@@ -429,9 +428,7 @@ void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWo
                 size_t suggIdx = index + static_cast<size_t>(ecode) - 1 ;
                 if (hasDocPosition && suggIdx < suggestions.size())
                 {
-                    mEditor->DeleteBlock() ;
-                    mEditor->GetDocument()->SetPosition(docWordStart) ;
-                    mEditor->InsertWordStarString(suggestions[suggIdx]) ;
+                    ReplaceWord(docWordStart, docWordEnd, suggestions[suggIdx]) ;
                 }
                 break ;
             }
@@ -466,9 +463,7 @@ void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWo
 
                 if (!newword.empty() && hasDocPosition)
                 {
-                    mEditor->DeleteBlock() ;
-                    mEditor->GetDocument()->SetPosition(docWordStart) ;
-                    mEditor->InsertWordStarString(newword) ;
+                    ReplaceWord(docWordStart, docWordEnd, newword) ;
                 }
                 break ;
             }
@@ -480,6 +475,45 @@ void cSpellCheck::ShowSingleWordDialog(const std::string &word, POSITION_T docWo
     {
         mEditor->GetDocument()->RestoreBlocks() ;
     }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  docWordStart  [in] document position of the word start
+/// @param  docWordEnd    [in] document position just past the word
+/// @param  replacement   [in] the text that replaces the word
+///
+/// @return nothing
+///
+/// @brief
+/// Replace the word with the given text. Text right after the word that
+/// the replacement already ends with is replaced too.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cSpellCheck::ReplaceWord(POSITION_T docWordStart, POSITION_T docWordEnd, const std::string &replacement)
+{
+    cDocument *doc = mEditor->GetDocument() ;
+    PARAGRAPH_T para = doc->GetParagraphFromPosition(docWordStart) ;
+
+    std::vector<std::string> graphemes ;
+    std::vector<POSITION_T> offsets ;
+    doc->GetParagraphGraphemes(para, graphemes, offsets) ;
+
+    POSITION_T paraStart = 0 ;
+    POSITION_T paraEnd = 0 ;
+    doc->GetParagraphStartandEnd(para, paraStart, paraEnd) ;
+
+    size_t trailing = SpellTrailingCount(graphemes, static_cast<size_t>(docWordEnd - paraStart), replacement) ;
+
+    doc->SetPosition(docWordStart) ;
+    doc->SetBeginBlock() ;
+    doc->SetPosition(docWordEnd + static_cast<POSITION_T>(trailing)) ;
+    doc->SetEndBlock() ;
+
+    mEditor->DeleteBlock() ;
+    doc->SetPosition(docWordStart) ;
+    mEditor->InsertWordStarString(replacement) ;
 }
 
 

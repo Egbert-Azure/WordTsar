@@ -3171,20 +3171,7 @@ void cWSEditorCtrl::SpellCheckDocument(void)
                             const std::string& replacement = suggestions[static_cast<size_t>(selected)];
 
                             // Also replace text after the word that the suggestion ends with.
-                            size_t trailingCount = 0;
-                            std::string trailing;
-                            for (size_t next = index; next < graphemes.size(); ++next)
-                            {
-                                trailing += graphemes[next];
-                                if (trailing.size() >= replacement.size())
-                                {
-                                    break;
-                                }
-                                if (replacement.compare(replacement.size() - trailing.size(), trailing.size(), trailing) == 0)
-                                {
-                                    trailingCount = next - index + 1;
-                                }
-                            }
+                            size_t trailingCount = SpellTrailingCount(graphemes, index, replacement);
 
                             POSITION_T pos = paraStart + static_cast<POSITION_T>(wordStart);
                             mDocument->SetPosition(pos);

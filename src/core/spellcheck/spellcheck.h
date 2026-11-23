@@ -45,6 +45,12 @@ struct sSpellWord
 // touch a digit are skipped.
 std::vector<sSpellWord> FindSpellWords(const std::vector<std::string> &graphemes);
 
+// Returns how many graphemes from wordEnd on the replacement already ends
+// with, such as the period after "evtl" when the replacement is "evtl.".
+// Those graphemes are replaced along with the word.
+size_t SpellTrailingCount(const std::vector<std::string> &graphemes, size_t wordEnd,
+                          const std::string &replacement);
+
 class cSpellChecker
 {
 public:
