@@ -2258,7 +2258,7 @@ TEST_CASE("cWordstarFile - German letters as ESC x FS load and save under CP437 
 }
 
 
-TEST_CASE("cWordstarFile - characters CP437 cannot hold save as their plain equivalent, superscript digits as ^T digits")
+TEST_CASE("cWordstarFile - characters CP437 cannot hold save as their plain equivalent, missing superscript digits as ^T digits")
 {
     ensureQApplication();
     cEditorCtrl editor;
@@ -2277,7 +2277,8 @@ TEST_CASE("cWordstarFile - characters CP437 cannot hold save as their plain equi
     REQUIRE(saver.SaveFile(path.string(), doc->GetTextSize()));
     std::string saved = ReadFileBytes(path);
 
-    const std::string expected("There's 7-12%\x14" "1\x14 x\x14" "23\x14 \x14" "a4\x14\x0D\x0A");
+    // CP437 holds the 2 (0xFD), so it stays ESC x FS
+    const std::string expected("There's 7-12%\x14" "1\x14 x\x1B\xFD\x1C\x14" "3\x14 \x14" "a4\x14\x0D\x0A");
     CHECK(Hex(saved, 128, expected.size()) == Hex(expected));
 
     // the digits load back as superscript text
