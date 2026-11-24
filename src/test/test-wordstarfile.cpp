@@ -43,6 +43,7 @@
 #include "src/core/layout/layoutbase.h"
 #include "src/files/wordstar/wordstarfile.h"
 #include "src/gui/editor/editorctrl.h"
+#include "src/input/keystroke.h"
 #include <QApplication>
 
 
@@ -3143,5 +3144,64 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         cDocument lastText;
         REQUIRE(cWordstarFile::DecodeNote(last, lastText));
         CHECK(lastText.GetParagraphText(0) == endnoteText.GetParagraphText(0));
+    }
+
+    SUBCASE("^ONF opens a footnote that ^KD writes into the text as one undo step")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        doc->Insert("One two\r");
+        doc->ClearUndoHistory();
+        doc->SetPosition(3);
+        POSITION_T size = doc->GetTextSize();
+
+        auto type = [&editor](const std::string& keys)
+        {
+            for (char ch : keys)
+            {
+                if (static_cast<unsigned char>(ch) < ' ')
+                {
+                    editor.FeedKey(CharKeyStroke(ch));
+                }
+                else
+                {
+                    editor.FeedKey(TextKeyStroke(std::string(1, ch)));
+                }
+            }
+        };
+
+        // a new endnote closed empty adds nothing
+        type("\x0F" "ne");
+        REQUIRE(editor.IsNoteOpen());
+        CHECK(editor.GetNoteTitle() == "Endnote 1");
+        type("\x0B" "d");
+        CHECK_FALSE(editor.IsNoteOpen());
+        CHECK(doc->GetTextSize() == size);
+        CHECK_FALSE(doc->CanUndo());
+
+        type("\x0F" "nf");
+        REQUIRE(editor.IsNoteOpen());
+        CHECK(editor.GetNoteTitle() == "Footnote 1");
+        type("See page 4");
+        CHECK(doc->GetTextSize() == size);
+        REQUIRE(editor.GetNoteEditor() != nullptr);
+        CHECK(editor.GetNoteEditor()->GetDocument()->GetParagraphText(0).find("See page 4") != std::string::npos);
+        type("\x0B" "d");
+        CHECK_FALSE(editor.IsNoteOpen());
+
+        CHECK(doc->GetControlChar(3) == STYLE_FOOTNOTE);
+        sNote note{};
+        REQUIRE(doc->GetNote(3, note));
+        CHECK(note.kind == NOTE_KIND_FOOTNOTE);
+        cDocument noteText;
+        REQUIRE(cWordstarFile::DecodeNote(note, noteText));
+        CHECK(noteText.GetControlChar(0) == STYLE_RAW_SEQUENCE);
+        CHECK(noteText.GetParagraphText(0).find("See page 4") != std::string::npos);
+
+        CHECK(editor.Undo());
+        CHECK(doc->GetTextSize() == size);
+        CHECK(noteCount(*doc) == 0);
+        CHECK_FALSE(doc->CanUndo());
     }
 }

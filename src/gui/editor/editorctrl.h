@@ -278,6 +278,10 @@ protected:
     void focusInEvent(QFocusEvent* event) override;
     void focusOutEvent(QFocusEvent* event) override;
 
+    // --- Note pane (see cEditorBase::ShowNotePane) ---
+    cEditorBase* ShowNotePane(cDocument* note, const std::string& title) override;
+    void HideNotePane(cEditorBase* pane) override;
+
     // --- Generate commands: source file chooser and save question ---
     // Return an empty string, or SAVE_QUESTION_CANCEL, under QT_TESTING=1.
     virtual std::string PromptForGenerateSource(const std::string& title, const std::string& defaultPath);

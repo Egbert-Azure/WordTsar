@@ -633,8 +633,9 @@ const sCommandKeys COMMAND_KEYS[] =
     { 'k',           WSCMD_NOT_IMPLEMENTED, "oej\\lfmniag" },
 
     { 'o',           WSCMD_RUNS,            "dc]tjwvgeh<>=+" },
+    { 'o',           WSCMD_SUBKEY,          "n" },
     { 'o',           WSCMD_DIALOG,          "?pylxiouf sab" },
-    { 'o',           WSCMD_NOT_IMPLEMENTED, "kmz#n" },
+    { 'o',           WSCMD_NOT_IMPLEMENTED, "kmz#" },
 
     { 'q',           WSCMD_FIND,            "f" },
     { 'q',           WSCMD_REPLACE,         "a" },
@@ -709,6 +710,7 @@ cWordStarInput::cWordStarInput(cEditorBase *editor)
     mControlPMode = false ;
     mControlQMode = false ;
     mControlKZMode = false ;
+    mControlONMode = false ;
     mWaitingForHelpTarget = false ;
     mWaitingForHelpChordTarget = false ;
     mHelpChordPrefix = 0 ;
@@ -726,7 +728,7 @@ cWordStarInput::~cWordStarInput(void)
 bool cWordStarInput::CheckControlMode(void)
 {
     return mControlMMode || mControlKMode || mControlOMode || mControlPMode || mControlQMode
-        || mControlKZMode ;
+        || mControlKZMode || mControlONMode ;
 }
 
 
@@ -859,6 +861,7 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
         mControlPMode = false ;
         mControlQMode = false ;
         mControlKZMode = false ;
+        mControlONMode = false ;
         mWaitingForHelpTarget = false ;
         mWaitingForHelpChordTarget = false ;
         if(hadActiveChord == true)
@@ -882,6 +885,13 @@ bool cWordStarInput::HandleKey(char ch, bool shift, bool alt)
         // before setting this one, so there's no ordering conflict either way.
         mControlKZMode = false ;
         OnControlKZChar(ch) ;
+        handled = true ;
+    }
+    else if(mControlONMode == true)
+    {
+        // after ^O,N: the note command key
+        mControlONMode = false ;
+        OnControlONChar(ch) ;
         handled = true ;
     }
     else if(mControlKMode == true)
@@ -1275,6 +1285,7 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
             mControlPMode = false ;
             mControlQMode = false ;
             mControlKZMode = false ;
+            mControlONMode = false ;
             mWaitingForHelpTarget = false ;
             mWaitingForHelpChordTarget = false ;
             if(hadActiveChord == true)
@@ -1318,6 +1329,7 @@ bool cWordStarInput::HandleSpecialKey(eSpecialKey key, bool shift, bool ctrl, bo
                 mControlPMode = false ;
                 mControlQMode = false ;
                 mControlKZMode = false ;
+                mControlONMode = false ;
                 mWaitingForHelpChordTarget = false ;
                 if(hadActiveChord == true)
                 {
@@ -1585,6 +1597,13 @@ bool cWordStarInput::OnControlKChar(char ch)
     if (ChordAvailable('k', ch) == false)
     {
         return false ;
+    }
+
+    // In a note editor ^KD, ^KS and ^KX write the note, ^KQ abandons it
+    if (mEditor->IsNoteEditor() == true && (ch == 'd' || ch == 's' || ch == 'x' || ch == 'q'))
+    {
+        mEditor->CloseNote(ch != 'q') ;
+        return true ;
     }
     
     switch(ch)
@@ -1954,6 +1973,10 @@ void cWordStarInput::OnControlOChar(char ch)
             mEditor->ToggleHyphenation() ;
             break ;
 
+        case 'n' :          // Notes, waits for the note command key
+            mControlONMode = true ;
+            break ;
+
         case '<' :
             mEditor->SetParagraphAlignment(JUST_LEFT) ;
             break ;
@@ -1975,6 +1998,51 @@ void cWordStarInput::OnControlOChar(char ch)
                 std::string t = string_sprintf("^O-%c", ch).c_str() ;
                 mEditor->InvalidCommand(t) ;
             }
+            break ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  ch [in] - the key pressed after ^O,N
+///
+/// @brief
+/// ^ONF and ^ONE open a new footnote or endnote at the cursor; in a note
+/// editor they are invalid. ^ONA, ^ONC and ^ONV do nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordStarInput::OnControlONChar(char ch)
+{
+    if(ch < ' ')
+    {
+        ch += '@' ;
+    }
+    ch = tolower(ch) ;
+
+    std::string t = string_sprintf("^O-n-%c", ch) ;
+
+    switch(ch)
+    {
+        case 'f' :
+        case 'e' :
+            if (mEditor->IsNoteEditor() == true || mEditor->IsNoteOpen() == true)
+            {
+                mEditor->InvalidCommand(t) ;
+            }
+            else if (mEditor->OpenNewNote((ch == 'f') ? NOTE_KIND_FOOTNOTE : NOTE_KIND_ENDNOTE) == false)
+            {
+                mEditor->NotImplemented(t) ;
+            }
+            break ;
+
+        case 'a' :
+        case 'c' :
+        case 'v' :
+            break ;
+
+        default :
+            mEditor->NotImplemented(t) ;
             break ;
     }
 }

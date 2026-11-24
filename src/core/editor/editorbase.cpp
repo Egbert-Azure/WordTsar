@@ -487,15 +487,30 @@ void cEditorBase::PerformPostCommandUpdate(void)
 /// @brief
 /// Single entry point for keys typed in either front end. Runs the front
 /// end's BeforeKey, the shared DispatchKey, and the front end's AfterKey
-/// when the key was handled.
+/// when the key was handled. While a note is open, keys fed to the note
+/// editor go through the editor whose note it is, so its macro records and
+/// plays them, and that editor sends them to the note editor.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::FeedKey(const sKeyStroke& key)
 {
+    if (mNoteOwner != nullptr)
+    {
+        return mNoteOwner->FeedKey(key) ;
+    }
+
     if (mMacro->InterceptKey(key) == true)
     {
         AfterKey(key) ;
         return true ;
+    }
+
+    if (mNoteEditor != nullptr)
+    {
+        mMacro->BeginKey(key) ;
+        bool handled = mNoteEditor->DispatchNoteKey(key) ;
+        mMacro->EndKey(handled) ;
+        return handled ;
     }
 
     IInputHandler* input = mMacro->PlaybackInput() ;
@@ -522,12 +537,224 @@ bool cEditorBase::FeedKey(const sKeyStroke& key)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  key [in] key stroke
+///
+/// @return true if the key was handled
+///
+/// @brief
+/// A key of the note editor: BeforeKey, DispatchKey with this editor's
+/// input handler, and AfterKey if the key was handled.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::DispatchNoteKey(const sKeyStroke& key)
+{
+    IInputHandler* input = GetInput() ;
+    if (input == nullptr)
+    {
+        return false ;
+    }
+
+    BeforeKey(key) ;
+    bool handled = DispatchKey(*this, *input, key) ;
+    if (handled == true)
+    {
+        AfterKey(key) ;
+    }
+    return handled ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  kind [in] NOTE_KIND_FOOTNOTE or NOTE_KIND_ENDNOTE
+///
+/// @return true if the note editor opened
+///
+/// @brief
+/// ^ONF, ^ONE: opens a new note at the cursor. The note text starts as
+/// cWordstarFile::NewNote() writes it: the number sequence, a tab and a
+/// hard return; the note editor's cursor is after the tab. The title
+/// counts the notes of the same kind before the cursor. Nothing opens in a
+/// note editor, while a note is open, or without a front end pane.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::OpenNewNote(eNoteKind kind)
+{
+    if ((mNoteOwner != nullptr) || (mNoteEditor != nullptr) || (mDocument == nullptr))
+    {
+        return false ;
+    }
+    if ((kind != NOTE_KIND_FOOTNOTE) && (kind != NOTE_KIND_ENDNOTE))
+    {
+        return false ;
+    }
+
+    CloseTypingGroup() ;
+
+    sNote note = cWordstarFile::NewNote(kind, this) ;
+    cDocument* content = new cDocument() ;
+    if (cWordstarFile::DecodeNote(note, *content, this) == false)
+    {
+        delete content ;
+        return false ;
+    }
+    content->SetPosition(std::min<POSITION_T>(2, content->GetTextSize())) ;
+
+    POSITION_T position = mDocument->GetPosition() ;
+    int number = 1 ;
+    for (POSITION_T pos = 0; pos < position; pos++)
+    {
+        sNote other ;
+        if ((mDocument->GetNote(pos, other) == true) && (other.kind == kind))
+        {
+            number++ ;
+        }
+    }
+    std::string title = ((kind == NOTE_KIND_ENDNOTE) ? "Endnote " : "Footnote ") + std::to_string(number) ;
+
+    cEditorBase* pane = ShowNotePane(content, title) ;
+    if (pane == nullptr)
+    {
+        delete content ;
+        return false ;
+    }
+
+    pane->mOwnsDocument = true ;
+    pane->mNoteOwner = this ;
+    mNoteEditor = pane ;
+    mNoteKind = kind ;
+    mNotePosition = position ;
+    mNoteIsNew = true ;
+    mNoteOriginal = note ;
+    mNoteTitle = title ;
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  keep [in] true to write the note (^KD ^KS ^KX), false to abandon
+///                   it (^KQ)
+///
+/// @brief
+/// Closes the open note. ^KQ asks first if the note changed. Writing a
+/// changed note runs one undo group: an edited note's marker is deleted,
+/// then the note is inserted at the marker position. A note without text
+/// is not inserted, so a new note closed empty leaves the document as it
+/// was. In the note editor, closes the note it edits.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::CloseNote(bool keep)
+{
+    if (mNoteOwner != nullptr)
+    {
+        mNoteOwner->CloseNote(keep) ;
+        return ;
+    }
+    if (mNoteEditor == nullptr)
+    {
+        return ;
+    }
+
+    cEditorBase* pane = mNoteEditor ;
+    pane->CloseTypingGroup() ;
+
+    sNote note = mNoteOriginal ;
+    bool encoded = cWordstarFile::EncodeNote(*pane->GetDocument(), note, this) ;
+    bool changed = (encoded == false) || (note.raw != mNoteOriginal.raw) ;
+
+    if (keep == true && encoded == false)
+    {
+        pane->ShowError("Note", "The note cannot be written") ;
+        return ;
+    }
+    if (keep == false && changed == true)
+    {
+        if (pane->AskYesNo("Abandon Note", "Abandon changes to this note?") == false)
+        {
+            return ;
+        }
+    }
+
+    bool empty = std::all_of(note.text.begin(), note.text.end(),
+                             [](char ch) { return static_cast<unsigned char>(ch) <= ' ' ; }) ;
+
+    mNoteEditor = nullptr ;
+    pane->mNoteOwner = nullptr ;
+    HideNotePane(pane) ;
+
+    if ((keep == true) && (changed == true) && ((mNoteIsNew == false) || (empty == false)))
+    {
+        CloseTypingGroup() ;
+        mDocument->BeginUndoGroup() ;
+        mDocument->SetPosition(mNotePosition) ;
+        if (mNoteIsNew == false)
+        {
+            mDocument->Delete(mNotePosition, 1) ;
+        }
+        if (empty == false)
+        {
+            if (mNoteKind == NOTE_KIND_ENDNOTE)
+            {
+                mDocument->InsertEndnote(note) ;
+            }
+            else
+            {
+                mDocument->InsertFootnote(note) ;
+            }
+        }
+        mDocument->EndUndoGroup() ;
+    }
+    else
+    {
+        mDocument->SetPosition(mNotePosition) ;
+    }
+
+    PerformPostCommandUpdate() ;
+}
+
+
+bool cEditorBase::IsNoteOpen(void) const
+{
+    return mNoteEditor != nullptr ;
+}
+
+
+bool cEditorBase::IsNoteEditor(void) const
+{
+    return mNoteOwner != nullptr ;
+}
+
+
+cEditorBase* cEditorBase::GetNoteEditor(void) const
+{
+    return mNoteEditor ;
+}
+
+
+std::string cEditorBase::GetNoteTitle(void) const
+{
+    if (mNoteOwner != nullptr)
+    {
+        return mNoteOwner->GetNoteTitle() ;
+    }
+    return (mNoteEditor != nullptr) ? mNoteTitle : std::string() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @brief
 /// ^MR: starts recording, or stops it and saves the macro.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::MacroRecord(void)
 {
+    if (mNoteOwner != nullptr)
+    {
+        mNoteOwner->MacroRecord() ;
+        return ;
+    }
     mMacro->RecordCommand() ;
 }
 
@@ -540,6 +767,11 @@ void cEditorBase::MacroRecord(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::MacroPlay(void)
 {
+    if (mNoteOwner != nullptr)
+    {
+        mNoteOwner->MacroPlay() ;
+        return ;
+    }
     mMacro->PlayCommand() ;
 }
 
@@ -552,6 +784,11 @@ void cEditorBase::MacroPlay(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::MacroPause(void)
 {
+    if (mNoteOwner != nullptr)
+    {
+        mNoteOwner->MacroPause() ;
+        return ;
+    }
     mMacro->PauseCommand() ;
 }
 
@@ -564,6 +801,11 @@ void cEditorBase::MacroPause(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::MacroEndRecording(void)
 {
+    if (mNoteOwner != nullptr)
+    {
+        mNoteOwner->MacroEndRecording() ;
+        return ;
+    }
     mMacro->EndRecordingCommand() ;
 }
 
@@ -648,18 +890,30 @@ bool cEditorBase::OpenDocument(const std::string& path)
 
 bool cEditorBase::IsMacroRecording(void) const
 {
+    if (mNoteOwner != nullptr)
+    {
+        return mNoteOwner->IsMacroRecording() ;
+    }
     return mMacro->IsRecording() ;
 }
 
 
 bool cEditorBase::IsMacroPlaying(void) const
 {
+    if (mNoteOwner != nullptr)
+    {
+        return mNoteOwner->IsMacroPlaying() ;
+    }
     return mMacro->IsPlaying() ;
 }
 
 
 std::string cEditorBase::MacroStateText(void) const
 {
+    if (mNoteOwner != nullptr)
+    {
+        return mNoteOwner->MacroStateText() ;
+    }
     return mMacro->StateText() ;
 }
 
@@ -692,6 +946,10 @@ bool cEditorBase::MacroInterceptKey(const sKeyStroke& key)
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::MacroAcknowledges(void)
 {
+    if (mNoteOwner != nullptr)
+    {
+        return mNoteOwner->MacroAcknowledges() ;
+    }
     return mMacro->AnswerException(MACRO_EXCEPTION_ACK) ;
 }
 
@@ -707,6 +965,10 @@ bool cEditorBase::MacroAcknowledges(void)
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::MacroAnswersQuestion(bool& yes)
 {
+    if (mNoteOwner != nullptr)
+    {
+        return mNoteOwner->MacroAnswersQuestion(yes) ;
+    }
     return mMacro->AnswerException(MACRO_EXCEPTION_QRY, &yes) ;
 }
 

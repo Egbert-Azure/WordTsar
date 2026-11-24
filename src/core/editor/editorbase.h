@@ -270,6 +270,18 @@ public:
                                        const std::vector<std::string>& items) = 0;          // List choice; empty on cancel
     virtual bool OpenDocument(const std::string& path);       // Replace the document with a file, saving a modified one first
 
+    // Notes (^ONF, ^ONE): the note text is edited by a second editor on a
+    // document of its own, shown by the front end below this editor. Keys
+    // fed to either editor, and macros, act on the note. This editor's
+    // document does not change until the note closes; closing writes the
+    // note in one undo step.
+    bool OpenNewNote(eNoteKind kind);                         // New footnote or endnote at the cursor; false if no note opened
+    void CloseNote(bool keep);                                // keep: ^KD ^KS ^KX; otherwise ^KQ, which asks if the note changed
+    bool IsNoteOpen(void) const;                              // A note of this editor's document is open
+    bool IsNoteEditor(void) const;                            // This editor edits a note
+    cEditorBase* GetNoteEditor(void) const;                   // Editor of the open note, nullptr if none
+    std::string GetNoteTitle(void) const;                     // "Footnote n" or "Endnote n" of the open note
+
     // Dirty State
     void ResetDocumentDirty(void) ;
     bool IsDocumentDirty(void) const ;
@@ -474,6 +486,13 @@ protected:
     // Recent Files list
     void RecordRecentFile(const std::string& filepath);
 
+    // Note pane (front end): ShowNotePane returns an editor on note, shown
+    // with title, or nullptr if the front end has none. HideNotePane removes
+    // the pane; the pane editor runs the key that closed it, so it must be
+    // destroyed later, not during the call. The pane editor deletes note.
+    virtual cEditorBase* ShowNotePane(cDocument* /*note*/, const std::string& /*title*/) { return nullptr; }
+    virtual void HideNotePane(cEditorBase* /*pane*/) {}
+
 private:
     /////////////////////////////////////////////////////////////////////////
     ///
@@ -501,6 +520,9 @@ private:
 
     // Block Case Conversion
     void ConvertBlockCase(std::string (cDocument::*convert)(const std::string &)) ;
+
+    // Key of the note pane, without the macro hooks of FeedKey
+    bool DispatchNoteKey(const sKeyStroke& key);
 
     // Caret Calc Helpers
     bool LookupCaretParagraph(sCaretCalcState& state) ;
@@ -646,6 +668,15 @@ protected:
 
     // Macros
     cMacroEngine* mMacro;                 // macro recorder and player (owned)
+
+    // Notes
+    cEditorBase* mNoteEditor = nullptr;   // editor of the open note (owned by the front end)
+    cEditorBase* mNoteOwner = nullptr;    // in a note editor: the editor whose note it edits
+    eNoteKind mNoteKind = NOTE_KIND_FOOTNOTE;
+    POSITION_T mNotePosition = 0;         // marker position of the open note
+    bool mNoteIsNew = false;              // the open note has no marker yet
+    sNote mNoteOriginal;                  // the open note as it was opened
+    std::string mNoteTitle;               // "Footnote n" or "Endnote n"
 
     // Background Layout State
     bool mLayoutInt;                          // Layout interrupted by user input?

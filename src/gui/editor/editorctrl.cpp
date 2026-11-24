@@ -4139,6 +4139,68 @@ void cEditorCtrl::focusOutEvent(QFocusEvent* event)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  note  [in] document of the note (the pane editor deletes it)
+/// @param  title [in] pane title
+///
+/// @return the note editor
+///
+/// @brief
+/// Creates the note editor on note with this editor's font, code page,
+/// measurement, control display, input mode and colours, in continuous
+/// mode and without auto-save.
+///
+/////////////////////////////////////////////////////////////////////////////
+cEditorBase* cEditorCtrl::ShowNotePane(cDocument* note, const std::string& title)
+{
+    UNUSED_ARGUMENT(title);
+
+    cEditorCtrl* pane = new cEditorCtrl(note, nullptr);
+    pane->mAutoSaveTimer->stop();
+    pane->SetInputMode(mInputMode);
+    pane->mInsertMode = mInsertMode;
+    pane->SetCodePage(GetCodePage());
+    pane->SetMeasurement(GetMeasurement());
+    pane->mSpellCheckLanguage = mSpellCheckLanguage;
+    if (pane->GetLayout() != nullptr)
+    {
+        pane->GetLayout()->SetHyphenationLanguage(mSpellCheckLanguage);
+    }
+    pane->SetDisplayMode(DISPLAY_CONTINUOUS);
+    pane->SetShowControls(GetShowControls());
+    pane->SetBGroundColour(GetBGroundColour());
+    pane->SetTextColour(GetTextColour());
+    pane->SetHighlightColour(GetHighlightColour());
+    pane->SetDotColour(GetDotColour());
+    pane->SetBlockColour(GetBlockColour());
+    pane->SetFont(GetFont());
+    pane->CalculateCaretPosition();
+    return pane;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  pane [in] the note editor
+///
+/// @brief
+/// Destroys the note editor once the key that closed it has run, and gives
+/// this editor the focus.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::HideNotePane(cEditorBase* pane)
+{
+    cEditorCtrl* editor = dynamic_cast<cEditorCtrl*>(pane);
+    if (editor != nullptr)
+    {
+        editor->hide();
+        editor->deleteLater();
+    }
+    setFocus();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
@@ -6792,7 +6854,7 @@ void cEditorCtrl::ToggleShowControl(void)
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorCtrl::LoadFile(const std::string& filename)
 {
-    if (filename.empty())
+    if (filename.empty() || IsNoteEditor())
     {
         return false;
     }
@@ -7057,6 +7119,13 @@ bool cEditorCtrl::InsertFileAtCursor(const std::string& filename)
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorCtrl::SaveFile(const std::string& filename)
 {
+    // A note editor writes its note into the document instead
+    if (IsNoteEditor())
+    {
+        CloseNote(true);
+        return true;
+    }
+
     QString qfilename = QString::fromStdString(filename);
     if (qfilename.isEmpty() || !mDocument)
     {
@@ -7782,6 +7851,14 @@ void cEditorCtrl::mousePressEvent(QMouseEvent* event)
     mSearchBlockSet = false;
     mStartSearchBlock = 0;
     mEndSearchBlock = 0;
+
+    // While a note is open the cursor stays at its marker
+    cEditorCtrl* note = dynamic_cast<cEditorCtrl*>(GetNoteEditor());
+    if (note != nullptr)
+    {
+        note->setFocus();
+        return;
+    }
 
     // Only handle left button
     if (event->button() == Qt::LeftButton)
