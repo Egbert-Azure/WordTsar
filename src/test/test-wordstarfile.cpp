@@ -2294,6 +2294,38 @@ TEST_CASE("cWordstarFile - characters CP437 cannot hold save as their plain equi
 }
 
 
+TEST_CASE("cWordstarFile - a paragraph starting with an ellipsis reloads as text and an em dash as two hyphens")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+    editor.SetCodePage(CP437);
+    doc->Clear();
+    doc->Insert("\xE2\x80\xA6" "and then\rword \xE2\x80\x94 word and 7\xE2\x80\x93" "12\r");
+
+    std::filesystem::path path = TempPath();
+    cWordstarFile saver(&editor);
+    saver.SetSilent(true);
+    REQUIRE(saver.SaveFile(path.string(), doc->GetTextSize()));
+
+    cEditorCtrl reloaded;
+    reloaded.SetCodePage(CP437);
+    REQUIRE(reloaded.LoadFile(path.string()));
+    std::filesystem::remove(path);
+
+    cDocument *loaded = reloaded.GetDocument();
+    cLayout layout;
+    layout.SetDocument(loaded);
+    layout.LayoutDocument(loaded);
+
+    REQUIRE(loaded->GetNumberofParagraphs() >= 2);
+    CHECK_FALSE(layout.ParagraphIsComment(0));
+    CHECK_FALSE(layout.ParagraphIsCommand(0));
+    CHECK(loaded->GetParagraphText(0).find("and then") != std::string::npos);
+    CHECK(loaded->GetParagraphText(1) == "word -- word and 7-12");
+}
+
+
 TEST_CASE("cWordstarFile - ESC FS FS loads as one right angle glyph")
 {
     ensureQApplication();
