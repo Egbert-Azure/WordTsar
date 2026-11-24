@@ -97,6 +97,10 @@ public:
     void TestBuildMenus(void) { BuildMenus(); }
     const wordstartui::cMenuBar& TestGetMenu(void) const { return mMenu; }
     cWSEditorCtrl* TestGetEditor(void) { return mEditor; }
+    // The edit screen with the menu bar, as after S on the Opening screen.
+    void TestEnterEditor(void) { BuildMenus(); SetMode(APP_EDITOR); }
+    // Screen row of the caret after the last TestDraw.
+    int TestCaretRow(void) const;
     void TestApplyConfig(cConfig& config) { ApplyConfig(config, true); }
     std::string TestTitleText(void) const { return TitleText(); }
     // Load a file the way the command line and the Opening screen do.
@@ -201,6 +205,15 @@ private:
     bool OpeningMacroPauseKey(const wordstartui::sInputEvent& event);
     void InjectChord(int controlCode, char follow);
     void InjectControl(int controlCode);
+    void InjectNoteKey(char follow);         // ^O N follow on MenuInput()
+
+    // Note pane (see cEditorBase::ShowNotePane): while a note is open the
+    // note editor is drawn below the text and menus act on it.
+    void SyncNotePane(void);                 // view and menu input of the open note editor
+    cWSEditorCtrl* Active(void);             // editor menus act on
+    cWSEditorView* ActiveView(void);         // view of Active()
+    cWordStarInput* MenuInput(void);         // menu input handler of Active()
+    void KeepOpenNote(void);                 // write an open note into the document
     void CheckCommandSignals(void);
     void OpenPreferences(void);
     void OpenSystemPreferences(void);
@@ -282,6 +295,11 @@ private:
     // WordStar-mode command regardless of the user's selected keyboard mode,
     // and can't collide with a chord the user has half-typed on the real one.
     cWordStarInput* mMenuInput; // owned
+    cWSEditorCtrl* mNoteEditor = nullptr;        // open note editor (owned by mEditor)
+    cWSEditorView* mNoteView = nullptr;          // view of mNoteEditor (owned)
+    cWordStarInput* mNoteMenuInput = nullptr;    // menu input handler of mNoteEditor (owned)
+    bool mShowScrollBar = true;                  // Display > Show scroll bar
+    int mNoteTextRows = 0;                       // text rows above the note pane at the last draw
     wordstartui::cMenuBar mMenu;
     int mMenuMacroState = 0;              // MacroMenuState() mMenu was built for
     wordstartui::cMenuBar mOpeningMenu;   // Opening screen menu bar (help level 4)

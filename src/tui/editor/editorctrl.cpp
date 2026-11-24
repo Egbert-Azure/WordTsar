@@ -97,7 +97,7 @@ using wordstartui::MakeRgb;
 /// values used by the editor control.
 ///
 /////////////////////////////////////////////////////////////////////////////
-cWSEditorCtrl::cWSEditorCtrl(void)
+cWSEditorCtrl::cWSEditorCtrl(cDocument* document)
     : cEditorBase()
     , mInput(nullptr)
     , mBGroundColour(MakeRgb(245, 245, 245))
@@ -161,7 +161,7 @@ cWSEditorCtrl::cWSEditorCtrl(void)
     mCenterView = false;
 
     // Create and own document and layout
-    mDocument = new cDocument();
+    mDocument = (document != nullptr) ? document : new cDocument();
     mLayout = new cLayout();
 
     // Initialize TUI font system
@@ -207,6 +207,11 @@ cWSEditorCtrl::cWSEditorCtrl(void)
 /////////////////////////////////////////////////////////////////////////////
 cWSEditorCtrl::~cWSEditorCtrl(void)
 {
+    delete mNotePane;
+    mNotePane = nullptr;
+    delete mClosedNotePane;
+    mClosedNotePane = nullptr;
+
     delete mInput;
     mInput = nullptr;
 
@@ -226,6 +231,124 @@ cWSEditorCtrl::~cWSEditorCtrl(void)
 
     delete mDocument;
     mDocument = nullptr;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  note  [in] document of the note (the pane editor deletes it)
+/// @param  title [in] pane title (drawn by the app)
+///
+/// @return the note editor
+///
+/// @brief
+/// Creates the note editor on note with this editor's font, code page,
+/// measurement, control display, input and insert mode, help level, file
+/// name, colours, terminal size and dialog host.
+///
+/////////////////////////////////////////////////////////////////////////////
+cEditorBase* cWSEditorCtrl::ShowNotePane(cDocument* note, const std::string& /*title*/)
+{
+    // The closed pane goes after the new one exists, so the app sees a new
+    // address for the new pane
+    cWSEditorCtrl* pane = new cWSEditorCtrl(note);
+    delete mClosedNotePane;
+    mClosedNotePane = nullptr;
+    delete mNotePane;
+    mNotePane = nullptr;
+
+    pane->SetInputMode(mInputMode);
+    pane->mInsertMode = mInsertMode;
+    pane->mHelpLevel = mHelpLevel;
+    pane->mHelpDisplay = mHelpDisplay;
+    pane->mFileName = mFileName;
+    pane->mFileDir = mFileDir;
+    pane->mFileSet = mFileSet;
+    pane->mShortName = mShortName;
+    pane->mLongName = mLongName;
+    pane->mAlwaysDot = mAlwaysDot;
+    pane->mSpellCheckLanguage = mSpellCheckLanguage;
+    pane->mSpellCheckDotCommands = mSpellCheckDotCommands;
+    pane->mAutoSaveIntervalSec = 0;
+    if (pane->GetLayout() != nullptr)
+    {
+        pane->GetLayout()->SetHyphenationLanguage(mSpellCheckLanguage);
+    }
+    pane->SetCodePage(GetCodePage());
+    pane->SetMeasurement(GetMeasurement());
+    pane->SetShowControls(GetShowControls());
+    pane->mAlwaysFlag = mAlwaysFlag;
+    pane->mCenterView = false;
+
+    pane->mBGroundColour = mBGroundColour;
+    pane->mTextColour = mTextColour;
+    pane->mScrollbarBg = mScrollbarBg;
+    pane->mScrollbarFg = mScrollbarFg;
+    pane->mFlagBg = mFlagBg;
+    pane->mFlagFg = mFlagFg;
+    pane->mHighlightColour = mHighlightColour;
+    pane->mHighlightFgColour = mHighlightFgColour;
+    pane->mDotColour = mDotColour;
+    pane->mDotFgColour = mDotFgColour;
+    pane->mBlockColour = mBlockColour;
+    pane->mBlockFgColour = mBlockFgColour;
+    pane->mSearchColour = mSearchColour;
+    pane->mSearchFgColour = mSearchFgColour;
+    pane->mCommentColour = mCommentColour;
+    pane->mCommentFgColour = mCommentFgColour;
+    pane->mErrorColour = mErrorColour;
+    pane->mErrorFgColour = mErrorFgColour;
+    pane->mUnknownColour = mUnknownColour;
+    pane->mUnknownFgColour = mUnknownFgColour;
+    pane->mNotImplementedColour = mNotImplementedColour;
+    pane->mNotImplementedFgColour = mNotImplementedFgColour;
+    pane->mBoldColour = mBoldColour;
+    pane->mBoldBgColour = mBoldBgColour;
+    pane->mItalicColour = mItalicColour;
+    pane->mItalicBgColour = mItalicBgColour;
+    pane->mStrikethroughColour = mStrikethroughColour;
+    pane->mStrikethroughBgColour = mStrikethroughBgColour;
+    pane->mUnderlineColour = mUnderlineColour;
+    pane->mUnderlineBgColour = mUnderlineBgColour;
+    pane->mSuperscriptColour = mSuperscriptColour;
+    pane->mSuperscriptBgColour = mSuperscriptBgColour;
+    pane->mSubscriptColour = mSubscriptColour;
+    pane->mSubscriptBgColour = mSubscriptBgColour;
+    pane->SetTermCapabilities(mTermSupportsBold, mTermSupportsItalic, mTermSupportsUnderline, mTermSupportsStrikethrough);
+
+    pane->mTerminalRows = mTerminalRows;
+    pane->mTerminalCols = mTerminalCols;
+    pane->mChromeRows = mChromeRows;
+    pane->mHost = mHost;
+    pane->mPreferencesHook = mPreferencesHook;
+
+    pane->SetFont(GetFont());
+    pane->LayoutDocument(true);
+    pane->CalculateCaretPosition();
+
+    mNotePane = pane;
+    return pane;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  pane [in] the note editor
+///
+/// @brief
+/// Keeps the closed note editor until the next note opens or this editor
+/// is destroyed: the key that closed it is still running.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::HideNotePane(cEditorBase* pane)
+{
+    if ((pane == nullptr) || (pane != mNotePane))
+    {
+        return;
+    }
+    delete mClosedNotePane;
+    mClosedNotePane = mNotePane;
+    mNotePane = nullptr;
 }
 
 
@@ -1022,7 +1145,7 @@ void cWSEditorCtrl::LayoutDocument(bool force)
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::LoadFile(const std::string& filename)
 {
-    if (filename.empty())
+    if (filename.empty() || IsNoteEditor())
     {
         return false;
     }
@@ -1271,6 +1394,12 @@ void cWSEditorCtrl::FileIOProgress(int percent)
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::SaveFile(const std::string& filename)
 {
+    // A note editor writes its note into the document instead
+    if (IsNoteEditor())
+    {
+        CloseNote(true);
+        return true;
+    }
     return SaveFileImpl(filename, false);
 }
 

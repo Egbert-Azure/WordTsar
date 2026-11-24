@@ -23,6 +23,7 @@
 
 #include "src/tui/editor/editorctrl.h"
 #include "src/tui/editor/editorview.h"
+#include "src/tui/wordtsar.h"
 #include "src/tui/wordstartui/src/screen.h"
 #include "src/core/document/document.h"
 #include "src/core/layout/layoutbase.h"
@@ -1489,4 +1490,84 @@ TEST_CASE("cWSEditorView - Esc then - inserts an en dash, not a hyphen")
     CHECK(editor.GetDocument()->GetTextSize() == before + 1);
     CHECK(editor.GetDocument()->GetText().find("\xE2\x80\x93") != std::string::npos);
     CHECK(editor.GetDocument()->GetText().find('-') == std::string::npos);
+}
+
+
+TEST_CASE("ws - ^ONF opens a footnote pane below the text that ^KD writes as one undo step")
+{
+    cWSWordTsar app;
+    app.TestEnterEditor();
+    cWSEditorCtrl* editor = app.TestGetEditor();
+    REQUIRE(editor != nullptr);
+    cDocument* doc = editor->GetDocument();
+    doc->Clear();
+    doc->Insert("One two\r");
+    doc->ClearUndoHistory();
+    doc->SetPosition(3);
+    editor->RelayoutAndRedraw();
+    POSITION_T size = doc->GetTextSize();
+
+    auto type = [&app](const std::string& keys)
+    {
+        for (char ch : keys)
+        {
+            wordstartui::sInputEvent event{};
+            if (static_cast<unsigned char>(ch) < ' ')
+            {
+                event.type = wordstartui::INPUT_TYPE_CONTROL;
+                event.controlCode = ch;
+            }
+            else
+            {
+                event.type = wordstartui::INPUT_TYPE_TEXT;
+                event.textUtf8 = std::string(1, ch);
+                event.codepoint = static_cast<unsigned char>(ch);
+            }
+            app.TestHandleEvent(event);
+        }
+    };
+    auto rowOf = [](wordstartui::cScreen& screen, const std::string& text)
+    {
+        for (int row = 0; row < screen.GetRows(); ++row)
+        {
+            if (ScreenText(screen, row, 0, screen.GetCols()).find(text) != std::string::npos)
+            {
+                return row;
+            }
+        }
+        return -1;
+    };
+
+    wordstartui::cScreen screen;
+    screen.Resize(25, 80);
+
+    type("\x0F" "nf");
+    REQUIRE(editor->IsNoteOpen());
+    type("See page 4");
+    CHECK(doc->GetTextSize() == size);
+
+    app.TestDraw(screen);
+    int textRow = rowOf(screen, "One two");
+    int titleRow = rowOf(screen, "Footnote 1");
+    int noteRow = rowOf(screen, "See page 4");
+    CHECK(textRow >= 0);
+    CHECK(titleRow > textRow);
+    CHECK(noteRow > titleRow);
+    CHECK(app.TestCaretRow() == noteRow);
+
+    type("\x0B" "d");
+    CHECK_FALSE(editor->IsNoteOpen());
+    app.TestDraw(screen);
+    CHECK(rowOf(screen, "Footnote 1") < 0);
+    CHECK(app.TestCaretRow() == rowOf(screen, "One"));
+
+    CHECK(doc->GetControlChar(3) == STYLE_FOOTNOTE);
+    sNote note{};
+    CHECK(doc->GetNote(3, note));
+    CHECK(note.kind == NOTE_KIND_FOOTNOTE);
+
+    type("\x15");
+    CHECK(doc->GetTextSize() == size);
+    CHECK_FALSE(doc->GetNote(3, note));
+    CHECK_FALSE(doc->CanUndo());
 }

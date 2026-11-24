@@ -265,6 +265,8 @@ cWSWordTsar::~cWSWordTsar(void)
         WriteConfig();
     }
 
+    delete mNoteView;
+    delete mNoteMenuInput;
     delete mView;
     delete mEditor;
     delete mMenuInput;
@@ -286,6 +288,11 @@ void cWSWordTsar::TestOpenFromOpening(const std::string& path)
     mFilename = path;
     mEditor->LoadFile(mFilename);
 }
+
+int cWSWordTsar::TestCaretRow(void) const
+{
+    return (mNoteView != nullptr) ? mNoteView->GetCaretRow() : mView->GetCaretRow();
+}
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
@@ -306,7 +313,7 @@ int cWSWordTsar::Run(int argc, char* argv[])
     mEditor->SetPreferencesHook([this](void) { OpenPreferences(); });
     mEditor->SetMacroKeyHook([this](void)
     {
-        mView->EnsureCaretVisible();
+        ActiveView()->EnsureCaretVisible();
         CheckCommandSignals();
     });
 
@@ -633,10 +640,11 @@ void cWSWordTsar::HostHideLoadProgress(void)
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::InjectChord(int controlCode, char follow)
 {
-    mMenuInput->HandleKey(static_cast<char>(controlCode), false, false);
-    mMenuInput->HandleKey(follow, false, false);
+    cWordStarInput* input = MenuInput();
+    input->HandleKey(static_cast<char>(controlCode), false, false);
+    input->HandleKey(follow, false, false);
 
-    mView->EnsureCaretVisible();
+    ActiveView()->EnsureCaretVisible();
 
     CheckCommandSignals();
 }
@@ -654,11 +662,124 @@ void cWSWordTsar::InjectChord(int controlCode, char follow)
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::InjectControl(int controlCode)
 {
-    mMenuInput->HandleKey(static_cast<char>(controlCode), false, false);
+    MenuInput()->HandleKey(static_cast<char>(controlCode), false, false);
 
-    mView->EnsureCaretVisible();
+    ActiveView()->EnsureCaretVisible();
 
     CheckCommandSignals();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  char follow [in] the key after ^O N
+///
+/// @brief
+/// Fire a ^O N note command through the menu input handler (see
+/// InjectChord).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::InjectNoteKey(char follow)
+{
+    cWordStarInput* input = MenuInput();
+    input->HandleKey(static_cast<char>(CTRL_O), false, false);
+    input->HandleKey('n', false, false);
+    input->HandleKey(follow, false, false);
+
+    ActiveView()->EnsureCaretVisible();
+
+    CheckCommandSignals();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Keeps the view and menu input handler in step with the note editor of
+/// mEditor: made when a note opens, deleted once it has closed.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::SyncNotePane(void)
+{
+    cWSEditorCtrl* pane = dynamic_cast<cWSEditorCtrl*>(mEditor->GetNoteEditor());
+    if (pane == mNoteEditor)
+    {
+        return;
+    }
+
+    delete mNoteView;
+    mNoteView = nullptr;
+    delete mNoteMenuInput;
+    mNoteMenuInput = nullptr;
+    mNoteEditor = pane;
+    mNoteTextRows = 0;
+
+    if (pane != nullptr)
+    {
+        pane->SetTerminalSize(mRows, mCols);
+        mNoteView = new cWSEditorView(pane);
+        mNoteView->SetShowScrollbar(mShowScrollBar);
+
+        // Full width until the next draw places the pane
+        int offset = 0;
+        int cols = mCols;
+        GetEditorHorizontalExtent(offset, cols);
+        sRect bounds;
+        bounds.row = 0;
+        bounds.col = offset;
+        bounds.rows = std::max(1, mRows / 3);
+        bounds.cols = cols;
+        mNoteView->SetBounds(bounds);
+        mNoteMenuInput = new cWordStarInput(pane);
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the editor menus act on: the note editor while a note is open,
+///         otherwise the main editor
+///
+/////////////////////////////////////////////////////////////////////////////
+cWSEditorCtrl* cWSWordTsar::Active(void)
+{
+    SyncNotePane();
+    return (mNoteEditor != nullptr) ? mNoteEditor : mEditor;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the view of Active()
+///
+/////////////////////////////////////////////////////////////////////////////
+cWSEditorView* cWSWordTsar::ActiveView(void)
+{
+    SyncNotePane();
+    return (mNoteView != nullptr) ? mNoteView : mView;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the WordStar input handler for menu commands of Active()
+///
+/////////////////////////////////////////////////////////////////////////////
+cWordStarInput* cWSWordTsar::MenuInput(void)
+{
+    SyncNotePane();
+    return (mNoteMenuInput != nullptr) ? mNoteMenuInput : mMenuInput;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Writes an open note into the document before a command that replaces
+/// or closes the document.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSWordTsar::KeepOpenNote(void)
+{
+    if (mEditor->IsNoteOpen() == true)
+    {
+        mEditor->CloseNote(true);
+    }
+    SyncNotePane();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -855,7 +976,12 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
     mShowTopStatus = config.mTuiShowStyleBar;
     mShowRuler = config.mTuiShowRuler;
     mShowBottomStatus = config.mTuiShowStatusBar;
-    mView->SetShowScrollbar(config.mTuiShowScrollBar);
+    mShowScrollBar = config.mTuiShowScrollBar;
+    mView->SetShowScrollbar(mShowScrollBar);
+    if (mNoteView != nullptr)
+    {
+        mNoteView->SetShowScrollbar(mShowScrollBar);
+    }
     mEditor->SetCenterView(config.mTuiCenterView);
     mShowStartupScreen = config.mTuiShowStartupScreen;
 
@@ -1183,6 +1309,7 @@ void cWSWordTsar::OpenRecentFiles(void)
     int selected = listPtr->GetSelectedIndex();
     if ((selected >= 0) && (selected < static_cast<int>(files.size())))
     {
+        KeepOpenNote();
         mFilename = files[static_cast<size_t>(selected)];
         mEditor->LoadFile(mFilename);
         mEditor->RelayoutAndRedraw();
@@ -1207,6 +1334,7 @@ void cWSWordTsar::OpenFile(void)
     std::string filename = mEditor->PromptForLoadFile();
     if (!filename.empty())
     {
+        KeepOpenNote();
         mEditor->LoadFile(filename);
     }
 }
@@ -1248,13 +1376,25 @@ void cWSWordTsar::BuildMenus(void)
         return modern ? mod : ws;
     };
     auto unavailable = [this](void) { ShowNotAvailable(); };
+    // A command on the main editor's document; keep: write an open note first
+    auto mainChord = [this](int controlCode, char follow, bool keep)
+    {
+        if (keep == true)
+        {
+            KeepOpenNote();
+        }
+        mMenuInput->HandleKey(static_cast<char>(controlCode), false, false);
+        mMenuInput->HandleKey(follow, false, false);
+        ActiveView()->EnsureCaretVisible();
+        CheckCommandSignals();
+    };
 
     // ------------------------------- File -------------------------------
     int file = mMenu.AddMenu("File", 'F');
     mMenu.AddSubItem(file, LB("&Open/Read...", "&Open...") + SC("", "Ctrl+O"), [this](void) { OpenFile(); });
-    mMenu.AddSubItem(file, std::string("&Save") + SC("^KS", "Ctrl+S"), [this](void) { InjectChord(CTRL_K, 's'); });
-    mMenu.AddSubItem(file, std::string("Save &As...") + SC("^KT", "Ctrl+Shift+S"), [this](void) { InjectChord(CTRL_K, 't'); });
-    mMenu.AddSubItem(file, std::string("Save and &Close") + SC("^KD", ""), [this](void) { InjectChord(CTRL_K, 'd'); });
+    mMenu.AddSubItem(file, std::string("&Save") + SC("^KS", "Ctrl+S"), [mainChord](void) { mainChord(CTRL_K, 's', false); });
+    mMenu.AddSubItem(file, std::string("Save &As...") + SC("^KT", "Ctrl+Shift+S"), [mainChord](void) { mainChord(CTRL_K, 't', false); });
+    mMenu.AddSubItem(file, std::string("Save and &Close") + SC("^KD", ""), [mainChord](void) { mainChord(CTRL_K, 'd', true); });
     mMenu.AddSeparator(file);
     mMenu.AddSubItem(file, std::string("&Print...") + SC("^KP", "Ctrl+P"), [this](void) { mEditor->Print(); });
     mMenu.AddSubItem(file, std::string("Print Pre&view") + SC("^OP", ""), [this](void) { mEditor->PrintPreview(); });
@@ -1262,12 +1402,12 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(file, std::string("&Recent Files..."), [this](void) { OpenRecentFiles(); });
     mMenu.AddSubItem(file, std::string("Pr&eferences..."), [this](void) { OpenSystemPreferences(); });
     mMenu.AddSeparator(file);
-    mMenu.AddSubItem(file, std::string("E&xit WordTsar") + SC("^KX", "Alt+F4"), [this](void) { InjectChord(CTRL_K, 'x'); });
+    mMenu.AddSubItem(file, std::string("E&xit WordTsar") + SC("^KX", "Alt+F4"), [mainChord](void) { mainChord(CTRL_K, 'x', true); });
 
     // ------------------------------- Edit -------------------------------
     int edit = mMenu.AddMenu("Edit", 'E');
     mMenu.AddSubItem(edit, std::string("&Undo") + SC("^U", "Ctrl+Z"), [this](void) { InjectControl(CTRL_U); });
-    mMenu.AddSubItem(edit, std::string("&Redo") + SC("Ctrl+Alt+U", "Ctrl+Y"), [this](void) { mEditor->Redo(); });
+    mMenu.AddSubItem(edit, std::string("&Redo") + SC("Ctrl+Alt+U", "Ctrl+Y"), [this](void) { Active()->Redo(); });
     mMenu.AddSeparator(edit);
     mMenu.AddSubItem(edit, std::string("Mark Block &Beginning") + SC("^KB", "Alt+K, B"), [this](void) { InjectChord(CTRL_K, 'b'); });
     mMenu.AddSubItem(edit, std::string("Mark Block En&d") + SC("^KK", "Alt+K, K"), [this](void) { InjectChord(CTRL_K, 'k'); });
@@ -1284,8 +1424,8 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(editDelete, std::string("Block") + SC("^KY", "Alt+K, Y"), [this](void) { InjectChord(CTRL_K, 'y'); });
     mMenu.AddSubMenuItem(editDelete, std::string("Word") + SC("^T", "Ctrl+Del"), [this](void) { InjectControl(CTRL_T); });
     mMenu.AddSubMenuItem(editDelete, std::string("Line") + SC("^Y", ""), [this](void) { InjectControl(CTRL_Y); });
-    mMenu.AddSubMenuItem(editDelete, std::string("Line Left") + SC("^QDel", "Alt+Q, DEL"), [this](void) { mEditor->DeleteLineLeft(); mEditor->PerformPostCommandUpdate(); });
-    mMenu.AddSubMenuItem(editDelete, std::string("Line Right") + SC("^QY", "Alt+Q, Y"), [this](void) { mEditor->DeleteLineRight(); mEditor->PerformPostCommandUpdate(); });
+    mMenu.AddSubMenuItem(editDelete, std::string("Line Left") + SC("^QDel", "Alt+Q, DEL"), [this](void) { Active()->DeleteLineLeft(); Active()->PerformPostCommandUpdate(); });
+    mMenu.AddSubMenuItem(editDelete, std::string("Line Right") + SC("^QY", "Alt+Q, Y"), [this](void) { Active()->DeleteLineRight(); Active()->PerformPostCommandUpdate(); });
     mMenu.AddSubMenuItem(editDelete, std::string("To Character...") + SC("^QT", "Alt+Q, T"), [this](void) { InjectChord(CTRL_Q, 't'); });
 
     mMenu.AddSubItem(edit, std::string("Mark Previo&us Block") + SC("^KU", "Alt+K, U"), [this](void) { InjectChord(CTRL_K, 'u'); });
@@ -1349,7 +1489,7 @@ void cWSWordTsar::BuildMenus(void)
 
     // ------------------------------ Insert ------------------------------
     int insert = mMenu.AddMenu("Insert", 'I');
-    mMenu.AddSubItem(insert, std::string("&Page Break") + SC(".pa", ""), [this](void) { mEditor->InsertText(".pa\r"); });
+    mMenu.AddSubItem(insert, std::string("&Page Break") + SC(".pa", ""), [this](void) { Active()->InsertText(".pa\r"); });
     mMenu.AddSeparator(insert);
     mMenu.AddSubItem(insert, std::string("&Today's Date") + SC("^M@", ""), [this](void) { InjectChord(CTRL_M, '@'); });
 
@@ -1363,14 +1503,14 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(insertOther, std::string("Current Path") + SC("^M\\", ""), [this](void) { InjectChord(CTRL_M, '\\'); });
 
     int insertVar = mMenu.AddSubMenu(insert, "&Variable");
-    mMenu.AddSubMenuItem(insertVar, "Date", [this](void) { mEditor->InsertText("&@&"); });
-    mMenu.AddSubMenuItem(insertVar, "Time", [this](void) { mEditor->InsertText("&!&"); });
-    mMenu.AddSubMenuItem(insertVar, "Page", [this](void) { mEditor->InsertText("&#&"); });
-    mMenu.AddSubMenuItem(insertVar, "Filename", [this](void) { mEditor->InsertText("&*&"); });
-    mMenu.AddSubMenuItem(insertVar, "Drive", [this](void) { mEditor->InsertText("&:&"); });
-    mMenu.AddSubMenuItem(insertVar, "Directory", [this](void) { mEditor->InsertText("&.&"); });
-    mMenu.AddSubMenuItem(insertVar, "Path", [this](void) { mEditor->InsertText("&\\&"); });
-    mMenu.AddSubMenuItem(insertVar, "Word Count", [this](void) { mEditor->InsertText("&?&"); });
+    mMenu.AddSubMenuItem(insertVar, "Date", [this](void) { Active()->InsertText("&@&"); });
+    mMenu.AddSubMenuItem(insertVar, "Time", [this](void) { Active()->InsertText("&!&"); });
+    mMenu.AddSubMenuItem(insertVar, "Page", [this](void) { Active()->InsertText("&#&"); });
+    mMenu.AddSubMenuItem(insertVar, "Filename", [this](void) { Active()->InsertText("&*&"); });
+    mMenu.AddSubMenuItem(insertVar, "Drive", [this](void) { Active()->InsertText("&:&"); });
+    mMenu.AddSubMenuItem(insertVar, "Directory", [this](void) { Active()->InsertText("&.&"); });
+    mMenu.AddSubMenuItem(insertVar, "Path", [this](void) { Active()->InsertText("&\\&"); });
+    mMenu.AddSubMenuItem(insertVar, "Word Count", [this](void) { Active()->InsertText("&?&"); });
 
     mMenu.AddSubItem(insert, std::string("&Extended Char...") + SC("^PO", ""), unavailable, false);
     mMenu.AddSeparator(insert);
@@ -1380,8 +1520,8 @@ void cWSWordTsar::BuildMenus(void)
 
     int insertNote = mMenu.AddSubMenu(insert, "&Note");
     mMenu.AddSubMenuItem(insertNote, std::string("Comment...") + SC("^ONC", ""), unavailable, false);
-    mMenu.AddSubMenuItem(insertNote, std::string("Footnote...") + SC("^ONF", ""), unavailable, false);
-    mMenu.AddSubMenuItem(insertNote, std::string("Endnote...") + SC("^ONE", ""), unavailable, false);
+    mMenu.AddSubMenuItem(insertNote, std::string("Footnote...") + SC("^ONF", ""), [this](void) { InjectNoteKey('f'); });
+    mMenu.AddSubMenuItem(insertNote, std::string("Endnote...") + SC("^ONE", ""), [this](void) { InjectNoteKey('e'); });
     mMenu.AddSubMenuItem(insertNote, std::string("Annotation") + SC("^ONA", ""), unavailable, false);
 
     mMenu.AddSeparator(insert);
@@ -1441,14 +1581,14 @@ void cWSWordTsar::BuildMenus(void)
 
     int layoutHF = mMenu.AddSubMenu(layout, "&Headers/Footers");
     mMenu.AddSubMenuItem(layoutHF, std::string("Header...") + SC(".he", ""), [this](void) {
-        mEditor->MoveCursorStartLine();
-        mEditor->GetDocument()->MaybeInsertHardReturn();
-        mEditor->GetDocument()->Insert(".he\n");
+        Active()->MoveCursorStartLine();
+        Active()->GetDocument()->MaybeInsertHardReturn();
+        Active()->GetDocument()->Insert(".he\n");
     });
     mMenu.AddSubMenuItem(layoutHF, std::string("Footer...") + SC(".fo", ""), [this](void) {
-        mEditor->MoveCursorStartLine();
-        mEditor->GetDocument()->MaybeInsertHardReturn();
-        mEditor->GetDocument()->Insert(".fo\n");
+        Active()->MoveCursorStartLine();
+        Active()->GetDocument()->MaybeInsertHardReturn();
+        Active()->GetDocument()->Insert(".fo\n");
     });
 
     mMenu.AddSubItem(layout, std::string("Page Numbering...") + SC("^O#", ""), unavailable, false);
@@ -1462,19 +1602,19 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Vertically Center") + SC("^OV", ""), unavailable, false);
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Word Together") + SC("^PO", ""), unavailable, false);
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Page") + SC(".cp", ""), [this](void) {
-        mEditor->MoveCursorStartLine();
-        mEditor->GetDocument()->MaybeInsertHardReturn();
-        mEditor->GetDocument()->Insert(".cp\n");
+        Active()->MoveCursorStartLine();
+        Active()->GetDocument()->MaybeInsertHardReturn();
+        Active()->GetDocument()->Insert(".cp\n");
     });
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Column") + SC(".cc", ""), unavailable, false);
 
     // ----------------------------- Utilities ----------------------------
     int util = mMenu.AddMenu("Utilities", 'U');
-    mMenu.AddSubItem(util, std::string("&Spell Check Global") + SC("^QL", ""), [this](void) { mEditor->SpellCheckDocument(); });
+    mMenu.AddSubItem(util, std::string("&Spell Check Global") + SC("^QL", ""), [this](void) { Active()->SpellCheckDocument(); });
 
     int utilSpell = mMenu.AddSubMenu(util, "Spell Check Ot&her");
-    mMenu.AddSubMenuItem(utilSpell, std::string("Rest of Document") + SC("^QL", ""), [this](void) { mEditor->SpellCheckDocument(); });
-    mMenu.AddSubMenuItem(utilSpell, std::string("Word") + SC("^QN", ""), [this](void) { mEditor->SpellCheckWord(); });
+    mMenu.AddSubMenuItem(utilSpell, std::string("Rest of Document") + SC("^QL", ""), [this](void) { Active()->SpellCheckDocument(); });
+    mMenu.AddSubMenuItem(utilSpell, std::string("Word") + SC("^QN", ""), [this](void) { Active()->SpellCheckWord(); });
     mMenu.AddSubMenuItem(utilSpell, std::string("Type Word...") + SC("^QO", ""), unavailable, false);
 
     mMenu.AddSubItem(util, std::string("&Thesaurus") + SC("^QJ", ""), unavailable, false);
@@ -1549,7 +1689,7 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(help, "&Help  F1", [this](void)
     {
         // Same as pressing F1 in the editor.
-        IInputHandler* input = mEditor->GetInput();
+        IInputHandler* input = Active()->GetInput();
         if (input != nullptr)
         {
             input->HandleSpecialKey(SPECIAL_F1);
@@ -1591,7 +1731,7 @@ int cWSWordTsar::MacroMenuState(void) const
 void cWSWordTsar::RunMacroCommand(void (cEditorBase::*command)(void))
 {
     (mEditor->*command)();
-    mView->EnsureCaretVisible();
+    ActiveView()->EnsureCaretVisible();
     CheckCommandSignals();
 }
 
@@ -1834,6 +1974,10 @@ void cWSWordTsar::LayoutChrome(void)
     mMenu.SetBounds(menuRect);
 
     mEditor->SetTerminalSize(mRows, mCols);
+    if (mNoteEditor != nullptr)
+    {
+        mNoteEditor->SetTerminalSize(mRows, mCols);
+    }
 }
 
 // =========================================================================
@@ -1852,7 +1996,7 @@ void cWSWordTsar::LayoutChrome(void)
 /////////////////////////////////////////////////////////////////////////////
 bool cWSWordTsar::IsHelpVisible(void)
 {
-    eHelpDisplay mode = mEditor->GetHelpDisplay();
+    eHelpDisplay mode = Active()->GetHelpDisplay();
 
     if (mode != mLastHelpMode)
     {
@@ -1873,7 +2017,7 @@ bool cWSWordTsar::IsHelpVisible(void)
     // mode is one of the HELP_CTRLx submenus here. Per the WS7 manual's
     // "Change Help Level", submenus only appear at levels 2-3 -- level 4
     // relies on the pull-down bar instead.
-    if (mEditor->mHelpLevel < 2 || mEditor->mHelpLevel > 3)
+    if (Active()->mHelpLevel < 2 || Active()->mHelpLevel > 3)
     {
         return false;
     }
@@ -1898,7 +2042,7 @@ int cWSWordTsar::HelpPanelRows(void)
         return 0;
     }
 
-    eHelpDisplay mode = mEditor->GetHelpDisplay();
+    eHelpDisplay mode = Active()->GetHelpDisplay();
     std::string text = GetHelpText(mode);
     if (text.empty() == true)
     {
@@ -1968,7 +2112,7 @@ void cWSWordTsar::DrawHelpPanel(cScreen& screen, int startRow, int rows)
     area.cols = mCols;
     screen.FillRect(area, " ", normal);
 
-    std::string text = GetHelpText(mEditor->GetHelpDisplay());
+    std::string text = GetHelpText(Active()->GetHelpDisplay());
     int row = startRow;
     size_t pos = 0;
 
@@ -2680,9 +2824,14 @@ void cWSWordTsar::GetEditorHorizontalExtent(int& offset, int& contentCols) const
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::DrawEditor(cScreen& screen, const cTheme& theme)
 {
+    SyncNotePane();
     if (mEditor->HasPendingLayout() == true)
     {
         mEditor->IdleLayout();
+    }
+    if ((mNoteEditor != nullptr) && (mNoteEditor->HasPendingLayout() == true))
+    {
+        mNoteEditor->IdleLayout();
     }
 
     sStyle editorStyle;
@@ -2740,9 +2889,54 @@ void cWSWordTsar::DrawEditor(cScreen& screen, const cTheme& theme)
     editorRect.rows = editorRows;
     editorRect.cols = centerCols;
 
-    mEditor->SetChromeRows(mRows - editorRows);
-    mView->SetBounds(editorRect);
-    mView->Draw(screen);
+    if (mNoteEditor != nullptr)
+    {
+        // Note pane below the text: a title row and a third of the rows
+        int noteRows = std::max(1, editorRows / 3);
+        int textRows = std::max(1, editorRows - noteRows - 1);
+        noteRows = std::max(1, editorRows - textRows - 1);
+
+        editorRect.rows = textRows;
+        mEditor->SetChromeRows(mRows - textRows);
+        mView->SetBounds(editorRect);
+
+        sRect noteRect = editorRect;
+        noteRect.row = editorTop + textRows + 1;
+        noteRect.rows = noteRows;
+        mNoteEditor->SetChromeRows(mRows - noteRows);
+        mNoteView->SetBounds(noteRect);
+
+        if (textRows != mNoteTextRows)
+        {
+            mView->EnsureCaretVisible();
+            mNoteView->EnsureCaretVisible();
+            mNoteTextRows = textRows;
+        }
+
+        mView->Draw(screen);
+
+        sStyle titleStyle;
+        titleStyle.fg = mTitleFg;
+        titleStyle.bg = mTitleBg;
+        titleStyle.attrs = wordstartui::CELL_ATTR_BOLD;
+        sRect titleRect;
+        titleRect.row = editorTop + textRows;
+        titleRect.col = 0;
+        titleRect.rows = 1;
+        titleRect.cols = mCols;
+        screen.FillRect(titleRect, " ", titleStyle);
+        std::string title = mEditor->GetNoteTitle();
+        int titleCol = std::max(0, (mCols - static_cast<int>(title.size())) / 2);
+        screen.PutText(titleRect.row, titleCol, title, titleStyle);
+
+        mNoteView->Draw(screen);
+    }
+    else
+    {
+        mEditor->SetChromeRows(mRows - editorRows);
+        mView->SetBounds(editorRect);
+        mView->Draw(screen);
+    }
 
     if (helpRows > 0)
     {
@@ -2856,7 +3050,7 @@ std::string cWSWordTsar::TitleText(void) const
 void cWSWordTsar::DrawTopStatus(cScreen& screen, int row)
 {
     sStatus status;
-    mEditor->GetStatus(status);
+    Active()->GetStatus(status);
 
     sStyle base;
     base.fg = mStatusFg;
@@ -3014,8 +3208,8 @@ bool cWSWordTsar::HandleTopStatusClick(int col)
     }
     if (aligned == true)
     {
-        mEditor->SetAlignment(just);
-        mEditor->PerformPostCommandUpdate();
+        Active()->SetAlignment(just);
+        Active()->PerformPostCommandUpdate();
         return true;
     }
 
@@ -3024,7 +3218,7 @@ bool cWSWordTsar::HandleTopStatusClick(int col)
     // name opens the font dialog; the style region opens the character-style
     // picker.
     sStatus status;
-    mEditor->GetStatus(status);
+    Active()->GetStatus(status);
     std::string label = status.font;
     if (status.style.empty() == false)
     {
@@ -3079,8 +3273,8 @@ bool cWSWordTsar::HandleBottomStatusClick(int col)
 {
     if ((col >= mModeClickStart) && (col < mModeClickEnd))
     {
-        mEditor->ToggleInsertOverwrite();
-        mEditor->PerformPostCommandUpdate();
+        Active()->ToggleInsertOverwrite();
+        Active()->PerformPostCommandUpdate();
         return true;
     }
     if ((col >= mPageClickStart) && (col < mPageClickEnd))
@@ -3186,8 +3380,8 @@ void cWSWordTsar::DrawRuler(cScreen& screen, int row)
     bar.cols = rulerCols;
     screen.FillRect(bar, "\xe2\x94\x80", style);
 
-    cLayoutBase* layout = mEditor->GetLayout();
-    COORD_T twipsPerCol = mEditor->GetTwipsPerColumn();
+    cLayoutBase* layout = Active()->GetLayout();
+    COORD_T twipsPerCol = Active()->GetTwipsPerColumn();
     if ((layout == nullptr) || (twipsPerCol <= 0))
     {
         return;
@@ -3230,7 +3424,7 @@ void cWSWordTsar::DrawRuler(cScreen& screen, int row)
     }
 
     // Caret indicator (inverted), hidden on dot/comment lines.
-    cDocument* doc = mEditor->GetDocument();
+    cDocument* doc = Active()->GetDocument();
     if (doc != nullptr)
     {
         POSITION_T pos = doc->GetPosition();
@@ -3270,7 +3464,7 @@ void cWSWordTsar::DrawRuler(cScreen& screen, int row)
 void cWSWordTsar::DrawBottomStatus(cScreen& screen)
 {
     sStatus status;
-    mEditor->GetStatus(status);
+    Active()->GetStatus(status);
 
     sStyle style;
     style.fg = mStatusFg;
@@ -3287,8 +3481,8 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
 
     // Left: transient status message, or an animated busy indicator while a
     // background layout is in progress.
-    std::string message = mEditor->GetStatusMessage();
-    mEditor->TickStatusMessage();
+    std::string message = Active()->GetStatusMessage();
+    Active()->TickStatusMessage();
     if (status.macroState.empty() == false)
     {
         message = (message.empty() == true) ? status.macroState : (status.macroState + "  " + message);
@@ -3433,7 +3627,7 @@ bool cWSWordTsar::HandleEvent(const sInputEvent& event)
         {
             // Direct edits (e.g. SetAlignment) mutate the document without going
             // through the input pipeline, so refresh the view here too.
-            mView->EnsureCaretVisible();
+            ActiveView()->EnsureCaretVisible();
             CheckCommandSignals();
         }
         return true;
@@ -3447,20 +3641,28 @@ bool cWSWordTsar::HandleEvent(const sInputEvent& event)
     {
         if (HandleBottomStatusClick(event.mouseCol) == true)
         {
-            mView->EnsureCaretVisible();
+            ActiveView()->EnsureCaretVisible();
             CheckCommandSignals();
         }
         return true;
     }
 
-    bool handled = mView->HandleEvent(event);
+    // While a note is open, mouse events go to the note pane and the cursor
+    // in the text stays at the note; keys go through mEditor to the note.
+    cWSEditorView* target = mView;
+    SyncNotePane();
+    if ((mNoteView != nullptr) && (event.type == wordstartui::INPUT_TYPE_MOUSE))
+    {
+        target = mNoteView;
+    }
+    bool handled = target->HandleEvent(event);
 
     if (handled == true)
     {
         // A scrollbar drag sets the viewport directly; don't re-center on caret.
-        if (mView->DidScrollByBar() == false)
+        if (target->DidScrollByBar() == false)
         {
-            mView->EnsureCaretVisible();
+            ActiveView()->EnsureCaretVisible();
         }
         CheckCommandSignals();
     }
@@ -3901,11 +4103,11 @@ void cWSWordTsar::SetMode(eAppMode mode)
 /////////////////////////////////////////////////////////////////////////////
 void cWSWordTsar::ShowNotAvailable(void)
 {
-    if (mEditor->IsStatusError() == true)
+    if (Active()->IsStatusError() == true)
     {
         return;
     }
-    mEditor->SetStatusMessage(kNotAvailableMessage);
+    Active()->SetStatusMessage(kNotAvailableMessage);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -4184,15 +4386,16 @@ void cWSWordTsar::OnAfterDraw(cTerminalDriver& driver)
         }
     }
 
-    if ((mMode == APP_EDITOR) && (mView->CaretVisible() == true))
+    cWSEditorView* view = (mMode == APP_EDITOR) ? ActiveView() : mView;
+    if ((mMode == APP_EDITOR) && (view->CaretVisible() == true))
     {
         // Insert mode draws a blinking block; overwrite mode draws a steady
         // block that covers the character.
-        wordstartui::eCursorShape shape = (mEditor->mInsertMode == true)
+        wordstartui::eCursorShape shape = (Active()->mInsertMode == true)
                                               ? wordstartui::CURSOR_SHAPE_BLOCK
                                               : wordstartui::CURSOR_SHAPE_BLOCK_STEADY;
         driver.SetCursorShape(shape);
-        driver.SetCursor(mView->GetCaretRow(), mView->GetCaretCol(), true);
+        driver.SetCursor(view->GetCaretRow(), view->GetCaretCol(), true);
     }
     else
     {

@@ -54,7 +54,9 @@ class cWSEditorCtrl : public cEditorBase
     // =================================================================
 
 public:
-    explicit cWSEditorCtrl(void);
+    // document: the document to edit, deleted with the editor; nullptr
+    // creates an empty one
+    explicit cWSEditorCtrl(cDocument* document = nullptr);
     virtual ~cWSEditorCtrl(void);
 
     // ---- Pure virtual: platform rendering ----
@@ -188,6 +190,13 @@ public:
     bool TermSupportsUnderline(void) const { return mTermSupportsUnderline; }
     bool TermSupportsStrikethrough(void) const { return mTermSupportsStrikethrough; }
 
+    // ---- Note pane (see cEditorBase::ShowNotePane) ----
+    // The pane editor is owned here; the app draws it while GetNoteEditor()
+    // returns it. A closed pane is kept until the next note opens or this
+    // editor is destroyed, since the key that closed it is still running.
+    cEditorBase* ShowNotePane(cDocument* note, const std::string& title) override;
+    void HideNotePane(cEditorBase* pane) override;
+
     // ---- Return-to-opening-menu signal (^KQ abandon, ^KD save and close) ----
     bool ReturnToOpeningRequested(void) const { return mReturnToOpening; }
     void ClearReturnToOpening(void) { mReturnToOpening = false; }
@@ -296,6 +305,10 @@ private:
 
     // Cached clipboard tool (0=none, detected on first use)
     int mClipboardTool;
+
+    // Note pane editors (owned): the open one and the last closed one
+    cWSEditorCtrl* mNotePane = nullptr;
+    cWSEditorCtrl* mClosedNotePane = nullptr;
 };
 
 #endif // WSTUI_EDITORCTRL_H
