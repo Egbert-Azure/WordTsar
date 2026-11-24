@@ -3204,4 +3204,67 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         CHECK(noteCount(*doc) == 0);
         CHECK_FALSE(doc->CanUndo());
     }
+
+    SUBCASE("^ONG goes to a note, ^OND edits it, ^KD writes the change as one undo step")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        cDocument footnoteText;
+        REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(NOTE_KIND_FOOTNOTE), footnoteText));
+        footnoteText.SetPosition(2);
+        footnoteText.Insert("First note");
+        doc->Insert("One");
+        doc->InsertNote(NOTE_KIND_FOOTNOTE, footnoteText);     // 3
+        doc->Insert(" two\r");
+        doc->ClearUndoHistory();
+        sNote old{};
+        REQUIRE(doc->GetNote(3, old));
+        POSITION_T size = doc->GetTextSize();
+
+        auto type = [&editor](const std::string& keys)
+        {
+            for (char ch : keys)
+            {
+                if (static_cast<unsigned char>(ch) < ' ')
+                {
+                    editor.FeedKey(CharKeyStroke(ch));
+                }
+                else
+                {
+                    editor.FeedKey(TextKeyStroke(std::string(1, ch)));
+                }
+            }
+        };
+
+        doc->SetPosition(0);
+        type("\x0F" "ng");
+        CHECK(doc->GetPosition() == 3);
+        type("\x0F" "ng");                                    // no more notes
+        CHECK(doc->GetPosition() == 3);
+
+        type("\x0F" "nd");
+        REQUIRE(editor.IsNoteOpen());
+        CHECK(editor.GetNoteTitle() == "Footnote 1");
+        type("See ");
+        CHECK(doc->GetTextSize() == size);
+        type("\x0B" "d");
+        CHECK_FALSE(editor.IsNoteOpen());
+
+        CHECK(doc->GetTextSize() == size);
+        CHECK(doc->GetControlChar(3) == STYLE_FOOTNOTE);
+        sNote edited{};
+        REQUIRE(doc->GetNote(3, edited));
+        cDocument editedText;
+        REQUIRE(cWordstarFile::DecodeNote(edited, editedText));
+        CHECK(editedText.GetParagraphText(0).find("See First note") != std::string::npos);
+
+        CHECK(editor.Undo());
+        CHECK_FALSE(doc->CanUndo());
+        sNote restored{};
+        REQUIRE(doc->GetNote(3, restored));
+        CHECK(restored.kind == NOTE_KIND_FOOTNOTE);
+        CHECK(restored.raw == old.raw);
+        CHECK(doc->GetTextSize() == size);
+    }
 }

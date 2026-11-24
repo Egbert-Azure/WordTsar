@@ -1635,7 +1635,6 @@ void cWordTsar::CreateMenus(void)
     QAction *GotoStyleTagAction = new QAction(mMenuProvider->GetEditGotoStyleTagLabel(), mMenuBar) ;
 GotoStyleTagAction->setEnabled(false) ;
     QAction *GotoNoteAction = new QAction(mMenuProvider->GetEditGotoNoteLabel(), mMenuBar) ;
-GotoNoteAction->setEnabled(false) ;
     QAction *GotoPreviousPositionAction = new QAction(mMenuProvider->GetEditGotoPreviousPositionLabel(), mMenuBar) ;
     QAction *GotoLastFindReplaceAction = new QAction(mMenuProvider->GetEditGotoLastFindReplaceLabel(), mMenuBar) ;
     QAction *GotoBeginningofBlockAction = new QAction(mMenuProvider->GetEditGotoBeginningOfBlockLabel(), mMenuBar) ;
@@ -1659,12 +1658,10 @@ GotoScrollDownAction->setEnabled(false) ;
     QAction *SetMarker0Action = new QAction(mMenuProvider->GetEditSetMarker0Label(), mMenuBar) ;
 
     QAction *EditNoteAction = new QAction(mMenuProvider->GetEditEditNoteLabel(), mMenuBar) ;
-EditNoteAction->setEnabled(false) ;
 
     QAction *NoteConvertAction = new QAction(mMenuProvider->GetEditNoteConvertLabel(), mMenuBar) ;
 NoteConvertAction->setEnabled(false) ;
     QAction *NotEndnoteLocationAction = new QAction(mMenuProvider->GetEditNoteEndnoteLocationLabel(), mMenuBar) ;
-NotEndnoteLocationAction->setEnabled(false) ;
 
     QAction *ColumnBlockModeAction = new QAction(mMenuProvider->GetEditColumnBlockModeLabel(), mMenuBar) ;
 ColumnBlockModeAction->setEnabled(false) ;
@@ -2583,7 +2580,9 @@ void cWordTsar::GotoStyle(void)
 
 void cWordTsar::GotoNote(void)
 {
-    Active()->NotImplemented("^Q-N-G") ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('n') ;
+    MenuInput()->HandleKey('g') ;
 }
 
 
@@ -2699,7 +2698,9 @@ void cWordTsar::Set0(void)
 
 void cWordTsar::EditNote(void)
 {
-    Active()->NotImplemented("^O-n-d") ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('n') ;
+    MenuInput()->HandleKey('d') ;
 }
 
 

@@ -1447,7 +1447,7 @@ void cWSWordTsar::BuildMenus(void)
     int editGotoOther = mMenu.AddSubMenu(edit, "Go to &Other");
     mMenu.AddSubMenuItem(editGotoOther, std::string("Font Tag") + SC("^Q=", "Alt+Q, ="), [this](void) { InjectChord(CTRL_Q, '='); });
     mMenu.AddSubMenuItem(editGotoOther, std::string("Style Tag") + SC("^Q<", ""), unavailable, false);
-    mMenu.AddSubMenuItem(editGotoOther, std::string("Note...") + SC("^ONG", ""), unavailable, false);
+    mMenu.AddSubMenuItem(editGotoOther, std::string("Note...") + SC("^ONG", ""), [this](void) { InjectNoteKey('g'); });
     mMenu.AddSubMenuItem(editGotoOther, std::string("Previous Position") + SC("^QP", "Alt+Q, P"), [this](void) { InjectChord(CTRL_Q, 'p'); });
     mMenu.AddSubMenuItem(editGotoOther, std::string("Last Find/Replace") + SC("^QV", "Alt+Q, V"), [this](void) { InjectChord(CTRL_Q, 'v'); });
     mMenu.AddSubMenuItem(editGotoOther, std::string("Beginning of Block") + SC("^QB", "Alt+Q, B"), [this](void) { InjectChord(CTRL_Q, 'b'); });
@@ -1465,11 +1465,15 @@ void cWSWordTsar::BuildMenus(void)
     }
     mMenu.AddSubMenuItem(editSetMarker, std::string("Marker 0") + SC("^K0", "Alt+K, 0"), [this](void) { InjectChord(CTRL_K, '0'); });
 
-    mMenu.AddSubItem(edit, std::string("Edit &Note") + SC("^OND", ""), unavailable, false);
+    mMenu.AddSubItem(edit, std::string("Edit &Note") + SC("^OND", ""), [this](void) { InjectNoteKey('d'); });
 
     int editNoteOpt = mMenu.AddSubMenu(edit, "Note Optio&ns");
     mMenu.AddSubMenuItem(editNoteOpt, std::string("Convert Note...") + SC("^ONV", ""), unavailable, false);
-    mMenu.AddSubMenuItem(editNoteOpt, std::string("Endnote Location") + SC(".pe", ""), unavailable, false);
+    mMenu.AddSubMenuItem(editNoteOpt, std::string("Endnote Location") + SC(".pe", ""), [this](void) {
+        Active()->MoveCursorStartLine();
+        Active()->GetDocument()->MaybeInsertHardReturn();
+        Active()->GetDocument()->Insert(".pe\n");
+    });
 
     int editSettings = mMenu.AddSubMenu(edit, "Editing Se&ttings");
     mMenu.AddSubMenuItem(editSettings, std::string("Column Block Mode") + SC("^KN", ""), unavailable, false);

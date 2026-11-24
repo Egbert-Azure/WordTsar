@@ -573,9 +573,7 @@ bool cEditorBase::DispatchNoteKey(const sKeyStroke& key)
 /// @brief
 /// ^ONF, ^ONE: opens a new note at the cursor. The note text starts as
 /// cWordstarFile::NewNote() writes it: the number sequence, a tab and a
-/// hard return; the note editor's cursor is after the tab. The title
-/// counts the notes of the same kind before the cursor. Nothing opens in a
-/// note editor, while a note is open, or without a front end pane.
+/// hard return.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::OpenNewNote(eNoteKind kind)
@@ -590,17 +588,124 @@ bool cEditorBase::OpenNewNote(eNoteKind kind)
     }
 
     CloseTypingGroup() ;
-
     sNote note = cWordstarFile::NewNote(kind, this) ;
+    return OpenNoteEditor(note, kind, mDocument->GetPosition(), true) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true if the note editor opened
+///
+/// @brief
+/// ^OND: opens the footnote or endnote whose marker is at the cursor.
+/// Closing it with ^KD writes the edited note in place of the old one;
+/// closing it without text deletes the note.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::OpenNoteAtCursor(void)
+{
+    if ((mNoteOwner != nullptr) || (mNoteEditor != nullptr) || (mDocument == nullptr))
+    {
+        return false ;
+    }
+
+    POSITION_T position = mDocument->GetPosition() ;
+    sNote note ;
+    if (mDocument->GetNote(position, note) == false)
+    {
+        return false ;
+    }
+    if ((note.kind != NOTE_KIND_FOOTNOTE) && (note.kind != NOTE_KIND_ENDNOTE))
+    {
+        return false ;
+    }
+
+    CloseTypingGroup() ;
+    return OpenNoteEditor(note, note.kind, position, false) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true if the cursor moved
+///
+/// @brief
+/// ^ONG: moves the cursor to the next footnote or endnote marker after the
+/// cursor. Without one the cursor stays and the status line says
+/// "No more notes".
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::GotoNextNote(void)
+{
+    if (mDocument == nullptr)
+    {
+        return false ;
+    }
+
+    POSITION_T size = mDocument->GetTextSize() ;
+    for (POSITION_T pos = mDocument->GetPosition() + 1; pos < size; pos++)
+    {
+        sNote note ;
+        if ((mDocument->GetNote(pos, note) == true) &&
+            ((note.kind == NOTE_KIND_FOOTNOTE) || (note.kind == NOTE_KIND_ENDNOTE)))
+        {
+            CloseTypingGroup() ;
+            mDocument->SetPosition(pos) ;
+            ScrollIntoView() ;
+            CalculateCaretPosition() ;
+            Repaint() ;
+            return true ;
+        }
+    }
+
+    SetStatusMessage("No more notes") ;
+    return false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  note     [in] the note to edit
+/// @param  kind     [in] NOTE_KIND_FOOTNOTE or NOTE_KIND_ENDNOTE
+/// @param  position [in] marker position
+/// @param  isNew    [in] the note has no marker yet
+///
+/// @return true if the note editor opened
+///
+/// @brief
+/// Decodes note into a document of its own and asks the front end for an
+/// editor on it. The note editor's cursor is after the first raw sequence
+/// and the tab that follows it, else at the start. The title counts the
+/// notes of the same kind before position. Nothing opens without a front
+/// end pane.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::OpenNoteEditor(const sNote& note, eNoteKind kind, POSITION_T position, bool isNew)
+{
     cDocument* content = new cDocument() ;
     if (cWordstarFile::DecodeNote(note, *content, this) == false)
     {
         delete content ;
         return false ;
     }
-    content->SetPosition(std::min<POSITION_T>(2, content->GetTextSize())) ;
 
-    POSITION_T position = mDocument->GetPosition() ;
+    POSITION_T start = 0 ;
+    POSITION_T contentSize = content->GetTextSize() ;
+    for (POSITION_T pos = 0; pos < contentSize; pos++)
+    {
+        if (content->GetControlChar(pos) == STYLE_RAW_SEQUENCE)
+        {
+            start = pos + 1 ;
+            if ((start < contentSize) && (content->GetControlChar(start) == STYLE_TAB))
+            {
+                start++ ;
+            }
+            break ;
+        }
+    }
+    content->SetPosition(std::min(start, contentSize)) ;
+
     int number = 1 ;
     for (POSITION_T pos = 0; pos < position; pos++)
     {
@@ -624,7 +729,7 @@ bool cEditorBase::OpenNewNote(eNoteKind kind)
     mNoteEditor = pane ;
     mNoteKind = kind ;
     mNotePosition = position ;
-    mNoteIsNew = true ;
+    mNoteIsNew = isNew ;
     mNoteOriginal = note ;
     mNoteTitle = title ;
     return true ;

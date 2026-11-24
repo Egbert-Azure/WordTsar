@@ -276,6 +276,8 @@ public:
     // document does not change until the note closes; closing writes the
     // note in one undo step.
     bool OpenNewNote(eNoteKind kind);                         // New footnote or endnote at the cursor; false if no note opened
+    bool OpenNoteAtCursor(void);                              // ^OND: the footnote or endnote at the cursor; false if none opened
+    bool GotoNextNote(void);                                  // ^ONG: cursor to the next note marker; false if there is none
     void CloseNote(bool keep);                                // keep: ^KD ^KS ^KX; otherwise ^KQ, which asks if the note changed
     bool IsNoteOpen(void) const;                              // A note of this editor's document is open
     bool IsNoteEditor(void) const;                            // This editor edits a note
@@ -523,6 +525,8 @@ private:
 
     // Key of the note pane, without the macro hooks of FeedKey
     bool DispatchNoteKey(const sKeyStroke& key);
+    // Opens a note editor on note at position (shared by ^ONF ^ONE ^OND)
+    bool OpenNoteEditor(const sNote& note, eNoteKind kind, POSITION_T position, bool isNew);
 
     // Caret Calc Helpers
     bool LookupCaretParagraph(sCaretCalcState& state) ;

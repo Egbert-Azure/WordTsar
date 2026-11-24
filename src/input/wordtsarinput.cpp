@@ -2008,8 +2008,9 @@ void cWordStarInput::OnControlOChar(char ch)
 /// @param  ch [in] - the key pressed after ^O,N
 ///
 /// @brief
-/// ^ONF and ^ONE open a new footnote or endnote at the cursor; in a note
-/// editor they are invalid. ^ONA, ^ONC and ^ONV do nothing.
+/// ^ONF and ^ONE open a new footnote or endnote at the cursor, ^OND the
+/// note at the cursor; in a note editor they are invalid. ^ONG moves the
+/// cursor to the next note. ^ONA, ^ONC and ^ONV do nothing.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWordStarInput::OnControlONChar(char ch)
@@ -2033,6 +2034,28 @@ void cWordStarInput::OnControlONChar(char ch)
             else if (mEditor->OpenNewNote((ch == 'f') ? NOTE_KIND_FOOTNOTE : NOTE_KIND_ENDNOTE) == false)
             {
                 mEditor->NotImplemented(t) ;
+            }
+            break ;
+
+        case 'd' :
+            if (mEditor->IsNoteEditor() == true || mEditor->IsNoteOpen() == true)
+            {
+                mEditor->InvalidCommand(t) ;
+            }
+            else if (mEditor->OpenNoteAtCursor() == false)
+            {
+                mEditor->SetStatusMessage("The cursor is not on a note") ;
+            }
+            break ;
+
+        case 'g' :
+            if (mEditor->IsNoteEditor() == true)
+            {
+                mEditor->InvalidCommand(t) ;
+            }
+            else
+            {
+                mEditor->GotoNextNote() ;
             }
             break ;
 
