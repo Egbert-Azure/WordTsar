@@ -213,7 +213,7 @@ private:
     cWSEditorCtrl* Active(void);             // editor menus act on
     cWSEditorView* ActiveView(void);         // view of Active()
     cWordStarInput* MenuInput(void);         // menu input handler of Active()
-    void KeepOpenNote(void);                 // write an open note into the document
+    bool KeepOpenNote(void);                 // write an open note into the document; false if it stays open
     void CheckCommandSignals(void);
     void OpenPreferences(void);
     void OpenSystemPreferences(void);

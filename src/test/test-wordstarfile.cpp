@@ -3272,6 +3272,90 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         CHECK(doc->GetTextSize() == size);
     }
 
+    SUBCASE("closing a note warns about characters the code page cannot hold")
+    {
+        class cAskingEditor : public cEditorCtrl
+        {
+        public:
+            bool mAnswer = false;
+            int mAsks = 0;
+            std::string mQuestion;
+
+            bool AskYesNo(const std::string& title, const std::string& question) override
+            {
+                (void)title;
+                ++mAsks;
+                mQuestion = question;
+                return mAnswer;
+            }
+        };
+
+        cAskingEditor editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        doc->Insert("One\r");
+        doc->ClearUndoHistory();
+        doc->SetPosition(3);
+
+        const std::string typed = "\xE2\x80\x94 \xE2\x80\x99 \xE2\x80\x9C \xE2\x80\x9D \xE2\x82\xAC \xC3\xBC";
+        auto typeNote = [&editor]()
+        {
+            editor.FeedKey(CharKeyStroke('\x0F'));
+            editor.FeedKey(TextKeyStroke("n"));
+            editor.FeedKey(TextKeyStroke("f"));
+            REQUIRE(editor.IsNoteOpen());
+            for (const std::string ch : {"\xE2\x80\x94", " ", "\xE2\x80\x99", " ", "\xE2\x80\x9C", " ",
+                                         "\xE2\x80\x9D", " ", "\xE2\x82\xAC", " ", "\xC3\xBC"})
+            {
+                editor.FeedKey(TextKeyStroke(ch));
+            }
+        };
+        auto closeNote = [&editor]()
+        {
+            editor.FeedKey(CharKeyStroke('\x0B'));
+            editor.FeedKey(TextKeyStroke("d"));
+        };
+
+        // CP437 holds only the ü: declining keeps the note open, accepting writes it
+        editor.SetCodePage(CP437);
+        typeNote();
+        closeNote();
+        CHECK(editor.mAsks == 1);
+        CHECK(editor.mQuestion.find("contains 5 character(s)") != std::string::npos);
+        REQUIRE(editor.IsNoteOpen());
+        CHECK(doc->GetControlChar(3) != STYLE_FOOTNOTE);
+        editor.mAnswer = true;
+        closeNote();
+        CHECK_FALSE(editor.IsNoteOpen());
+        CHECK(doc->GetControlChar(3) == STYLE_FOOTNOTE);
+        CHECK(editor.Undo());
+
+        // CP1252 holds all six through close, save and load
+        editor.mAsks = 0;
+        editor.SetCodePage(CP1252);
+        doc->SetPosition(3);
+        typeNote();
+        closeNote();
+        CHECK(editor.mAsks == 0);
+        REQUIRE_FALSE(editor.IsNoteOpen());
+
+        std::filesystem::path path = TempPath();
+        cWordstarFile saver(&editor);
+        REQUIRE(saver.SaveFile(path.string(), doc->GetTextSize()));
+        cDocument loaded;
+        loaded.Clear();
+        cWordstarFile loader(&editor);
+        loader.mDocument = &loaded;
+        REQUIRE(loader.LoadFile(path.string()));
+        std::filesystem::remove(path);
+
+        sNote note{};
+        REQUIRE(loaded.GetNote(3, note));
+        cDocument noteText;
+        REQUIRE(cWordstarFile::DecodeNote(note, noteText, &editor));
+        CHECK(noteText.GetParagraphText(0).find(typed) != std::string::npos);
+    }
+
     SUBCASE("an edited note whose marker moved stays open and deletes nothing")
     {
         cEditorCtrl editor;

@@ -753,8 +753,10 @@ bool cEditorBase::OpenNoteEditor(const sNote& note, eNoteKind kind, POSITION_T p
 /// is not inserted, so a new note closed empty leaves the document as it
 /// was. If the marker of an edited note is no longer at the recorded
 /// position, or the recorded position of a new note lies past the text,
-/// nothing is written and the note stays open. In the note editor, closes
-/// the note it edits.
+/// nothing is written and the note stays open. Before a changed note is
+/// written, the code page warning of a WordStar save
+/// (cWordstarFile::ConfirmCodePage) is given unless quiet; declining it
+/// keeps the note open. In the note editor, closes the note it edits.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::CloseNote(bool keep, bool quiet)
@@ -809,6 +811,14 @@ void cEditorBase::CloseNote(bool keep, bool quiet)
             {
                 pane->ShowMessage("Note", "The note's marker is no longer where the note was opened, so the note was not written. The note stays open.") ;
             }
+            return ;
+        }
+
+        cWordstarFile checker(this) ;
+        checker.mDocument = pane->GetDocument() ;
+        checker.SetSilent(quiet) ;
+        if (checker.ConfirmCodePage(0, pane->GetDocument()->GetTextSize()) == false)
+        {
             return ;
         }
     }

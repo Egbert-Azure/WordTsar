@@ -772,14 +772,18 @@ cWordStarInput* cWSWordTsar::MenuInput(void)
 /// Writes an open note into the document before a command that replaces
 /// or closes the document.
 ///
+/// @return false if the note stays open (the code page warning was
+///         declined, or the note cannot be written); the command then stops
+///
 /////////////////////////////////////////////////////////////////////////////
-void cWSWordTsar::KeepOpenNote(void)
+bool cWSWordTsar::KeepOpenNote(void)
 {
     if (mEditor->IsNoteOpen() == true)
     {
         mEditor->CloseNote(true);
     }
     SyncNotePane();
+    return mEditor->IsNoteOpen() == false;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1309,7 +1313,10 @@ void cWSWordTsar::OpenRecentFiles(void)
     int selected = listPtr->GetSelectedIndex();
     if ((selected >= 0) && (selected < static_cast<int>(files.size())))
     {
-        KeepOpenNote();
+        if (KeepOpenNote() == false)
+        {
+            return;
+        }
         mFilename = files[static_cast<size_t>(selected)];
         mEditor->LoadFile(mFilename);
         mEditor->RelayoutAndRedraw();
@@ -1334,7 +1341,10 @@ void cWSWordTsar::OpenFile(void)
     std::string filename = mEditor->PromptForLoadFile();
     if (!filename.empty())
     {
-        KeepOpenNote();
+        if (KeepOpenNote() == false)
+        {
+            return;
+        }
         mEditor->LoadFile(filename);
     }
 }
@@ -1379,9 +1389,9 @@ void cWSWordTsar::BuildMenus(void)
     // A command on the main editor's document; keep: write an open note first
     auto mainChord = [this](int controlCode, char follow, bool keep)
     {
-        if (keep == true)
+        if ((keep == true) && (KeepOpenNote() == false))
         {
-            KeepOpenNote();
+            return;
         }
         mMenuInput->HandleKey(static_cast<char>(controlCode), false, false);
         mMenuInput->HandleKey(follow, false, false);

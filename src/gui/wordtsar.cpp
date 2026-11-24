@@ -521,8 +521,7 @@ cWordTsar::~cWordTsar(void)
 /////////////////////////////////////////////////////////////////////////////
 void cWordTsar::closeEvent(QCloseEvent *event)
 {
-    KeepOpenNote() ;
-    if (mEditor->CloseEvent())
+    if (KeepOpenNote() && mEditor->CloseEvent())
     {
         event->accept();
     }
@@ -657,7 +656,10 @@ bool cWordTsar::eventFilter(QObject *obj, QEvent *event)
 
 void cWordTsar::LoadFile(QString name)
 {
-    KeepOpenNote() ;
+    if (KeepOpenNote() == false)
+    {
+        return ;
+    }
     mLoadFileName = name ;
     if (mEditor->LoadFile(name.toStdString()))
     {
@@ -2316,7 +2318,10 @@ ReformatNotesAction->setEnabled(false) ;
 // we handle menus by generating keys as if from the user
 void cWordTsar::Open(void)
 {
-    KeepOpenNote() ;
+    if (KeepOpenNote() == false)
+    {
+        return ;
+    }
     mEditor->Open() ;
 }
 
@@ -2352,7 +2357,10 @@ void cWordTsar::SaveAs(void)
 
 void cWordTsar::SaveandClose(void)
 {
-    KeepOpenNote() ;
+    if (KeepOpenNote() == false)
+    {
+        return ;
+    }
     mEditor->SaveAndClose() ;
 }
 
@@ -2381,7 +2389,10 @@ void cWordTsar::AboutWordTsar(void)
 
 void cWordTsar::ExitWordTsar(void)
 {
-    KeepOpenNote() ;
+    if (KeepOpenNote() == false)
+    {
+        return ;
+    }
     mEditor->ExitApplication() ;
 }
 
@@ -2972,13 +2983,17 @@ cWordStarInput *cWordTsar::MenuInput(void)
 /// Writes an open note into the document before a command that replaces
 /// or closes the document.
 ///
+/// @return false if the note stays open (the code page warning was
+///         declined, or the note cannot be written); the command then stops
+///
 /////////////////////////////////////////////////////////////////////////////
-void cWordTsar::KeepOpenNote(void)
+bool cWordTsar::KeepOpenNote(void)
 {
     if (mEditor->IsNoteOpen() == true)
     {
         mEditor->CloseNote(true) ;
     }
+    return mEditor->IsNoteOpen() == false ;
 }
 
 
@@ -3732,7 +3747,10 @@ void cWordTsar::StopRecordMacro(void)
 
 void cWordTsar::EditMacro(void)
 {
-    KeepOpenNote() ;
+    if (KeepOpenNote() == false)
+    {
+        return ;
+    }
     mEditor->MacroEdit() ;
 }
 
