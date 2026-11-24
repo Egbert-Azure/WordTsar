@@ -1003,10 +1003,61 @@ static unsigned char CodePageByte(eCodePage codepage, char32_t cp)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  cp [in] - code point
+///
+/// @return the plain ASCII text written for cp when a code page cannot
+///         hold it, nullptr if there is none
+///
+/////////////////////////////////////////////////////////////////////////////
+static const char *PlainFallback(char32_t cp)
+{
+    switch(cp)
+    {
+        case 0x2018 :                                   // left single quote
+        case 0x2019 :                                   // right single quote
+            return "'" ;
+        case 0x201C :                                   // left double quote
+        case 0x201D :                                   // right double quote
+            return "\"" ;
+        case 0x2011 :                                   // non-breaking hyphen
+        case 0x2013 :                                   // en dash
+        case 0x2014 :                                   // em dash
+            return "-" ;
+        case 0x2026 :                                   // ellipsis
+            return "..." ;
+        case 0x00B9 :
+            return "1" ;
+        case 0x00B2 :
+            return "2" ;
+        case 0x00B3 :
+            return "3" ;
+        case 0x2070 :
+            return "0" ;
+        case 0x2074 :
+            return "4" ;
+        case 0x2075 :
+            return "5" ;
+        case 0x2076 :
+            return "6" ;
+        case 0x2077 :
+            return "7" ;
+        case 0x2078 :
+            return "8" ;
+        case 0x2079 :
+            return "9" ;
+    }
+
+    return nullptr ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  str [in] - one character, UTF-8
 ///
 /// @return the number of code points of a multi-byte character other than
-///         NBSP that the current code page cannot hold
+///         NBSP that the current code page cannot hold and that have no
+///         plain fallback
 ///
 /////////////////////////////////////////////////////////////////////////////
 size_t cWordstarFile::CountUnmappable(const std::string &str)
@@ -1020,7 +1071,7 @@ size_t cWordstarFile::CountUnmappable(const std::string &str)
 
         for(char32_t cp : codepoints)
         {
-            if(CodePageByte(codepage, cp) == 0)
+            if(CodePageByte(codepage, cp) == 0 && PlainFallback(cp) == nullptr)
             {
                 unmappableCount++ ;
             }
@@ -1478,7 +1529,8 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
 /// @brief
 /// NBSP becomes ^O. A first code point in 0x20..0x7E is written as its
 /// byte. Every other code point becomes ESC x FS, x being the byte of the
-/// current code page; a code point the code page cannot hold is left out.
+/// current code page. A code point the code page cannot hold is written as
+/// its PlainFallback() text, or left out if it has none.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, uint32_t &stylecounter)
@@ -1513,6 +1565,12 @@ void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, ui
                 out += static_cast<char>(chws) ;
                 out += static_cast<char>(STYLE_EXTEND) ;
                 stylecounter += 3 ;
+            }
+            else if(const char *plain = PlainFallback(cp))
+            {
+                std::string text(plain) ;
+                out += text ;
+                stylecounter += static_cast<uint32_t>(text.size()) ;
             }
         }
     }

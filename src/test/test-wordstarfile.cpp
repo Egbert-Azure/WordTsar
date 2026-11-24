@@ -3337,12 +3337,13 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
             editor.FeedKey(TextKeyStroke("d"));
         };
 
-        // CP437 holds only the ü: declining keeps the note open, accepting writes it
+        // CP437 holds the ü and has plain fallbacks for the dash and quotes, not
+        // for the euro sign: declining keeps the note open, accepting writes it
         editor.SetCodePage(CP437);
         typeNote();
         closeNote();
         CHECK(editor.mAsks == 1);
-        CHECK(editor.mQuestion.find("contains 5 character(s)") != std::string::npos);
+        CHECK(editor.mQuestion.find("contains 1 character(s)") != std::string::npos);
         REQUIRE(editor.IsNoteOpen());
         CHECK(doc->GetControlChar(3) != STYLE_FOOTNOTE);
         editor.mAnswer = true;
