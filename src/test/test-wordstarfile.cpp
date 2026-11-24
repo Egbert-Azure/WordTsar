@@ -2322,7 +2322,7 @@ TEST_CASE("cWordstarFile - a paragraph starting with an ellipsis reloads as text
     CHECK_FALSE(layout.ParagraphIsComment(0));
     CHECK_FALSE(layout.ParagraphIsCommand(0));
     CHECK(loaded->GetParagraphText(0).find("and then") != std::string::npos);
-    CHECK(loaded->GetParagraphText(1) == "word -- word and 7-12");
+    CHECK(loaded->GetParagraphText(1) == "word -- word and 7-12\r");
 }
 
 

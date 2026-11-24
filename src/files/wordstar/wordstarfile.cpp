@@ -1021,8 +1021,9 @@ static const char *PlainFallback(char32_t cp)
             return "\"" ;
         case 0x2011 :                                   // non-breaking hyphen
         case 0x2013 :                                   // en dash
-        case 0x2014 :                                   // em dash
             return "-" ;
+        case 0x2014 :                                   // em dash
+            return "--" ;
         case 0x2026 :                                   // ellipsis
             return "..." ;
     }
@@ -1635,7 +1636,8 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
 /// byte. Every other code point becomes ESC x FS, x being the byte of the
 /// current code page. A superscript digit the code page cannot hold becomes
 /// ^T digit ^T. Any other code point the code page cannot hold is written
-/// as its PlainFallback() text, or left out if it has none.
+/// as its PlainFallback() text, or left out if it has none. Fallback text
+/// that starts with a dot at the start of a line follows a no-break space.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, uint32_t &stylecounter)
@@ -1681,6 +1683,15 @@ void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, ui
             else if(const char *plain = PlainFallback(cp))
             {
                 std::string text(plain) ;
+                // a line starting with a dot is a dot command or comment: a
+                // no-break space written first keeps the text a paragraph
+                if(text[0] == '.' && (out.empty() || out.back() == '\n'))
+                {
+                    out += static_cast<char>(STYLE_EXTSTART) ;
+                    out += static_cast<char>(codepage == CP1252 ? 0xA0 : 0xFF) ;
+                    out += static_cast<char>(STYLE_EXTEND) ;
+                    stylecounter += 3 ;
+                }
                 out += text ;
                 stylecounter += static_cast<uint32_t>(text.size()) ;
             }
