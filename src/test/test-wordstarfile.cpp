@@ -3272,6 +3272,44 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         CHECK(doc->GetTextSize() == size);
     }
 
+    SUBCASE("an edited note whose marker moved stays open and deletes nothing")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        cDocument footnoteText;
+        REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(NOTE_KIND_FOOTNOTE), footnoteText));
+        footnoteText.SetPosition(2);
+        footnoteText.Insert("First note");
+        doc->Insert("One");
+        doc->InsertNote(NOTE_KIND_FOOTNOTE, footnoteText);     // 3
+        doc->Insert(" two\r");
+        doc->ClearUndoHistory();
+        doc->SetPosition(3);
+
+        editor.FeedKey(CharKeyStroke('\x0F'));
+        editor.FeedKey(TextKeyStroke("n"));
+        editor.FeedKey(TextKeyStroke("d"));
+        REQUIRE(editor.IsNoteOpen());
+        editor.FeedKey(TextKeyStroke("x"));
+        doc->SetPosition(0);
+        doc->Insert("A");                                      // the marker is now at 4
+        std::string text = doc->GetParagraphText(0);
+        editor.FeedKey(CharKeyStroke('\x0B'));
+        editor.FeedKey(TextKeyStroke("d"));
+
+        CHECK(editor.IsNoteOpen());
+        CHECK(doc->GetParagraphText(0) == text);
+        CHECK(doc->GetControlChar(4) == STYLE_FOOTNOTE);
+        if (editor.IsNoteOpen())
+        {
+            editor.GetNoteEditor()->GetDocument()->Undo();
+            editor.FeedKey(CharKeyStroke('\x0B'));
+            editor.FeedKey(TextKeyStroke("q"));
+        }
+        CHECK_FALSE(editor.IsNoteOpen());
+    }
+
     SUBCASE("notes are numbered in document order, .f# sets the next number, the marker shows it")
     {
         cEditorCtrl editor;

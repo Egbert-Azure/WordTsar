@@ -2814,9 +2814,17 @@ void cWordTsar::ToggleRevealCodes(void)
 {
     if (mRevealCodesVisible)
     {
-        // Hide: transfer focus back to main editor, disconnect siblings, destroy codes editor
-        mEditor->mHasFocusDim = true ;
-        mEditor->setFocus() ;
+        // Hide: transfer focus back to main editor (or the open note),
+        // disconnect siblings, destroy codes editor
+        if (mNotePaneWidget != nullptr)
+        {
+            mNoteEditor->setFocus() ;
+        }
+        else
+        {
+            mEditor->mHasFocusDim = true ;
+            mEditor->setFocus() ;
+        }
         mEditor->SetSiblingEditor(nullptr) ;
 
         delete mCodesEditorWidget ;  // deletes child widgets too
@@ -2902,10 +2910,19 @@ void cWordTsar::ToggleRevealCodes(void)
         mSplitter->setSizes({700, 300}) ;
         mRevealCodesVisible = true ;
 
-        // Main editor stays active, codes editor starts dimmed
+        // Main editor stays active, codes editor starts dimmed; while a note
+        // is open the codes pane takes no input and the note keeps the focus
         mRevealCodesEditor->mHasFocusDim = false ;
-        mEditor->mHasFocusDim = true ;
-        mEditor->setFocus() ;
+        if (mNotePaneWidget != nullptr)
+        {
+            mCodesEditorWidget->setEnabled(false) ;
+            mNoteEditor->setFocus() ;
+        }
+        else
+        {
+            mEditor->mHasFocusDim = true ;
+            mEditor->setFocus() ;
+        }
 
         // Defer scroll sync -- widget needs valid geometry from Qt layout pass
         QTimer::singleShot(0, mRevealCodesEditor, [this]()
@@ -2975,7 +2992,8 @@ void cWordTsar::KeepOpenNote(void)
 /// @brief
 /// Adds the note pane below the editors in the splitter: a title bar in
 /// the colours of the Show Formatting pane, the note editor and its
-/// scrollbar. The note editor gets the focus.
+/// scrollbar. The note editor gets the focus. The Show Formatting pane
+/// takes no input while the note pane is open.
 ///
 /////////////////////////////////////////////////////////////////////////////
 cEditorCtrl *cWordTsar::OpenNotePane(cDocument *note, const std::string &title)
@@ -3023,6 +3041,10 @@ cEditorCtrl *cWordTsar::OpenNotePane(cDocument *note, const std::string &title)
 
     mSplitter->addWidget(mNotePaneWidget) ;
     mNotePaneWidget->show() ;
+    if (mCodesEditorWidget != nullptr)
+    {
+        mCodesEditorWidget->setEnabled(false) ;
+    }
 
     QList<int> sizes = mSplitter->sizes() ;
     int total = 0 ;
@@ -3049,7 +3071,8 @@ cEditorCtrl *cWordTsar::OpenNotePane(cDocument *note, const std::string &title)
 ///
 /// @brief
 /// Removes the note pane once the key or command that closed it has run,
-/// and gives the main editor the focus.
+/// takes input in the Show Formatting pane again, and gives the main
+/// editor the focus.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWordTsar::CloseNotePane(void)
@@ -3061,6 +3084,10 @@ void cWordTsar::CloseNotePane(void)
         mNotePaneWidget = nullptr ;
     }
     mNoteEditor = nullptr ;
+    if (mCodesEditorWidget != nullptr)
+    {
+        mCodesEditorWidget->setEnabled(true) ;
+    }
 
     mEditor->mHasFocusDim = true ;
     mEditor->setFocus() ;

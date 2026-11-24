@@ -749,7 +749,10 @@ bool cEditorBase::OpenNoteEditor(const sNote& note, eNoteKind kind, POSITION_T p
 /// changed note runs one undo group: an edited note's marker is deleted,
 /// then the note is inserted at the marker position. A note without text
 /// is not inserted, so a new note closed empty leaves the document as it
-/// was. In the note editor, closes the note it edits.
+/// was. If the marker of an edited note is no longer at the recorded
+/// position, or the recorded position of a new note lies past the text,
+/// nothing is written and the note stays open. In the note editor, closes
+/// the note it edits.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::CloseNote(bool keep)
@@ -787,11 +790,26 @@ void cEditorBase::CloseNote(bool keep)
     bool empty = std::all_of(note.text.begin(), note.text.end(),
                              [](char ch) { return static_cast<unsigned char>(ch) <= ' ' ; }) ;
 
+    bool write = (keep == true) && (changed == true) && ((mNoteIsNew == false) || (empty == false)) ;
+    if (write == true)
+    {
+        sNote marker ;
+        bool markerHere = (mNoteIsNew == true) ?
+            (mNotePosition <= mDocument->GetTextSize()) :
+            ((mDocument->GetNote(mNotePosition, marker) == true) &&
+             (marker.kind == mNoteOriginal.kind) && (marker.raw == mNoteOriginal.raw)) ;
+        if (markerHere == false)
+        {
+            pane->ShowMessage("Note", "The note's marker is no longer where the note was opened, so the note was not written. The note stays open.") ;
+            return ;
+        }
+    }
+
     mNoteEditor = nullptr ;
     pane->mNoteOwner = nullptr ;
     HideNotePane(pane) ;
 
-    if ((keep == true) && (changed == true) && ((mNoteIsNew == false) || (empty == false)))
+    if (write == true)
     {
         CloseTypingGroup() ;
         mDocument->BeginUndoGroup() ;
