@@ -224,9 +224,9 @@ private :
     // --- DOCX writing (Save As Word) ---
     bool WriteDocx(const std::string &filename) ;
     std::string BuildDocumentXml(void) ;
-    static std::string BuildContentTypesXml(void) ;
+    static std::string BuildContentTypesXml(bool footnotes, bool endnotes) ;
     static std::string BuildRelsXml(void) ;
-    static std::string BuildDocumentRelsXml(void) ;
+    static std::string BuildDocumentRelsXml(bool footnotes, bool endnotes) ;
     static std::string BuildStylesXml(void) ;
     static std::string BuildCoreXml(void) ;
     static std::string BuildAppXml(void) ;
@@ -234,6 +234,9 @@ private :
     void SaveDotCommand(pugi::xml_node &body, std::string &text) ;
     void SaveParagraph(pugi::xml_node &body, std::string &text) ;
     void FlushRun(pugi::xml_node &paragraph, std::string &buffer) ;
+    void SaveNote(pugi::xml_node &paragraph) ;
+    void SaveNoteProperties(pugi::xml_node &sectPr) ;
+    static void FillNoteRun(pugi::xml_node run, const char *element, int id) ;
     static std::string ColorToHex(sSeqRGBColor &color) ;
 
 private :
@@ -308,6 +311,13 @@ private :
     sSeqRGBColor mWColor ;
 
     POSITION_T mWCurrentPosition ;
+
+    pugi::xml_document mWFootnotes ;    // word/footnotes.xml, empty if the document has no footnotes
+    pugi::xml_document mWEndnotes ;     // word/endnotes.xml, empty if the document has no endnotes
+    int mWFootnoteCount = 0 ;
+    int mWEndnoteCount = 0 ;
+    POSITION_T mWNoteNumberPos = -1 ;        // number sequence of the note being written, -1 if none
+    bool mWNoteIsEndnote = false ;              // the note being written is an endnote
 };
 
 

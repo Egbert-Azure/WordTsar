@@ -221,6 +221,62 @@ bool cDotCommandParser::ParseNoteNumbering(const std::string& command, char& mod
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  doc           [in]  document to scan
+/// @param  footnoteMode  [out] mode of the first .f# line giving one, 0 if none
+/// @param  footnoteStart [out] start of the first .f# line giving one, empty if none
+/// @param  endnoteStart  [out] start of the first .e# line giving one, empty if none
+///
+/// @brief
+/// Reads the document-wide note numbering for export.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDotCommandParser::FirstNoteNumbering(cDocument* doc, char& footnoteMode, std::string& footnoteStart,
+                                           std::string& endnoteStart)
+{
+    footnoteMode = 0;
+    footnoteStart.clear();
+    endnoteStart.clear();
+    if (doc == nullptr)
+    {
+        return;
+    }
+
+    for (PARAGRAPH_T para = 0; para < doc->GetNumberofParagraphs(); para++)
+    {
+        std::string prefix = doc->GetParagraphPrefix(para, 3);
+        if (prefix.length() < 3 || prefix[0] != '.' || prefix[2] != '#')
+        {
+            continue;
+        }
+        char command = static_cast<char>(toupper(static_cast<unsigned char>(prefix[1])));
+        char mode = 0;
+        std::string start;
+        if ((command != 'F' && command != 'E') ||
+            ParseNoteNumbering(doc->GetParagraphText(para), mode, start) == false)
+        {
+            continue;
+        }
+        if (command == 'F')
+        {
+            if (footnoteMode == 0)
+            {
+                footnoteMode = mode;
+            }
+            if (footnoteStart.empty())
+            {
+                footnoteStart = start;
+            }
+        }
+        else if (endnoteStart.empty())
+        {
+            endnoteStart = start;
+        }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  std::string command [in] - Dot command text to parse
 ///
 /// @return eDotCommandStatus - Command recognition status

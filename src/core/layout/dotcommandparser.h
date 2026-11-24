@@ -54,6 +54,10 @@ public:
     // .F# / .E# arguments: mode 'D' (continuous), 'P' (each page) or 0, and the
     // starting number or letter, empty if none
     static bool ParseNoteNumbering(const std::string& command, char& mode, std::string& start);
+    // Mode of the first .F# giving one, the start of the first .F# and of the
+    // first .E# giving one, as ParseNoteNumbering() reads them
+    static void FirstNoteNumbering(cDocument* doc, char& footnoteMode, std::string& footnoteStart,
+                                   std::string& endnoteStart);
 
 protected:
     // Individual dot command parsers (protected for testing)

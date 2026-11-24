@@ -992,35 +992,7 @@ void cRTFWriter::CreateNoteSettings(void)
     char footnoteMode = 0 ;
     std::string footnoteStart ;
     std::string endnoteStart ;
-    for (PARAGRAPH_T para = 0; para < mDocument->GetNumberofParagraphs(); para++)
-    {
-        std::string prefix = toLowerStr(mDocument->GetParagraphPrefix(para, 3)) ;
-        if (prefix != ".f#" && prefix != ".e#")
-        {
-            continue ;
-        }
-        char mode = 0 ;
-        std::string start ;
-        if (cDotCommandParser::ParseNoteNumbering(mDocument->GetParagraphText(para), mode, start) == false)
-        {
-            continue ;
-        }
-        if (prefix == ".f#")
-        {
-            if (footnoteMode == 0)
-            {
-                footnoteMode = mode ;
-            }
-            if (footnoteStart.empty())
-            {
-                footnoteStart = start ;
-            }
-        }
-        else if (endnoteStart.empty())
-        {
-            endnoteStart = start ;
-        }
-    }
+    cDotCommandParser::FirstNoteNumbering(mDocument, footnoteMode, footnoteStart, endnoteStart) ;
 
     // number, numbering format: a letter starts at its place in the alphabet
     auto startNumber = [](const std::string &start, std::string &format) -> long

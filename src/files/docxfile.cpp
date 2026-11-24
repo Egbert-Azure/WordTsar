@@ -96,6 +96,8 @@
 #include "src/core/document/document.h"
 #include "src/core/editor/editorbase.h"
 #include "src/core/layout/layoutbase.h"
+#include "src/core/layout/dotcommandparser.h"
+#include "src/files/wordstar/wordstarfile.h"
 
 #include "zip.h"
 
@@ -2335,6 +2337,13 @@ void cDOCXFile::SaveParagraph(pugi::xml_node &body, std::string &text)
         {
             unsigned char ch = static_cast<unsigned char>(mDocument->GetControlChar(mWCurrentPosition)) ;
 
+            // the number sequence of a note prints the note's number
+            if (mWCurrentPosition == mWNoteNumberPos)
+            {
+                FlushRun(para, buffer) ;
+                FillNoteRun(para.append_child("w:r"), mWNoteIsEndnote ? "w:endnoteRef" : "w:footnoteRef", -1) ;
+            }
+
             switch (ch)
             {
                 case STYLE_BOLD :
@@ -2400,6 +2409,12 @@ void cDOCXFile::SaveParagraph(pugi::xml_node &body, std::string &text)
                     mDocument->GetColor(mWCurrentPosition, mWColor) ;
                     break ;
 
+                case STYLE_FOOTNOTE :
+                case STYLE_ENDNOTE :
+                    FlushRun(para, buffer) ;
+                    SaveNote(para) ;
+                    break ;
+
                 default :
                     break ;
             }
@@ -2415,6 +2430,251 @@ void cDOCXFile::SaveParagraph(pugi::xml_node &body, std::string &text)
     }
 
     FlushRun(para, buffer) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  run     [in] the w:r node to fill
+/// @param  element [in] w:footnoteReference, w:endnoteReference, w:footnoteRef
+///                      or w:endnoteRef
+/// @param  id      [in] note id, -1 for none
+///
+/// @return nothing
+///
+/// @brief
+/// Makes run a superscript note number.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDOCXFile::FillNoteRun(pugi::xml_node run, const char *element, int id)
+{
+    run.append_child("w:rPr").append_child("w:vertAlign").append_attribute("w:val") = "superscript" ;
+    pugi::xml_node reference = run.append_child(element) ;
+    if (id >= 0)
+    {
+        reference.append_attribute("w:id") = id ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  paragraph [in] the w:p node holding the note marker
+///
+/// @return nothing
+///
+/// @brief
+/// Writes the footnote or endnote whose marker is at mWCurrentPosition: a
+/// w:footnoteReference or w:endnoteReference run in paragraph, and a
+/// w:footnote or w:endnote in mWFootnotes or mWEndnotes (created with its
+/// separator notes on first use) holding the note's paragraphs, written by
+/// SaveParagraph() from the note's own document. The note's number
+/// sequence becomes w:footnoteRef / w:endnoteRef. Empty paragraphs at the
+/// end of the note and dot command lines in it are left out.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDOCXFile::SaveNote(pugi::xml_node &paragraph)
+{
+    sNote note ;
+    if (mDocument->GetNote(mWCurrentPosition, note) == false ||
+        (note.kind != NOTE_KIND_FOOTNOTE && note.kind != NOTE_KIND_ENDNOTE))
+    {
+        return ;
+    }
+    cDocument content ;
+    if (cWordstarFile::DecodeNote(note, content, mEditor) == false)
+    {
+        return ;
+    }
+
+    bool endnote = (note.kind == NOTE_KIND_ENDNOTE) ;
+    pugi::xml_document &part = endnote ? mWEndnotes : mWFootnotes ;
+    const char *rootName = endnote ? "w:endnotes" : "w:footnotes" ;
+    const char *noteName = endnote ? "w:endnote" : "w:footnote" ;
+    pugi::xml_node root = part.child(rootName) ;
+    if (!root)
+    {
+        pugi::xml_node decl = part.append_child(pugi::node_declaration) ;
+        decl.append_attribute("version") = "1.0" ;
+        decl.append_attribute("encoding") = "UTF-8" ;
+        decl.append_attribute("standalone") = "yes" ;
+        root = part.append_child(rootName) ;
+        root.append_attribute("xmlns:w") = "http://schemas.openxmlformats.org/wordprocessingml/2006/main" ;
+
+        pugi::xml_node separator = root.append_child(noteName) ;
+        separator.append_attribute("w:type") = "separator" ;
+        separator.append_attribute("w:id") = -1 ;
+        separator.append_child("w:p").append_child("w:r").append_child("w:separator") ;
+
+        pugi::xml_node continuation = root.append_child(noteName) ;
+        continuation.append_attribute("w:type") = "continuationSeparator" ;
+        continuation.append_attribute("w:id") = 0 ;
+        continuation.append_child("w:p").append_child("w:r").append_child("w:continuationSeparator") ;
+    }
+
+    int id = endnote ? ++mWEndnoteCount : ++mWFootnoteCount ;
+    FillNoteRun(paragraph.append_child("w:r"), endnote ? "w:endnoteReference" : "w:footnoteReference", id) ;
+
+    pugi::xml_node noteNode = root.append_child(noteName) ;
+    noteNode.append_attribute("w:id") = id ;
+
+    cDocument *savedDocument = mDocument ;
+    POSITION_T savedPosition = mWCurrentPosition ;
+    bool savedBold = mWBold ;
+    bool savedItalics = mWItalics ;
+    bool savedUnderline = mWUnderline ;
+    bool savedStrikethrough = mWStrikethrough ;
+    bool savedSuperscript = mWSuperscript ;
+    bool savedSubscript = mWSubscript ;
+    std::string savedFontName = mWFontName ;
+    double savedFontSize = mWFontSize ;
+    sSeqRGBColor savedColor = mWColor ;
+
+    mWBold = false ;
+    mWItalics = false ;
+    mWUnderline = false ;
+    mWStrikethrough = false ;
+    mWSuperscript = false ;
+    mWSubscript = false ;
+    mWFontName.clear() ;
+    mWFontSize = 0.0 ;
+    mWColor.red = -1 ;
+    mWColor.green = -1 ;
+    mWColor.blue = -1 ;
+    mWColor.alpha = -1 ;
+
+    mDocument = &content ;
+    mWNoteIsEndnote = endnote ;
+    mWNoteNumberPos = -1 ;
+    for (POSITION_T pos = 0; pos < content.GetTextSize(); pos++)
+    {
+        if (content.GetControlChar(pos) == STYLE_RAW_SEQUENCE)
+        {
+            mWNoteNumberPos = pos ;
+            break ;
+        }
+    }
+
+    // a paragraph holding only white space and kept WordStar bytes prints nothing
+    auto blank = [&content](PARAGRAPH_T para)
+    {
+        POSITION_T start, end ;
+        content.GetParagraphStartandEnd(para, start, end) ;
+        if (end <= start)
+        {
+            return true ;
+        }
+        std::string text = content.GetParagraphText(para) ;
+        for (size_t i = 0; i < text.size(); i++)
+        {
+            unsigned char byte = static_cast<unsigned char>(text[i]) ;
+            eModifiers control = content.GetControlChar(start + static_cast<POSITION_T>(i)) ;
+            bool kept = byte == static_cast<unsigned char>(MARKER_CHAR) &&
+                        (control == STYLE_RAW_BYTE || control == STYLE_RAW_SEQUENCE) ;
+            if (!kept && byte != ' ' && byte != '\t' && byte != '\r' && byte != '\n')
+            {
+                return false ;
+            }
+        }
+        return true ;
+    } ;
+
+    PARAGRAPH_T last = content.GetNumberofParagraphs() - 1 ;
+    while (last > 0 && blank(last))
+    {
+        last-- ;
+    }
+    for (PARAGRAPH_T para = 0; para <= last; para++)
+    {
+        POSITION_T start, end ;
+        std::string text = content.GetParagraphText(para) ;
+        content.GetParagraphStartandEnd(para, start, end) ;
+        mWCurrentPosition = start ;
+        if (text.empty() || text[0] == '.')
+        {
+            continue ;
+        }
+        SaveParagraph(noteNode, text) ;
+    }
+
+    // a note without a number sequence starts with its number
+    pugi::xml_node first = noteNode.child("w:p") ;
+    if (mWNoteNumberPos < 0 && first)
+    {
+        FillNoteRun(first.insert_child_after("w:r", first.child("w:pPr")),
+                    endnote ? "w:endnoteRef" : "w:footnoteRef", -1) ;
+    }
+    if (!first)
+    {
+        FillNoteRun(noteNode.append_child("w:p").append_child("w:r"),
+                    endnote ? "w:endnoteRef" : "w:footnoteRef", -1) ;
+    }
+
+    mWNoteNumberPos = -1 ;
+    mDocument = savedDocument ;
+    mWCurrentPosition = savedPosition ;
+    mWBold = savedBold ;
+    mWItalics = savedItalics ;
+    mWUnderline = savedUnderline ;
+    mWStrikethrough = savedStrikethrough ;
+    mWSuperscript = savedSuperscript ;
+    mWSubscript = savedSubscript ;
+    mWFontName = savedFontName ;
+    mWFontSize = savedFontSize ;
+    mWColor = savedColor ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  sectPr [in] the w:sectPr node, still without children
+///
+/// @return nothing
+///
+/// @brief
+/// Writes w:footnotePr and w:endnotePr when the document has notes: number
+/// format and start from the first .f# and .e# lines, footnotes restarting
+/// on each page (the default) or continuous (.f# d), endnotes continuous.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDOCXFile::SaveNoteProperties(pugi::xml_node &sectPr)
+{
+    if (mWFootnoteCount == 0 && mWEndnoteCount == 0)
+    {
+        return ;
+    }
+
+    char footnoteMode = 0 ;
+    std::string footnoteStart ;
+    std::string endnoteStart ;
+    cDotCommandParser::FirstNoteNumbering(mDocument, footnoteMode, footnoteStart, endnoteStart) ;
+
+    // number format and start: a letter starts at its place in the alphabet
+    auto properties = [&sectPr](const char *name, const std::string &start, const char *restart)
+    {
+        std::string format = "decimal" ;
+        long number = 1 ;
+        if (!start.empty())
+        {
+            unsigned char first = static_cast<unsigned char>(start[0]) ;
+            if (isalpha(first))
+            {
+                format = isupper(first) ? "upperLetter" : "lowerLetter" ;
+                number = toupper(first) - 'A' + 1 ;
+            }
+            else
+            {
+                number = std::stol(start) ;
+            }
+        }
+        pugi::xml_node pr = sectPr.append_child(name) ;
+        pr.append_child("w:numFmt").append_attribute("w:val") = format.c_str() ;
+        pr.append_child("w:numStart").append_attribute("w:val") = number ;
+        pr.append_child("w:numRestart").append_attribute("w:val") = restart ;
+    } ;
+
+    properties("w:footnotePr", footnoteStart, (footnoteMode == 'D') ? "continuous" : "eachPage") ;
+    properties("w:endnotePr", endnoteStart, "continuous") ;
 }
 
 
@@ -2648,6 +2908,7 @@ std::string cDOCXFile::BuildDocumentXml(void)
     }
 
     pugi::xml_node sectPr = body.append_child("w:sectPr") ;
+    SaveNoteProperties(sectPr) ;
 
     pugi::xml_node pgSz = sectPr.append_child("w:pgSz") ;
     pgSz.append_attribute("w:w") = mWPaperWidth ;
@@ -2682,8 +2943,17 @@ std::string cDOCXFile::BuildDocumentXml(void)
 /// Package part declaring the content type of every part in the archive.
 ///
 /////////////////////////////////////////////////////////////////////////////
-std::string cDOCXFile::BuildContentTypesXml(void)
+std::string cDOCXFile::BuildContentTypesXml(bool footnotes, bool endnotes)
 {
+    std::string notes ;
+    if (footnotes)
+    {
+        notes += "<Override PartName=\"/word/footnotes.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml\"/>" ;
+    }
+    if (endnotes)
+    {
+        notes += "<Override PartName=\"/word/endnotes.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml\"/>" ;
+    }
     return
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
         "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
@@ -2693,6 +2963,7 @@ std::string cDOCXFile::BuildContentTypesXml(void)
         "<Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/>"
         "<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>"
         "<Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/>"
+        + notes +
         "</Types>" ;
 }
 
@@ -2726,12 +2997,22 @@ std::string cDOCXFile::BuildRelsXml(void)
 /// Relationships local to the main document part: points at the styles part.
 ///
 /////////////////////////////////////////////////////////////////////////////
-std::string cDOCXFile::BuildDocumentRelsXml(void)
+std::string cDOCXFile::BuildDocumentRelsXml(bool footnotes, bool endnotes)
 {
+    std::string notes ;
+    if (footnotes)
+    {
+        notes += "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes\" Target=\"footnotes.xml\"/>" ;
+    }
+    if (endnotes)
+    {
+        notes += "<Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes\" Target=\"endnotes.xml\"/>" ;
+    }
     return
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
         "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
         "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>"
+        + notes +
         "</Relationships>" ;
 }
 
@@ -2844,7 +3125,16 @@ bool cDOCXFile::WriteDocx(const std::string &filename)
         mWPaperHeight = static_cast<int>(mEditor->GetLayout()->GetPaperHeight()) ;
     }
 
+    mWFootnotes.reset() ;
+    mWEndnotes.reset() ;
+    mWFootnoteCount = 0 ;
+    mWEndnoteCount = 0 ;
+    mWNoteNumberPos = -1 ;
+    mWNoteIsEndnote = false ;
+
     std::string documentXml = BuildDocumentXml() ;
+    bool footnotes = mWFootnoteCount > 0 ;
+    bool endnotes = mWEndnoteCount > 0 ;
 
     zip_t *zip = zip_open(filename.c_str(), ZIP_DEFAULT_COMPRESSION_LEVEL, 'w') ;
     if (zip == nullptr)
@@ -2864,10 +3154,22 @@ bool cDOCXFile::WriteDocx(const std::string &filename)
     } ;
 
     bool ok = true ;
-    ok = ok && writeEntry("[Content_Types].xml", BuildContentTypesXml()) ;
+    ok = ok && writeEntry("[Content_Types].xml", BuildContentTypesXml(footnotes, endnotes)) ;
     ok = ok && writeEntry("_rels/.rels", BuildRelsXml()) ;
     ok = ok && writeEntry("word/document.xml", documentXml) ;
-    ok = ok && writeEntry("word/_rels/document.xml.rels", BuildDocumentRelsXml()) ;
+    ok = ok && writeEntry("word/_rels/document.xml.rels", BuildDocumentRelsXml(footnotes, endnotes)) ;
+    if (footnotes)
+    {
+        std::ostringstream oss ;
+        mWFootnotes.save(oss) ;
+        ok = ok && writeEntry("word/footnotes.xml", oss.str()) ;
+    }
+    if (endnotes)
+    {
+        std::ostringstream oss ;
+        mWEndnotes.save(oss) ;
+        ok = ok && writeEntry("word/endnotes.xml", oss.str()) ;
+    }
     ok = ok && writeEntry("word/styles.xml", BuildStylesXml()) ;
     ok = ok && writeEntry("docProps/core.xml", BuildCoreXml()) ;
     ok = ok && writeEntry("docProps/app.xml", BuildAppXml()) ;

@@ -41,12 +41,14 @@
 #include "src/core/include/config.h"
 #include "src/core/document/document.h"
 #include "src/core/layout/layoutbase.h"
+#include "src/files/docxfile.h"
 #include "src/files/rtf/write/rtfwriter.h"
 #include "src/files/wordstar/wordstarfile.h"
 #include "src/gui/editor/editorctrl.h"
 #include "src/gui/print/pdfprintout.h"
 #include "src/input/keystroke.h"
 #include <QApplication>
+#include "zip.h"
 
 
 namespace
@@ -3552,5 +3554,85 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         CHECK(rtf.find("\\chftn") < groups[0]);
         CHECK(rtf.find("Beta") < groups[1]);
         CHECK(rtf.find("Gamma") > groups[1]);
+    }
+
+    SUBCASE("DOCX export writes the notes to footnotes.xml and endnotes.xml in marker order")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        auto insertNote = [doc](eNoteKind kind, const std::string& text)
+        {
+            cDocument content;
+            REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(kind), content));
+            content.SetPosition(2);
+            content.Insert(text);
+            doc->InsertNote(kind, content);
+        };
+
+        doc->Insert(".f# d 3\rAlpha");
+        insertNote(NOTE_KIND_FOOTNOTE, "First note");
+        doc->Insert(" Beta");
+        insertNote(NOTE_KIND_ENDNOTE, "End note");
+        doc->Insert(" Gamma");
+        insertNote(NOTE_KIND_FOOTNOTE, "Second note");
+        doc->Insert("\r");
+
+        std::filesystem::path path = TempPath();
+        path.replace_extension(".docx");
+        cDOCXFile writer(&editor);
+        REQUIRE(writer.SaveFile(path.string(), doc->GetTextSize()));
+
+        auto part = [&path](const char* name)
+        {
+            std::string xml;
+            zip_t* zip = zip_open(path.string().c_str(), ZIP_DEFAULT_COMPRESSION_LEVEL, 'r');
+            REQUIRE(zip != nullptr);
+            if (zip_entry_open(zip, name) == 0)
+            {
+                void* buffer = nullptr;
+                size_t size = 0;
+                if (zip_entry_read(zip, &buffer, &size) >= 0 && buffer != nullptr)
+                {
+                    xml.assign(static_cast<char*>(buffer), size);
+                    free(buffer);
+                }
+                zip_entry_close(zip);
+            }
+            zip_close(zip);
+            return xml;
+        };
+        std::string document = part("word/document.xml");
+        std::string footnotes = part("word/footnotes.xml");
+        std::string endnotes = part("word/endnotes.xml");
+        std::string types = part("[Content_Types].xml");
+        std::string rels = part("word/_rels/document.xml.rels");
+        std::filesystem::remove(path);
+
+        CHECK(footnotes.find("w:separator") != std::string::npos);
+        CHECK(endnotes.find("w:separator") != std::string::npos);
+        size_t first = footnotes.find("First note");
+        size_t second = footnotes.find("Second note");
+        CHECK(first != std::string::npos);
+        CHECK(second != std::string::npos);
+        CHECK(first < second);
+        CHECK(footnotes.find("w:footnoteRef") < first);
+        CHECK(footnotes.find("End note") == std::string::npos);
+        CHECK(endnotes.find("End note") != std::string::npos);
+
+        size_t ref1 = document.find("<w:footnoteReference w:id=\"1\"");
+        size_t refEnd = document.find("<w:endnoteReference w:id=\"1\"");
+        size_t ref2 = document.find("<w:footnoteReference w:id=\"2\"");
+        CHECK(ref1 < refEnd);
+        CHECK(refEnd < ref2);
+        CHECK(ref2 != std::string::npos);
+        CHECK(document.find("Gamma") < ref2);
+        CHECK(document.find("<w:numStart w:val=\"3\"") != std::string::npos);
+        CHECK(document.find("<w:numRestart w:val=\"continuous\"") != std::string::npos);
+
+        CHECK(types.find("/word/footnotes.xml") != std::string::npos);
+        CHECK(types.find("/word/endnotes.xml") != std::string::npos);
+        CHECK(rels.find("Target=\"footnotes.xml\"") != std::string::npos);
+        CHECK(rels.find("Target=\"endnotes.xml\"") != std::string::npos);
     }
 }
