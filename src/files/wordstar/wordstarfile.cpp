@@ -2651,99 +2651,93 @@ void cWordstarFile::ParseTab(void)
  * This function processes a WordStar file sequence containing note data (footnote, endnote,
  * annotation or comment)
  * and extracts the relevant information including note formatting, text content, and metadata.
- * The function handles both simple notes and embedded footnotes with sub-sequences.
  * 
  * @param sequence The raw byte sequence from the WordStar file containing note data
  * @param type The type of note sequence being parsed (footnote, endnote, annotation or comment)
  * 
- * @details The function performs the following operations:
- * - Extracts main sequence information using a union to interpret bytes as note structure
- * - Checks for embedded footnotes (tag == 1) and processes sub-sequence data if present
- * - Extracts the note text content from the remaining sequence
- * - Creates a note object with the parsed symbol format and text
- * - Inserts the note into the document as a footnote (footnotes, annotations and
- *   comments, told apart by sNote::kind) or as an endnote
+ * @details Layout of the sequence body:
+ * - bytes 0-1: line count of the note
+ * - bytes 2-3: bit 15 set when the note holds a nested sequence; the low 15 bits
+ *   are then the offset of that nested sequence plus 4
+ * - byte 4: format byte
+ * - from byte 5: the note text. A nested sequence (the note's own number, of
+ *   the note's type) sits inside the text and is left out of sNote::text;
+ *   every other byte, nested tab sequences included, is note text.
  * 
- * @note A note shorter than its 4-byte header, an embedded footnote shorter than its
- *       13 bytes of sub-sequence data, or a sub-sequence with no closing STYLE_SEQUENCE
- *       is dropped (nothing is inserted).
- * @note The conversion field in sub-sequence data is currently not implemented (see @todo)
- * @todo Use subdata.note.conversion if set to change note type and insert properly
+ * For a footnote or endnote, the nested sequence body is line count (2 bytes),
+ * number (2 bytes, 0-based) and a format byte whose high nibble is the
+ * numbering symbol (eNoteSymbol; a value above NOTE_NUMBER reads as NOTE_NUMBER)
+ * and whose low nibble is the note type.
  * 
- * @see sWSBasenote, sWSFootnote, sNote, cDocument::InsertFootnote, cDocument::InsertEndnote
+ * The note is inserted as a footnote (footnotes, annotations and comments, told
+ * apart by sNote::kind) or as an endnote. sNote::raw keeps the body unchanged.
+ * 
+ * @note A note shorter than its header, or a nested sequence that does not lie
+ *       complete inside the note, is dropped (nothing is inserted).
+ * 
+ * @see sWSBasenote, sNote, cDocument::InsertFootnote, cDocument::InsertEndnote
  */
 void cWordstarFile::ParseNote(std::string sequence, eSequence type)
 {
-    // main sequence information
+    const size_t textStart = 5 ;
+
+    // a note shorter than its header is dropped
+    if(sequence.size() < textStart - 1)
+    {
+        return ;
+    }
+
     union udata
     {
         char byte[4] ;
         sWSBasenote note ;
     };
     udata data ;
-
-    // sub sequence information
-    union sdata
-    {
-        char byte[5] ;
-        sWSFootnote note ;
-    };
-    sdata subdata ;
-
-    // prefill incase we don't have a subsequence
-    subdata.note.linecount = 0 ;
-    subdata.note.number = 0 ;
-    subdata.note.conversion = 0 ;
-    subdata.note.format = 3 ;
-
-
-    // a note shorter than its header is dropped
-    if(sequence.size() < 4)
-    {
-        return ;
-    }
-
-    size_t loop ;
-    for(loop = 0; loop < 4; loop++)
+    for(size_t loop = 0; loop < 4; loop++)
     {
         data.byte[loop] = sequence[loop] ;
     }
 
-    // see if we have an embedded footnote
+    eNoteSymbol symbol = NOTE_NUMBER ;
+    std::string text ;
     if(data.note.tag == 1)
     {
-        // an embedded footnote without its sub sequence data is dropped
-        if(sequence.size() < 13)
+        // the nested sequence: 0x1D, size (2 bytes), type, body, size (2 bytes), 0x1D
+        size_t nested = data.note.tagoffset >= 4 ? data.note.tagoffset - 4 : 0 ;
+        if(nested < textStart || nested + 4 > sequence.size() ||
+           sequence[nested] != static_cast<char>(STYLE_SEQUENCE))
         {
             return ;
         }
 
-        for(loop = 9; loop < 13; loop++)
-        {
-            subdata.byte[loop - 9] = sequence[loop] ;
-        }
-
-        // get to end of sub sequence; one that never ends is dropped
-        loop = sequence.find(static_cast<char>(STYLE_SEQUENCE), loop) ;
-        if(loop == std::string::npos)
+        size_t nestedSize = static_cast<unsigned char>(sequence[nested + 1]) |
+                            (static_cast<size_t>(static_cast<unsigned char>(sequence[nested + 2])) << 8) ;
+        size_t nestedEnd = nested + nestedSize + 3 ;
+        if(nestedSize < 4 || nestedEnd > sequence.size() ||
+           sequence[nestedEnd - 1] != static_cast<char>(STYLE_SEQUENCE))
         {
             return ;
         }
+
+        unsigned char nestedType = static_cast<unsigned char>(sequence[nested + 3]) ;
+        if((nestedType == eSequence::SEQ_FOOTNOTE || nestedType == eSequence::SEQ_ENDNOTE) && nestedSize >= 9)
+        {
+            unsigned char format = static_cast<unsigned char>(sequence[nested + 8]) >> 4 ;
+            if(format <= NOTE_NUMBER)
+            {
+                symbol = static_cast<eNoteSymbol>(format) ;
+            }
+        }
+
+        text = sequence.substr(textStart, nested - textStart) + sequence.substr(nestedEnd) ;
     }
-
-    loop++ ;  // get past the STYLE_SEQUENCE if in sub sequence or unused char if not
-
-
-    std::string text ;
-    for(; loop < sequence.size(); loop++)
+    else if(sequence.size() > textStart)
     {
-        text.push_back(sequence[loop]) ;
+        text = sequence.substr(textStart) ;
     }
-
-    ///< @todo use subdata.note.conversion if set to change note type and insert properly
 
     sNote note ;
-    note.symbol = static_cast<eNoteSymbol>(subdata.note.format) ;
+    note.symbol = symbol ;
     note.text = text ;
     note.raw = sequence ;
     if(type == eSequence::SEQ_FOOTNOTE)

@@ -149,8 +149,8 @@ struct sSeqRGBColor
 struct sWSBasenote
 {
     uint16_t linecount ;                        ///< line count of note
-    uint16_t  tag : 1 ;                         ///< if set, other bits define offset to an internal sequence
-    uint16_t tagoffset : 15 ;                   ///< if bit 15 is one, this is the offset
+    uint16_t tagoffset : 15 ;                   ///< offset of the nested sequence plus 4, when tag is set
+    uint16_t tag : 1 ;                          ///< bit 15: the note holds a nested sequence
     uint8_t unused ;                            ///< unused byte
 //    std::string text ;                          ///< text of note or nested sequence
 };

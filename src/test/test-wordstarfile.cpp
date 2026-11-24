@@ -611,10 +611,8 @@ TEST_CASE("cWordstarFile::LoadFile - footnote sequences")
 
     SUBCASE("a note with an embedded footnote sub-sequence is inserted")
     {
-        std::string body("\x00\x00\x01\x00", 4);               // tag = 1
-        body += std::string(5, '\x00');                          // bytes 4-8
-        body += std::string("\x00\x00\x01\x03", 4);            // sub-sequence data, bytes 9-12
-        body += "xx\x1D";                                       // rest of the sub-sequence
+        std::string body("\x00\x00\x09\x80\x33", 5);           // nested sequence at 5, format byte
+        body += std::string("\x1D\x09\x00\x03\x00\x00\x00\x00\x33\x09\x00\x1D", 12);
         body += "note text";
         CHECK(loadNote(body));
         CHECK(hasFootnote());
@@ -629,15 +627,15 @@ TEST_CASE("cWordstarFile::LoadFile - footnote sequences")
 
     SUBCASE("an embedded footnote without its sub-sequence data is dropped")
     {
-        CHECK(loadNote(std::string("\x00\x00\x01\x00", 4)));
+        CHECK(loadNote(std::string("\x00\x00\x09\x80\x33", 5)));
         CHECK_FALSE(hasFootnote());
         CHECK(document.GetParagraphText(0).rfind("Hi!", 0) == 0);
     }
 
     SUBCASE("an embedded footnote whose sub-sequence never ends is dropped")
     {
-        std::string body("\x00\x00\x01\x00", 4);
-        body += std::string(9, 'a');                              // bytes 4-12, no 0x1D after them
+        std::string body("\x00\x00\x09\x80\x33\x1D\x09\x00\x03", 9);
+        body += std::string(9, 'a');                              // bytes 9-17, no 0x1D at byte 16
         body += "no end";
         CHECK(loadNote(body));
         CHECK_FALSE(hasFootnote());
@@ -3045,5 +3043,34 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         CHECK(noteCount(document) == 0);
         CHECK(document.GetControlChar(1) == STYLE_BOLD);
         CHECK(document.GetTextSize() == 4);
+    }
+
+    SUBCASE("a loaded note's text runs around its nested number sequence")
+    {
+        // bytes 2-3: bit 15 set, low bits = offset of the nested sequence + 4;
+        // byte 4 the format byte; text before the nested sequence, the nested
+        // footnote sequence (number 1, lower case letters), a nested tab
+        // sequence, then the rest of the text
+        std::string before = "abc";
+        std::string nested("\x1D\x09\x00\x03\x00\x00\x01\x00\x23\x09\x00\x1D", 12);
+        std::string tab("\x1D\x0A\x00\x09\x68\x01\x84\x03\x20\x02\x0A\x00\x1D", 13);
+        std::string after = "Note\x0D\x0A";
+        uint16_t tag = static_cast<uint16_t>(0x8000 | (5 + before.size() + 4));
+        std::string body("\x01\x00", 2);
+        body += static_cast<char>(tag & 0xFF);
+        body += static_cast<char>(tag >> 8);
+        body += '\x23';
+        body += before + nested + tab + after;
+
+        cEditorCtrl editor;
+        editor.GetDocument()->Clear();
+        std::string input = WordStar7File("Hi" + SequenceBytes(SEQ_FOOTNOTE, body) + "!\x0D\x0A");
+        CHECK(RoundTrip(editor, input) == input);
+
+        sNote loaded{};
+        REQUIRE(editor.GetDocument()->GetNote(2, loaded));
+        CHECK(loaded.text == before + tab + after);
+        CHECK(loaded.symbol == NOTE_LOWER);
+        CHECK(loaded.raw == body);
     }
 }
