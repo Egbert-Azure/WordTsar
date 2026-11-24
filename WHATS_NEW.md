@@ -2,6 +2,36 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## 0.18.0 (2026-11-24)
+
+**Additions**
+
+- Footnotes and endnotes. ^ONF opens a footnote and ^ONE an endnote in a pane below the text. ^KD saves the note and closes the pane, ^KQ abandons it (#91).
+- ^OND edits the note at the cursor. ^ONG goes to the next note (#91).
+- Notes are numbered in document order. Footnotes restart at 1 on each page. .f# d numbers them through the document, .f# p restarts them. .f# n and .e# n set the start number or letter (#91).
+- With ^OD on, a marker shows the first words of its note. Otherwise it shows the number (#91).
+- Footnotes print at the foot of the page. Endnotes print at a .pe line, or after the last paragraph (#91).
+- Footnotes and endnotes export to RTF and DOCX (#91).
+- Closing a note that holds characters the code page cannot write shows a warning. You can keep the note open (#91).
+- &%& gives the total page count (#87).
+
+**Changes**
+
+- Changed: File > Open and Save As add the file to Recent Files (#88).
+- Changed: the spelling check dialog looks like WordStar 7's Spelling Check, with its option names and keys. The word shows in bold (#90).
+- Changed: saving to a code page that cannot hold a character writes a plain stand-in. Curly quotes become ' and ", en and em dashes become -, the em dash is written as --, and the ellipsis becomes ... (#93, #94).
+- Changed: a superscript digit the code page cannot hold is saved as a digit between ^T toggles (#93).
+- Changed: the save warning counts only the characters that are lost (#93).
+
+**Fixes**
+
+- Fixed: deleting a note marker now deletes its note (#54).
+- Fixed: ^P=, ^P+ and ^D open the font dialog on macOS 27 (#86).
+- Fixed: the spelling check showed the wrong text after an em dash or a curly quote (#89).
+- Fixed: Replace and Global Replacement in the spelling check now work. Text after the replaced word stays, and a marked block stays on its text (#90).
+- Fixed: a column after a right, centre or decimal tab now starts at its own tab stop (#92).
+- Fixed: an ellipsis at the start of a line is saved after a no-break space, so it is not read as a dot command (#94).
+
 ## 0.17.0 (2026-11-07)
 
 **Additions**

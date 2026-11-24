@@ -749,7 +749,7 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^OM | Size window | -- | No |
 | ^OZ | Paragraph number | -- | No |
 | ^O# | Page numbering | -- | No |
-| ^ON | Notes | -- | No |
+| ^ON | Notes | Waits for a note key: F new footnote, E new endnote, D edit the note at the cursor, G go to the next note. A, C and V do nothing | Partly |
 
 ### ^Q Chord -- Quick Functions
 
