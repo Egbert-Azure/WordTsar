@@ -82,6 +82,8 @@
 #include "src/core/codepage/cp437.h"
 #include "src/core/codepage/cp1252.h"
 #include "src/files/rtf/symbolpua.h"
+#include "src/files/wordstar/wordstarfile.h"
+#include "src/core/layout/dotcommandparser.h"
 
 
 //extern sExtendedChars gCodePage437[] ;
@@ -386,6 +388,8 @@ cRTFWriter::cRTFWriter(cEditorBase *editor)
 
     mGroupCount = 0 ;
     mNewLine = false ;
+
+    mNoteNumberPos = -1 ;
 
     mDoIndex = false ;
     mDonefacingp = false ;
@@ -798,6 +802,7 @@ void cRTFWriter::CreateRTF(void)
     ControlWord("margr", mCurrentMargr) ;
     ControlWord("margt", mCurrentTopMargin) ;
     ControlWord("margb", mCurrentBottomMargin) ;
+    CreateNoteSettings() ;
     NewLine() ;
 
 //    PAGE_T oldpage = 0 ;
@@ -827,7 +832,8 @@ void cRTFWriter::CreateRTF(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  text - [in] the paragraph text to write as RTF
+/// @param  text         - [in] the paragraph text to write as RTF
+/// @param  endParagraph - [in] false to leave out the closing \par
 ///
 /// @return nothing
 ///
@@ -835,7 +841,7 @@ void cRTFWriter::CreateRTF(void)
 /// Writes a text paragraph to RTF, processing control codes, special
 /// characters, and Unicode code points.
 /////////////////////////////////////////////////////////////////////////////
-void cRTFWriter::CreateText(std::string &text)
+void cRTFWriter::CreateText(std::string &text, bool endParagraph)
 {
     // Win-1252 codepage for ANSI fallback characters (created once, not per-char)
     cCodePageWin1252 cp1252 ;
@@ -852,7 +858,12 @@ void cRTFWriter::CreateText(std::string &text)
             (mDocument->GetControlChar(mCurrentPosition) == STYLE_RAW_BYTE ||
              mDocument->GetControlChar(mCurrentPosition) == STYLE_RAW_SEQUENCE))
         {
-            // a raw byte or a kept WordStar sequence writes nothing
+            // a raw byte or a kept WordStar sequence writes nothing,
+            // except the number sequence of a note
+            if (mCurrentPosition == mNoteNumberPos)
+            {
+                CreateNoteReference() ;
+            }
             if (pos == textStart)
             {
                 textStart = pos + 1 ;
@@ -948,7 +959,227 @@ void cRTFWriter::CreateText(std::string &text)
         }
     }
     NewLine() ;
-    ControlWord("par") ;
+    if (endParagraph)
+    {
+        ControlWord("par") ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Writes the document's footnote and endnote settings when it has notes:
+/// footnotes at the bottom of the page, endnotes at the end of the
+/// document, and the numbering of the first .f# and .e# lines (start,
+/// restart on each page or continuous, number or letter).
+/////////////////////////////////////////////////////////////////////////////
+void cRTFWriter::CreateNoteSettings(void)
+{
+    std::vector<std::pair<POSITION_T, eNoteKind>> notes ;
+    mDocument->GetNotePositions(notes) ;
+    bool hasEndnotes = std::any_of(notes.begin(), notes.end(),
+                                   [](const auto &note) { return note.second == NOTE_KIND_ENDNOTE ; }) ;
+    bool hasFootnotes = std::any_of(notes.begin(), notes.end(),
+                                    [](const auto &note) { return note.second == NOTE_KIND_FOOTNOTE ; }) ;
+    if (!hasEndnotes && !hasFootnotes)
+    {
+        return ;
+    }
+
+    char footnoteMode = 0 ;
+    std::string footnoteStart ;
+    std::string endnoteStart ;
+    for (PARAGRAPH_T para = 0; para < mDocument->GetNumberofParagraphs(); para++)
+    {
+        std::string prefix = toLowerStr(mDocument->GetParagraphPrefix(para, 3)) ;
+        if (prefix != ".f#" && prefix != ".e#")
+        {
+            continue ;
+        }
+        char mode = 0 ;
+        std::string start ;
+        if (cDotCommandParser::ParseNoteNumbering(mDocument->GetParagraphText(para), mode, start) == false)
+        {
+            continue ;
+        }
+        if (prefix == ".f#")
+        {
+            if (footnoteMode == 0)
+            {
+                footnoteMode = mode ;
+            }
+            if (footnoteStart.empty())
+            {
+                footnoteStart = start ;
+            }
+        }
+        else if (endnoteStart.empty())
+        {
+            endnoteStart = start ;
+        }
+    }
+
+    // number, numbering format: a letter starts at its place in the alphabet
+    auto startNumber = [](const std::string &start, std::string &format) -> long
+    {
+        format = "nar" ;
+        if (start.empty())
+        {
+            return 1 ;
+        }
+        unsigned char first = static_cast<unsigned char>(start[0]) ;
+        if (isalpha(first))
+        {
+            format = isupper(first) ? "nauc" : "nalc" ;
+            return toupper(first) - 'A' + 1 ;
+        }
+        return std::stol(start) ;
+    } ;
+
+    std::string format ;
+    ControlWord("ftnbj") ;
+    ControlWord("aenddoc") ;
+    ControlWord("fet", hasEndnotes ? 2 : 0) ;
+    ControlWord("ftnstart", startNumber(footnoteStart, format)) ;
+    ControlWord("ftn" + format) ;
+    ControlWord((footnoteMode == 'D') ? "ftnrstcont" : "ftnrstpg") ;
+    ControlWord("aftnstart", startNumber(endnoteStart, format)) ;
+    ControlWord("aftn" + format) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Writes the automatic note number, superscript.
+/////////////////////////////////////////////////////////////////////////////
+void cRTFWriter::CreateNoteReference(void)
+{
+    StartGroup() ;
+    ControlWord("super") ;
+    ControlWord("chftn") ;
+    EndGroup() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Writes the footnote or endnote whose marker is at mCurrentPosition: the
+/// reference number, then a \footnote group (\ftnalt for an endnote)
+/// holding the note's text, written from the note's own document with the
+/// number at the note's number sequence. Empty paragraphs at the end of
+/// the note and dot command lines in it are left out.
+/////////////////////////////////////////////////////////////////////////////
+void cRTFWriter::CreateNote(void)
+{
+    sNote note ;
+    if (mDocument->GetNote(mCurrentPosition, note) == false ||
+        (note.kind != NOTE_KIND_FOOTNOTE && note.kind != NOTE_KIND_ENDNOTE))
+    {
+        return ;
+    }
+    cDocument content ;
+    if (cWordstarFile::DecodeNote(note, content, mEditor) == false)
+    {
+        return ;
+    }
+
+    CreateNoteReference() ;
+    StartGroup() ;
+    ControlWord("footnote") ;
+    if (note.kind == NOTE_KIND_ENDNOTE)
+    {
+        ControlWord("ftnalt") ;
+    }
+    ControlWord("pard") ;
+    ControlWord("plain") ;
+    NewLine() ;
+
+    cDocument *savedDocument = mDocument ;
+    POSITION_T savedPosition = mCurrentPosition ;
+    sRTFParaFormat savedParagraph = paragraph ;
+    paragraph.character.bold = false ;
+    paragraph.character.italics = false ;
+    paragraph.character.underline = false ;
+    paragraph.character.subscript = false ;
+    paragraph.character.superscript = false ;
+    paragraph.character.strikethrough = false ;
+    paragraph.character.smallcaps = false ;
+
+    mDocument = &content ;
+    mNoteNumberPos = -1 ;
+    for (POSITION_T pos = 0; pos < content.GetTextSize(); pos++)
+    {
+        if (content.GetControlChar(pos) == STYLE_RAW_SEQUENCE)
+        {
+            mNoteNumberPos = pos ;
+            break ;
+        }
+    }
+    if (mNoteNumberPos < 0)
+    {
+        CreateNoteReference() ;
+    }
+
+    // a paragraph holding only white space and kept WordStar bytes prints nothing
+    auto blank = [&content](PARAGRAPH_T para)
+    {
+        POSITION_T start, end ;
+        content.GetParagraphStartandEnd(para, start, end) ;
+        if (end <= start)
+        {
+            return true ;
+        }
+        std::string text = content.GetParagraphText(para) ;
+        for (size_t i = 0; i < text.size(); i++)
+        {
+            unsigned char byte = static_cast<unsigned char>(text[i]) ;
+            eModifiers control = content.GetControlChar(start + static_cast<POSITION_T>(i)) ;
+            bool kept = byte == static_cast<unsigned char>(MARKER_CHAR) &&
+                        (control == STYLE_RAW_BYTE || control == STYLE_RAW_SEQUENCE) ;
+            if (!kept && byte != ' ' && byte != '\t' && byte != '\r' && byte != '\n')
+            {
+                return false ;
+            }
+        }
+        return true ;
+    } ;
+
+    PARAGRAPH_T last = content.GetNumberofParagraphs() - 1 ;
+    while (last > 0 && blank(last))
+    {
+        last-- ;
+    }
+    for (PARAGRAPH_T para = 0; para <= last; para++)
+    {
+        POSITION_T start, end ;
+        std::string text = content.GetParagraphText(para) ;
+        content.GetParagraphStartandEnd(para, start, end) ;
+        mCurrentPosition = start ;
+        if (!text.empty() && text[0] == '.')
+        {
+            continue ;
+        }
+        if (!text.empty() && text.back() == static_cast<char>(HARD_RETURN))
+        {
+            text.pop_back() ;
+        }
+        CreateText(text, para < last) ;
+    }
+
+    mNoteNumberPos = -1 ;
+    mDocument = savedDocument ;
+    mCurrentPosition = savedPosition ;
+    paragraph = savedParagraph ;
+    EndGroup() ;
 }
 
 
@@ -1058,6 +1289,11 @@ void cRTFWriter::CreateModifiers(unsigned char ch)
 
         case STYLE_TAB :
             ControlWord("tab") ;             /// @todo - style of TAB!
+            break ;
+
+        case STYLE_FOOTNOTE :
+        case STYLE_ENDNOTE :
+            CreateNote() ;
             break ;
 
         case STYLE_FONT1 :

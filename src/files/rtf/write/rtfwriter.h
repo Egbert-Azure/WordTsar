@@ -70,9 +70,12 @@ private :
     void CreateStyleSheet(void) ;
     void CreateGenerator(void) ;
     void CreateRTF(void) ;
-    void CreateText(std::string &text) ;
+    void CreateText(std::string &text, bool endParagraph = true) ;
     void CreateDot(std::string &dot) ;
     void PreScanMargins(void) ;
+    void CreateNoteSettings(void) ;
+    void CreateNote(void) ;
+    void CreateNoteReference(void) ;
 
     void CreateModifiers(unsigned char ch) ;
     void CreateFont1(void) ;                // name changed to CreateFont1 from CreateFont, because VS2019 screws up and spews tons of errors about CreatFontW
@@ -125,6 +128,8 @@ private :
     std::array<sRTFHeaderFooter, MAX_HEADER_FOOTER> mFootersEven ;
     std::array<sRTFHeaderFooter, MAX_HEADER_FOOTER> mHeadersOdd ;
     std::array<sRTFHeaderFooter, MAX_HEADER_FOOTER> mFootersOdd ;
+
+    POSITION_T mNoteNumberPos ;     // position of the note number in the note being written, -1 if none
 
     bool mDoIndex ;             // create index at end of document?
     bool mDonefacingp ;         // have we done a facingp?

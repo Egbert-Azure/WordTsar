@@ -41,6 +41,7 @@
 #include "src/core/include/config.h"
 #include "src/core/document/document.h"
 #include "src/core/layout/layoutbase.h"
+#include "src/files/rtf/write/rtfwriter.h"
 #include "src/files/wordstar/wordstarfile.h"
 #include "src/gui/editor/editorctrl.h"
 #include "src/gui/print/pdfprintout.h"
@@ -3497,5 +3498,59 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         layout->SetPrintLayout(false);
         layout->LayoutDocument(doc);
         CHECK(layout->GetPageEndnotes(1).empty());
+    }
+
+    SUBCASE("RTF export writes the notes as RTF footnotes and endnotes in marker order")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        auto insertNote = [doc](eNoteKind kind, const std::string& text)
+        {
+            cDocument content;
+            REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(kind), content));
+            content.SetPosition(2);
+            content.Insert(text);
+            doc->InsertNote(kind, content);
+        };
+
+        doc->Insert(".f# d 3\rAlpha");
+        insertNote(NOTE_KIND_FOOTNOTE, "First note");
+        doc->Insert(" Beta");
+        insertNote(NOTE_KIND_ENDNOTE, "End note");
+        doc->Insert(" Gamma");
+        insertNote(NOTE_KIND_FOOTNOTE, "Second note");
+        doc->Insert("\r");
+
+        std::filesystem::path path = TempPath();
+        std::string filename = path.string();
+        cRTFWriter writer(&editor);
+        REQUIRE(writer.Start(filename));
+        std::ifstream in(path);
+        std::string rtf((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        in.close();
+        std::filesystem::remove(path);
+
+        CHECK(rtf.find("\\fet2") != std::string::npos);
+        CHECK(rtf.find("\\ftnrstcont") != std::string::npos);
+        CHECK(rtf.find("\\ftnstart3") != std::string::npos);
+
+        std::vector<size_t> groups;
+        for (size_t at = rtf.find("{\\footnote"); at != std::string::npos; at = rtf.find("{\\footnote", at + 1))
+        {
+            groups.push_back(at);
+        }
+        REQUIRE(groups.size() == 3);
+        size_t first = rtf.find("First note");
+        size_t end = rtf.find("End note");
+        size_t second = rtf.find("Second note");
+        CHECK((groups[0] < first && first < groups[1]));
+        CHECK((groups[1] < end && end < groups[2]));
+        CHECK(groups[2] < second);
+        CHECK(rtf.find("\\ftnalt", groups[1]) < end);
+        CHECK(rtf.find("\\ftnalt", groups[0]) > first);
+        CHECK(rtf.find("\\chftn") < groups[0]);
+        CHECK(rtf.find("Beta") < groups[1]);
+        CHECK(rtf.find("Gamma") > groups[1]);
     }
 }
