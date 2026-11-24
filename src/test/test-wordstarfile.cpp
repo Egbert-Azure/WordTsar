@@ -3072,5 +3072,76 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         CHECK(loaded.text == before + tab + after);
         CHECK(loaded.symbol == NOTE_LOWER);
         CHECK(loaded.raw == body);
+
+        // an unchanged note keeps its bytes, an edited one is rebuilt around the same nested sequence
+        sNote kept = loaded;
+        kept.raw = body.substr(0, body.size() - 2) + "\x8D\x0A" "more\x0D\x0A";
+        cDocument content;
+        REQUIRE(cWordstarFile::DecodeNote(kept, content));
+        sNote encoded = kept;
+        CHECK(cWordstarFile::EncodeNote(content, encoded));
+        CHECK(encoded.raw == kept.raw);
+
+        content.SetPosition(0);
+        content.Insert("x");
+        CHECK(cWordstarFile::EncodeNote(content, encoded));
+        CHECK(encoded.raw.substr(4, 1) == "\x23");
+        CHECK(encoded.raw.find(nested) != std::string::npos);
+        CHECK(encoded.text.substr(0, 4) == "xabc");
+    }
+
+    SUBCASE("a new footnote and endnote save and load with their text")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+
+        cDocument footnoteText;
+        REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(NOTE_KIND_FOOTNOTE), footnoteText));
+        footnoteText.SetPosition(2);                        // after the number sequence and the tab
+        footnoteText.Insert("First note");
+        cDocument endnoteText;
+        REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(NOTE_KIND_ENDNOTE), endnoteText));
+        endnoteText.SetPosition(2);
+        endnoteText.Insert("Last n\u00F6te");
+
+        doc->Insert("One");
+        doc->InsertNote(NOTE_KIND_FOOTNOTE, footnoteText);     // 3
+        doc->Insert(" two");
+        doc->InsertNote(NOTE_KIND_ENDNOTE, endnoteText);       // 8
+        doc->Insert("\r");
+
+        std::filesystem::path path = TempPath();
+        cWordstarFile saver(&editor);
+        REQUIRE(saver.SaveFile(path.string(), doc->GetTextSize()));
+        cDocument loaded;
+        loaded.Clear();
+        cWordstarFile loader;
+        loader.mDocument = &loaded;
+        REQUIRE(loader.LoadFile(path.string()));
+        std::filesystem::remove(path);
+
+        CHECK(noteCount(loaded) == 2);
+        sNote first{};
+        REQUIRE(loaded.GetNote(3, first));
+        CHECK(loaded.GetControlChar(3) == STYLE_FOOTNOTE);
+        CHECK(first.kind == NOTE_KIND_FOOTNOTE);
+        CHECK(first.raw.substr(0, 21) == std::string("\x01\x00\x09\x80\x33\x1D\x09\x00\x03\x00\x00\x00\x00\x33\x09\x00\x1D"
+                                                     "\x1D\x0A\x00\x09", 21));
+        cDocument firstText;
+        REQUIRE(cWordstarFile::DecodeNote(first, firstText));
+        CHECK(firstText.GetParagraphText(0) == footnoteText.GetParagraphText(0));
+        CHECK(firstText.GetControlChar(0) == STYLE_RAW_SEQUENCE);
+        CHECK(firstText.GetControlChar(1) == STYLE_TAB);
+
+        sNote last{};
+        REQUIRE(loaded.GetNote(8, last));
+        CHECK(loaded.GetControlChar(8) == STYLE_ENDNOTE);
+        CHECK(last.kind == NOTE_KIND_ENDNOTE);
+        CHECK(last.raw.substr(2, 3) == std::string("\x09\x80\x34", 3));
+        CHECK(last.raw.substr(5, 12) == std::string("\x1D\x09\x00\x04\x00\x00\x00\x00\x34\x09\x00\x1D", 12));
+        cDocument lastText;
+        REQUIRE(cWordstarFile::DecodeNote(last, lastText));
+        CHECK(lastText.GetParagraphText(0) == endnoteText.GetParagraphText(0));
     }
 }

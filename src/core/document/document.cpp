@@ -101,6 +101,7 @@
 
 #include "document.h"
 #include "src/core/include/config.h"
+#include "src/files/wordstar/wordstarfile.h"
 
 
 //#include "src/files/rtf/read/rtfparser.h"           // just for sColorTable
@@ -2005,6 +2006,35 @@ void cDocument::InsertEndnote(sNote &note)
 
     // notify listeners (inner Insert was suppressed by mUndoDisabled)
     NotifyChanged(currentparagraphnumber) ;
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  kind     [IN] - the kind of note
+/// @param  content  [IN] - the note text
+///
+/// @return  nothing
+///
+/// @brief
+/// Insert a new note of kind at the cursor, its sequence built as WordStar 7
+/// writes one (cWordstarFile::NewNote()) and holding the text of content.
+/// Endnotes go to the endnote table, all other kinds to the footnote table.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::InsertNote(eNoteKind kind, cDocument &content)
+{
+    sNote note = cWordstarFile::NewNote(kind) ;
+    cWordstarFile::EncodeNote(content, note) ;
+    if(kind == NOTE_KIND_ENDNOTE)
+    {
+        InsertEndnote(note) ;
+    }
+    else
+    {
+        InsertFootnote(note) ;
+    }
 }
 
 

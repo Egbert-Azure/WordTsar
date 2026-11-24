@@ -123,6 +123,10 @@ public:
     static std::string LineEndBeforeAppend(const std::string &text, const std::string &lineEnd) ;
     static bool ReplaceFileContent(const std::string &filename, const std::string &data) ;
 
+    static sNote NewNote(eNoteKind kind, cEditorBase *editor = nullptr) ;
+    static bool DecodeNote(const sNote &note, cDocument &content, cEditorBase *editor = nullptr) ;
+    static bool EncodeNote(cDocument &content, sNote &note, cEditorBase *editor = nullptr) ;
+
     bool CanLoad(void) ;
     bool CanSave(void) ;
 
@@ -132,6 +136,7 @@ public:
 
 private :
     size_t CountUnmappable(const std::string &str) ;
+    eCodePage CodePage(void) ;
     bool AskCodePage(size_t unmappableCount) ;
     void EncodeCharacter(const std::string &str, std::string &out, uint32_t &stylecounter) ;
 
@@ -149,6 +154,7 @@ private :
     void ParseTab(void) ;
 
     void ParseNote(std::string sequence, eSequence type) ;
+    static bool SplitNote(const std::string &sequence, eNoteSymbol &symbol, std::string &text, size_t &nested) ;
 
     void InsertFootnote(void) ;
 
@@ -169,6 +175,8 @@ private:
     unsigned char mVariableChar ;       ///< the character between the '&' markers
 
     uint32_t mStyleOffset ;                           ///< pointer to start of tyles (end of document)
+
+    bool mInNote = false ;              ///< true while a note body is read: note sequences in it become raw sequences
 };
 
 

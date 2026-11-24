@@ -321,6 +321,7 @@ public:
     void InsertFont(sInternalFonts &font) ;                 // used by Wordstar file loader
     void InsertFootnote(sNote &note) ;                      // insert a footnote
     void InsertEndnote(sNote &note) ;                       // insert an endnote
+    void InsertNote(eNoteKind kind, cDocument &content) ;   // insert a new note holding content's text
     void InsertVariable(eVariableType type) ;               // insert a variable (&@&, &#&, etc.)
     void InsertRawByte(unsigned char byte) ;                // insert a control byte from a text file
     void InsertRawSequence(const sRawSequence &sequence) ;  // insert a WordStar sequence kept as read

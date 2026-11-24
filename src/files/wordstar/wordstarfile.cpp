@@ -1016,7 +1016,7 @@ size_t cWordstarFile::CountUnmappable(const std::string &str)
     {
         std::u32string codepoints ;
         mDocument->GetCodePoints(str, codepoints) ;
-        eCodePage codepage = mEditor->GetCodePage() ;
+        eCodePage codepage = CodePage() ;
 
         for(char32_t cp : codepoints)
         {
@@ -1050,7 +1050,7 @@ bool cWordstarFile::AskCodePage(size_t unmappableCount)
     // message names the one actually in effect instead of blaming the format.
     if(unmappableCount > 0 && !mSilent)
     {
-        eCodePage scanCodePage = mEditor->GetCodePage() ;
+        eCodePage scanCodePage = CodePage() ;
         static const char *codePageNames[] = { "CP437", "CP737", "CP850", "CP1252" } ;
         const char *codePageName = "the current code page" ;
         if(static_cast<size_t>(scanCodePage) < sizeof(codePageNames) / sizeof(codePageNames[0]))
@@ -1494,7 +1494,7 @@ void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, ui
     {
         bool printable = (static_cast<unsigned long>(ch1) >= 32 && static_cast<unsigned long>(ch1) <= 126) ;
         std::u32string codepoints ;
-        eCodePage codepage = mEditor->GetCodePage() ;
+        eCodePage codepage = CodePage() ;
 
         mDocument->GetCodePoints(str, codepoints) ;
 
@@ -2189,7 +2189,18 @@ void cWordstarFile::HandleSequence(void)
                     return ;
                 }
 
-                ParseNote(str, type) ;
+                if(mInNote)
+                {
+                    // the note's own number sequence inside a note body is kept as read
+                    sRawSequence sequence ;
+                    sequence.type = static_cast<unsigned char>(intro.type) ;
+                    sequence.body = str ;
+                    mDocument->InsertRawSequence(sequence) ;
+                }
+                else
+                {
+                    ParseNote(str, type) ;
+                }
             }
             break ;
 
@@ -2277,7 +2288,7 @@ bool cWordstarFile::ReadBytes(size_t count, std::string &bytes)
 void cWordstarFile::InsertExtendedChar(unsigned char c)
 {
     bool found = false ;
-    eCodePage page = mEditor->GetCodePage() ;
+    eCodePage page = CodePage() ;
 
     switch(page)
     {
@@ -2679,61 +2690,12 @@ void cWordstarFile::ParseTab(void)
  */
 void cWordstarFile::ParseNote(std::string sequence, eSequence type)
 {
-    const size_t textStart = 5 ;
-
-    // a note shorter than its header is dropped
-    if(sequence.size() < textStart - 1)
-    {
-        return ;
-    }
-
-    union udata
-    {
-        char byte[4] ;
-        sWSBasenote note ;
-    };
-    udata data ;
-    for(size_t loop = 0; loop < 4; loop++)
-    {
-        data.byte[loop] = sequence[loop] ;
-    }
-
     eNoteSymbol symbol = NOTE_NUMBER ;
     std::string text ;
-    if(data.note.tag == 1)
+    size_t nested = 0 ;
+    if(SplitNote(sequence, symbol, text, nested) == false)
     {
-        // the nested sequence: 0x1D, size (2 bytes), type, body, size (2 bytes), 0x1D
-        size_t nested = data.note.tagoffset >= 4 ? data.note.tagoffset - 4 : 0 ;
-        if(nested < textStart || nested + 4 > sequence.size() ||
-           sequence[nested] != static_cast<char>(STYLE_SEQUENCE))
-        {
-            return ;
-        }
-
-        size_t nestedSize = static_cast<unsigned char>(sequence[nested + 1]) |
-                            (static_cast<size_t>(static_cast<unsigned char>(sequence[nested + 2])) << 8) ;
-        size_t nestedEnd = nested + nestedSize + 3 ;
-        if(nestedSize < 4 || nestedEnd > sequence.size() ||
-           sequence[nestedEnd - 1] != static_cast<char>(STYLE_SEQUENCE))
-        {
-            return ;
-        }
-
-        unsigned char nestedType = static_cast<unsigned char>(sequence[nested + 3]) ;
-        if((nestedType == eSequence::SEQ_FOOTNOTE || nestedType == eSequence::SEQ_ENDNOTE) && nestedSize >= 9)
-        {
-            unsigned char format = static_cast<unsigned char>(sequence[nested + 8]) >> 4 ;
-            if(format <= NOTE_NUMBER)
-            {
-                symbol = static_cast<eNoteSymbol>(format) ;
-            }
-        }
-
-        text = sequence.substr(textStart, nested - textStart) + sequence.substr(nestedEnd) ;
-    }
-    else if(sequence.size() > textStart)
-    {
-        text = sequence.substr(textStart) ;
+        return ;
     }
 
     sNote note ;
@@ -2760,6 +2722,330 @@ void cWordstarFile::ParseNote(std::string sequence, eSequence type)
         note.kind = NOTE_KIND_ENDNOTE ;
         mDocument->InsertEndnote(note) ;
     }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return eCodePage - the editor's code page, CP437 without an editor
+///
+/////////////////////////////////////////////////////////////////////////////
+eCodePage cWordstarFile::CodePage(void)
+{
+    if(mEditor == nullptr)
+    {
+        return CP437 ;
+    }
+    return mEditor->GetCodePage() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  sequence [IN]  - note sequence body (see ParseNote())
+/// @param  symbol   [OUT] - numbering symbol from the nested footnote or endnote sequence,
+///                          NOTE_NUMBER when there is none
+/// @param  text     [OUT] - the bytes from byte 5 without the nested sequence
+/// @param  nested   [OUT] - offset of the nested sequence, std::string::npos when there is none
+///
+/// @return bool - false if the note is shorter than its header or its nested
+///                sequence does not lie complete inside it
+///
+/// @brief
+/// Split a note sequence body into its text and its nested number sequence.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::SplitNote(const std::string &sequence, eNoteSymbol &symbol, std::string &text, size_t &nested)
+{
+    const size_t textStart = 5 ;
+
+    symbol = NOTE_NUMBER ;
+    text.clear() ;
+    nested = std::string::npos ;
+
+    if(sequence.size() < textStart - 1)
+    {
+        return false ;
+    }
+
+    union udata
+    {
+        char byte[4] ;
+        sWSBasenote note ;
+    };
+    udata data ;
+    for(size_t loop = 0; loop < 4; loop++)
+    {
+        data.byte[loop] = sequence[loop] ;
+    }
+
+    if(data.note.tag == 0)
+    {
+        if(sequence.size() > textStart)
+        {
+            text = sequence.substr(textStart) ;
+        }
+        return true ;
+    }
+
+    // the nested sequence: 0x1D, size (2 bytes), type, body, size (2 bytes), 0x1D
+    size_t start = data.note.tagoffset >= 4 ? data.note.tagoffset - 4 : 0 ;
+    if(start < textStart || start + 4 > sequence.size() ||
+       sequence[start] != static_cast<char>(STYLE_SEQUENCE))
+    {
+        return false ;
+    }
+
+    size_t nestedSize = static_cast<unsigned char>(sequence[start + 1]) |
+                        (static_cast<size_t>(static_cast<unsigned char>(sequence[start + 2])) << 8) ;
+    size_t nestedEnd = start + nestedSize + 3 ;
+    if(nestedSize < 4 || nestedEnd > sequence.size() ||
+       sequence[nestedEnd - 1] != static_cast<char>(STYLE_SEQUENCE))
+    {
+        return false ;
+    }
+
+    unsigned char nestedType = static_cast<unsigned char>(sequence[start + 3]) ;
+    if((nestedType == eSequence::SEQ_FOOTNOTE || nestedType == eSequence::SEQ_ENDNOTE) && nestedSize >= 9)
+    {
+        unsigned char format = static_cast<unsigned char>(sequence[start + 8]) >> 4 ;
+        if(format <= NOTE_NUMBER)
+        {
+            symbol = static_cast<eNoteSymbol>(format) ;
+        }
+    }
+
+    text = sequence.substr(textStart, start - textStart) + sequence.substr(nestedEnd) ;
+    nested = start ;
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  kind   [IN] - the kind of note
+/// @param  editor [IN] - editor whose code page is used, or nullptr for CP437
+///
+/// @return sNote - an empty note of that kind
+///
+/// @brief
+/// A new note as WordStar 7 writes one: a footnote or endnote holds its
+/// nested number sequence (number 0, numbers), a tab, then CR LF; an
+/// annotation or comment holds CR LF. Format byte 0x33 for a footnote,
+/// 0x34 for an endnote, 0x05 for an annotation, 0x06 for a comment.
+///
+/////////////////////////////////////////////////////////////////////////////
+sNote cWordstarFile::NewNote(eNoteKind kind, cEditorBase *editor)
+{
+    cDocument content ;
+    content.Clear() ;
+    if(kind == NOTE_KIND_FOOTNOTE || kind == NOTE_KIND_ENDNOTE)
+    {
+        sWSTab tab ;
+        tab.tabsize = 360 ;
+        tab.abstabsize = 900 ;
+        tab.type = TAB_TAB ;
+        tab.size = 2 ;
+        content.InsertTab(tab) ;
+    }
+    content.Insert(static_cast<CHAR_T>(HARD_RETURN)) ;
+
+    sNote note ;
+    note.kind = kind ;
+    note.symbol = NOTE_NUMBER ;
+    EncodeNote(content, note, editor) ;
+    return note ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  note    [IN]  - the note to decode
+/// @param  content [OUT] - cleared, then filled with the note text
+/// @param  editor  [IN]  - editor whose code page is used, or nullptr for CP437
+///
+/// @return bool - true on success
+///
+/// @brief
+/// Read the bytes after the format byte of note.raw into content as a
+/// WordStar file is read. The note's nested number sequence becomes a
+/// raw sequence marker, a nested tab sequence a tab. Records no undo.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::DecodeNote(const sNote &note, cDocument &content, cEditorBase *editor)
+{
+    content.Clear() ;
+    if(note.raw.size() <= 5)
+    {
+        content.ClearUndoHistory() ;
+        return true ;
+    }
+
+    std::string bytes = note.raw.substr(5) ;
+    FILE *file = fmemopen(bytes.data(), bytes.size(), "rb") ;
+    if(file == nullptr)
+    {
+        return false ;
+    }
+
+    cWordstarFile decoder(editor) ;
+    decoder.mDocument = &content ;
+    decoder.mFile = file ;
+    decoder.mInNote = true ;
+
+    bool oldLoading = content.GetLoading() ;
+    content.SetLoading(true) ;
+    char inchar ;
+    for(size_t loop = 0; fread(&inchar, 1, 1, file) == 1; loop++)
+    {
+        if(inchar == static_cast<char>(STYLE_EOF) && decoder.mExtendedChar == false)
+        {
+            break ;
+        }
+        decoder.HandleChar(static_cast<unsigned char>(inchar), loop) ;
+    }
+    content.SetLoading(oldLoading) ;
+    fclose(file) ;
+
+    content.SetPosition(0) ;
+    content.ClearUndoHistory() ;
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  content [IN]     - the note text
+/// @param  note    [IN/OUT] - the note; raw, text and symbol are set
+/// @param  editor  [IN]     - editor whose code page is used, or nullptr for CP437
+///
+/// @return bool - true on success
+///
+/// @brief
+/// Write content back into note.raw. If content reads the same as the
+/// note's current raw bytes, raw is left byte for byte. Otherwise raw is
+/// rebuilt: line count, the nested sequence flag and offset, the format byte
+/// (kept, or 0x33/0x34/0x05/0x06 for a new note), then content as a
+/// WordStar file holds it. A footnote or endnote without a nested number
+/// sequence gets one (number 0) in front of the text.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWordstarFile::EncodeNote(cDocument &content, sNote &note, cEditorBase *editor)
+{
+    cWordstarFile encoder(editor) ;
+    encoder.mDocument = &content ;
+    uint32_t stylecounter = 0 ;
+    std::string body = encoder.EncodeRange(0, content.GetTextSize(), stylecounter) ;
+
+    if(note.raw.empty() == false)
+    {
+        cDocument original ;
+        if(DecodeNote(note, original, editor))
+        {
+            cWordstarFile originalEncoder(editor) ;
+            originalEncoder.mDocument = &original ;
+            uint32_t originalcounter = 0 ;
+            if(originalEncoder.EncodeRange(0, original.GetTextSize(), originalcounter) == body)
+            {
+                return true ;
+            }
+        }
+    }
+
+    char format ;
+    if(note.raw.size() > 4)
+    {
+        format = note.raw[4] ;
+    }
+    else if(note.kind == NOTE_KIND_ENDNOTE)
+    {
+        format = 0x34 ;
+    }
+    else if(note.kind == NOTE_KIND_ANNOTATION)
+    {
+        format = 0x05 ;
+    }
+    else if(note.kind == NOTE_KIND_COMMENT)
+    {
+        format = 0x06 ;
+    }
+    else
+    {
+        format = 0x33 ;
+    }
+
+    // the nested note sequence, and the lines outside sequences and dot commands
+    size_t nested = std::string::npos ;
+    uint16_t lines = 0 ;
+    bool lineStart = true ;
+    bool dotLine = false ;
+    for(size_t loop = 0; loop < body.size(); )
+    {
+        if(body[loop] == static_cast<char>(STYLE_SEQUENCE) && loop + 3 < body.size())
+        {
+            size_t size = static_cast<unsigned char>(body[loop + 1]) |
+                          (static_cast<size_t>(static_cast<unsigned char>(body[loop + 2])) << 8) ;
+            unsigned char type = static_cast<unsigned char>(body[loop + 3]) ;
+            if(nested == std::string::npos && type >= eSequence::SEQ_FOOTNOTE && type <= eSequence::SEQ_COMMENT)
+            {
+                nested = loop ;
+            }
+            loop += size + 3 ;
+            continue ;
+        }
+        if(lineStart)
+        {
+            dotLine = body[loop] == '.' ;
+            lineStart = false ;
+        }
+        if(body[loop] == 10)
+        {
+            if(dotLine == false)
+            {
+                lines++ ;
+            }
+            lineStart = true ;
+        }
+        loop++ ;
+    }
+
+    if(nested == std::string::npos && (note.kind == NOTE_KIND_FOOTNOTE || note.kind == NOTE_KIND_ENDNOTE))
+    {
+        char type = note.kind == NOTE_KIND_ENDNOTE ? eSequence::SEQ_ENDNOTE : eSequence::SEQ_FOOTNOTE ;
+        std::string tag("\x1D\x09\x00", 3) ;
+        tag += type ;
+        tag += std::string(4, '\0') ;       // line count, number
+        tag += format ;
+        tag += std::string("\x09\x00\x1D", 3) ;
+        body = tag + body ;
+        nested = 0 ;
+    }
+
+    uint16_t tag = 0 ;
+    if(nested != std::string::npos)
+    {
+        tag = static_cast<uint16_t>(0x8000 | (5 + nested + 4)) ;
+    }
+
+    std::string raw ;
+    raw += static_cast<char>(lines & 0xFF) ;
+    raw += static_cast<char>(lines >> 8) ;
+    raw += static_cast<char>(tag & 0xFF) ;
+    raw += static_cast<char>(tag >> 8) ;
+    raw += format ;
+    raw += body ;
+
+    eNoteSymbol symbol = NOTE_NUMBER ;
+    std::string text ;
+    if(SplitNote(raw, symbol, text, nested) == false)
+    {
+        return false ;
+    }
+
+    note.raw = raw ;
+    note.text = text ;
+    note.symbol = symbol ;
+    return true ;
 }
 
 
