@@ -2984,3 +2984,66 @@ TEST_CASE("cWordstarFile::InsertAtTextEnd - a 0x1A inside a malformed header is 
 
     CHECK(InsertedAtTextEnd(target, "new\r\n") == PadEof(target.substr(0, 128 + text.size()) + "new\r\n"));
 }
+
+
+TEST_CASE("Footnotes and endnotes keep their text and numbers")
+{
+    ensureQApplication();
+
+    // number of note entries reachable through the markers of doc
+    auto noteCount = [](cDocument &doc) -> int
+    {
+        int count = 0;
+        for (POSITION_T pos = 0; pos < doc.GetTextSize(); pos++)
+        {
+            sNote found{};
+            if (doc.GetNote(pos, found))
+            {
+                count++;
+            }
+        }
+        return count;
+    };
+
+    SUBCASE("deleting a note marker removes its note and undo brings both back")
+    {
+        cDocument document;
+        document.Clear();
+
+        sNote footnote{};
+        footnote.text = "first";
+        sNote endnote{};
+        endnote.kind = NOTE_KIND_ENDNOTE;
+        endnote.text = "last";
+
+        document.Insert("x");                 // 0
+        document.InsertFootnote(footnote);    // 1
+        document.Insert(STYLE_BOLD);          // 2
+        document.InsertEndnote(endnote);      // 3
+        document.Insert("y");                 // 4
+        document.ClearUndoHistory();
+        REQUIRE(noteCount(document) == 2);
+
+        document.Delete(1, 1);
+        sNote stray{};
+        CHECK_FALSE(document.GetNote(0, stray));
+        CHECK(noteCount(document) == 1);
+        CHECK(document.GetControlChar(1) == STYLE_BOLD);
+        CHECK(document.GetControlChar(2) == STYLE_ENDNOTE);
+
+        document.Undo();
+        sNote restored{};
+        CHECK(document.GetControlChar(1) == STYLE_FOOTNOTE);
+        CHECK(document.GetNote(1, restored));
+        CHECK(restored.text == "first");
+        CHECK(document.GetControlChar(2) == STYLE_BOLD);
+        CHECK(noteCount(document) == 2);
+
+        // a second delete leaves no copy of either note behind
+        document.Delete(1, 1);
+        document.Delete(2, 1);
+        CHECK(noteCount(document) == 0);
+        CHECK(document.GetControlChar(1) == STYLE_BOLD);
+        CHECK(document.GetTextSize() == 4);
+    }
+}

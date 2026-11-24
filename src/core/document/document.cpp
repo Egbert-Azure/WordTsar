@@ -6160,7 +6160,8 @@ void cDocument::DeleteColor(POSITION_T position)
 ///
 /// @return nothing
 ///
-/// @brief Delete a control char entry from the control chars table
+/// @brief Delete a control char entry from the control chars table, or a
+///        footnote or endnote entry from its note table
 ///
 /// This should never be called directly, only from Delete()
 /////////////////////////////////////////////////////////////////////////////
@@ -6192,6 +6193,19 @@ void cDocument::DeleteControlChar(POSITION_T position)
                 if(iter1 != paraiter->format.end() && iter1->first == position)
                 {
                     paraiter->format.erase(iter1) ;
+                    paraiter->pairs.erase(iter) ;
+                }
+            }
+            else if(iter->second == TYPE_FOOTNOTE || iter->second == TYPE_ENDNOTE)
+            {
+                std::vector<FootnotePair> &list = iter->second == TYPE_FOOTNOTE ? paraiter->footnote : paraiter->endnote ;
+                FootnotePair t1 ;
+                t1.first = position ;
+
+                auto iter1 = lower_bound(list.begin(), list.end(), t1, FootnoteCompare) ;
+                if(iter1 != list.end() && iter1->first == position)
+                {
+                    list.erase(iter1) ;
                     paraiter->pairs.erase(iter) ;
                 }
             }
