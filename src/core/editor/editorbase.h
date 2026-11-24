@@ -278,7 +278,7 @@ public:
     bool OpenNewNote(eNoteKind kind);                         // New footnote or endnote at the cursor; false if no note opened
     bool OpenNoteAtCursor(void);                              // ^OND: the footnote or endnote at the cursor; false if none opened
     bool GotoNextNote(void);                                  // ^ONG: cursor to the next note marker; false if there is none
-    void CloseNote(bool keep);                                // keep: ^KD ^KS ^KX; otherwise ^KQ, which asks if the note changed
+    void CloseNote(bool keep, bool quiet = false);            // keep: ^KD ^KS ^KX; otherwise ^KQ, which asks if the note changed; quiet: no dialog
     bool IsNoteOpen(void) const;                              // A note of this editor's document is open
     bool IsNoteEditor(void) const;                            // This editor edits a note
     cEditorBase* GetNoteEditor(void) const;                   // Editor of the open note, nullptr if none

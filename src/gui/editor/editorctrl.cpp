@@ -7274,12 +7274,29 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
 ///
 /// @brief
 /// Emergency save when crashing. Saves to emergency-[timestamp].ws file.
-/// Called by crash handler.
-///
+/// Called by crash handler. An open note is first written into the
+/// document without a dialog (CloseNote quiet); if that fails the document
+/// is saved without it. A note editor saves the document it edits a note of.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::EmergencySaveFile(char *text)
 {
+    if (mNoteOwner != nullptr)
+    {
+        mNoteOwner->EmergencySaveFile(text);
+        return;
+    }
+    if (IsNoteOpen())
+    {
+        try
+        {
+            CloseNote(true, true);
+        }
+        catch (const std::exception&)
+        {
+        }
+    }
+
     if (!mDocument)
     {
         fprintf(stderr, "Emergency save FAILED - no document!\n");

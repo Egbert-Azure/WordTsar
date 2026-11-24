@@ -3310,6 +3310,48 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         CHECK_FALSE(editor.IsNoteOpen());
     }
 
+    SUBCASE("an emergency save writes the open note with the document")
+    {
+        std::filesystem::path dir = TempPath();
+        std::filesystem::create_directory(dir);
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        doc->Insert("One\r");
+        REQUIRE(editor.SaveFile((dir / "doc.ws").string()));
+        doc->SetPosition(3);
+
+        editor.FeedKey(CharKeyStroke('\x0F'));
+        editor.FeedKey(TextKeyStroke("n"));
+        editor.FeedKey(TextKeyStroke("f"));
+        REQUIRE(editor.IsNoteOpen());
+        editor.FeedKey(TextKeyStroke("Kept"));
+        editor.EmergencySaveFile(nullptr);
+        CHECK_FALSE(editor.IsNoteOpen());
+
+        std::filesystem::path emergency;
+        for (const auto& entry : std::filesystem::directory_iterator(dir))
+        {
+            if (entry.path().filename().string().rfind("emergency-", 0) == 0)
+            {
+                emergency = entry.path();
+            }
+        }
+        REQUIRE_FALSE(emergency.empty());
+        cDocument loaded;
+        loaded.Clear();
+        cWordstarFile loader(&editor);
+        loader.mDocument = &loaded;
+        REQUIRE(loader.LoadFile(emergency.string()));
+        std::filesystem::remove_all(dir);
+
+        sNote note{};
+        REQUIRE(loaded.GetNote(3, note));
+        cDocument noteText;
+        REQUIRE(cWordstarFile::DecodeNote(note, noteText, &editor));
+        CHECK(noteText.GetParagraphText(0).find("Kept") != std::string::npos);
+    }
+
     SUBCASE("notes are numbered in document order, .f# sets the next number, the marker shows it")
     {
         cEditorCtrl editor;

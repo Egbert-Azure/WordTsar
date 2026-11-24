@@ -1519,12 +1519,30 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
 /// @return nothing
 ///
 /// @brief
-/// Emergency save on a fatal error. Saves to filename.emergency when the
-/// document has unsaved changes.
+/// Emergency save on a fatal error. An open note is first written into
+/// the document without a dialog (CloseNote quiet). Saves to
+/// filename.emergency when the document has unsaved changes. A note editor
+/// saves the document it edits a note of.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSEditorCtrl::EmergencySaveFile(char *text)
 {
+    if (mNoteOwner != nullptr)
+    {
+        mNoteOwner->EmergencySaveFile(text);
+        return;
+    }
+    if (IsNoteOpen())
+    {
+        try
+        {
+            CloseNote(true, true);
+        }
+        catch (const std::exception&)
+        {
+        }
+    }
+
     if (!mDocument || !mDocument->IsModified())
     {
         return;

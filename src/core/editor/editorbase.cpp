@@ -741,8 +741,10 @@ bool cEditorBase::OpenNoteEditor(const sNote& note, eNoteKind kind, POSITION_T p
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @param  keep [in] true to write the note (^KD ^KS ^KX), false to abandon
-///                   it (^KQ)
+/// @param  keep  [in] true to write the note (^KD ^KS ^KX), false to abandon
+///                    it (^KQ)
+/// @param  quiet [in] true to show no dialog: a note that cannot be written
+///                    stays open, an abandoned note is not asked about
 ///
 /// @brief
 /// Closes the open note. ^KQ asks first if the note changed. Writing a
@@ -755,11 +757,11 @@ bool cEditorBase::OpenNoteEditor(const sNote& note, eNoteKind kind, POSITION_T p
 /// the note it edits.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorBase::CloseNote(bool keep)
+void cEditorBase::CloseNote(bool keep, bool quiet)
 {
     if (mNoteOwner != nullptr)
     {
-        mNoteOwner->CloseNote(keep) ;
+        mNoteOwner->CloseNote(keep, quiet) ;
         return ;
     }
     if (mNoteEditor == nullptr)
@@ -776,10 +778,13 @@ void cEditorBase::CloseNote(bool keep)
 
     if (keep == true && encoded == false)
     {
-        pane->ShowError("Note", "The note cannot be written") ;
+        if (quiet == false)
+        {
+            pane->ShowError("Note", "The note cannot be written") ;
+        }
         return ;
     }
-    if (keep == false && changed == true)
+    if (keep == false && changed == true && quiet == false)
     {
         if (pane->AskYesNo("Abandon Note", "Abandon changes to this note?") == false)
         {
@@ -800,7 +805,10 @@ void cEditorBase::CloseNote(bool keep)
              (marker.kind == mNoteOriginal.kind) && (marker.raw == mNoteOriginal.raw)) ;
         if (markerHere == false)
         {
-            pane->ShowMessage("Note", "The note's marker is no longer where the note was opened, so the note was not written. The note stays open.") ;
+            if (quiet == false)
+            {
+                pane->ShowMessage("Note", "The note's marker is no longer where the note was opened, so the note was not written. The note stays open.") ;
+            }
             return ;
         }
     }

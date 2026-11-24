@@ -189,12 +189,16 @@ void cTerminateSignal::OnActivated(void)
 /// @param  editor [in] editor whose document is saved; may be nullptr
 ///
 /// @brief
-/// Saves the document to an emergency file next to it when it has unsaved
-/// changes. Shows no dialog.
+/// Writes an open note into the document, then saves the document to an
+/// emergency file next to it when it has unsaved changes. Shows no dialog.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void EmergencySaveOnTerminate(cEditorCtrl *editor)
 {
+    if ((editor != nullptr) && editor->IsNoteOpen())
+    {
+        editor->CloseNote(true, true);
+    }
     if ((editor == nullptr) || (editor->GetDocument() == nullptr) || !editor->GetDocument()->IsModified())
     {
         return;
