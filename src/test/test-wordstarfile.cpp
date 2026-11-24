@@ -3424,4 +3424,78 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         CHECK_FALSE(layout->GetPrintLayout());
         CHECK(layout->GetPageFootnotes(1).lines.empty());
     }
+
+    SUBCASE("the print layout puts the endnotes at .pe within the document's margins")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        auto insertNote = [doc](eNoteKind kind, const std::string& text)
+        {
+            cDocument content;
+            REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(kind), content));
+            content.SetPosition(2);
+            content.Insert(text);
+            doc->InsertNote(kind, content);
+        };
+        auto lineText = [](const sHeaderFooterLine& line)
+        {
+            std::string all;
+            for (const std::string& grapheme : line.graphemes)
+            {
+                unsigned char first = grapheme.empty() ? 0 : static_cast<unsigned char>(grapheme[0]);
+                if (first >= 0x20 && first != 0x7F)
+                {
+                    all += grapheme;
+                }
+            }
+            return all;
+        };
+
+        doc->Insert(".rm 30\r");
+        doc->Insert("Alpha");
+        insertNote(NOTE_KIND_FOOTNOTE, "First note");
+        doc->Insert("\rBeta");
+        insertNote(NOTE_KIND_ENDNOTE, "End note words that wrap at the right margin");
+        doc->Insert("\rGamma");
+        insertNote(NOTE_KIND_FOOTNOTE, "Second note");
+        doc->Insert("\r.pe\rAfter\r");
+
+        cLayoutBase* layout = editor.GetLayout();
+        layout->SetShowControl(SHOW_NONE);
+        layout->SetMarkersVisible(false);
+        layout->SetPrintLayout(true);
+        layout->LayoutDocument(doc);
+
+        // y of the printed lines holding text, by text
+        auto lineTop = [&](const std::string& text) -> COORD_T
+        {
+            for (PARAGRAPH_T para = 0; para < layout->GetNumberOfParagraphs(); para++)
+            {
+                if (doc->GetParagraphText(para).rfind(text, 0) == 0)
+                {
+                    const sParagraphLayout* paraLayout = layout->GetParagraphLayout(para);
+                    REQUIRE(paraLayout != nullptr);
+                    REQUIRE_FALSE(paraLayout->lines.empty());
+                    return paraLayout->lines.front().pagey;
+                }
+            }
+            return -1;
+        };
+
+        std::vector<sHeaderFooterLine> endnotes = layout->GetPageEndnotes(1);
+        REQUIRE(endnotes.size() >= 2);                          // wraps at .rm 30
+        std::string text;
+        for (const sHeaderFooterLine& line : endnotes)
+        {
+            text += lineText(line);
+        }
+        CHECK(text.rfind("1End note", 0) == 0);
+        CHECK(endnotes.front().line.pagey > lineTop("Gamma"));
+        CHECK(endnotes.back().line.pagey < lineTop("After"));
+        CHECK(lineText(layout->GetPageFootnotes(1).lines.front()) == "1First note");
+        layout->SetPrintLayout(false);
+        layout->LayoutDocument(doc);
+        CHECK(layout->GetPageEndnotes(1).empty());
+    }
 }

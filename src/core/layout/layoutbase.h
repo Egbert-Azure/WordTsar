@@ -352,6 +352,7 @@ public:
     void SetPrintLayout(bool print);
     bool GetPrintLayout(void) const;
     sPageFootnotes GetPageFootnotes(PAGE_T page) const;
+    std::vector<sHeaderFooterLine> GetPageEndnotes(PAGE_T page) const;
     virtual cLayoutBase* CreateNoteLayout(void) const;
 
     // ----- Query Methods - Control Code Visibility -----
@@ -492,6 +493,7 @@ private:
     std::vector<sHeaderFooterLine> LayoutNoteLines(POSITION_T position);
     void PlaceFootnoteLines(std::vector<sHeaderFooterLine>& lines);
     COORD_T GetFootnoteReserve(PAGE_T page) const;
+    void PlaceEndnotes(POSITION_T at);
 
     // =================================================================
     // MEMBER VARIABLES
@@ -552,6 +554,8 @@ private:
     std::vector<POSITION_T> mPrintFootnotes;        // Footnote marker positions of the print layout
     std::map<PAGE_T, sFootnoteArea> mFootnoteAreas; // Footnotes by page
     std::vector<sHeaderFooterLine> mFootnoteCarry;  // Note lines that continue on the next page
+    std::vector<sNoteNumber> mPrintEndnotes;        // Endnotes of the print layout, in marker order
+    std::map<PAGE_T, std::vector<sHeaderFooterLine>> mEndnoteLines; // Placed endnote lines by page
 
     // Margin change tracking handled by cPageManager
 

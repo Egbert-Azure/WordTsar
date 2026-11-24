@@ -376,6 +376,8 @@ void cLayoutBase::LayoutDocument(cDocument* doc, std::function<void(int)> progre
     mFootnoteAreas.clear();
     mFootnoteCarry.clear();
     mPrintFootnotes.clear();
+    mPrintEndnotes.clear();
+    mEndnoteLines.clear();
     if (mPrintLayout)
     {
         std::vector<std::pair<POSITION_T, eNoteKind>> notes;
@@ -385,6 +387,13 @@ void cLayoutBase::LayoutDocument(cDocument* doc, std::function<void(int)> progre
             if (note.second == NOTE_KIND_FOOTNOTE)
             {
                 mPrintFootnotes.push_back(note.first);
+            }
+        }
+        for (const sNoteNumber& number : NumberNotes(doc))
+        {
+            if (number.kind == NOTE_KIND_ENDNOTE)
+            {
+                mPrintEndnotes.push_back(number);
             }
         }
     }
@@ -511,6 +520,12 @@ void cLayoutBase::LayoutDocument(cDocument* doc, std::function<void(int)> progre
 #endif
             }
         }
+    }
+
+    // Endnotes without a .pe line after them print at the end of the document
+    if (mPrintLayout)
+    {
+        PlaceEndnotes(-1);
     }
 
     // Note lines still waiting continue on pages of their own
@@ -1193,6 +1208,16 @@ bool cLayoutBase::LayoutDotCommandParagraph(PARAGRAPH_T para, const std::string&
 
     // Replace existing entry with dot command layout
     mParagraphLayout[para] = dotPara;
+
+    // Print layout: .pe prints the endnotes whose markers come before it
+    if (mPrintLayout && mFullLayout && dotPara.isCommand && text.length() >= 3 &&
+        toupper(static_cast<unsigned char>(text[1])) == 'P' && toupper(static_cast<unsigned char>(text[2])) == 'E')
+    {
+        POSITION_T paraStart = 0;
+        POSITION_T paraEnd = 0;
+        mDocument->GetParagraphStartandEnd(para, paraStart, paraEnd);
+        PlaceEndnotes(paraStart);
+    }
 
     // Save end state for next paragraph
     SaveParagraphEndState(para);
@@ -3085,6 +3110,61 @@ sPageFootnotes cLayoutBase::GetPageFootnotes(PAGE_T page) const
 ///
 /// @param  page [in] page number
 ///
+/// @return the endnote lines printed on the page, positioned on it; empty
+///         outside a print layout
+///
+/////////////////////////////////////////////////////////////////////////////
+std::vector<sHeaderFooterLine> cLayoutBase::GetPageEndnotes(PAGE_T page) const
+{
+    auto found = mEndnoteLines.find(page);
+    return (found == mEndnoteLines.end()) ? std::vector<sHeaderFooterLine>() : found->second;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  at [in] start of the .pe line being laid out, -1 for the end
+///                 of the document
+///
+/// @brief
+/// Lays out the endnotes that print at at, in marker order, and places
+/// their lines in the text flow of the current page, starting new pages
+/// as needed.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::PlaceEndnotes(POSITION_T at)
+{
+    for (const sNoteNumber& number : mPrintEndnotes)
+    {
+        if (number.endnoteAt != at)
+        {
+            continue;
+        }
+        for (const sHeaderFooterLine& noteLine : LayoutNoteLines(number.position))
+        {
+            COORD_T height = noteLine.line.lineheight;
+            if (NeedNewPage(height))
+            {
+                IncrementPageAndCreateBox();
+            }
+            sHeaderFooterLine placed = noteLine;
+            placed.line.pagex = mBoxLeft + noteLine.line.pagex;
+            placed.line.pagey = mBoxTop;
+            placed.line.pagenumber = mCurrentPage;
+            mEndnoteLines[mCurrentPage].push_back(placed);
+
+            mBoxTop += height;
+            mScreenY += height;
+            mPageManager->UpdateCurrentBoxY(height);
+        }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  page [in] page number
+///
 /// @return height the page's footnotes take at the bottom of its text box
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -3140,8 +3220,9 @@ void cLayoutBase::AddLineFootnotes(PARAGRAPH_T paragraphNum, const sLineLayout& 
 ///
 /// @brief
 /// Decodes the note into a document of its own and lays it out with a
-/// second layout of the same kind (CreateNoteLayout()) in the default font.
-/// Empty lines at the end are dropped.
+/// second layout of the same kind (CreateNoteLayout()) in the default font,
+/// within the left and right margins in effect. Empty lines at the end are
+/// dropped.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::vector<sHeaderFooterLine> cLayoutBase::LayoutNoteLines(POSITION_T position)
@@ -3169,6 +3250,14 @@ std::vector<sHeaderFooterLine> cLayoutBase::LayoutNoteLines(POSITION_T position)
             break;
         }
     }
+
+    // The note takes the margins in effect where it prints
+    char margins[64];
+    snprintf(margins, sizeof(margins), ".lm %.4f\"\r.rm %.4f\"\r",
+             static_cast<double>(mLayoutState->GetLeftMargin()) / TWIPSPERINCH,
+             static_cast<double>(mLayoutState->GetRightMargin()) / TWIPSPERINCH);
+    content.SetPosition(0);
+    content.Insert(margins);
 
     std::unique_ptr<cLayoutBase> noteLayout(CreateNoteLayout());
     if (!noteLayout)
@@ -4690,6 +4779,10 @@ PAGE_T cLayoutBase::GetNumberOfPages(void) const
                                           return !paraLayout.lines.empty();
                                       });
     PAGE_T footnotePages = mFootnoteAreas.empty() ? 0 : mFootnoteAreas.rbegin()->first;
+    if (!mEndnoteLines.empty())
+    {
+        footnotePages = std::max(footnotePages, mEndnoteLines.rbegin()->first);
+    }
     if (lastWithLines == mParagraphLayout.rend())
     {
         return std::clamp(footnotePages, static_cast<PAGE_T>(1), boxPages);

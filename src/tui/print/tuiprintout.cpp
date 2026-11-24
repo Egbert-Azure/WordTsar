@@ -426,6 +426,12 @@ void cTUIPrintout::RenderHeadersFooters(CGContextRef ctx, PAGE_T pageNum, double
     }
 
     RenderFootnotes(ctx, pageNum, pageHeightPt);
+
+    // Endnotes printed in the text flow of this page
+    for (const sHeaderFooterLine& noteLine : mLayout->GetPageEndnotes(pageNum))
+    {
+        RenderHeaderFooterLine(ctx, noteLine, pageHeightPt);
+    }
 }
 
 
