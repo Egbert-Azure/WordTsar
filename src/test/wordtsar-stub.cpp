@@ -123,3 +123,16 @@ void cWordTsar::OnInputModeChanged(eInputMode /*mode*/)
 {
     // Empty stub - no menu provider swap in test environment
 }
+
+
+cEditorCtrl *cWordTsar::OpenNotePane(cDocument * /*note*/, const std::string & /*title*/)
+{
+    // Empty stub - no note pane in test environment
+    return nullptr;
+}
+
+
+void cWordTsar::CloseNotePane(void)
+{
+    // Empty stub - no note pane in test environment
+}

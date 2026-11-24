@@ -4145,19 +4145,31 @@ void cEditorCtrl::focusOutEvent(QFocusEvent* event)
 /// @return the note editor
 ///
 /// @brief
-/// Creates the note editor on note with this editor's font, code page,
-/// measurement, control display, input mode and colours, in continuous
+/// Creates the note editor on note, in the main window's note pane if
+/// there is one, with this editor's font, code page, measurement, control
+/// display, input mode, help level, file name and colours, in continuous
 /// mode and without auto-save.
 ///
 /////////////////////////////////////////////////////////////////////////////
 cEditorBase* cEditorCtrl::ShowNotePane(cDocument* note, const std::string& title)
 {
-    UNUSED_ARGUMENT(title);
-
-    cEditorCtrl* pane = new cEditorCtrl(note, nullptr);
+    cEditorCtrl* pane = nullptr;
+    if (mWordTsar != nullptr)
+    {
+        pane = mWordTsar->OpenNotePane(note, title);
+    }
+    if (pane == nullptr)
+    {
+        pane = new cEditorCtrl(note, nullptr);
+    }
     pane->mAutoSaveTimer->stop();
     pane->SetInputMode(mInputMode);
     pane->mInsertMode = mInsertMode;
+    pane->mHelpLevel = mHelpLevel;
+    pane->mHelpDisplay = mHelpDisplay;
+    pane->mDispStatusBar = mDispStatusBar;
+    pane->mFileName = mFileName;
+    pane->mFileDir = mFileDir;
     pane->SetCodePage(GetCodePage());
     pane->SetMeasurement(GetMeasurement());
     pane->mSpellCheckLanguage = mSpellCheckLanguage;
@@ -4190,10 +4202,14 @@ cEditorBase* cEditorCtrl::ShowNotePane(cDocument* note, const std::string& title
 void cEditorCtrl::HideNotePane(cEditorBase* pane)
 {
     cEditorCtrl* editor = dynamic_cast<cEditorCtrl*>(pane);
-    if (editor != nullptr)
+    if (editor != nullptr && editor->parentWidget() == nullptr)
     {
         editor->hide();
         editor->deleteLater();
+    }
+    if (mWordTsar != nullptr)
+    {
+        mWordTsar->CloseNotePane();
     }
     setFocus();
 }

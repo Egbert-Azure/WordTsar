@@ -80,6 +80,10 @@ public:
     // used for testing
     cEditorCtrl *GetEditorCtrl(void) { return mEditor ; }
 
+    // Note pane (see cEditorBase::ShowNotePane)
+    cEditorCtrl *OpenNotePane(cDocument *note, const std::string &title) ;
+    void CloseNotePane(void) ;
+
 protected :
     // Qt event overrides
     void closeEvent(QCloseEvent *event) override ;
@@ -90,6 +94,9 @@ private :
     // Menu setup
     void CreateMenus(void) ;
     void UpdateRecentFilesMenu(void) ;
+    cEditorCtrl *Active(void) ;                 // editor menus act on
+    cWordStarInput *MenuInput(void) ;           // menu input handler of Active()
+    void KeepOpenNote(void) ;                   // write an open note into the document
     void ApplyHelpColors(const QColor& helpBg, const QColor& helpFg, const QColor& keyColor, const QColor& keyBgColor) ;
 
 private slots :
@@ -363,6 +370,9 @@ private:
     cEditorCtrl *mRevealCodesEditor ;         // codes pane editor (nullptr when hidden)
     bool mRevealCodesVisible ;                // reveal codes toggle state
     QAction *mCommandTagsAction ;             // Command Tags / Show Formatting menu action
+    QWidget *mNotePaneWidget = nullptr ;      // note pane: title, note editor and scrollbar (nullptr when no note is open)
+    cEditorCtrl *mNoteEditor = nullptr ;      // editor of the open note
+    std::unique_ptr<cWordStarInput> mNoteMenuInput ;   // menu input handler of mNoteEditor
     QMenu *mRecentFilesMenu ;                 // File > Recent Files submenu
 
     // Utilities > Macros actions, enabled by UpdateMacroActions()

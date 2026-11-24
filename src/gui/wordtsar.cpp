@@ -521,6 +521,7 @@ cWordTsar::~cWordTsar(void)
 /////////////////////////////////////////////////////////////////////////////
 void cWordTsar::closeEvent(QCloseEvent *event)
 {
+    KeepOpenNote() ;
     if (mEditor->CloseEvent())
     {
         event->accept();
@@ -606,22 +607,22 @@ bool cWordTsar::eventFilter(QObject *obj, QEvent *event)
         }
         else if (obj == mStatLeft)
         {
-            mEditor->SetAlignment(JUST_LEFT) ;
+            Active()->SetAlignment(JUST_LEFT) ;
             handled = true ;
         }
         else if (obj == mStatCenter)
         {
-            mEditor->SetAlignment(JUST_CENTER) ;
+            Active()->SetAlignment(JUST_CENTER) ;
             handled = true ;
         }
         else if (obj == mStatRight)
         {
-            mEditor->SetAlignment(JUST_RIGHT) ;
+            Active()->SetAlignment(JUST_RIGHT) ;
             handled = true ;
         }
         else if (obj == mStatJustify)
         {
-            mEditor->SetAlignment(JUST_JUST) ;
+            Active()->SetAlignment(JUST_JUST) ;
             handled = true ;
         }
         else if (obj == mStatFont)
@@ -631,7 +632,7 @@ bool cWordTsar::eventFilter(QObject *obj, QEvent *event)
         }
         else if (obj == mStatMode)
         {
-            mEditor->ToggleInsertOverwrite() ;
+            Active()->ToggleInsertOverwrite() ;
             handled = true ;
         }
         else if (obj == mStatPage)
@@ -643,8 +644,8 @@ bool cWordTsar::eventFilter(QObject *obj, QEvent *event)
         if (handled)
         {
             // Same update as menu actions (see mMenuBar::triggered connection)
-            mEditor->PerformPostCommandUpdate() ;
-            QTimer::singleShot(1, mEditor, SLOT(OnIdle())) ;
+            Active()->PerformPostCommandUpdate() ;
+            QTimer::singleShot(1, Active(), SLOT(OnIdle())) ;
             return true ;
         }
     }
@@ -656,6 +657,7 @@ bool cWordTsar::eventFilter(QObject *obj, QEvent *event)
 
 void cWordTsar::LoadFile(QString name)
 {
+    KeepOpenNote() ;
     mLoadFileName = name ;
     if (mEditor->LoadFile(name.toStdString()))
     {
@@ -755,7 +757,7 @@ void cWordTsar::OpenRecentFile(void)
 /////////////////////////////////////////////////////////////////////////////
 void cWordTsar::OnStatusTimer(void)
 {
-    UpdateStatus(mEditor) ;
+    UpdateStatus(Active()) ;
 }
 
 
@@ -1873,9 +1875,7 @@ GraphicAction->setEnabled(false) ;
     QAction *NoteCommentAction = new QAction(mMenuProvider->GetInsertNoteCommentLabel(), mMenuBar) ;
 NoteCommentAction->setEnabled(false) ;
     QAction *NoteFootnoteAction = new QAction(mMenuProvider->GetInsertNoteFootnoteLabel(), mMenuBar) ;
-NoteFootnoteAction->setEnabled(false) ;
     QAction *NoteEndnoteAction = new QAction(mMenuProvider->GetInsertNoteEndnoteLabel(), mMenuBar) ;
-NoteEndnoteAction->setEnabled(false) ;
     QAction *NoteAnnotationAction = new QAction(mMenuProvider->GetInsertNoteAnnotationLabel(), mMenuBar) ;
 NoteAnnotationAction->setEnabled(false) ;
 
@@ -2311,14 +2311,15 @@ ReformatNotesAction->setEnabled(false) ;
     // (same update as keyboard handler -- shared via PerformPostCommandUpdate)
     connect(mMenuBar, &QMenuBar::triggered, this, [this](QAction*)
     {
-        mEditor->PerformPostCommandUpdate() ;
-        QTimer::singleShot(1, mEditor, SLOT(OnIdle())) ;
+        Active()->PerformPostCommandUpdate() ;
+        QTimer::singleShot(1, Active(), SLOT(OnIdle())) ;
     }) ;
 }
 
 // we handle menus by generating keys as if from the user
 void cWordTsar::Open(void)
 {
+    KeepOpenNote() ;
     mEditor->Open() ;
 }
 
@@ -2329,10 +2330,10 @@ void cWordTsar::InsertFile(void)
     // content at the cursor, into the document already open -- see
     // cEditorCtrl::InsertFileAtCursor(). Distinct from Open() above, which
     // replaces the whole document (real WS7's "Open a document").
-    std::string filename = mEditor->PromptForLoadFile() ;
+    std::string filename = Active()->PromptForLoadFile() ;
     if (!filename.empty())
     {
-        mEditor->InsertFileAtCursor(filename) ;
+        Active()->InsertFileAtCursor(filename) ;
     }
 }
 
@@ -2354,6 +2355,7 @@ void cWordTsar::SaveAs(void)
 
 void cWordTsar::SaveandClose(void)
 {
+    KeepOpenNote() ;
     mEditor->SaveAndClose() ;
 }
 
@@ -2382,349 +2384,350 @@ void cWordTsar::AboutWordTsar(void)
 
 void cWordTsar::ExitWordTsar(void)
 {
+    KeepOpenNote() ;
     mEditor->ExitApplication() ;
 }
 
 
 void cWordTsar::Undo(void)
 {
-    mEditor->Undo() ;
+    Active()->Undo() ;
 }
 
 
 void cWordTsar::Redo(void)
 {
-    mEditor->Redo() ;
+    Active()->Redo() ;
 }
 
 
 void cWordTsar::MarkBlockStart(void)
 {
-    mEditor->SetBeginBlock() ;
+    Active()->SetBeginBlock() ;
 }
 
 
 void cWordTsar::MarkBlockEnd(void)
 {
-    mEditor->SetEndBlock() ;
+    Active()->SetEndBlock() ;
 }
 
 
 void cWordTsar::MoveBlock(void)
 {
-    mEditor->MoveBlock() ;
+    Active()->MoveBlock() ;
 }
 
 
 void cWordTsar::CopyBlock(void)
 {
-    mEditor->CopyBlock() ;
+    Active()->CopyBlock() ;
 }
 
 
 void cWordTsar::CopyFromClipboard(void)
 {
-    mEditor->ClipboardPaste() ;
+    Active()->ClipboardPaste() ;
 }
 
 
 void cWordTsar::CopyToClipboard(void)
 {
-    mEditor->ClipboardCopy() ;
+    Active()->ClipboardCopy() ;
 }
 
 
 void cWordTsar::DeleteBlock(void)
 {
-    mEditor->DeleteBlock() ;
+    Active()->DeleteBlock() ;
 }
 
 
 void cWordTsar::DeleteWord(void)
 {
-    mEditor->DeleteWordRight() ;
+    Active()->DeleteWordRight() ;
 }
 
 
 void cWordTsar::DeleteLine(void)
 {
-    mEditor->DeleteLine() ;
+    Active()->DeleteLine() ;
 }
 
 
 void cWordTsar::DeleteLineLeft(void)
 {
-    mEditor->DeleteLineLeft() ;
+    Active()->DeleteLineLeft() ;
 }
 
 
 void cWordTsar::DeleteLineRight(void)
 {
-    mEditor->DeleteLineRight() ;
+    Active()->DeleteLineRight() ;
 }
 
 
 void cWordTsar::DeleteToChar(void)
 {
-    mEditor->DeleteToChar() ;
+    Active()->DeleteToChar() ;
 }
 
 
 void cWordTsar::MarkPrevBlock(void)
 {
-    mEditor->SetPreviousBlock() ;
+    Active()->SetPreviousBlock() ;
 }
 
 
 void cWordTsar::Find(void)
 {
-    mEditor->Find() ;
+    Active()->Find() ;
 }
 
 
 void cWordTsar::FindandReplace(void)
 {
-    mEditor->Replace() ;
+    Active()->Replace() ;
 }
 
 
 void cWordTsar::FindNext(void)
 {
-    mEditor->FindAgain() ;
+    Active()->FindAgain() ;
 }
 
 
 void cWordTsar::GotoChar(void)
 {
-    mEditor->GotoCharacter() ;
+    Active()->GotoCharacter() ;
 }
 
 
 void cWordTsar::GotoPage(void)
 {
-    mEditor->GotoPage() ;
+    Active()->GotoPage() ;
 }
 
 
 void cWordTsar::Goto1(void)
 {
-    mEditor->GotoSavePosition(1) ;
+    Active()->GotoSavePosition(1) ;
 }
 
 
 void cWordTsar::Goto2(void)
 {
-    mEditor->GotoSavePosition(2) ;
+    Active()->GotoSavePosition(2) ;
 }
 
 
 void cWordTsar::Goto3(void)
 {
-    mEditor->GotoSavePosition(3) ;
+    Active()->GotoSavePosition(3) ;
 }
 
 
 void cWordTsar::Goto4(void)
 {
-    mEditor->GotoSavePosition(4) ;
+    Active()->GotoSavePosition(4) ;
 }
 
 
 void cWordTsar::Goto5(void)
 {
-    mEditor->GotoSavePosition(5) ;
+    Active()->GotoSavePosition(5) ;
 }
 
 
 void cWordTsar::Goto6(void)
 {
-    mEditor->GotoSavePosition(6) ;
+    Active()->GotoSavePosition(6) ;
 }
 
 
 void cWordTsar::Goto7(void)
 {
-    mEditor->GotoSavePosition(7) ;
+    Active()->GotoSavePosition(7) ;
 }
 
 
 void cWordTsar::Goto8(void)
 {
-    mEditor->GotoSavePosition(8) ;
+    Active()->GotoSavePosition(8) ;
 }
 
 
 void cWordTsar::Goto9(void)
 {
-    mEditor->GotoSavePosition(9) ;
+    Active()->GotoSavePosition(9) ;
 }
 
 
 void cWordTsar::Goto0(void)
 {
-    mEditor->GotoSavePosition(0) ;
+    Active()->GotoSavePosition(0) ;
 }
 
 
 void cWordTsar::GotoFont(void)
 {
-    mEditor->GotoFontTag() ;
+    Active()->GotoFontTag() ;
 }
 
 
 void cWordTsar::GotoStyle(void)
 {
-    mEditor->NotImplemented("^Q-<") ;
+    Active()->NotImplemented("^Q-<") ;
 }
 
 
 void cWordTsar::GotoNote(void)
 {
-    mEditor->NotImplemented("^Q-N-G") ;
+    Active()->NotImplemented("^Q-N-G") ;
 }
 
 
 void cWordTsar::GotoPrevPos(void)
 {
-    mEditor->GotoPreviousPosition() ;
+    Active()->GotoPreviousPosition() ;
 }
 
 
 void cWordTsar::GotoLastFindandReplace(void)
 {
-    mEditor->GotoLastFindandReplace() ;
+    Active()->GotoLastFindandReplace() ;
 }
 
 
 void cWordTsar::GotoStartBlock(void)
 {
-    mEditor->MoveCursorStartBlock() ;
+    Active()->MoveCursorStartBlock() ;
 }
 
 
 void cWordTsar::GotoEndBlock(void)
 {
-    mEditor->MoveCursorEndBlock() ;
+    Active()->MoveCursorEndBlock() ;
 }
 
 
 void cWordTsar::GotoDocumentStart(void)
 {
-    mEditor->MoveCursorTopofFile() ;
+    Active()->MoveCursorTopofFile() ;
 }
 
 
 void cWordTsar::GotoDocumentEnd(void)
 {
-    mEditor->MoveCursorEndofFile() ;
+    Active()->MoveCursorEndofFile() ;
 }
 
 
 void cWordTsar::GotoScrollUp(void)
 {
-    mEditor->NotImplemented("^Q-w") ;
+    Active()->NotImplemented("^Q-w") ;
 }
 
 
 void cWordTsar::GotoScrollDown(void)
 {
-    mEditor->NotImplemented("^Q-z") ;
+    Active()->NotImplemented("^Q-z") ;
 }
 
 
 void cWordTsar::Set1(void)
 {
-    mEditor->SavePosition(1) ;
+    Active()->SavePosition(1) ;
 }
 
 
 void cWordTsar::Set2(void)
 {
-    mEditor->SavePosition(2) ;
+    Active()->SavePosition(2) ;
 }
 
 
 void cWordTsar::Set3(void)
 {
-    mEditor->SavePosition(3) ;
+    Active()->SavePosition(3) ;
 }
 
 
 void cWordTsar::Set4(void)
 {
-    mEditor->SavePosition(4) ;
+    Active()->SavePosition(4) ;
 }
 
 
 
 void cWordTsar::Set5(void)
 {
-    mEditor->SavePosition(5) ;
+    Active()->SavePosition(5) ;
 }
 
 
 void cWordTsar::Set6(void)
 {
-    mEditor->SavePosition(6) ;
+    Active()->SavePosition(6) ;
 }
 
 
 void cWordTsar::Set7(void)
 {
-    mEditor->SavePosition(7) ;
+    Active()->SavePosition(7) ;
 }
 
 
 void cWordTsar::Set8(void)
 {
-    mEditor->SavePosition(8) ;
+    Active()->SavePosition(8) ;
 }
 
 
 void cWordTsar::Set9(void)
 {
-    mEditor->SavePosition(9) ;
+    Active()->SavePosition(9) ;
 }
 
 
 
 void cWordTsar::Set0(void)
 {
-    mEditor->SavePosition(0) ;
+    Active()->SavePosition(0) ;
 }
 
 
 void cWordTsar::EditNote(void)
 {
-    mEditor->NotImplemented("^O-n-d") ;
+    Active()->NotImplemented("^O-n-d") ;
 }
 
 
 
 void cWordTsar::NoteCOnvert(void)
 {
-    mEditor->NotImplemented("^O-n-v") ;
+    Active()->NotImplemented("^O-n-v") ;
 }
 
 
 void cWordTsar::NoteEndNoteLocation(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".pe\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".pe\n") ;
 }
 
 
 void cWordTsar::ColumnBlockMode(void)
 {
-    mEditor->NotImplemented("^K-n") ;
+    Active()->NotImplemented("^K-n") ;
 }
 
 
 void cWordTsar::ColumnReplaceMode(void)
 {
-    mEditor->NotImplemented("^K-i") ;
+    Active()->NotImplemented("^K-i") ;
 }
 
 
@@ -2736,19 +2739,19 @@ void cWordTsar::AutoAlign(void)
 
 void cWordTsar::CloseDialog(void)
 {
-    mEditor->InvalidCommand("^O-<CR>") ;
+    Active()->InvalidCommand("^O-<CR>") ;
 }
 
 
 void cWordTsar::CommandTags(void)
 {
-    mEditor->ToggleShowControl() ;
+    Active()->ToggleShowControl() ;
 }
 
 
 void cWordTsar::BlockHighlight(void)
 {
-    mEditor->ToggleHideBlock() ;
+    Active()->ToggleHideBlock() ;
 }
 
 
@@ -2914,89 +2917,238 @@ void cWordTsar::ToggleRevealCodes(void)
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the editor menus act on: the note editor while a note is open,
+///         otherwise the main editor
+///
+/////////////////////////////////////////////////////////////////////////////
+cEditorCtrl *cWordTsar::Active(void)
+{
+    if ((mNoteEditor != nullptr) && (mEditor->GetNoteEditor() == mNoteEditor))
+    {
+        return mNoteEditor ;
+    }
+    return mEditor ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the WordStar input handler for menu commands of Active()
+///
+/////////////////////////////////////////////////////////////////////////////
+cWordStarInput *cWordTsar::MenuInput(void)
+{
+    if ((Active() == mNoteEditor) && (mNoteMenuInput != nullptr))
+    {
+        return mNoteMenuInput.get() ;
+    }
+    return mMenuInput ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Writes an open note into the document before a command that replaces
+/// or closes the document.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordTsar::KeepOpenNote(void)
+{
+    if (mEditor->IsNoteOpen() == true)
+    {
+        mEditor->CloseNote(true) ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  note  [in] document of the note (the returned editor deletes it)
+/// @param  title [in] pane title, "Footnote n" or "Endnote n"
+///
+/// @return the note editor
+///
+/// @brief
+/// Adds the note pane below the editors in the splitter: a title bar in
+/// the colours of the Show Formatting pane, the note editor and its
+/// scrollbar. The note editor gets the focus.
+///
+/////////////////////////////////////////////////////////////////////////////
+cEditorCtrl *cWordTsar::OpenNotePane(cDocument *note, const std::string &title)
+{
+    if (mNotePaneWidget != nullptr)
+    {
+        return nullptr ;
+    }
+
+    mNotePaneWidget = new QWidget(mSplitter) ;
+    QVBoxLayout *containerLayout = new QVBoxLayout(mNotePaneWidget) ;
+    containerLayout->setSpacing(0) ;
+    containerLayout->setContentsMargins(0, 0, 0, 0) ;
+
+    QColor bg = mEditor->GetBGroundColour() ;
+    QColor fg = mEditor->GetTextColour() ;
+    int titleR = static_cast<int>(bg.red()   * 0.7 + fg.red()   * 0.3) ;
+    int titleG = static_cast<int>(bg.green() * 0.7 + fg.green() * 0.3) ;
+    int titleB = static_cast<int>(bg.blue()  * 0.7 + fg.blue()  * 0.3) ;
+
+    QLabel *titleLabel = new QLabel(QString::fromStdString(title), mNotePaneWidget) ;
+    titleLabel->setAlignment(Qt::AlignCenter) ;
+    titleLabel->setStyleSheet(
+        QString("background-color: rgb(%1, %2, %3); "
+                "color: rgb(%4, %5, %6); "
+                "padding: 2px; "
+                "font-weight: bold; "
+                "border-bottom: 1px solid rgb(%4, %5, %6);")
+        .arg(titleR).arg(titleG).arg(titleB)
+        .arg(fg.red()).arg(fg.green()).arg(fg.blue())) ;
+    containerLayout->addWidget(titleLabel, 0) ;
+
+    QWidget *editorRow = new QWidget(mNotePaneWidget) ;
+    QHBoxLayout *rowLayout = new QHBoxLayout(editorRow) ;
+    rowLayout->setSpacing(0) ;
+    rowLayout->setContentsMargins(0, 0, 0, 0) ;
+
+    mNoteEditor = new cEditorCtrl(note, editorRow) ;
+    QScrollBar *scrollbar = new QScrollBar(editorRow) ;
+    rowLayout->addWidget(mNoteEditor) ;
+    rowLayout->addWidget(scrollbar) ;
+    containerLayout->addWidget(editorRow, 1) ;
+    mNoteEditor->SetScrollbar(scrollbar) ;
+    mNoteMenuInput = std::make_unique<cWordStarInput>(mNoteEditor) ;
+
+    mSplitter->addWidget(mNotePaneWidget) ;
+    mNotePaneWidget->show() ;
+
+    QList<int> sizes = mSplitter->sizes() ;
+    int total = 0 ;
+    for (int size : sizes)
+    {
+        total += size ;
+    }
+    if (sizes.size() >= 2 && total > 0)
+    {
+        int pane = total / 3 ;
+        sizes.last() = pane ;
+        sizes.first() = std::max(1, sizes.first() - pane) ;
+        mSplitter->setSizes(sizes) ;
+    }
+
+    mEditor->mHasFocusDim = false ;
+    mNoteEditor->mHasFocusDim = true ;
+    mNoteEditor->setFocus() ;
+    return mNoteEditor ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Removes the note pane once the key or command that closed it has run,
+/// and gives the main editor the focus.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordTsar::CloseNotePane(void)
+{
+    if (mNotePaneWidget != nullptr)
+    {
+        mNotePaneWidget->hide() ;
+        mNotePaneWidget->deleteLater() ;
+        mNotePaneWidget = nullptr ;
+    }
+    mNoteEditor = nullptr ;
+
+    mEditor->mHasFocusDim = true ;
+    mEditor->setFocus() ;
+}
+
+
 // InsertMenu
 void cWordTsar::PageBreak(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".pa\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".pa\n") ;
 };
 
 
 
 void cWordTsar::InsertDate(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('@') ;
+    MenuInput()->HandleKey(CTRL_M) ;
+    MenuInput()->HandleKey('@') ;
 }
 
 
 void cWordTsar::InsertTime(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('!') ;
+    MenuInput()->HandleKey(CTRL_M) ;
+    MenuInput()->HandleKey('!') ;
 }
 
 
 void cWordTsar::MathResult(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('=') ;
+    MenuInput()->HandleKey(CTRL_M) ;
+    MenuInput()->HandleKey('=') ;
 }
 
 
 void cWordTsar::MathExpression(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('#') ;
+    MenuInput()->HandleKey(CTRL_M) ;
+    MenuInput()->HandleKey('#') ;
 }
 
 
 void cWordTsar::MathDollar(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('$') ;
+    MenuInput()->HandleKey(CTRL_M) ;
+    MenuInput()->HandleKey('$') ;
 }
 
 
 void cWordTsar::Filename(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('*') ;
+    MenuInput()->HandleKey(CTRL_M) ;
+    MenuInput()->HandleKey('*') ;
 }
 
 
 
 void cWordTsar::Directory(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('.') ;
+    MenuInput()->HandleKey(CTRL_M) ;
+    MenuInput()->HandleKey('.') ;
 }
 
 
 void cWordTsar::Path(void)
 {
-    mMenuInput->HandleKey(CTRL_M) ;
-    mMenuInput->HandleKey('\\') ;
+    MenuInput()->HandleKey(CTRL_M) ;
+    MenuInput()->HandleKey('\\') ;
 }
 
 
 void cWordTsar::VarDate(void)
 {
-    mEditor->InsertText("&@&") ;
+    Active()->InsertText("&@&") ;
 }
 
 
 void cWordTsar::VarTime(void)
 {
-    mEditor->InsertText("&!&") ;
+    Active()->InsertText("&!&") ;
 }
 
 
 void cWordTsar::VarPage(void)
 {
-    mEditor->InsertText("&#&") ;
+    Active()->InsertText("&#&") ;
 }
 
 
@@ -3004,88 +3156,88 @@ void cWordTsar::VarPage(void)
 
 void cWordTsar::VarFilename(void)
 {
-    mEditor->InsertText("&*&") ;
+    Active()->InsertText("&*&") ;
 }
 
 
 void cWordTsar::VarDrive(void)
 {
-    mEditor->InsertText("&:&") ;
+    Active()->InsertText("&:&") ;
 }
 
 
 void cWordTsar::VarDirectory(void)
 {
-    mEditor->InsertText("&.&") ;
+    Active()->InsertText("&.&") ;
 }
 
 
 void cWordTsar::VarPath(void)
 {
-    mEditor->InsertText("&\\&") ;
+    Active()->InsertText("&\\&") ;
 }
 
 
 void cWordTsar::VarWordCount(void)
 {
-    mEditor->InsertText("&?&") ;
+    Active()->InsertText("&?&") ;
 }
 
 
 void cWordTsar::ExtendedChar(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('0') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('0') ;
 }
 
 
 void cWordTsar::FileAtPrint(void)
 {
     // @TODO - get file via dialog
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".fi\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".fi\n") ;
 }
 
 
 void cWordTsar::Graphic(void)
 {
     // @TODO - get file via dialog
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('*') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('*') ;
 }
 
 
 void cWordTsar::NoteComment(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('n') ;
-    mMenuInput->HandleKey('c') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('n') ;
+    MenuInput()->HandleKey('c') ;
 }
 
 
 void cWordTsar::NoteFootnote(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('n') ;
-    mMenuInput->HandleKey('f') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('n') ;
+    MenuInput()->HandleKey('f') ;
 }
 
 
 void cWordTsar::NoteEndnote(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('n') ;
-    mMenuInput->HandleKey('e') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('n') ;
+    MenuInput()->HandleKey('e') ;
 }
 
 
 void cWordTsar::NoteAnnotation(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('n') ;
-    mMenuInput->HandleKey('a') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('n') ;
+    MenuInput()->HandleKey('a') ;
 }
 
 
@@ -3100,7 +3252,7 @@ void cWordTsar::TOCEntry(void)
         return ;
     }
 
-    mEditor->InsertDotCommandEntry(".tc", text.toStdString()) ;
+    Active()->InsertDotCommandEntry(".tc", text.toStdString()) ;
 }
 
 
@@ -3115,168 +3267,168 @@ void cWordTsar::IndexEntry(void)
         return ;
     }
 
-    mEditor->InsertDotCommandEntry(".ix", text.toStdString()) ;
+    Active()->InsertDotCommandEntry(".ix", text.toStdString()) ;
 }
 
 
 void cWordTsar::IndexMark(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('k') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('k') ;
 }
 
 
 void cWordTsar::DotLeader(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('.') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('.') ;
 }
 
 
 void cWordTsar::ParOutlineNumber(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('z') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('z') ;
 }
 
 
 void cWordTsar::Bold(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('b') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('b') ;
 }
 
 
 void cWordTsar::Italics(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('y') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('y') ;
 }
 
 
 void cWordTsar::Underline(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('s') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('s') ;
 }
 
 
 void cWordTsar::font(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('=') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('=') ;
 }
 
 
 void cWordTsar::Strikeout(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('x') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('x') ;
 }
 
 
 void cWordTsar::Subscript(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('v') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('v') ;
 }
 
 
 void cWordTsar::Superscript(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('t') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('t') ;
 }
 
 
 void cWordTsar::DoubleStrike(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('d') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('d') ;
 }
 
 
 void cWordTsar::Color(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('-') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('-') ;
 }
 
 
 void cWordTsar::SelectParStyle(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('f') ;
-    mMenuInput->HandleKey('s') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('f') ;
+    MenuInput()->HandleKey('s') ;
 }
 
 
 void cWordTsar::ReturntoPrevStyle(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('f') ;
-    mMenuInput->HandleKey('p') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('f') ;
+    MenuInput()->HandleKey('p') ;
 }
 
 
 void cWordTsar::DefineParStyle(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('f') ;
-    mMenuInput->HandleKey('d') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('f') ;
+    MenuInput()->HandleKey('d') ;
 }
 
 
 void cWordTsar::CopyStyletoLibrary(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('f') ;
-    mMenuInput->HandleKey('o') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('f') ;
+    MenuInput()->HandleKey('o') ;
 }
 
 
 void cWordTsar::DeleteLibraryStyle(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('f') ;
-    mMenuInput->HandleKey('y') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('f') ;
+    MenuInput()->HandleKey('y') ;
 }
 
 
 void cWordTsar::RenameLibraryStyle(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('f') ;
-    mMenuInput->HandleKey('r') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('f') ;
+    MenuInput()->HandleKey('r') ;
 }
 
 
 void cWordTsar::RenameDocStyle(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('f') ;
-    mMenuInput->HandleKey('e') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('f') ;
+    MenuInput()->HandleKey('e') ;
 }
 
 
 void cWordTsar::Uppercase(void)
 {
-    mMenuInput->HandleKey(CTRL_K) ;
-    mMenuInput->HandleKey('\"') ;
+    MenuInput()->HandleKey(CTRL_K) ;
+    MenuInput()->HandleKey('\"') ;
 }
 
 
 void cWordTsar::Lowercase(void)
 {
-    mMenuInput->HandleKey(CTRL_K) ;
-    mMenuInput->HandleKey('\'') ;
+    MenuInput()->HandleKey(CTRL_K) ;
+    MenuInput()->HandleKey('\'') ;
 }
 
 
 void cWordTsar::Sentencecase(void)
 {
-    mMenuInput->HandleKey(CTRL_K) ;
-    mMenuInput->HandleKey('.') ;
+    MenuInput()->HandleKey(CTRL_K) ;
+    MenuInput()->HandleKey('.') ;
 }
 
 
@@ -3284,236 +3436,236 @@ void cWordTsar::Sentencecase(void)
 
 void cWordTsar::CenterLine(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('c') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('c') ;
 }
 
 
 void cWordTsar::RightAlign(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey(']') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey(']') ;
 }
 
 
 void cWordTsar::LeftAlignParagraph(void)
 {
-    mEditor->SetParagraphAlignment(JUST_LEFT) ;
+    Active()->SetParagraphAlignment(JUST_LEFT) ;
 }
 
 
 void cWordTsar::CenterParagraph(void)
 {
-    mEditor->SetParagraphAlignment(JUST_CENTER) ;
+    Active()->SetParagraphAlignment(JUST_CENTER) ;
 }
 
 
 void cWordTsar::RightAlignParagraph(void)
 {
-    mEditor->SetParagraphAlignment(JUST_RIGHT) ;
+    Active()->SetParagraphAlignment(JUST_RIGHT) ;
 }
 
 
 void cWordTsar::JustifyParagraph(void)
 {
-    mEditor->SetParagraphAlignment(JUST_JUST) ;
+    Active()->SetParagraphAlignment(JUST_JUST) ;
 }
 
 
 void cWordTsar::RulerLine(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('l') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('l') ;
 }
 
 
 void cWordTsar::Columns(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('U') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('U') ;
 }
 
 
 void cWordTsar::Page(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('Y') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('Y') ;
 }
 
 
 void cWordTsar::Header(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".he\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".he\n") ;
 }
 
 
 void cWordTsar::Footer(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".fo\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".fo\n") ;
 }
 
 
 void cWordTsar::PageNumbering(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('#') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('#') ;
 }
 
 
 void cWordTsar::LineNumbering(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".l#\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".l#\n") ;
 }
 
 
 void cWordTsar::Alignment(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('s') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('s') ;
 }
 
 
 void cWordTsar::OverprintChar(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('H') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('H') ;
 }
 
 
 void cWordTsar::OverprintLine(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey(HARD_RETURN) ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey(HARD_RETURN) ;
 }
 
 
 void cWordTsar::OptionalHyphen(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('e') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('e') ;
 }
 
 
 void cWordTsar::VerticalCenter(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('v') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('v') ;
 }
 
 
 void cWordTsar::KeepWordsTogether(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('O') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('O') ;
 }
 
 
 void cWordTsar::KeepLinesTogetherPage(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".cp\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".cp\n") ;
 }
 
 
 void cWordTsar::KeepLinesTogetherColumn(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".cc\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".cc\n") ;
 }
 
 
 void cWordTsar::SpellCheckGlobal(void)
 {
-    mMenuInput->HandleKey(CTRL_Q) ;
-    mMenuInput->HandleKey('r') ;
-    mMenuInput->HandleKey(CTRL_Q) ;
-    mMenuInput->HandleKey('l') ;
+    MenuInput()->HandleKey(CTRL_Q) ;
+    MenuInput()->HandleKey('r') ;
+    MenuInput()->HandleKey(CTRL_Q) ;
+    MenuInput()->HandleKey('l') ;
 }
 
 
 void cWordTsar::SpellCheckRest(void)
 {
-    mMenuInput->HandleKey(CTRL_Q) ;
-    mMenuInput->HandleKey('l') ;
+    MenuInput()->HandleKey(CTRL_Q) ;
+    MenuInput()->HandleKey('l') ;
 }
 
 
 void cWordTsar::SpellCheckWord(void)
 {
-    mMenuInput->HandleKey(CTRL_Q) ;
-    mMenuInput->HandleKey('N') ;
+    MenuInput()->HandleKey(CTRL_Q) ;
+    MenuInput()->HandleKey('N') ;
 }
 
 
 void cWordTsar::SpellCheckType(void)
 {
-    mMenuInput->HandleKey(CTRL_Q) ;
-    mMenuInput->HandleKey('o') ;
+    MenuInput()->HandleKey(CTRL_Q) ;
+    MenuInput()->HandleKey('o') ;
 }
 
 
 void cWordTsar::Thesaurus(void)
 {
-    mMenuInput->HandleKey(CTRL_Q) ;
-    mMenuInput->HandleKey('j') ;
+    MenuInput()->HandleKey(CTRL_Q) ;
+    MenuInput()->HandleKey('j') ;
 }
 
 
 
 void cWordTsar::Inset(void)
 {
-    mMenuInput->HandleKey(CTRL_P) ;
-    mMenuInput->HandleKey('&') ;
+    MenuInput()->HandleKey(CTRL_P) ;
+    MenuInput()->HandleKey('&') ;
 }
 
 
 void cWordTsar::Calculator(void)
 {
-    mMenuInput->HandleKey(CTRL_Q) ;
-    mMenuInput->HandleKey('M') ;
+    MenuInput()->HandleKey(CTRL_Q) ;
+    MenuInput()->HandleKey('M') ;
 }
 
 
 void cWordTsar::BlockMath(void)
 {
-    mMenuInput->HandleKey(CTRL_K) ;
-    mMenuInput->HandleKey('m') ;
+    MenuInput()->HandleKey(CTRL_K) ;
+    MenuInput()->HandleKey('m') ;
 }
 
 
 void cWordTsar::SortBlockAsc(void)
 {
-    mMenuInput->HandleKey(CTRL_K) ;
-    mMenuInput->HandleKey('z') ;
-    mMenuInput->HandleKey('a') ;
+    MenuInput()->HandleKey(CTRL_K) ;
+    MenuInput()->HandleKey('z') ;
+    MenuInput()->HandleKey('a') ;
 }
 
 
 void cWordTsar::SortBlockDes(void)
 {
-    mMenuInput->HandleKey(CTRL_K) ;
-    mMenuInput->HandleKey('z') ;
-    mMenuInput->HandleKey('d') ;
+    MenuInput()->HandleKey(CTRL_K) ;
+    MenuInput()->HandleKey('z') ;
+    MenuInput()->HandleKey('d') ;
 }
 
 
 void cWordTsar::WordCount(void)
 {
-    mMenuInput->HandleKey(CTRL_K) ;
-    mMenuInput->HandleKey('?') ;
+    MenuInput()->HandleKey(CTRL_K) ;
+    MenuInput()->HandleKey('?') ;
 }
 
 
@@ -3552,6 +3704,7 @@ void cWordTsar::StopRecordMacro(void)
 
 void cWordTsar::EditMacro(void)
 {
+    KeepOpenNote() ;
     mEditor->MacroEdit() ;
 }
 
@@ -3619,125 +3772,125 @@ void cWordTsar::UpdateMacroActions(void)
 
 void cWordTsar::DataFile(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".df\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".df\n") ;
 }
 
 
 void cWordTsar::NameVars(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".rv\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".rv\n") ;
 }
 
 
 void cWordTsar::SetVar(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".sv\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".sv\n") ;
 }
 
 
 void cWordTsar::SetVarMath(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".ma\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".ma\n") ;
 }
 
 
 void cWordTsar::AskVar(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".av\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".av\n") ;
 }
 
 
 void cWordTsar::If(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".if\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".if\n") ;
 }
 
 
 void cWordTsar::Else(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".el\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".el\n") ;
 }
 
 
 void cWordTsar::EndIf(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".ei\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".ei\n") ;
 }
 
 
 void cWordTsar::Top(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".go t\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".go t\n") ;
 }
 
 
 void cWordTsar::Bottom(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".go b\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".go b\n") ;
 }
 
 
 void cWordTsar::Clear(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".cs\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".cs\n") ;
 }
 
 
 void cWordTsar::Display(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".dm\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".dm\n") ;
 }
 
 
 void cWordTsar::PrintNTimes(void)
 {
-    mEditor->MoveCursorStartLine() ;
+    Active()->MoveCursorStartLine() ;
 
-    mEditor->GetDocument()->MaybeInsertHardReturn() ;
-    mEditor->GetDocument()->Insert(".rp\n") ;
+    Active()->GetDocument()->MaybeInsertHardReturn() ;
+    Active()->GetDocument()->Insert(".rp\n") ;
 }
 
 
 void cWordTsar::ReformatRest(void)
 {
-    mMenuInput->HandleKey(CTRL_Q) ;
-    mMenuInput->HandleKey('u') ;
+    MenuInput()->HandleKey(CTRL_Q) ;
+    MenuInput()->HandleKey('u') ;
 }
 
 
@@ -3745,9 +3898,9 @@ void cWordTsar::ReformatRest(void)
 
 void cWordTsar::ReformatNotes(void)
 {
-    mMenuInput->HandleKey(CTRL_O) ;
-    mMenuInput->HandleKey('n') ;
-    mMenuInput->HandleKey('u') ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('n') ;
+    MenuInput()->HandleKey('u') ;
 }
 
 

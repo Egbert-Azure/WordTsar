@@ -1066,7 +1066,7 @@ QString cWordStarMenuProvider::GetUtilReformatRestLabel(void) const
 
 QString cWordStarMenuProvider::GetUtilReformatNotesLabel(void) const
 {
-    return "Resst of &Notes\t^ONU";
+    return "Rest of &Notes\t^ONU";
 }
 
 /////////////////////////////////////////////////////////////////////////////
