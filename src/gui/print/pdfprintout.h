@@ -92,6 +92,9 @@ private:
     // Render headers and footers for a page
     void RenderHeadersFooters(CGContextRef ctx, PAGE_T pageNum, double pageHeightPt);
 
+    // Render the footnotes of a page
+    void RenderFootnotes(CGContextRef ctx, PAGE_T pageNum, double pageHeightPt);
+
     // Render a header/footer line
     void RenderHeaderFooterLine(CGContextRef ctx, const sHeaderFooterLine& hfLine,
                                  double pageHeightPt);

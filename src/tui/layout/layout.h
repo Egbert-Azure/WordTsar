@@ -23,6 +23,7 @@
 
 #include "src/core/layout/layoutbase.h"
 #include "src/tui/fonts/tuifontcalc.h"    // sTUIFontInfo
+#include "src/tui/layout/tuitextmeasurement.h"
 
 // Forward declarations
 class cTUITextMeasurement;
@@ -70,6 +71,9 @@ public:
     // Override base class to update TUI font when string font changes
     void SetDefaultFont(const std::string& font) override;
 
+    // Layout for a note's text, measuring with this layout's fonts
+    cLayoutBase* CreateNoteLayout(void) const override;
+
     // Pure virtual implementations from cLayoutBase
     // Font-aware paragraph segmentation with measurement
     std::vector<sSegmentLayout> BuildParagraphSegments(PARAGRAPH_T paragraphNum) override;
@@ -105,7 +109,13 @@ private:
     sTUIFontInfo mCurrentFontInfo;             // Current font (replaces QFont mFont)
 
     // Text measurement
-    cTUITextMeasurement* mTUITextMeasurement;   // TUI text measurement (OWNED)
+    cTUITextMeasurement* mTUITextMeasurement;   // TUI text measurement (OWNED unless mSharedMeasurement)
+
+    // Note layout: measurement borrowed from the layout that created it,
+    // whose font is put back when this layout is deleted
+    explicit cLayout(cTUITextMeasurement* shared);
+    bool mSharedMeasurement = false;
+    cTUITextMeasurement::sFontState mSharedFontState;
 };
 
 #endif // TUI_LAYOUT_H

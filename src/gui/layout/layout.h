@@ -56,6 +56,9 @@ public:
     // Override base class to update Qt font when string font changes
     void SetDefaultFont(const std::string& font) override;
 
+    // Layout for a note's text
+    cLayoutBase* CreateNoteLayout(void) const override;
+
     // Public for testing
     std::vector<sSegmentLayout> BuildParagraphSegments(PARAGRAPH_T paragraphNum) override;
 

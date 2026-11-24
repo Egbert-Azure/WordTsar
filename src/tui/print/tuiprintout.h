@@ -73,6 +73,9 @@ public:
     static bool HasDisplayEnvironment(void);
 
 private:
+    // Write the PDF of the current layout
+    bool WritePDF(const std::string& filepath);
+
     // Coordinate conversion: twips to PDF points (1 point = 20 twips)
     double TwipsToPoints(COORD_T twips) const;
 
@@ -81,6 +84,9 @@ private:
 
     // Render headers and footers for a page
     void RenderHeadersFooters(CGContextRef ctx, PAGE_T pageNum, double pageHeightPt);
+
+    // Render the footnotes of a page
+    void RenderFootnotes(CGContextRef ctx, PAGE_T pageNum, double pageHeightPt);
 
     // Render a header/footer line
     void RenderHeaderFooterLine(CGContextRef ctx, const sHeaderFooterLine& hfLine,

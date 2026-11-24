@@ -128,6 +128,7 @@ cLayoutBase::cLayoutBase(void)
     mInitialPaperHeight = 0;
     mActiveParagraph = -1;  // No active paragraph until editor sets it
     mMarkersVisible = true;
+    mPrintLayout = false;
 
     // Current box coordinates (cached from mPageManager for wrapping performance)
     mBoxLeft = 0;
@@ -372,6 +373,21 @@ void cLayoutBase::LayoutDocument(cDocument* doc, std::function<void(int)> progre
     mPageManager->Reset();
     mParagraphLayout.clear();
     mFormattingCheckpoints.clear();
+    mFootnoteAreas.clear();
+    mFootnoteCarry.clear();
+    mPrintFootnotes.clear();
+    if (mPrintLayout)
+    {
+        std::vector<std::pair<POSITION_T, eNoteKind>> notes;
+        doc->GetNotePositions(notes);
+        for (const auto& note : notes)
+        {
+            if (note.second == NOTE_KIND_FOOTNOTE)
+            {
+                mPrintFootnotes.push_back(note.first);
+            }
+        }
+    }
 
     // Reset state
     mCurrentBoxIndex = NOT_SET;
@@ -495,6 +511,12 @@ void cLayoutBase::LayoutDocument(cDocument* doc, std::function<void(int)> progre
 #endif
             }
         }
+    }
+
+    // Note lines still waiting continue on pages of their own
+    for (int extra = 0; mPrintLayout && !mFootnoteCarry.empty() && extra < 1000; extra++)
+    {
+        IncrementPageAndCreateBox();
     }
 
     // Clear loop flag - subsequent LayoutParagraph() calls are partial layout
@@ -1431,6 +1453,12 @@ void cLayoutBase::IncrementPageAndCreateBox(void)
 
     // Create new page box (full page size - boxes are layout containers, not content wrappers)
     CreatePageBox(mCurrentPage);
+
+    // Footnote lines that did not fit the previous page come first
+    if (mPrintLayout && !mFootnoteCarry.empty())
+    {
+        PlaceFootnoteLines(mFootnoteCarry);
+    }
 }
 
 
@@ -1535,7 +1563,7 @@ bool cLayoutBase::CheckPageBreak(PARAGRAPH_T paragraphNum)
 /////////////////////////////////////////////////////////////////////////////
 bool cLayoutBase::NeedNewPage(COORD_T lineHeight)
 {
-    return mPageManager->NeedNewPage(lineHeight);
+    return mPageManager->NeedNewPage(lineHeight + (mPrintLayout ? GetFootnoteReserve(mCurrentPage) : 0));
 }
 
 
@@ -2508,6 +2536,12 @@ bool cLayoutBase::SaveLine(PARAGRAPH_T paragraphNum, sLineLayout& line)
     // Update page Y coordinate for next line (resets at page breaks via CreatePageBox)
     mBoxTop += line.lineheight;
 
+    // Print layout: the line's footnotes take space at the bottom of its page
+    if (mPrintLayout && mFullLayout && line.isPrintable && !mPrintFootnotes.empty())
+    {
+        AddLineFootnotes(paragraphNum, para->lines.back());
+    }
+
     return true;
 }
 
@@ -2974,6 +3008,273 @@ bool cLayoutBase::GetNoteMarkerText(POSITION_T position, std::string& label, std
     }
     mNoteWords[note.raw + note.text] = *tag;
     return true;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  print [in] true while print, PDF or print preview lay out the document
+///
+/// @brief
+/// In a print layout a full layout reserves the space of each footnote at
+/// the bottom of its marker's page. The screen layout does not.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::SetPrintLayout(bool print)
+{
+    mPrintLayout = print;
+}
+
+
+bool cLayoutBase::GetPrintLayout(void) const
+{
+    return mPrintLayout;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return a new layout of the same kind for laying out a note's text,
+///         nullptr in the base class. The caller owns it.
+///
+/////////////////////////////////////////////////////////////////////////////
+cLayoutBase* cLayoutBase::CreateNoteLayout(void) const
+{
+    return nullptr;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  page [in] page number
+///
+/// @return the rule and the footnote lines of the page, positioned above
+///         the bottom of its text box; empty outside a print layout
+///
+/////////////////////////////////////////////////////////////////////////////
+sPageFootnotes cLayoutBase::GetPageFootnotes(PAGE_T page) const
+{
+    sPageFootnotes result;
+    auto found = mFootnoteAreas.find(page);
+    if (found == mFootnoteAreas.end())
+    {
+        return result;
+    }
+
+    const sFootnoteArea& area = found->second;
+    result.ruleTop = area.bottom - area.height;
+    result.ruleHeight = FOOTNOTE_RULE_HEIGHT;
+    result.ruleLeft = area.left;
+    result.ruleRight = std::min(area.left + FOOTNOTE_RULE_WIDTH, area.right);
+
+    COORD_T y = result.ruleTop + FOOTNOTE_RULE_HEIGHT;
+    for (const sHeaderFooterLine& noteLine : area.lines)
+    {
+        sHeaderFooterLine placed = noteLine;
+        placed.line.pagex = area.left + noteLine.line.pagex;
+        placed.line.pagey = y;
+        placed.line.pagenumber = page;
+        y += noteLine.line.lineheight;
+        result.lines.push_back(placed);
+    }
+    return result;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  page [in] page number
+///
+/// @return height the page's footnotes take at the bottom of its text box
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T cLayoutBase::GetFootnoteReserve(PAGE_T page) const
+{
+    auto found = mFootnoteAreas.find(page);
+    return (found == mFootnoteAreas.end()) ? 0 : found->second.height;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  paragraphNum [in] paragraph of the line
+/// @param  line         [in] line just saved on the current page
+///
+/// @brief
+/// Lays out the footnotes whose markers are on the line and places their
+/// lines at the bottom of the current page, in marker order. Lines that do
+/// not fit continue on the next page.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::AddLineFootnotes(PARAGRAPH_T paragraphNum, const sLineLayout& line)
+{
+    POSITION_T paraStart = 0;
+    POSITION_T paraEnd = 0;
+    mDocument->GetParagraphStartandEnd(paragraphNum, paraStart, paraEnd);
+    POSITION_T first = paraStart + line.linestart;
+    POSITION_T last = first;
+    for (const sSegmentLayout& segment : line.segments)
+    {
+        last = std::max(last, paraStart + segment.startPosition + segment.length);
+    }
+
+    for (auto marker = std::lower_bound(mPrintFootnotes.begin(), mPrintFootnotes.end(), first);
+         marker != mPrintFootnotes.end() && *marker < last; ++marker)
+    {
+        std::vector<sHeaderFooterLine> noteLines = LayoutNoteLines(*marker);
+        if (mFootnoteCarry.empty())
+        {
+            PlaceFootnoteLines(noteLines);
+        }
+        mFootnoteCarry.insert(mFootnoteCarry.end(), noteLines.begin(), noteLines.end());
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  position [in] footnote marker position
+///
+/// @return the printable lines of the note, its number sequence replaced
+///         by the note's label; pagex relative to the left of the text box
+///
+/// @brief
+/// Decodes the note into a document of its own and lays it out with a
+/// second layout of the same kind (CreateNoteLayout()) in the default font.
+/// Empty lines at the end are dropped.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::vector<sHeaderFooterLine> cLayoutBase::LayoutNoteLines(POSITION_T position)
+{
+    std::vector<sHeaderFooterLine> result;
+    sNote note;
+    if (mDocument->GetNote(position, note) == false)
+    {
+        return result;
+    }
+
+    cDocument content;
+    if (cWordstarFile::DecodeNote(note, content) == false)
+    {
+        return result;
+    }
+    std::string label = GetNoteLabel(position);
+    for (POSITION_T pos = 0; pos < content.GetTextSize(); pos++)
+    {
+        if (content.GetControlChar(pos) == STYLE_RAW_SEQUENCE)
+        {
+            content.Delete(pos, 1);
+            content.SetPosition(pos);
+            content.Insert(label);
+            break;
+        }
+    }
+
+    std::unique_ptr<cLayoutBase> noteLayout(CreateNoteLayout());
+    if (!noteLayout)
+    {
+        return result;
+    }
+    noteLayout->SetDefaultFont(mLayoutState->GetDefaultFont());
+    noteLayout->SetDefaultTextColor(mLayoutState->GetDefaultTextColor());
+    noteLayout->SetShowControl(SHOW_NONE);
+    noteLayout->SetMarkersVisible(false);
+    noteLayout->SetActiveParagraph(-1);
+    noteLayout->LayoutDocument(&content);
+
+    for (PARAGRAPH_T para = 0; para < noteLayout->GetNumberOfParagraphs(); para++)
+    {
+        const sParagraphLayout* paraLayout = noteLayout->GetParagraphLayout(para);
+        if (paraLayout == nullptr)
+        {
+            continue;
+        }
+        for (const sLineLayout& noteLine : paraLayout->lines)
+        {
+            if (!noteLine.isPrintable)
+            {
+                continue;
+            }
+            sHeaderFooterLine out;
+            out.line = noteLine;
+            const sBoxes* box = noteLayout->GetBoxByIndex(noteLine.boxIndex);
+            out.line.pagex = noteLine.pagex - ((box != nullptr) ? box->left : 0);
+            for (const sSegmentLayout& segment : noteLine.segments)
+            {
+                std::vector<std::string> graphemes;
+                segment.GetGraphemes(&content, graphemes);
+                graphemes.resize(segment.position.size());
+                out.graphemes.insert(out.graphemes.end(), graphemes.begin(), graphemes.end());
+            }
+            result.push_back(out);
+        }
+    }
+
+    auto printable = [](const sHeaderFooterLine& noteLine)
+    {
+        return std::any_of(noteLine.graphemes.begin(), noteLine.graphemes.end(), [](const std::string& grapheme)
+        {
+            unsigned char first = grapheme.empty() ? 0 : static_cast<unsigned char>(grapheme[0]);
+            return first > 0x20 && first != 0x7F;
+        });
+    };
+    while (!result.empty() && !printable(result.back()))
+    {
+        result.pop_back();
+    }
+    return result;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  lines [in/out] note lines to place; the lines that do not fit
+///                        stay in it
+///
+/// @brief
+/// Adds note lines to the footnotes of the current page while they fit
+/// between the text and the bottom of the text box. The first footnote
+/// line of a page also takes the rule block. A page without text and
+/// footnotes takes at least one line.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::PlaceFootnoteLines(std::vector<sHeaderFooterLine>& lines)
+{
+    const sBoxes* box = mPageManager->GetCurrentBox();
+    if (box == nullptr || lines.empty())
+    {
+        return;
+    }
+
+    sFootnoteArea& area = mFootnoteAreas[mCurrentPage];
+    if (area.lines.empty())
+    {
+        area.bottom = box->bottom;
+        area.left = box->left;
+        area.right = box->right;
+    }
+
+    COORD_T available = box->bottom - (box->top + box->currentY) - area.height;
+    size_t placed = 0;
+    for (const sHeaderFooterLine& noteLine : lines)
+    {
+        COORD_T height = noteLine.line.lineheight + (area.lines.empty() ? FOOTNOTE_RULE_HEIGHT : 0);
+        bool emptyPage = area.lines.empty() && box->containedLines.empty();
+        if (height > available && !emptyPage)
+        {
+            break;
+        }
+        area.height += height;
+        available -= height;
+        area.lines.push_back(noteLine);
+        placed++;
+    }
+    lines.erase(lines.begin(), lines.begin() + static_cast<std::ptrdiff_t>(placed));
+
+    if (area.lines.empty())
+    {
+        mFootnoteAreas.erase(mCurrentPage);
+    }
 }
 
 
@@ -4388,11 +4689,13 @@ PAGE_T cLayoutBase::GetNumberOfPages(void) const
                                       {
                                           return !paraLayout.lines.empty();
                                       });
+    PAGE_T footnotePages = mFootnoteAreas.empty() ? 0 : mFootnoteAreas.rbegin()->first;
     if (lastWithLines == mParagraphLayout.rend())
     {
-        return 1;
+        return std::clamp(footnotePages, static_cast<PAGE_T>(1), boxPages);
     }
-    return std::clamp(lastWithLines->lines.back().pagenumber, static_cast<PAGE_T>(1), boxPages);
+    return std::clamp(std::max(lastWithLines->lines.back().pagenumber, footnotePages),
+                      static_cast<PAGE_T>(1), boxPages);
 }
 
 

@@ -165,6 +165,41 @@ bool cTUITextMeasurement::SetFontFromDescriptor(const std::string& descriptor)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return the current font
+///
+/////////////////////////////////////////////////////////////////////////////
+cTUITextMeasurement::sFontState cTUITextMeasurement::GetFontState(void) const
+{
+    sFontState state;
+    state.family = mCurrentFontFamily;
+    state.pointSize = mCurrentPointSize;
+    state.bold = mCurrentBold;
+    state.italic = mCurrentItalic;
+    state.descriptor = mManagerFontDescriptor;
+    return state;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  state [in] font from GetFontState()
+///
+/////////////////////////////////////////////////////////////////////////////
+void cTUITextMeasurement::SetFontState(const sFontState& state)
+{
+    if (!state.descriptor.empty())
+    {
+        SetFontFromDescriptor(state.descriptor);
+    }
+    else
+    {
+        SetFont(state.family, state.pointSize, state.bold, state.italic);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  text [in] Text to measure
 ///
 /// @return COORD_T [out] Width in twips

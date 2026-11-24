@@ -43,6 +43,7 @@
 #include "src/core/layout/layoutbase.h"
 #include "src/files/wordstar/wordstarfile.h"
 #include "src/gui/editor/editorctrl.h"
+#include "src/gui/print/pdfprintout.h"
 #include "src/input/keystroke.h"
 #include <QApplication>
 
@@ -3337,5 +3338,90 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
 
         doc->Delete(20, 1);
         CHECK(labels(cLayoutBase::NumberNotes(doc)) == "ea f5 ");
+    }
+
+    SUBCASE("the print layout puts each footnote on its marker's page below the text")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        auto insertNote = [doc](eNoteKind kind, const std::string& text)
+        {
+            cDocument content;
+            REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(kind), content));
+            content.SetPosition(2);
+            content.Insert(text);
+            doc->InsertNote(kind, content);
+        };
+        auto noteText = [](const sPageFootnotes& notes)
+        {
+            std::string all;
+            for (const sHeaderFooterLine& line : notes.lines)
+            {
+                for (const std::string& grapheme : line.graphemes)
+                {
+                    unsigned char first = grapheme.empty() ? 0 : static_cast<unsigned char>(grapheme[0]);
+                    if (first >= 0x20 && first != 0x7F)
+                    {
+                        all += grapheme;
+                    }
+                }
+            }
+            return all;
+        };
+
+        doc->Insert("Alpha");
+        insertNote(NOTE_KIND_FOOTNOTE, "First note");          // 5
+        doc->Insert("\r");
+        for (int line = 0; line < 40; line++)
+        {
+            doc->Insert("Line " + std::to_string(line) + "\r");
+        }
+        doc->Insert("Beta");
+        POSITION_T second = doc->GetPosition();
+        insertNote(NOTE_KIND_FOOTNOTE, "Second note");
+        doc->Insert("\r");
+
+        cLayoutBase* layout = editor.GetLayout();
+        layout->SetShowControl(SHOW_NONE);
+        layout->SetMarkersVisible(false);
+        layout->LayoutDocument(doc);
+        CHECK(layout->GetPageFootnotes(1).lines.empty());       // the screen reserves no space
+
+        layout->SetPrintLayout(true);
+        layout->LayoutDocument(doc);
+        REQUIRE(layout->GetPageOfPosition(5) == 1);
+        REQUIRE(layout->GetPageOfPosition(second) == 2);
+        CHECK(layout->GetNoteLabel(second) == "1");             // footnotes restart on each page
+
+        sPageFootnotes first = layout->GetPageFootnotes(1);
+        sPageFootnotes last = layout->GetPageFootnotes(2);
+        CHECK(noteText(first) == "1First note");
+        CHECK(noteText(last) == "1Second note");
+
+        // the text on page 1 ends above the rule, the note follows it
+        COORD_T lowest = 0;
+        for (PARAGRAPH_T para = 0; para < layout->GetNumberOfParagraphs(); para++)
+        {
+            for (const sLineLayout& line : layout->GetParagraphLayout(para)->lines)
+            {
+                if (line.pagenumber == 1 && line.isPrintable)
+                {
+                    lowest = std::max(lowest, line.pagey + line.lineheight);
+                }
+            }
+        }
+        REQUIRE_FALSE(first.lines.empty());
+        CHECK(lowest <= first.ruleTop);
+        CHECK(first.lines.front().line.pagey >= first.ruleTop);
+        layout->SetPrintLayout(false);
+
+        // the PDF is printed from the print layout, the screen layout comes back
+        std::filesystem::path pdf = TempPath();
+        cGUIPDFPrintout printout(&editor);
+        CHECK(printout.GeneratePDF(pdf.string()));
+        std::filesystem::remove(pdf);
+        CHECK_FALSE(layout->GetPrintLayout());
+        CHECK(layout->GetPageFootnotes(1).lines.empty());
     }
 }

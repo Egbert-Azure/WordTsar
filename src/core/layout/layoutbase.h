@@ -22,6 +22,7 @@
 #define LAYOUTBASE_H
 
 #include <map>
+#include <memory>
 #include <functional>
 #include <utility>
 
@@ -155,6 +156,29 @@ struct sFormattingCheckpoint
 
 // Checkpoint interval: save formatting state every N paragraphs
 static constexpr PARAGRAPH_T CHECKPOINT_INTERVAL = 100;
+
+// Height of the block holding the rule above a page's footnotes (twips)
+static constexpr COORD_T FOOTNOTE_RULE_HEIGHT = 240;
+// Length of that rule (twips)
+static constexpr COORD_T FOOTNOTE_RULE_WIDTH = 2880;
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @struct sPageFootnotes
+///
+/// @brief
+/// The footnotes printed at the bottom of one page: a short rule, then the
+/// note lines with their graphemes, positioned on the page.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sPageFootnotes
+{
+    COORD_T ruleTop = 0;                            // Top of the rule block (page twips)
+    COORD_T ruleHeight = 0;                         // Height of the rule block
+    COORD_T ruleLeft = 0;                           // Rule start X
+    COORD_T ruleRight = 0;                          // Rule end X
+    std::vector<sHeaderFooterLine> lines;           // Note lines, pagex / pagey set
+};
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -324,6 +348,12 @@ public:
     std::vector<sHeaderFooterLine> GetPageHeaders(PAGE_T page);
     std::vector<sHeaderFooterLine> GetPageFooters(PAGE_T page);
 
+    // ----- Print Layout / Footnotes -----
+    void SetPrintLayout(bool print);
+    bool GetPrintLayout(void) const;
+    sPageFootnotes GetPageFootnotes(PAGE_T page) const;
+    virtual cLayoutBase* CreateNoteLayout(void) const;
+
     // ----- Query Methods - Control Code Visibility -----
     eShowControl GetShowControl(void) const;
     PARAGRAPH_T GetActiveParagraph(void) const;
@@ -457,6 +487,12 @@ private:
     // ----- Line Lookup Helpers -----
     std::pair<PARAGRAPH_T, const sLineLayout*> FindLineByRawLineNumber(LINE_T rawLineNumber) const;
 
+    // ----- Footnote Helpers (print layout) -----
+    void AddLineFootnotes(PARAGRAPH_T paragraphNum, const sLineLayout& line);
+    std::vector<sHeaderFooterLine> LayoutNoteLines(POSITION_T position);
+    void PlaceFootnoteLines(std::vector<sHeaderFooterLine>& lines);
+    COORD_T GetFootnoteReserve(PAGE_T page) const;
+
     // =================================================================
     // MEMBER VARIABLES
     // =================================================================
@@ -502,6 +538,20 @@ private:
 
     // Note marker tags by note bytes
     mutable std::map<std::string, std::string> mNoteWords;
+
+    // ----- Print Layout / Footnotes -----
+    struct sFootnoteArea
+    {
+        COORD_T bottom = 0;                         // Bottom of the text box (page twips)
+        COORD_T left = 0;                           // Left edge of the text box
+        COORD_T right = 0;                          // Right edge of the text box
+        COORD_T height = 0;                         // Rule block plus note lines
+        std::vector<sHeaderFooterLine> lines;       // pagex relative to the box, pagey not set
+    };
+    bool mPrintLayout;                              // Footnote space is reserved
+    std::vector<POSITION_T> mPrintFootnotes;        // Footnote marker positions of the print layout
+    std::map<PAGE_T, sFootnoteArea> mFootnoteAreas; // Footnotes by page
+    std::vector<sHeaderFooterLine> mFootnoteCarry;  // Note lines that continue on the next page
 
     // Margin change tracking handled by cPageManager
 

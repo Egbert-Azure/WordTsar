@@ -52,6 +52,18 @@ public:
                  bool bold = false, bool italic = false);
     bool SetFontFromDescriptor(const std::string& descriptor);
 
+    // Current font, to put back after another layout measured with this object
+    struct sFontState
+    {
+        std::string family;
+        double pointSize = 12.0;
+        bool bold = false;
+        bool italic = false;
+        std::string descriptor;
+    };
+    sFontState GetFontState(void) const;
+    void SetFontState(const sFontState& state);
+
     // Text measurement (override abstract interface from cTextMeasurement)
     COORD_T GetTextWidth(const std::string& text) override;
     COORD_T GetTextWidth(const std::string& text, const std::string& font) override;

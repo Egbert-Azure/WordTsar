@@ -77,6 +77,7 @@ bool cGUIPDFPrintout::GeneratePDF(const std::string& filepath)
     mLayout->SetShowControl(SHOW_NONE);
     mLayout->SetActiveParagraph(-1);
     mLayout->SetMarkersVisible(false);  // block / place markers never print
+    mLayout->SetPrintLayout(true);      // footnotes take their space on the page
     mLayout->LayoutDocument(mDocument);
 
     bool result = false;
@@ -132,6 +133,7 @@ bool cGUIPDFPrintout::GeneratePDF(const std::string& filepath)
 
     mLayout->SetShowControl(savedShowControl);
     mLayout->SetMarkersVisible(true);
+    mLayout->SetPrintLayout(false);
     PARAGRAPH_T curPara = mDocument->GetParagraphFromPosition(mDocument->GetPosition());
     mLayout->SetActiveParagraph(curPara);
     mLayout->LayoutDocument(mDocument);
@@ -193,6 +195,41 @@ void cGUIPDFPrintout::RenderHeadersFooters(CGContextRef ctx, PAGE_T pageNum, dou
     for (const auto& hfLine : mLayout->GetPageFooters(pageNum))
     {
         RenderHeaderFooterLine(ctx, hfLine, pageHeightPt);
+    }
+
+    RenderFootnotes(ctx, pageNum, pageHeightPt);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  ctx          [in] PDF context (current page)
+/// @param  pageNum      [in] page number
+/// @param  pageHeightPt [in] page height in points
+///
+/// @brief
+/// Draws the page's footnotes: a short rule, then the note lines.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cGUIPDFPrintout::RenderFootnotes(CGContextRef ctx, PAGE_T pageNum, double pageHeightPt)
+{
+    sPageFootnotes footnotes = mLayout->GetPageFootnotes(pageNum);
+    if (footnotes.lines.empty())
+    {
+        return;
+    }
+
+    sSeqRGBColor black;
+    black.red = -1;
+    black.green = -1;
+    black.blue = -1;
+    black.alpha = -1;
+    double ruleY = pageHeightPt - TwipsToPoints(footnotes.ruleTop + footnotes.ruleHeight / 2);
+    DrawUnderline(ctx, black, TwipsToPoints(footnotes.ruleLeft), TwipsToPoints(footnotes.ruleRight), ruleY, 0.5);
+
+    for (const sHeaderFooterLine& noteLine : footnotes.lines)
+    {
+        RenderHeaderFooterLine(ctx, noteLine, pageHeightPt);
     }
 }
 
@@ -372,6 +409,16 @@ void cGUIPDFPrintout::RenderSegment(CGContextRef ctx, const sSegmentLayout& segm
             POSITION_T docPos = paragraphStart + segment.startPosition + static_cast<POSITION_T>(i);
 
             eModifiers controlType = mDocument->GetControlChar(docPos);
+            std::string label;
+            if ((controlType == STYLE_FOOTNOTE || controlType == STYLE_ENDNOTE) &&
+                mLayout->GetNoteMarkerText(docPos, label))
+            {
+                // Note reference: the label, superscript
+                double noteX = TwipsToPoints(lineX + static_cast<COORD_T>(segment.position[i]));
+                double noteY = pageHeightPt - TwipsToPoints(lineY + lineHeight - mLayout->GetSubSuperRoll());
+                DrawGrapheme(ctx, ctFont, segment.textcolor, label, noteX, noteY);
+                continue;
+            }
             if (controlType == STYLE_VARIABLE)
             {
                 eVariableType varType = mDocument->GetVariable(docPos);

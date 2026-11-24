@@ -94,8 +94,51 @@ cLayout::cLayout(void)
 /////////////////////////////////////////////////////////////////////////////
 cLayout::~cLayout(void)
 {
-    delete mTUITextMeasurement;
+    if (mSharedMeasurement)
+    {
+        mTUITextMeasurement->SetFontState(mSharedFontState);
+    }
+    else
+    {
+        delete mTUITextMeasurement;
+    }
     mTUITextMeasurement = nullptr;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  shared [in] text measurement of the layout creating this one
+///
+/// @brief
+/// Constructor of a note layout: measures with shared, whose current font
+/// the destructor puts back.
+///
+/////////////////////////////////////////////////////////////////////////////
+cLayout::cLayout(cTUITextMeasurement* shared)
+{
+    mTUITextMeasurement = shared;
+    mSharedMeasurement = true;
+    mSharedFontState = shared->GetFontState();
+    SetTextMeasurement(mTUITextMeasurement);
+
+    mCurrentFontInfo.name = "Courier New";
+    mCurrentFontInfo.size = 12;
+    mCurrentFontInfo.bold = false;
+    mCurrentFontInfo.italic = false;
+    mCurrentFontInfo.underline = false;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return a layout for a note's text that measures with this layout's
+///         text measurement; the caller owns it
+///
+/////////////////////////////////////////////////////////////////////////////
+cLayoutBase* cLayout::CreateNoteLayout(void) const
+{
+    return new cLayout(mTUITextMeasurement);
 }
 
 
