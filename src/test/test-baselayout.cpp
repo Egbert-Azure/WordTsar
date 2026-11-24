@@ -10304,7 +10304,7 @@ TEST_CASE("Layout R2-1: DOT_NOTIMPLEMENTED commands - group A-E")
     CHECK(f.parser.ParseDotCommand(".DF file.dat") == DOT_NOTIMPLEMENTED);
 
     // 'E' commands
-    CHECK(f.parser.ParseDotCommand(".E# 1") == DOT_NOTIMPLEMENTED);
+    CHECK(f.parser.ParseDotCommand(".E# 1") == DOT_GOOD);
     CHECK(f.parser.ParseDotCommand(".EL ") == DOT_NOTIMPLEMENTED);
     CHECK(f.parser.ParseDotCommand(".EI ") == DOT_NOTIMPLEMENTED);
 }
@@ -10314,7 +10314,7 @@ TEST_CASE("Layout R2-1b: DOT_NOTIMPLEMENTED commands - group F-L" * doctest::may
     sParserFixture f;
 
     // 'F' commands (F# and FI only -- FO/FM already tested)
-    CHECK(f.parser.ParseDotCommand(".F# 1") == DOT_NOTIMPLEMENTED);
+    CHECK(f.parser.ParseDotCommand(".F# 1") == DOT_GOOD);
     CHECK(f.parser.ParseDotCommand(".FI file.txt") == DOT_NOTIMPLEMENTED);
 
     // 'G' commands
@@ -10348,7 +10348,7 @@ TEST_CASE("Layout R2-1c: DOT_NOTIMPLEMENTED commands - group M-X")
     CHECK(f.parser.ParseDotCommand(".OX on") == DOT_UNKNOWN);
 
     // 'P' commands (PE, P# -- PA/PC/PF/PL/PO/PN already tested)
-    CHECK(f.parser.ParseDotCommand(".PE ") == DOT_NOTIMPLEMENTED);
+    CHECK(f.parser.ParseDotCommand(".PE ") == DOT_GOOD);
     CHECK(f.parser.ParseDotCommand(".P# 1") == DOT_NOTIMPLEMENTED);
 
     // 'R' commands (RP, RV -- RM/RR already tested)

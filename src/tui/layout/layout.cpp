@@ -700,6 +700,29 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 continue;
             }
 
+            // Footnote / endnote marker: the width of its reference label in
+            // every mode; with control codes shown, a tag with the note's
+            // first words
+            if (controlType == STYLE_FOOTNOTE || controlType == STYLE_ENDNOTE)
+            {
+                std::string label;
+                std::string tag;
+                if (GetNoteMarkerText(documentPos, label, &tag))
+                {
+                    AddSegmentMarker(currentSegment, pendingMarker);
+                    if (GetShowControl() == SHOW_ALL)
+                    {
+                        AddSegmentTag(currentSegment, tag);
+                        currentSegment.hasControlCodes = true;
+                        currentSegment.controlCodeIndices.push_back(currentSegment.length);
+                    }
+                    currentSegment.position.push_back(currentX);
+                    currentSegment.length++;
+                    currentX += GetTextWidth(label);
+                    continue;
+                }
+            }
+
             // Apply formatting control code using helper
             ApplyFormattingControlCode(controlType, documentPos);
 

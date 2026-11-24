@@ -676,9 +676,9 @@ bool cEditorBase::GotoNextNote(void)
 /// @brief
 /// Decodes note into a document of its own and asks the front end for an
 /// editor on it. The note editor's cursor is after the first raw sequence
-/// and the tab that follows it, else at the start. The title counts the
-/// notes of the same kind before position. Nothing opens without a front
-/// end pane.
+/// and the tab that follows it, else at the start. The title holds the
+/// note's reference label from the layout's numbering. Nothing opens
+/// without a front end pane.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::OpenNoteEditor(const sNote& note, eNoteKind kind, POSITION_T position, bool isNew)
@@ -706,16 +706,19 @@ bool cEditorBase::OpenNoteEditor(const sNote& note, eNoteKind kind, POSITION_T p
     }
     content->SetPosition(std::min(start, contentSize)) ;
 
-    int number = 1 ;
-    for (POSITION_T pos = 0; pos < position; pos++)
+    std::string label = "1" ;
+    std::vector<sNoteNumber> numbers = (mLayout != nullptr) ?
+        mLayout->GetNoteNumbers(isNew ? position : -1, kind) :
+        cLayoutBase::NumberNotes(mDocument, nullptr, isNew ? position : -1, kind) ;
+    for (const sNoteNumber& number : numbers)
     {
-        sNote other ;
-        if ((mDocument->GetNote(pos, other) == true) && (other.kind == kind))
+        if ((number.position == position) && (number.kind == kind))
         {
-            number++ ;
+            label = number.label ;
+            break ;
         }
     }
-    std::string title = ((kind == NOTE_KIND_ENDNOTE) ? "Endnote " : "Footnote ") + std::to_string(number) ;
+    std::string title = ((kind == NOTE_KIND_ENDNOTE) ? "Endnote " : "Footnote ") + label ;
 
     cEditorBase* pane = ShowNotePane(content, title) ;
     if (pane == nullptr)

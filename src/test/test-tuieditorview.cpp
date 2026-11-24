@@ -1566,6 +1566,16 @@ TEST_CASE("ws - ^ONF opens a footnote pane below the text that ^KD writes as one
     CHECK(doc->GetNote(3, note));
     CHECK(note.kind == NOTE_KIND_FOOTNOTE);
 
+    // the marker shows the note's first words as a tag, or its number with tags off
+    editor->GetLayout()->SetShowControl(SHOW_ALL);
+    editor->RelayoutAndRedraw();
+    app.TestDraw(screen);
+    CHECK(rowOf(screen, "One<See page 4> two") >= 0);
+    editor->GetLayout()->SetShowControl(SHOW_NONE);
+    editor->RelayoutAndRedraw();
+    app.TestDraw(screen);
+    CHECK(rowOf(screen, "One1 two") >= 0);
+
     type("\x15");
     CHECK(doc->GetTextSize() == size);
     CHECK_FALSE(doc->GetNote(3, note));

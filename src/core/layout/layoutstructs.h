@@ -449,6 +449,23 @@ struct sHeaderFooterDefinition
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @struct sNoteNumber
+///
+/// @brief
+/// Reference number or letter of one footnote or endnote marker.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sNoteNumber
+{
+    POSITION_T position = 0;                // Marker position
+    eNoteKind kind = NOTE_KIND_FOOTNOTE;    // NOTE_KIND_FOOTNOTE or NOTE_KIND_ENDNOTE
+    std::string label;                      // Reference number or letter
+    POSITION_T endnoteAt = -1;              // Endnote: start of the .pe line it prints at, -1 = document end
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @struct sParagraphLayout
 ///
 /// @brief

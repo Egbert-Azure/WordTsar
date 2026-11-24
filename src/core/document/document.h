@@ -357,12 +357,14 @@ public:
     bool GetFont(POSITION_T position, sInternalFonts &intfont) ;
     eVariableType GetVariable(POSITION_T position) ;
     bool GetNote(POSITION_T position, sNote &note) ;
+    void GetNotePositions(std::vector<std::pair<POSITION_T, eNoteKind>> &notes) ;
     eModifiers GetControlChar(POSITION_T) ;
     unsigned char GetRawByte(POSITION_T position) ;
     bool GetRawSequence(POSITION_T position, sRawSequence &sequence) ;
 
     // --- Text Retrieval ---
     std::string GetParagraphText(PARAGRAPH_T para) ;
+    std::string GetParagraphPrefix(PARAGRAPH_T para, size_t length) ;
     size_t GetParagraphGraphemeOffsets(const PARAGRAPH_T &para, std::vector<PARAGRAPH_T> &offsets);
     void GetParagraphGraphemes(PARAGRAPH_T para, std::vector<std::string>& graphemes, std::vector<POSITION_T>& offsets);
     std::string GetBlockText(POSITION_T start, POSITION_T end) ;

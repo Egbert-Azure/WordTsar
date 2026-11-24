@@ -51,6 +51,10 @@ public:
     std::string ToRomanNumeralUpper(PAGE_T num) const;
     std::string FormatPageNumber(PAGE_T page, ePageNumberFormat format) const;
 
+    // .F# / .E# arguments: mode 'D' (continuous), 'P' (each page) or 0, and the
+    // starting number or letter, empty if none
+    static bool ParseNoteNumbering(const std::string& command, char& mode, std::string& start);
+
 protected:
     // Individual dot command parsers (protected for testing)
     // NOTE: Complex methods (ParsePageBreak, ParseConditionalPageBreak, ParseHeader,

@@ -3267,4 +3267,75 @@ TEST_CASE("Footnotes and endnotes keep their text and numbers")
         CHECK(restored.raw == old.raw);
         CHECK(doc->GetTextSize() == size);
     }
+
+    SUBCASE("notes are numbered in document order, .f# sets the next number, the marker shows it")
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        doc->Clear();
+        auto insertNote = [doc](eNoteKind kind, const std::string& text)
+        {
+            cDocument content;
+            REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(kind), content));
+            content.SetPosition(2);
+            content.Insert(text);
+            doc->InsertNote(kind, content);
+        };
+        auto labels = [](const std::vector<sNoteNumber>& numbers)
+        {
+            std::string all;
+            for (const sNoteNumber& number : numbers)
+            {
+                all += ((number.kind == NOTE_KIND_ENDNOTE) ? "e" : "f") + number.label + " ";
+            }
+            return all;
+        };
+
+        doc->Insert("One");
+        insertNote(NOTE_KIND_FOOTNOTE, "First note");          // 3
+        doc->Insert(" two");
+        insertNote(NOTE_KIND_ENDNOTE, "Last note");            // 8
+        doc->Insert(" three");
+        insertNote(NOTE_KIND_FOOTNOTE, "Second note");         // 15
+        doc->Insert("\r");
+        doc->ClearUndoHistory();
+
+        CHECK(labels(cLayoutBase::NumberNotes(doc)) == "f1 e1 f2 ");
+        // footnotes restart on each page unless .f# d numbers them through the document
+        auto twoPages = [](POSITION_T position) -> PAGE_T { return (position < 10) ? 1 : 2; };
+        CHECK(labels(cLayoutBase::NumberNotes(doc, twoPages)) == "f1 e1 f1 ");
+
+        cLayoutBase* layout = editor.GetLayout();
+        std::string marker(1, MARKER_CHAR);
+        layout->SetShowControl(SHOW_NONE);
+        layout->LayoutDocument(doc);
+        CHECK(layout->GetDisplayCharacter(15, marker) == "2");
+        LINE_T line = layout->GetLineFromPosition(15);
+        CHECK(layout->FindLayoutCoordInLine(16, line) > layout->FindLayoutCoordInLine(15, line));
+        layout->SetShowControl(SHOW_ALL);
+        layout->LayoutDocument(doc);
+        CHECK(layout->GetDisplayCharacter(3, marker) == "<First note>");
+
+        doc->SetPosition(15);
+        editor.FeedKey(CharKeyStroke('\x0F'));
+        editor.FeedKey(TextKeyStroke("n"));
+        editor.FeedKey(TextKeyStroke("d"));
+        REQUIRE(editor.IsNoteOpen());
+        CHECK(editor.GetNoteTitle() == "Footnote 2");
+        editor.FeedKey(CharKeyStroke('\x0B'));
+        editor.FeedKey(TextKeyStroke("q"));
+        REQUIRE_FALSE(editor.IsNoteOpen());
+
+        doc->SetPosition(0);
+        doc->Insert(".f# 5\r.e# a\r.f#d\r");                    // notes move by 17
+        CHECK(labels(cLayoutBase::NumberNotes(doc)) == "f5 ea f6 ");
+        CHECK(labels(cLayoutBase::NumberNotes(doc, twoPages)) == "f5 ea f6 ");
+        layout->LayoutDocument(doc);
+        CHECK(layout->GetParagraphDotStatus(0) == DOT_GOOD);
+        CHECK(layout->GetParagraphDotStatus(1) == DOT_GOOD);
+        CHECK(layout->GetParagraphDotStatus(2) == DOT_GOOD);
+
+        doc->Delete(20, 1);
+        CHECK(labels(cLayoutBase::NumberNotes(doc)) == "ea f5 ");
+    }
 }

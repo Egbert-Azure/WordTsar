@@ -2503,6 +2503,66 @@ bool cDocument::GetNote(POSITION_T position, sNote &note)
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param notes   [OUT] marker position and kind of every note
+///
+/// @brief
+/// Lists the notes reachable through their markers, in document order.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDocument::GetNotePositions(std::vector<std::pair<POSITION_T, eNoteKind>> &notes)
+{
+    notes.clear() ;
+    for(const sParagraphData &para : mParagraphData)
+    {
+        if(para.footnote.empty() && para.endnote.empty())
+        {
+            continue ;
+        }
+
+        std::vector<std::pair<POSITION_T, eNoteKind>> found ;
+        auto collect = [&para, &found](const std::vector<FootnotePair> &list, eType type)
+        {
+            for(const FootnotePair &entry : list)
+            {
+                PairTable pcomp ;
+                pcomp.first = entry.first ;
+                auto iter = lower_bound(para.pairs.begin(), para.pairs.end(), pcomp, TableCompare) ;
+                if(iter != para.pairs.end() && iter->first == entry.first && iter->second == type)
+                {
+                    found.emplace_back(para.index + entry.first, entry.second.kind) ;
+                }
+            }
+        } ;
+        collect(para.footnote, TYPE_FOOTNOTE) ;
+        collect(para.endnote, TYPE_ENDNOTE) ;
+        std::sort(found.begin(), found.end(),
+                  [](const auto &first, const auto &second) { return first.first < second.first ; }) ;
+        notes.insert(notes.end(), found.begin(), found.end()) ;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param para    [IN] paragraph number
+/// @param length  [IN] number of bytes wanted
+///
+/// @return the first length bytes of the paragraph's text, fewer if it is shorter
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDocument::GetParagraphPrefix(PARAGRAPH_T para, size_t length)
+{
+    if(para < 0 || static_cast<size_t>(para) >= mParagraphData.size())
+    {
+        return std::string() ;
+    }
+    const std::string &buffer = mParagraphData[para].buffer ;
+    return std::string(buffer, 0, std::min(length, buffer.size())) ;
+}
+
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///

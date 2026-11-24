@@ -160,6 +160,67 @@ void cDotCommandParser::SetDocument(cDocument* document)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  command [in]  .F# or .E# dot command text
+/// @param  mode    [out] 'D' for .f# d (continuous), 'P' for .f# p (each
+///                       page), 0 if not given
+/// @param  start   [out] starting number or letter, empty if not given
+///
+/// @return false if the arguments are not a mode and a number or one letter
+///
+/// @brief
+/// Reads ".f# [d|p] [n|letter]" and ".e# [n|letter]".
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDotCommandParser::ParseNoteNumbering(const std::string& command, char& mode, std::string& start)
+{
+    mode = 0;
+    start.clear();
+    if (command.length() < 3)
+    {
+        return false;
+    }
+
+    auto trim = [](std::string text)
+    {
+        text.erase(0, text.find_first_not_of(" \t\r\n"));
+        size_t last = text.find_last_not_of(" \t\r\n");
+        text.erase((last == std::string::npos) ? 0 : last + 1);
+        return text;
+    };
+
+    bool footnote = (toupper(static_cast<unsigned char>(command[1])) == 'F');
+    std::string rest = trim(command.substr(3));
+    if (footnote && !rest.empty())
+    {
+        char first = static_cast<char>(toupper(static_cast<unsigned char>(rest[0])));
+        if ((first == 'D' || first == 'P') && (rest.length() == 1 || rest[1] == ' ' || rest[1] == '\t'))
+        {
+            mode = first;
+            rest = trim(rest.substr(1));
+        }
+    }
+
+    if (rest.empty())
+    {
+        return true;
+    }
+    if (rest.length() <= 6 &&
+        std::all_of(rest.begin(), rest.end(), [](char ch) { return isdigit(static_cast<unsigned char>(ch)) != 0; }))
+    {
+        start = std::to_string(std::stoi(rest));
+        return true;
+    }
+    if (rest.length() == 1 && isalpha(static_cast<unsigned char>(rest[0])))
+    {
+        start = rest;
+        return true;
+    }
+    return false;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  std::string command [in] - Dot command text to parse
 ///
 /// @return eDotCommandStatus - Command recognition status
@@ -285,8 +346,9 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
         {
             if (cmdCode[0] == 'E' && cmdCode[1] == '#')  // Set Endnote Value (.E#)
             {
-                // NOTE: takes a numeric value -- use EvaluateExpression for math support
-                return DOT_NOTIMPLEMENTED;
+                char mode = 0;
+                std::string start;
+                return ParseNoteNumbering(command, mode, start) ? DOT_GOOD : DOT_ERROR;
             }
             if (cmdCode == "EL")  // Else (conditional logic)
             {
@@ -313,8 +375,9 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
             }
             if (cmdCode[0] == 'F' && cmdCode[1] == '#')  // Set Footnote Numbering (.F#)
             {
-                // NOTE: takes a numeric value -- use EvaluateExpression for math support
-                return DOT_NOTIMPLEMENTED;
+                char mode = 0;
+                std::string start;
+                return ParseNoteNumbering(command, mode, start) ? DOT_GOOD : DOT_ERROR;
             }
             if (cmdCode == "FI")  // File Insert
             {
@@ -478,9 +541,9 @@ eDotCommandStatus cDotCommandParser::ParseDotCommand(const std::string& command)
             {
                 return ParsePageNumberColumn(upperCmd);
             }
-            if (cmdCode == "PE")  // Print Endnotes
+            if (cmdCode == "PE")  // Print Endnotes: cLayoutBase::NumberNotes() places them
             {
-                return DOT_NOTIMPLEMENTED;
+                return DOT_GOOD;
             }
             if (cmdCode == "PF")  // Paragraph Realignment: layout and print always reflow
             {

@@ -370,6 +370,17 @@ public:
                                     PAGE_T pageNumber = 0) const;
     std::string GetVariableExpansion(eVariableType type) const;
 
+    // ----- Footnote / Endnote Numbering -----
+    static std::vector<sNoteNumber> NumberNotes(cDocument* doc,
+                                                const std::function<PAGE_T(POSITION_T)>& pageOf = nullptr,
+                                                POSITION_T newNotePos = -1,
+                                                eNoteKind newNoteKind = NOTE_KIND_FOOTNOTE);
+    std::vector<sNoteNumber> GetNoteNumbers(POSITION_T newNotePos = -1,
+                                            eNoteKind newNoteKind = NOTE_KIND_FOOTNOTE) const;
+    std::string GetNoteLabel(POSITION_T position) const;
+    bool GetNoteMarkerText(POSITION_T position, std::string& label, std::string* tag = nullptr) const;
+    PAGE_T GetPageOfPosition(POSITION_T position) const;
+
     // ----- Font Formatting -----
     virtual std::string GetFontWithFormatting(bool bold, bool italic, bool underline) = 0;
 
@@ -488,6 +499,9 @@ private:
 
     // Block / place markers shown inline (false for print layouts)
     bool mMarkersVisible;
+
+    // Note marker tags by note bytes
+    mutable std::map<std::string, std::string> mNoteWords;
 
     // Margin change tracking handled by cPageManager
 

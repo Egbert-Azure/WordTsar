@@ -86,6 +86,7 @@
 #include "headerfootermanager.h"
 #include "src/core/document/document.h"
 #include "src/core/hyphenation/hyphenator.h"
+#include "src/files/wordstar/wordstarfile.h"
 #include "unicodelib.h"
 #include "unicodelib_encodings.h"
 #include <sstream>
@@ -2630,6 +2631,19 @@ std::string cLayoutBase::GetDisplayCharacter(POSITION_T documentPos,
         }
     }
 
+    // Footnote / endnote marker: a tag with the note's first words with
+    // control codes shown, else the reference number
+    if (mDocument && grapheme.length() == 1 && grapheme[0] == MARKER_CHAR)
+    {
+        std::string label;
+        std::string tag;
+        bool showTag = (mLayoutState->GetShowControl() == SHOW_ALL);
+        if (GetNoteMarkerText(documentPos, label, showTag ? &tag : nullptr))
+        {
+            return showTag ? tag : label;
+        }
+    }
+
     // Delegate all other cases to text mMeasurement
     if (mTextMeasurement)
     {
@@ -2638,6 +2652,328 @@ std::string cLayoutBase::GetDisplayCharacter(POSITION_T documentPos,
 
     // Fallback if mTextMeasurement not set (should not happen in normal operation)
     return grapheme;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  start  [in] starting number or letter ("1", "A", "a")
+/// @param  offset [in] notes counted since the start
+///
+/// @return the reference label: a number, or letters A..Z, AA, AB, ...
+///         in the case of the starting letter
+///
+/////////////////////////////////////////////////////////////////////////////
+static std::string NoteLabel(const std::string& start, int offset)
+{
+    if (!start.empty() && isalpha(static_cast<unsigned char>(start[0])))
+    {
+        bool upper = isupper(static_cast<unsigned char>(start[0])) != 0;
+        int n = (toupper(static_cast<unsigned char>(start[0])) - 'A') + offset + 1;
+        std::string label;
+        while (n > 0)
+        {
+            n--;
+            label.insert(label.begin(), static_cast<char>((upper ? 'A' : 'a') + (n % 26)));
+            n /= 26;
+        }
+        return label;
+    }
+    int first = start.empty() ? 1 : atoi(start.c_str());
+    return std::to_string(first + offset);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  doc         [in] document
+/// @param  pageOf      [in] page of a position, 0 if not known; nullptr
+///                          numbers footnotes through the document
+/// @param  newNotePos  [in] position of a note not yet in the document, -1 if none
+/// @param  newNoteKind [in] kind of that note
+///
+/// @return the footnotes and endnotes in document order with their labels
+///
+/// @brief
+/// Numbers the notes. Footnotes and endnotes count from 1. A .f# or .e#
+/// line with a number or letter starts the next footnote or endnote at it.
+/// Footnotes restart at the starting value on each page unless .f# d
+/// numbers them through the document (.f# p restarts them again); a page
+/// of 0 does not restart. An endnote prints at the first .pe line after
+/// its marker, else at the document end. A new note at a position comes
+/// before a marker at the same position.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::vector<sNoteNumber> cLayoutBase::NumberNotes(cDocument* doc,
+                                                  const std::function<PAGE_T(POSITION_T)>& pageOf,
+                                                  POSITION_T newNotePos, eNoteKind newNoteKind)
+{
+    std::vector<sNoteNumber> numbers;
+    if (doc == nullptr)
+    {
+        return numbers;
+    }
+
+    std::vector<std::pair<POSITION_T, eNoteKind>> notes;
+    doc->GetNotePositions(notes);
+    if (newNotePos >= 0)
+    {
+        auto at = std::find_if(notes.begin(), notes.end(),
+                               [newNotePos](const auto& note) { return note.first >= newNotePos; });
+        notes.insert(at, std::make_pair(newNotePos, newNoteKind));
+    }
+
+    struct sNoteDotLine
+    {
+        POSITION_T position;
+        char command;                       // 'F' .f#, 'E' .e#, 'P' .pe
+        char mode;
+        std::string start;
+    };
+    std::vector<sNoteDotLine> dotLines;
+    PARAGRAPH_T paragraphs = doc->GetNumberofParagraphs();
+    for (PARAGRAPH_T para = 0; para < paragraphs; para++)
+    {
+        std::string prefix = doc->GetParagraphPrefix(para, 3);
+        if (prefix.length() < 3 || prefix[0] != '.')
+        {
+            continue;
+        }
+        std::string code;
+        code += static_cast<char>(toupper(static_cast<unsigned char>(prefix[1])));
+        code += static_cast<char>(toupper(static_cast<unsigned char>(prefix[2])));
+        if (code != "F#" && code != "E#" && code != "PE")
+        {
+            continue;
+        }
+
+        sNoteDotLine line;
+        POSITION_T end = 0;
+        doc->GetParagraphStartandEnd(para, line.position, end);
+        line.command = code[0];
+        line.mode = 0;
+        if (code != "PE" &&
+            cDotCommandParser::ParseNoteNumbering(doc->GetParagraphText(para), line.mode, line.start) == false)
+        {
+            continue;
+        }
+        dotLines.push_back(line);
+    }
+
+    std::string footnoteStart = "1";
+    std::string endnoteStart = "1";
+    bool perPage = true;
+    int footnoteCount = 0;
+    int endnoteCount = 0;
+    PAGE_T footnotePage = 0;
+    size_t nextDot = 0;
+
+    for (const auto& note : notes)
+    {
+        for (; nextDot < dotLines.size() && dotLines[nextDot].position <= note.first; nextDot++)
+        {
+            const sNoteDotLine& line = dotLines[nextDot];
+            if (line.command == 'F')
+            {
+                if (line.mode != 0)
+                {
+                    perPage = (line.mode == 'P');
+                }
+                if (!line.start.empty())
+                {
+                    footnoteStart = line.start;
+                    footnoteCount = 0;
+                    footnotePage = pageOf ? pageOf(line.position) : 0;
+                }
+            }
+            else if (line.command == 'E' && !line.start.empty())
+            {
+                endnoteStart = line.start;
+                endnoteCount = 0;
+            }
+        }
+
+        sNoteNumber number;
+        number.position = note.first;
+        number.kind = note.second;
+        if (note.second == NOTE_KIND_FOOTNOTE)
+        {
+            PAGE_T page = pageOf ? pageOf(note.first) : 0;
+            if (perPage && page > 0 && footnotePage > 0 && page != footnotePage)
+            {
+                footnoteCount = 0;
+            }
+            if (page > 0)
+            {
+                footnotePage = page;
+            }
+            number.label = NoteLabel(footnoteStart, footnoteCount++);
+        }
+        else if (note.second == NOTE_KIND_ENDNOTE)
+        {
+            number.label = NoteLabel(endnoteStart, endnoteCount++);
+            for (size_t dot = nextDot; dot < dotLines.size(); dot++)
+            {
+                if (dotLines[dot].command == 'P')
+                {
+                    number.endnoteAt = dotLines[dot].position;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            continue;
+        }
+        numbers.push_back(number);
+    }
+
+    return numbers;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  position [in] document position
+///
+/// @return page of the laid-out line holding position, 0 if its paragraph
+///         is not laid out
+///
+/////////////////////////////////////////////////////////////////////////////
+PAGE_T cLayoutBase::GetPageOfPosition(POSITION_T position) const
+{
+    if (mDocument == nullptr || position < 0 || position >= mDocument->GetTextSize())
+    {
+        return 0;
+    }
+    PARAGRAPH_T para = mDocument->GetParagraphFromPosition(position);
+    if (para < 0 || para >= static_cast<PARAGRAPH_T>(mParagraphLayout.size()) ||
+        mParagraphLayout[para].lines.empty())
+    {
+        return 0;
+    }
+
+    POSITION_T start = 0;
+    POSITION_T end = 0;
+    mDocument->GetParagraphStartandEnd(para, start, end);
+    const std::vector<sLineLayout>& lines = mParagraphLayout[para].lines;
+    for (size_t i = lines.size(); i > 0; i--)
+    {
+        if (position - start >= lines[i - 1].linestart)
+        {
+            return lines[i - 1].pagenumber;
+        }
+    }
+    return lines[0].pagenumber;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  newNotePos  [in] position of a note not yet in the document, -1 if none
+/// @param  newNoteKind [in] kind of that note
+///
+/// @return NumberNotes() with the pages of this layout
+///
+/////////////////////////////////////////////////////////////////////////////
+std::vector<sNoteNumber> cLayoutBase::GetNoteNumbers(POSITION_T newNotePos, eNoteKind newNoteKind) const
+{
+    return NumberNotes(mDocument, [this](POSITION_T position) { return GetPageOfPosition(position); },
+                       newNotePos, newNoteKind);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  position [in] note marker position
+///
+/// @return reference label of the footnote or endnote at position, empty if none
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cLayoutBase::GetNoteLabel(POSITION_T position) const
+{
+    for (const sNoteNumber& number : GetNoteNumbers())
+    {
+        if (number.position == position)
+        {
+            return number.label;
+        }
+    }
+    return std::string();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  position [in]  document position
+/// @param  label    [out] the note's reference label
+/// @param  tag      [out] if not nullptr, the command tag of the marker:
+///                        the first words of the note in < >
+///
+/// @return true if a footnote or endnote marker is at position
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cLayoutBase::GetNoteMarkerText(POSITION_T position, std::string& label, std::string* tag) const
+{
+    eModifiers control = mDocument->GetControlChar(position);
+    if (control != STYLE_FOOTNOTE && control != STYLE_ENDNOTE)
+    {
+        return false;
+    }
+    sNote note;
+    if (mDocument->GetNote(position, note) == false ||
+        (note.kind != NOTE_KIND_FOOTNOTE && note.kind != NOTE_KIND_ENDNOTE))
+    {
+        return false;
+    }
+
+    label = GetNoteLabel(position);
+    if (tag == nullptr)
+    {
+        return true;
+    }
+
+    auto cached = mNoteWords.find(note.raw + note.text);
+    if (cached != mNoteWords.end())
+    {
+        *tag = cached->second;
+        return true;
+    }
+
+    std::string plain;
+    cDocument content;
+    if (cWordstarFile::DecodeNote(note, content))
+    {
+        plain = content.GetPlainText(0, content.GetTextSize(), " ");
+    }
+    else
+    {
+        for (char ch : note.text)
+        {
+            plain += (static_cast<unsigned char>(ch) < ' ') ? ' ' : ch;
+        }
+    }
+
+    // first words, up to 24 bytes unless the first word is longer
+    std::istringstream stream(plain);
+    std::string word;
+    std::string words;
+    while (stream >> word)
+    {
+        if (!words.empty() && words.length() + 1 + word.length() > 24)
+        {
+            break;
+        }
+        words += (words.empty() ? "" : " ") + word;
+    }
+    *tag = "<" + words + ">";
+
+    if (mNoteWords.size() > 256)
+    {
+        mNoteWords.clear();
+    }
+    mNoteWords[note.raw + note.text] = *tag;
+    return true;
 }
 
 
