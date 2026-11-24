@@ -2258,6 +2258,27 @@ TEST_CASE("cWordstarFile - German letters as ESC x FS load and save under CP437 
 }
 
 
+TEST_CASE("cWordstarFile - characters CP437 cannot hold save as their plain equivalent")
+{
+    ensureQApplication();
+    cEditorCtrl editor;
+    cDocument *doc = editor.GetDocument();
+    editor.SetCodePage(CP437);
+    doc->Clear();
+    doc->Insert("There\xE2\x80\x99s 7\xE2\x80\x93" "12%\xC2\xB9\r");      // U+2019, U+2013, U+00B9
+
+    std::filesystem::path path = TempPath();
+    cWordstarFile saver(&editor);
+    saver.SetSilent(true);
+    REQUIRE(saver.SaveFile(path.string(), doc->GetTextSize()));
+    std::string saved = ReadFileBytes(path);
+    std::filesystem::remove(path);
+
+    const std::string expected("There's 7-12%1\x0D\x0A");
+    CHECK(Hex(saved, 128, expected.size()) == Hex(expected));
+}
+
+
 TEST_CASE("cWordstarFile - ESC FS FS loads as one right angle glyph")
 {
     ensureQApplication();
