@@ -2258,24 +2258,38 @@ TEST_CASE("cWordstarFile - German letters as ESC x FS load and save under CP437 
 }
 
 
-TEST_CASE("cWordstarFile - characters CP437 cannot hold save as their plain equivalent")
+TEST_CASE("cWordstarFile - characters CP437 cannot hold save as their plain equivalent, superscript digits as ^T digits")
 {
     ensureQApplication();
     cEditorCtrl editor;
     cDocument *doc = editor.GetDocument();
     editor.SetCodePage(CP437);
     doc->Clear();
-    doc->Insert("There\xE2\x80\x99s 7\xE2\x80\x93" "12%\xC2\xB9\r");      // U+2019, U+2013, U+00B9
+    doc->Insert("There\xE2\x80\x99s 7\xE2\x80\x93" "12%\xC2\xB9 x\xC2\xB2\xC2\xB3 ");  // U+2019, U+2013, U+00B9, U+00B2, U+00B3
+    doc->BeginSuperscript();
+    doc->Insert("a\xE2\x81\xB4");                                             // U+2074 inside superscript
+    doc->BeginSuperscript();
+    doc->Insert("\r");
 
     std::filesystem::path path = TempPath();
     cWordstarFile saver(&editor);
     saver.SetSilent(true);
     REQUIRE(saver.SaveFile(path.string(), doc->GetTextSize()));
     std::string saved = ReadFileBytes(path);
-    std::filesystem::remove(path);
 
-    const std::string expected("There's 7-12%1\x0D\x0A");
+    const std::string expected("There's 7-12%\x14" "1\x14 x\x14" "23\x14 \x14" "a4\x14\x0D\x0A");
     CHECK(Hex(saved, 128, expected.size()) == Hex(expected));
+
+    // the digits load back as superscript text
+    cDocument loaded;
+    loaded.Clear();
+    cWordstarFile loader(&editor);
+    loader.mDocument = &loaded;
+    REQUIRE(loader.LoadFile(path.string()));
+    std::filesystem::remove(path);
+    CHECK(loaded.GetControlChar(13) == STYLE_SUPERSCRIPT);
+    CHECK(loaded.GetCharNoAdvance(14) == "1");
+    CHECK(loaded.GetControlChar(15) == STYLE_SUPERSCRIPT);
 }
 
 
