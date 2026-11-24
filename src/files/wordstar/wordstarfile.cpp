@@ -1025,26 +1025,6 @@ static const char *PlainFallback(char32_t cp)
             return "-" ;
         case 0x2026 :                                   // ellipsis
             return "..." ;
-        case 0x00B9 :
-            return "1" ;
-        case 0x00B2 :
-            return "2" ;
-        case 0x00B3 :
-            return "3" ;
-        case 0x2070 :
-            return "0" ;
-        case 0x2074 :
-            return "4" ;
-        case 0x2075 :
-            return "5" ;
-        case 0x2076 :
-            return "6" ;
-        case 0x2077 :
-            return "7" ;
-        case 0x2078 :
-            return "8" ;
-        case 0x2079 :
-            return "9" ;
     }
 
     return nullptr ;
@@ -1053,11 +1033,82 @@ static const char *PlainFallback(char32_t cp)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  cp [in] - code point
+///
+/// @return the digit '0'..'9' of a superscript digit code point, 0 for any
+///         other code point
+///
+/////////////////////////////////////////////////////////////////////////////
+static char SuperscriptDigit(char32_t cp)
+{
+    switch(cp)
+    {
+        case 0x00B9 :
+            return '1' ;
+        case 0x00B2 :
+            return '2' ;
+        case 0x00B3 :
+            return '3' ;
+        case 0x2070 :
+            return '0' ;
+        case 0x2074 :
+        case 0x2075 :
+        case 0x2076 :
+        case 0x2077 :
+        case 0x2078 :
+        case 0x2079 :
+            return static_cast<char>('0' + (cp - 0x2070)) ;
+    }
+
+    return 0 ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  codepage [in] - code page to use
+/// @param  cp       [in] - code point
+///
+/// @return the digit '0'..'9' of a superscript digit code point that
+///         codepage cannot hold, 0 for any other code point
+///
+/////////////////////////////////////////////////////////////////////////////
+static char MissingSuperscriptDigit(eCodePage codepage, char32_t cp)
+{
+    if(CodePageByte(codepage, cp) != 0)
+    {
+        return 0 ;
+    }
+    return SuperscriptDigit(cp) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  codepage   [in] - code page to use
+/// @param  codepoints [in] - code points of one character
+///
+/// @return the digit of a character that is one superscript digit code
+///         point codepage cannot hold, 0 otherwise
+///
+/////////////////////////////////////////////////////////////////////////////
+static char MissingSuperscriptDigit(eCodePage codepage, const std::u32string &codepoints)
+{
+    if(codepoints.size() == 1)
+    {
+        return MissingSuperscriptDigit(codepage, codepoints[0]) ;
+    }
+    return 0 ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  str [in] - one character, UTF-8
 ///
 /// @return the number of code points of a multi-byte character other than
-///         NBSP that the current code page cannot hold and that have no
-///         plain fallback
+///         NBSP that the current code page cannot hold, that have no
+///         plain fallback and that are not superscript digits
 ///
 /////////////////////////////////////////////////////////////////////////////
 size_t cWordstarFile::CountUnmappable(const std::string &str)
@@ -1071,7 +1122,7 @@ size_t cWordstarFile::CountUnmappable(const std::string &str)
 
         for(char32_t cp : codepoints)
         {
-            if(CodePageByte(codepage, cp) == 0 && PlainFallback(cp) == nullptr)
+            if(CodePageByte(codepage, cp) == 0 && PlainFallback(cp) == nullptr && SuperscriptDigit(cp) == 0)
             {
                 unmappableCount++ ;
             }
@@ -1272,7 +1323,11 @@ bool cWordstarFile::SaveRange(std::string filename, POSITION_T start, POSITION_T
 ///
 /// @brief
 /// Encodes start..end as they are: codes open at start or end are neither
-/// added nor closed. Encoding stops at an end of file marker.
+/// added nor closed. Encoding stops at an end of file marker. A superscript
+/// digit the code page cannot hold is written as its digit, a run of them
+/// between one ^T pair unless superscript is already on there. Any other
+/// character, a superscript digit the code page holds included, closes
+/// that pair before it is written.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_t &stylecounter)
@@ -1284,6 +1339,18 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
     intro.start = 0x1d ;
     close.finish = 0x1d ;
 
+    // superscript is on where an odd number of ^T markers precede
+    bool superscriptOn = false ;
+    for(POSITION_T scan = 0; scan < start; scan++)
+    {
+        std::string str = mDocument->GetChar(scan) ;
+        if(str.length() == 1 && str[0] == MARKER_CHAR && mDocument->GetControlChar(scan) == STYLE_SUPERSCRIPT)
+        {
+            superscriptOn = !superscriptOn ;
+        }
+    }
+    bool superscriptAdded = false ;     // a ^T written in front of superscript digits is open
+
     // go through the buffer
     for(POSITION_T loop = start; loop < end; loop++)
     {
@@ -1291,11 +1358,42 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
         std::string str = mDocument->GetChar(loop) ;
         char ch1 = str[0] ;
 
+        // a superscript digit the code page cannot hold is written as the digit in superscript; a run of them shares one ^T pair
+        char digit = 0 ;
+        if(str.length() > 1)
+        {
+            std::u32string codepoints ;
+            mDocument->GetCodePoints(str, codepoints) ;
+            digit = MissingSuperscriptDigit(CodePage(), codepoints) ;
+        }
+        if(digit != 0)
+        {
+            if(superscriptOn == false && superscriptAdded == false)
+            {
+                out += static_cast<char>(STYLE_SUPERSCRIPT) ;
+                stylecounter++ ;
+                superscriptAdded = true ;
+            }
+            out += digit ;
+            stylecounter++ ;
+            continue ;
+        }
+        if(superscriptAdded)
+        {
+            out += static_cast<char>(STYLE_SUPERSCRIPT) ;
+            stylecounter++ ;
+            superscriptAdded = false ;
+        }
+
         if(str.length() == 1)
         {
             if(ch1 == MARKER_CHAR)
             {
                 eModifiers control = mDocument->GetControlChar(loop) ;
+                if(control == STYLE_SUPERSCRIPT)
+                {
+                    superscriptOn = !superscriptOn ;
+                }
                 if(control == STYLE_RAW_BYTE)
                 {
                     continue ;      // a control byte from a text file is left out
@@ -1516,6 +1614,12 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
         }
     }
 
+    if(superscriptAdded)
+    {
+        out += static_cast<char>(STYLE_SUPERSCRIPT) ;
+        stylecounter++ ;
+    }
+
     return out ;
 }
 
@@ -1529,8 +1633,9 @@ std::string cWordstarFile::EncodeRange(POSITION_T start, POSITION_T end, uint32_
 /// @brief
 /// NBSP becomes ^O. A first code point in 0x20..0x7E is written as its
 /// byte. Every other code point becomes ESC x FS, x being the byte of the
-/// current code page. A code point the code page cannot hold is written as
-/// its PlainFallback() text, or left out if it has none.
+/// current code page. A superscript digit the code page cannot hold becomes
+/// ^T digit ^T. Any other code point the code page cannot hold is written
+/// as its PlainFallback() text, or left out if it has none.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, uint32_t &stylecounter)
@@ -1566,6 +1671,13 @@ void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, ui
                 out += static_cast<char>(STYLE_EXTEND) ;
                 stylecounter += 3 ;
             }
+            else if(char digit = SuperscriptDigit(cp))
+            {
+                out += static_cast<char>(STYLE_SUPERSCRIPT) ;
+                out += digit ;
+                out += static_cast<char>(STYLE_SUPERSCRIPT) ;
+                stylecounter += 3 ;
+            }
             else if(const char *plain = PlainFallback(cp))
             {
                 std::string text(plain) ;
@@ -1585,8 +1697,9 @@ void cWordstarFile::EncodeCharacter(const std::string &str, std::string &out, ui
 ///
 /// @brief
 /// ASCII stays as it is, except 0x1A, 0x1B and 0x1D, which are left out.
-/// Any other code point is encoded as EncodeRange() encodes it
-/// (EncodeCharacter()).
+/// Superscript digits the code page cannot hold are written as in
+/// EncodeRange(). Any other code point
+/// is encoded as EncodeRange() encodes it (EncodeCharacter()).
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cWordstarFile::EncodeText(const std::string &text)
@@ -1595,6 +1708,9 @@ std::string cWordstarFile::EncodeText(const std::string &text)
     uint32_t counted = 0 ;
     std::u32string codepoints ;
     mDocument->GetCodePoints(text, codepoints) ;
+    eCodePage codepage = CodePage() ;
+    bool superscriptOn = false ;
+    bool superscriptAdded = false ;     // a ^T written in front of superscript digits is open
 
     for(char32_t cp : codepoints)
     {
@@ -1603,8 +1719,28 @@ std::string cWordstarFile::EncodeText(const std::string &text)
             continue ;
         }
 
+        if(char digit = MissingSuperscriptDigit(codepage, cp))
+        {
+            if(superscriptOn == false && superscriptAdded == false)
+            {
+                out += static_cast<char>(STYLE_SUPERSCRIPT) ;
+                superscriptAdded = true ;
+            }
+            out += digit ;
+            continue ;
+        }
+        if(superscriptAdded)
+        {
+            out += static_cast<char>(STYLE_SUPERSCRIPT) ;
+            superscriptAdded = false ;
+        }
+
         if(cp < 0x80)
         {
+            if(cp == STYLE_SUPERSCRIPT)
+            {
+                superscriptOn = !superscriptOn ;
+            }
             out += static_cast<char>(cp) ;
             continue ;
         }
@@ -1612,6 +1748,11 @@ std::string cWordstarFile::EncodeText(const std::string &text)
         std::string str ;
         unicode::utf8::encode_codepoint(cp, str) ;
         EncodeCharacter(str, out, counted) ;
+    }
+
+    if(superscriptAdded)
+    {
+        out += static_cast<char>(STYLE_SUPERSCRIPT) ;
     }
 
     return out ;
