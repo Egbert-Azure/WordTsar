@@ -6226,10 +6226,18 @@ void cLayoutBase::FinalizeLine(sLineLayout& line, COORD_T maxLineWidth, bool isF
     // Position segments within line
     // Convert segment-relative positions to line-relative positions
     COORD_T currentX = alignmentOffset;
+    // Line-relative x as measured by word wrap, where each tab ends exactly at its stop
+    COORD_T wrapX = alignmentOffset;
 
     for (size_t si = 0; si < line.segments.size(); ++si)
     {
         auto& segment = line.segments[si];
+        COORD_T segmentWrapX = wrapX;
+        wrapX += segment.totalWidth;
+        if (segment.isTab)
+        {
+            wrapX += segment.tabWidth;
+        }
 
         if (segment.isTab)
         {
@@ -6244,8 +6252,9 @@ void cLayoutBase::FinalizeLine(sLineLayout& line, COORD_T maxLineWidth, bool isF
             // Only TAB_TAB, TAB_SOFT and TAB_DECIMAL advance currentX by tabWidth.
             if (segment.tabType == TAB_TAB || segment.tabType == TAB_SOFT || segment.tabType == TAB_DECIMAL)
             {
-                // Advance to the tab stop position
-                currentX += segment.tabWidth;
+                // Move to the tab stop position; the preceding text ends at textEnd
+                COORD_T textEnd = currentX;
+                currentX = segmentWrapX + segment.tabWidth;
 
                 // Apply tab stop column positioning based on tabStopType
                 // tabStopType is from .tb/.tab definitions, NOT the document tab character
@@ -6320,6 +6329,12 @@ void cLayoutBase::FinalizeLine(sLineLayout& line, COORD_T maxLineWidth, bool isF
                     currentX -= widthBeforeDecimal;
                 }
                 // else TAB_TAB: left-aligned, no adjustment needed
+
+                // A column wider than the space before its stop starts after the preceding text
+                if (currentX < textEnd)
+                {
+                    currentX = textEnd;
+                }
             }
             else
             {

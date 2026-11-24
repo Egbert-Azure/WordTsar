@@ -9507,6 +9507,91 @@ TEST_CASE("Layout L1d: Decimal tab stop with no decimal point uses right-align f
     CHECK(!line->segments.empty());
 }
 
+TEST_CASE("Layout L1e: Each column sits at its own tab stop after a right, centre or decimal stop")
+{
+    ensureQApplication();
+
+    // Lays out "Item<tab>col2<tab>Total" with ".tb <stop2> >5i" and returns
+    // the anchor x of column 2 (right edge, centre or decimal point, by
+    // stop type) and the right edge of column 3, both relative to the
+    // left margin.
+    auto columnEdges = [](const std::string& stop2, const std::string& col2,
+                          COORD_T& col2Anchor, COORD_T& col3Right)
+    {
+        cEditorCtrl editor;
+        cDocument* doc = editor.GetDocument();
+        cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+        REQUIRE(layout != nullptr);
+
+        doc->Insert(".tb " + stop2 + " >5i\r");
+        sWSTab tab;
+        tab.type = TAB_TAB;
+        tab.tabsize = 0;
+        tab.abstabsize = 0;
+        tab.size = 0;
+        doc->Insert("Item");
+        doc->InsertTab(tab);
+        doc->Insert(col2);
+        doc->InsertTab(tab);
+        doc->Insert("Total\r");
+        layout->LayoutDocument(doc);
+
+        POSITION_T textStart = static_cast<POSITION_T>(4 + stop2.size() + 5);
+        const sLineLayout* line = layout->GetLineByRawLineNumber(layout->GetLineFromPosition(textStart));
+        REQUIRE(line != nullptr);
+
+        std::vector<const sSegmentLayout*> columns;
+        for (const auto& segment : line->segments)
+        {
+            if (!segment.isTab && !segment.position.empty())
+            {
+                columns.push_back(&segment);
+            }
+        }
+        REQUIRE(columns.size() == 3);
+
+        // Tab stops are measured from the left margin; positions from line->pagex.
+        COORD_T lineToStop = -layout->GetLeftMargin();
+
+        const sSegmentLayout* c2 = columns[1];
+        if (stop2[0] == '^')
+        {
+            col2Anchor = c2->position.front() + c2->totalWidth / 2 - lineToStop;
+        }
+        else if (stop2[0] == '#')
+        {
+            std::vector<std::string> graphemes;
+            c2->GetGraphemes(doc, graphemes);
+            size_t dot = 0;
+            while (dot < graphemes.size() && graphemes[dot] != ".")
+            {
+                ++dot;
+            }
+            REQUIRE(dot < c2->position.size());
+            col2Anchor = c2->position[dot] - lineToStop;
+        }
+        else
+        {
+            col2Anchor = c2->position.front() + c2->totalWidth - lineToStop;
+        }
+        col3Right = columns[2]->position.front() + columns[2]->totalWidth - lineToStop;
+    };
+
+    for (const std::string stop2 : { ">3i", "^3i", "#3i" })
+    {
+        for (const std::string col2 : { "1.5", "1234567.89" })
+        {
+            CAPTURE(stop2);
+            CAPTURE(col2);
+            COORD_T col2Anchor = 0;
+            COORD_T col3Right = 0;
+            columnEdges(stop2, col2, col2Anchor, col3Right);
+            CHECK(col2Anchor == doctest::Approx(4320).epsilon(0.001));
+            CHECK(col3Right == doctest::Approx(7200).epsilon(0.001));
+        }
+    }
+}
+
 // =========================================================================
 // Group L2: JustifyLine center/right alignment (coverage)
 // =========================================================================
