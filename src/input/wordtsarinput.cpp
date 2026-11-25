@@ -2006,7 +2006,7 @@ void cWordStarInput::OnControlOChar(char ch)
 /// @brief
 /// ^ONF and ^ONE open a new footnote or endnote at the cursor, ^OND the
 /// note at the cursor; in a note editor they are invalid. ^ONG moves the
-/// cursor to the next note. ^ONA, ^ONC and ^ONV do nothing.
+/// cursor to the next note. Other keys are not implemented.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWordStarInput::OnControlONChar(char ch)
@@ -2053,11 +2053,6 @@ void cWordStarInput::OnControlONChar(char ch)
             {
                 mEditor->GotoNextNote() ;
             }
-            break ;
-
-        case 'a' :
-        case 'c' :
-        case 'v' :
             break ;
 
         default :

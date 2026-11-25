@@ -21,6 +21,7 @@
 #include "src/input/macroscript.h"
 
 #include <cctype>
+#include <cstring>
 #include <map>
 
 #include "src/core/codepage/cp437.h"
@@ -501,6 +502,10 @@ public:
             case STATE_SUBKEY:
             {
                 mState = STATE_TOP;
+                if (mChord == 'o')
+                {
+                    return NoteKey(key, refused);
+                }
                 return true;
             }
 
@@ -609,6 +614,28 @@ private:
             }
         }
         return true;
+    }
+
+    // The key after ^ON: F, E, D and G run, any other key is refused.
+    bool NoteKey(const sKeyStroke& key, std::string& refused)
+    {
+        char c = '\0';
+        if ((key.kind == KEYSTROKE_CHAR) && (key.alt == false))
+        {
+            c = static_cast<char>(key.ch + '@');
+        }
+        else if ((key.kind == KEYSTROKE_TEXT) && (key.ctrl == false) && (key.alt == false) &&
+                 (key.utf8.size() == 1) && (static_cast<unsigned char>(key.utf8[0]) < 0x80U))
+        {
+            c = key.utf8[0];
+        }
+        c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        if ((c != '\0') && (std::strchr("fedg", c) != nullptr))
+        {
+            return true;
+        }
+        refused = "^ON" + ((c == '\0') ? KeyToKeyString(key) : ChordName('o', c).substr(2));
+        return false;
     }
 
     bool Command(eWordStarCommand command, char letter, const std::string& name, std::string& refused)
