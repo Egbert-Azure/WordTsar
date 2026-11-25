@@ -1491,6 +1491,7 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(editSettings, std::string("Column Block Mode") + SC("^KN", ""), unavailable, false);
     mMenu.AddSubMenuItem(editSettings, std::string("Column Replace") + SC("^KI", ""), unavailable, false);
     mMenu.AddSubMenuItem(editSettings, std::string("Auto Align") + SC("^OA", ""), unavailable, false);
+    mMenu.AddSubMenuItem(editSettings, LB("Closes Dialog", "Close Dialog") + SC("^O Enter", ""), unavailable, false);
 
     // ------------------------------- View -------------------------------
     int view = mMenu.AddMenu("View", 'V');
