@@ -206,6 +206,7 @@ public:
     virtual void SelectColor(void) = 0;                       // Show color selection dialog
     virtual void PageLayout(void) = 0;                        // Show page layout dialog
     virtual void PrintPreview(void) = 0;                      // Show print preview
+    virtual void Print(void) = 0;                             // Print the document (^KP)
     virtual void SpellCheckDocument(void) = 0;                // Spell check entire document
     virtual void SpellCheckWord(void) = 0;                    // Spell check word at cursor
     virtual void SpellCheckEnterWord(void) = 0;               // Spell check user-entered word

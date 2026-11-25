@@ -423,7 +423,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
         // --- Print ---
         case CTRL_P :
         {
-            mEditor->PrintPreview() ;
+            mEditor->Print() ;
             handled = true ;
             break ;
         }

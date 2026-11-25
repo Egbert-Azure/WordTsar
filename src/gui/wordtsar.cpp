@@ -1591,7 +1591,7 @@ void cWordTsar::CreateMenus(void)
     connect(SaveAction, &QAction::triggered, this, &cWordTsar::Save) ;
     connect(SaveAsAction, &QAction::triggered, this, &cWordTsar::SaveAs) ;
     connect(SaveandCloseAction, &QAction::triggered, this, &cWordTsar::SaveandClose) ;
-    connect(PrintAction, &QAction::triggered, this, &cWordTsar::PrintPreview) ;
+    connect(PrintAction, &QAction::triggered, this, &cWordTsar::Print) ;
     connect(PrintPreviewAction, &QAction::triggered, this, &cWordTsar::PrintPreview) ;
     connect(PreferencesAction, &QAction::triggered, this, [this]()
     {
@@ -2377,7 +2377,6 @@ void cWordTsar::SaveandClose(void)
 
 void cWordTsar::Print(void)
 {
-    mEditor->Save() ;
     mEditor->Print() ;
 }
 

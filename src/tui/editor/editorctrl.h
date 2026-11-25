@@ -103,7 +103,7 @@ public:
     void SelectColor(void) override;
     void PageLayout(void) override;
     void PrintPreview(void) override;
-    void Print(void);
+    void Print(void) override;
     void SpellCheckDocument(void) override;
     void SpellCheckWord(void) override;
     void SpellCheckEnterWord(void) override;

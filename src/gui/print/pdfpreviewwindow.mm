@@ -254,3 +254,33 @@ void ShowPDFPrintPreview(const std::string& pdfPath, const std::string& windowTi
         [NSApp runModalForWindow:window];
     }
 }
+
+
+/////////////////////////////////////////////////////////////////////////////
+bool PrintPDFWithDialog(const std::string& pdfPath, const std::string& jobTitle)
+{
+    @autoreleasepool
+    {
+        NSString* nsPath = [NSString stringWithUTF8String:pdfPath.c_str()];
+        PDFDocument* document = [[PDFDocument alloc] initWithURL:[NSURL fileURLWithPath:nsPath]];
+        if (!document)
+        {
+            return false;
+        }
+
+        NSPrintOperation* operation =
+            [document printOperationForPrintInfo:[NSPrintInfo sharedPrintInfo]
+                                     scalingMode:kPDFPrintPageScaleNone
+                                      autoRotate:YES];
+        if (!operation)
+        {
+            return false;
+        }
+        operation.jobTitle = [NSString stringWithUTF8String:jobTitle.c_str()];
+        operation.showsPrintPanel = YES;
+        operation.showsProgressPanel = YES;
+        [NSApp activateIgnoringOtherApps:YES];
+        [operation runOperation];
+    }
+    return true;
+}

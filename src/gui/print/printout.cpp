@@ -93,12 +93,29 @@ void cPrintout::PrintPreview(void)
 /// @return nothing
 ///
 /// @brief
-/// See the class-doc note in printout.h -- there is no separate "print
-/// without preview" path any more now that both are PDF-based; the preview
-/// window's own Print button is the print path.
+/// Generates the same PDF as PrintPreview() to a temp file and shows the
+/// macOS Print dialog for it.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cPrintout::PrintDocument(void)
 {
-    PrintPreview();
+    QString baseName = QFileInfo(mEditor->mFileName.c_str()).completeBaseName();
+    if (baseName.isEmpty())
+    {
+        baseName = "Untitled";
+    }
+    QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    QString uuid = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    QString pdfPath = QDir(tempDir).filePath(
+        QString("WordTsar-%1-print-%2.pdf").arg(baseName, uuid));
+
+    cGUIPDFPrintout pdfPrinter(mEditor);
+    if ((pdfPrinter.GeneratePDF(pdfPath.toStdString()) == false) ||
+        (PrintPDFWithDialog(pdfPath.toStdString(), baseName.toStdString()) == false))
+    {
+        QMessageBox::warning(mEditor, tr("Print"),
+            tr("Failed to generate the PDF for printing."));
+    }
+
+    QFile::remove(pdfPath);
 }

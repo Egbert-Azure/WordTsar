@@ -1891,7 +1891,7 @@ bool cWordStarInput::OnControlKChar(char ch)
             break ;
             
         case 'p' :
-            mEditor->PrintPreview() ;
+            mEditor->Print() ;
             break ;
 
         case 'u' :

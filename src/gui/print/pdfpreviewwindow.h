@@ -45,4 +45,18 @@
 /////////////////////////////////////////////////////////////////////////////
 void ShowPDFPrintPreview(const std::string& pdfPath, const std::string& windowTitle);
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  pdfPath [in] - Path to an already-generated PDF file
+/// @param  jobTitle [in] - Title of the print job
+///
+/// @return false if the PDF could not be loaded
+///
+/// @brief
+/// Shows the macOS Print dialog for the PDF at pdfPath and prints it.
+/// Blocks until the dialog is closed.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool PrintPDFWithDialog(const std::string& pdfPath, const std::string& jobTitle);
+
 #endif // GUI_PDFPREVIEWWINDOW_H

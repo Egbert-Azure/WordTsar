@@ -55,12 +55,7 @@ public:
 
     void PrintPreview(void);
 
-    // No separate "print without preview" path any more -- see
-    // KEY_MAPPING.md's [^print-deviation] footnote: the GUI's ^K,P and
-    // File > Print have only ever reached PrintPreview() in practice, and
-    // the preview window's own Print button is the sole print path now
-    // that both are PDF-based. Kept as an alias so any future caller of
-    // the historical PrintDocument() name still gets a working print path.
+    // Shows the macOS Print dialog for the same PDF PrintPreview() shows.
     void PrintDocument(void);
 
 private:
