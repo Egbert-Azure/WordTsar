@@ -3212,7 +3212,7 @@ TEST_CASE("TUI - a status message does not cross between the Opening and edit sc
 
     app.TestHandleEvent(OpeningAltText("u"));
     REQUIRE(app.TestGetMenu().IsOpen() == true);
-    app.TestHandleEvent(OpeningText("t"));
+    app.TestHandleEvent(OpeningText("c"));
     REQUIRE(StatusMessage(app) == kNotAvailable);
     REQUIRE(app.TestGetEditor()->GetDocument()->IsModified() == false);
 
@@ -3320,7 +3320,7 @@ TEST_CASE("TUI - the not-available message does not replace an error message")
             app.TestGetEditor()->SetStatusMessage(failed, false, 300, true);
             app.TestHandleEvent(OpeningAltText("u"));
             REQUIRE(app.TestGetMenu().IsOpen() == true);
-            CHECK(app.TestHandleEvent(OpeningText("t")) == true);
+            CHECK(app.TestHandleEvent(OpeningText("c")) == true);
             CHECK(StatusMessage(app) == failed);
             CHECK(app.TestGetMenu().IsOpen() == false);
             CHECK(app.TestInEditor() == true);
@@ -3350,7 +3350,7 @@ TEST_CASE("TUI - the not-available message does not replace an error message")
         app.TestGetEditor()->SetStatusMessage("Sent to x", false, 90);
         app.TestHandleEvent(OpeningAltText("u"));
         REQUIRE(app.TestGetMenu().IsOpen() == true);
-        app.TestHandleEvent(OpeningText("t"));
+        app.TestHandleEvent(OpeningText("c"));
         CHECK(StatusMessage(app) == kNotAvailable);
         CHECK(app.TestGetMenu().IsOpen() == false);
     }
@@ -3380,7 +3380,7 @@ TEST_CASE("TUI - the not-available message does not follow ^KD to the Opening sc
 
     app.TestHandleEvent(OpeningAltText("u"));
     REQUIRE(app.TestGetMenu().IsOpen() == true);
-    app.TestHandleEvent(OpeningText("t"));
+    app.TestHandleEvent(OpeningText("c"));
     REQUIRE(StatusMessage(app) == kNotAvailable);
     REQUIRE(app.TestGetEditor()->GetDocument()->IsModified() == false);
 
