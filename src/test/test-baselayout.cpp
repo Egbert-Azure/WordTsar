@@ -28,6 +28,8 @@
 #include "src/core/layout/dotcommandparser.h"
 #include "src/core/layout/layoutstate.h"
 #include "src/core/include/config.h"
+#include "src/core/utils/config.h"
+#include "src/files/wordstar/wordstarfile.h"
 #include <QApplication>
 
 // Headers / footers of every page of a layout, by page (pages without lines are left out)
@@ -14565,4 +14567,94 @@ TEST_CASE("Footnote number is laid out as superscript and keeps the line height"
     CHECK(FontUtils::FontFromDescriptor(number->font).pointSizeF() <
           FontUtils::FontFromDescriptor(plainLine->segments[0].font).pointSizeF());
     CHECK(notedLine->lineheight == plainLine->lineheight);
+}
+
+
+TEST_CASE("Footnote Font from Preferences sets the font and size of footnotes")
+{
+    ensureQApplication();
+
+    cDocument doc;
+    doc.Insert("Alpha");
+    cDocument content;
+    REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(NOTE_KIND_FOOTNOTE), content));
+    content.SetPosition(2);
+    content.Insert("a note");
+    doc.InsertNote(NOTE_KIND_FOOTNOTE, content);
+    doc.Insert("\rBeta\r");
+
+    cLayout layout;
+    layout.SetShowControl(SHOW_NONE);
+    layout.SetMarkersVisible(false);
+    layout.SetPrintLayout(true);
+    layout.LayoutDocument(&doc);
+
+    // fonts and line heights of the body lines
+    auto bodySnapshot = [&]()
+    {
+        std::vector<std::string> result;
+        for (PARAGRAPH_T para = 0; para < layout.GetNumberOfParagraphs(); para++)
+        {
+            for (const sLineLayout& line : layout.GetParagraphLayout(para)->lines)
+            {
+                result.push_back(std::to_string(line.lineheight) + " " + std::to_string(line.pagey));
+                for (const sSegmentLayout& segment : line.segments)
+                {
+                    result.push_back(segment.font);
+                }
+            }
+        }
+        return result;
+    };
+    // fonts of the footnote text, without the superscript number
+    auto noteFonts = [&]()
+    {
+        std::vector<std::string> result;
+        for (const sHeaderFooterLine& line : layout.GetPageFootnotes(1).lines)
+        {
+            for (const sSegmentLayout& segment : line.line.segments)
+            {
+                if (!segment.isSuperscript)
+                {
+                    result.push_back(segment.font);
+                }
+            }
+        }
+        return result;
+    };
+
+    std::vector<std::string> body = bodySnapshot();
+    const sLineLayout* alpha = layout.GetLineByRawLineNumber(0);
+    REQUIRE(alpha != nullptr);
+    REQUIRE(alpha->segments.empty() == false);
+    std::string bodyFont = alpha->segments.front().font;
+
+    SUBCASE("unset: the footnote is in the body font")
+    {
+        std::vector<std::string> fonts = noteFonts();
+        REQUIRE(fonts.empty() == false);
+        for (const std::string& font : fonts)
+        {
+            CHECK(font == bodyFont);
+        }
+    }
+
+    SUBCASE("set to Georgia 10 pt: the footnote is in it, the body text is not")
+    {
+        cConfig config;
+        config.mFootnoteFont = "Georgia";
+        config.mFootnoteFontSize = 10.0;
+        REQUIRE(config.GetFootnoteFontDescriptor().has_value());
+        CHECK(config.GetEndnoteFontDescriptor().has_value() == false);
+        layout.SetNoteFont(NOTE_KIND_FOOTNOTE, *config.GetFootnoteFontDescriptor());
+        layout.LayoutDocument(&doc);
+
+        std::vector<std::string> fonts = noteFonts();
+        REQUIRE(fonts.empty() == false);
+        for (const std::string& font : fonts)
+        {
+            CHECK(font.rfind("Georgia|10.0|", 0) == 0);
+        }
+        CHECK(bodySnapshot() == body);
+    }
 }
