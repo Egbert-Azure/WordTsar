@@ -680,12 +680,12 @@ const sCommandKeys COMMAND_KEYS[] =
     { WSCMD_ALT,     WSCMD_PREFIX,          "kqopm" },
     { WSCMD_ALT,     WSCMD_RUNS,            "\x15-=" },
 
-    { 'k',           WSCMD_RUNS,            "bkcvy\"'.<,h[]?udsxq" },
+    { 'k',           WSCMD_RUNS,            "bkcvy\"'.<,h[]?udsxqni" },
     { 'k',           WSCMD_RUNS,            DIGITS },
     { 'k',           WSCMD_SUBKEY,          "z" },
     { 'k',           WSCMD_FILE,            "r" },
     { 'k',           WSCMD_DIALOG,          "tpw" },
-    { 'k',           WSCMD_NOT_IMPLEMENTED, "oej\\lfmniag" },
+    { 'k',           WSCMD_NOT_IMPLEMENTED, "oej\\lfmag" },
 
     { 'o',           WSCMD_RUNS,            "dc]tjwvgeha<>=+" },
     { 'o',           WSCMD_SUBKEY,          "n" },
@@ -1884,6 +1884,14 @@ bool cWordStarInput::OnControlKChar(char ch)
 
         case 'w' :          // Write block to file (real WordStar 7 ^KW)
             mEditor->WriteBlockToFile() ;
+            break ;
+
+        case 'n' :          // column block mode
+            mEditor->ToggleColumnMode() ;
+            break ;
+
+        case 'i' :          // column replace mode
+            mEditor->ToggleColumnReplace() ;
             break ;
 
         case 'z' :          // Sort block, waits for A (ascending) or D (descending)

@@ -430,9 +430,9 @@ const sSettingName SETTING_NAMES[] =
     { "insert",      MACRO_SETTING_INSERT },
     { "cmdtags",     MACRO_SETTING_CMD_TAGS },
     { "hidedots",    MACRO_SETTING_HIDE_DOTS },
-    { "colmode",     MACRO_SETTING_IGNORED },
-    { "colreplace",  MACRO_SETTING_IGNORED },
-    { "colrepl",     MACRO_SETTING_IGNORED },
+    { "colmode",     MACRO_SETTING_COL_MODE },
+    { "colreplace",  MACRO_SETTING_COL_REPLACE },
+    { "colrepl",     MACRO_SETTING_COL_REPLACE },
     { "wsquiet",     MACRO_SETTING_IGNORED }
 };
 

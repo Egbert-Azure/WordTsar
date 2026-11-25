@@ -226,6 +226,8 @@ private:
     bool mSavedShowDot;
     int mSavedHelpLevel;
     bool mSavedPageView;
+    bool mSavedColumnMode;
+    bool mSavedColumnReplace;
 };
 
 /// @}

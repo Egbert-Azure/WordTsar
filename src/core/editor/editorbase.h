@@ -96,6 +96,28 @@ struct sFindRequest
     int scope = 0;                  // 0 next occurrence, 1 entire file (G), 2 rest of file (R)
 };
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @struct sColumnRow
+///
+/// @brief
+/// One layout line of a column block (^KN): the line's text and the part
+/// of it inside the rectangle. In a line with tabs, from..to holds whole
+/// cells plus one separator tab; contentFrom..contentTo the cells alone.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sColumnRow
+{
+    PARAGRAPH_T paragraph = 0;      // Paragraph of the line
+    POSITION_T lineStart = 0;       // First position of the line
+    POSITION_T lineEnd = 0;         // End of the line's text (a hard return is not part of it)
+    POSITION_T from = 0;            // First position in the rectangle
+    POSITION_T to = 0;              // End of the part in the rectangle
+    POSITION_T contentFrom = 0;     // from..to without the separator tab
+    POSITION_T contentTo = 0;
+    bool tabbed = false;            // The line has tabs: its cells are separated by tabs
+};
+
 std::string FindOptionLetters(const sFindRequest& request);                  // Option letters of a request
 void ApplyFindOptionLetters(const std::string& letters, sFindRequest& request);   // Set the options from letters
 
@@ -384,6 +406,18 @@ public:
     void LowerCaseBlock(void);
     void SentenceCaseBlock(void);
 
+    // Column blocks (^KN) and column replace (^KI): one setting for every
+    // editor of the session, off at start, not saved (columnblock.cpp)
+    static void SetColumnMode(bool on);
+    static bool GetColumnMode(void);
+    static void SetColumnReplace(bool on);
+    static bool GetColumnReplace(void);
+    void ToggleColumnMode(void);
+    void ToggleColumnReplace(void);
+    bool IsColumnBlock(void) const;                              // Column mode on and a block marked
+    std::vector<sColumnRow> GetColumnRows(void);                 // Rows of the marked column block, from the current layout
+    bool GetColumnLineRange(const sLineLayout& line, POSITION_T& from, POSITION_T& to);   // Part of a laid out line in the column block; false if none
+
     // Batch Update
     void BeginBatchUpdate(void);
     void EndBatchUpdate(void);
@@ -525,6 +559,20 @@ private:
 
     // Block Case Conversion
     void ConvertBlockCase(std::string (cDocument::*convert)(const std::string &)) ;
+
+    // Column blocks (columnblock.cpp)
+    struct sColumnLine ;
+    struct sColumnBounds ;
+    bool BuildColumnLine(PARAGRAPH_T para, size_t lineIndex, sColumnLine& line) ;
+    bool ColumnLineAt(POSITION_T position, sColumnLine& line, size_t& lineIndex) ;
+    bool GetColumnBounds(sColumnBounds& bounds) ;
+    void LayoutForColumns(PARAGRAPH_T lastPara) ;
+    static void ColumnRowOfLine(const sColumnLine& line, COORD_T left, COORD_T right, sColumnRow& row) ;
+    bool CollectColumnRows(std::vector<sColumnRow>& rows, bool layoutFirst, bool* badShape = nullptr) ;
+    void ColumnCopyOrMove(bool move) ;
+    void ColumnDelete(void) ;
+    void ColumnSort(bool ascending) ;
+    std::string ColumnClipboardText(void) ;
 
     // Key of the note pane, without the macro hooks of FeedKey
     bool DispatchNoteKey(const sKeyStroke& key);
@@ -673,6 +721,11 @@ protected:
 
     // Undo Grouping
     bool mTypingGroupActive;              // tracks whether we're accumulating typed characters
+
+    // Column blocks: shared by every editor
+    static bool mColumnMode;              // ^KN
+    static bool mColumnReplace;           // ^KI
+    PARAGRAPH_T mColumnLaidOut = -1;      // last paragraph LayoutForColumns has laid out in this command
 
     // Macros
     cMacroEngine* mMacro;                 // macro recorder and player (owned)

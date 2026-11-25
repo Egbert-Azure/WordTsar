@@ -3754,6 +3754,12 @@ void cEditorBase::CopyBlock(void)
         return;
     }
 
+    if (IsColumnBlock())
+    {
+        ColumnCopyOrMove(false) ;
+        return ;
+    }
+
     CloseTypingGroup() ;
 
     // wrap in undo group so the copy undoes as one step
@@ -3780,6 +3786,12 @@ void cEditorBase::MoveBlock(void)
         return;
     }
 
+    if (IsColumnBlock())
+    {
+        ColumnCopyOrMove(true) ;
+        return ;
+    }
+
     CloseTypingGroup() ;
 
     // wrap in undo group so the move undoes as one step
@@ -3804,6 +3816,12 @@ void cEditorBase::DeleteBlock(void)
     if (!mDocument)
     {
         return;
+    }
+
+    if (IsColumnBlock())
+    {
+        ColumnDelete() ;
+        return ;
     }
 
     CloseTypingGroup() ;

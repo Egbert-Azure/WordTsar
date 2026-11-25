@@ -57,7 +57,9 @@ enum eMacroSetting
     MACRO_SETTING_CMD_TAGS,
     MACRO_SETTING_HIDE_DOTS,
     MACRO_SETTING_HELP_LEVEL,   ///< WordStar 7 level 0-4
-    MACRO_SETTING_IGNORED       ///< ColMode, ColReplace, WSQuiet
+    MACRO_SETTING_COL_MODE,     ///< ColMode
+    MACRO_SETTING_COL_REPLACE,  ///< ColReplace, ColRepl
+    MACRO_SETTING_IGNORED       ///< WSQuiet
 };
 
 

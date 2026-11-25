@@ -560,6 +560,8 @@ cMacroEngine::cMacroEngine(cEditorBase& editor)
     , mSavedShowDot(true)
     , mSavedHelpLevel(0)
     , mSavedPageView(false)
+    , mSavedColumnMode(false)
+    , mSavedColumnReplace(false)
 {
 }
 
@@ -1554,6 +1556,8 @@ void cMacroEngine::SaveSettings(void)
     mSavedShowControl = static_cast<int>((mSavedPageView == true) ? mEditor.GetShowControls() : ShownControls(mEditor));
     mSavedShowDot = mEditor.GetShowDot();
     mSavedHelpLevel = mEditor.mHelpLevel;
+    mSavedColumnMode = cEditorBase::GetColumnMode();
+    mSavedColumnReplace = cEditorBase::GetColumnReplace();
 }
 
 
@@ -1563,6 +1567,8 @@ void cMacroEngine::RestoreSettings(void)
 {
     mEditor.mInsertMode = mSavedInsert;
     mEditor.mHelpLevel = mSavedHelpLevel;
+    cEditorBase::SetColumnMode(mSavedColumnMode);
+    cEditorBase::SetColumnReplace(mSavedColumnReplace);
     mEditor.SetShowDot(mSavedShowDot);
     if (mEditor.GetDisplayMode() != DISPLAY_PAGE)
     {
@@ -1590,8 +1596,8 @@ void cMacroEngine::RestoreSettings(void)
 /// shown: dot commands hidden shows nothing (SHOW_NONE), otherwise command
 /// tags show all (SHOW_ALL) or dot commands only (SHOW_DOT). In page view,
 /// HideDots(OFF) and CmdTags(ON) switch to continuous view. SetHelpLevel 0-4
-/// sets the help level 0-3. ColMode, ColReplace and WSQuiet have no
-/// WordTsar setting.
+/// sets the help level 0-3. ColMode and ColReplace set column mode and
+/// column replace. WSQuiet has no WordTsar setting.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMacroEngine::ApplySetting(const sMacroStatement& statement)
@@ -1620,6 +1626,15 @@ void cMacroEngine::ApplySetting(const sMacroStatement& statement)
 
         case MACRO_SETTING_HELP_LEVEL:
             mEditor.mHelpLevel = (statement.value > 0) ? (statement.value - 1) : 0;
+            return;
+
+        case MACRO_SETTING_COL_MODE:
+            cEditorBase::SetColumnMode(statement.value != 0);
+            mEditor.Repaint();
+            return;
+
+        case MACRO_SETTING_COL_REPLACE:
+            cEditorBase::SetColumnReplace(statement.value != 0);
             return;
 
         case MACRO_SETTING_CMD_TAGS:
