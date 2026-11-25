@@ -1631,7 +1631,7 @@ void cWSWordTsar::BuildMenus(void)
     int utilSpell = mMenu.AddSubMenu(util, "Spell Check Ot&her");
     mMenu.AddSubMenuItem(utilSpell, std::string("Rest of Document") + SC("^QL", ""), [this](void) { Active()->SpellCheckDocument(); });
     mMenu.AddSubMenuItem(utilSpell, std::string("Word") + SC("^QN", ""), [this](void) { Active()->SpellCheckWord(); });
-    mMenu.AddSubMenuItem(utilSpell, std::string("Type Word...") + SC("^QO", ""), unavailable, false);
+    mMenu.AddSubMenuItem(utilSpell, std::string("Type Word...") + SC("^QO", ""), [this](void) { InjectChord(CTRL_Q, 'o'); });
 
     mMenu.AddSubItem(util, std::string("&Thesaurus") + SC("^QJ", ""), unavailable, false);
     mMenu.AddSeparator(util);
@@ -1640,8 +1640,13 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubItem(util, std::string("Block &Math") + SC("^KM", ""), unavailable, false);
 
     int utilSort = mMenu.AddSubMenu(util, "Sort &Block");
-    mMenu.AddSubMenuItem(utilSort, std::string("Ascending") + SC("^KZA", ""), unavailable, false);
-    mMenu.AddSubMenuItem(utilSort, std::string("Descending") + SC("^KZD", ""), unavailable, false);
+    auto sortBlock = [this](char order)
+    {
+        MenuInput()->HandleKey(static_cast<char>(CTRL_K), false, false);
+        InjectChord('z', order);
+    };
+    mMenu.AddSubMenuItem(utilSort, std::string("Ascending") + SC("^KZA", ""), [sortBlock](void) { sortBlock('a'); });
+    mMenu.AddSubMenuItem(utilSort, std::string("Descending") + SC("^KZD", ""), [sortBlock](void) { sortBlock('d'); });
 
     mMenu.AddSubItem(util, std::string("&Word Count") + SC("^K?", "Alt+K, ?"), [this](void) { InjectChord(CTRL_K, '?'); });
     mMenu.AddSeparator(util);
