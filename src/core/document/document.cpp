@@ -5915,8 +5915,8 @@ POSITION_T cDocument::FindPrev(const std::string &needle, const POSITION_T &star
         }
     }
 
-    PARAGRAPH_T startpara = GetParagraphFromPosition(start);
     POSITION_T adjustedStart = (start > 0) ? start - 1 : 0;
+    PARAGRAPH_T startpara = GetParagraphFromPosition(adjustedStart);
     for (PARAGRAPH_T ploop = startpara; ploop >= 0; ploop--)
     {
         POSITION_T index = mParagraphData[ploop].index;
