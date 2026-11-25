@@ -28,6 +28,7 @@
 #include "src/core/document/document.h"
 #include "src/gui/editor/editorctrl.h"
 #include "src/files/docxfile.h"
+#include "src/files/wordstar/wordstarfile.h"
 #include <QApplication>
 #include "zip.h"
 
@@ -228,4 +229,61 @@ TEST_CASE("DOCX writer - .. comment line is preserved as hidden text, not droppe
     }
     CHECK(sawVisible) ;
     CHECK_FALSE(sawCommentText) ;
+}
+
+
+TEST_CASE("DOCX writer - italics and a footnote after a non-ASCII character land on the right text")
+{
+    ensureQApplication() ;
+    cEditorCtrl editor ;
+    cDocument *doc = editor.GetDocument() ;
+    doc->Clear() ;
+
+    doc->Insert("Rule \xC2\xA7 says ") ;
+    doc->BeginItalics() ;
+    doc->Insert("quoted") ;
+    doc->BeginItalics() ;
+    doc->Insert(" after") ;
+    cDocument content ;
+    REQUIRE(cWordstarFile::DecodeNote(cWordstarFile::NewNote(NOTE_KIND_FOOTNOTE), content)) ;
+    content.SetPosition(2) ;
+    content.Insert("Note text") ;
+    doc->InsertNote(NOTE_KIND_FOOTNOTE, content) ;
+    doc->Insert(" tail\rPlain ") ;
+    doc->BeginItalics() ;
+    doc->Insert("italic") ;
+    doc->BeginItalics() ;
+    doc->Insert(" word\r") ;
+
+    std::string path = "/tmp/wordtsar_docxtest_utf8pos.docx" ;
+    cDOCXFile writer(&editor) ;
+    REQUIRE(writer.SaveFile(path, doc->GetTextSize())) ;
+    std::string xml = ExtractDocumentXml(path) ;
+
+    pugi::xml_document parsed ;
+    REQUIRE(parsed.load_string(xml.c_str())) ;
+    std::string italic ;
+    std::string upright ;
+    int references = 0 ;
+    for (pugi::xpath_node node : parsed.select_nodes("//w:r"))
+    {
+        pugi::xml_node run = node.node() ;
+        if (run.child("w:footnoteReference"))
+        {
+            references++ ;
+        }
+        std::string text = run.child("w:t").text().get() ;
+        if (run.child("w:rPr").child("w:i"))
+        {
+            italic += text ;
+        }
+        else
+        {
+            upright += text ;
+        }
+    }
+    CHECK(italic == "quoteditalic") ;
+    CHECK(upright.find("after") != std::string::npos) ;
+    CHECK(upright.find("word") != std::string::npos) ;
+    CHECK(references == 1) ;
 }
