@@ -46,6 +46,7 @@ Both apps -- the terminal `ws` and the GUI `WordTsar` -- support both modes inde
   - [Special / Navigation Keys](#special--navigation-keys)
   - [^M Chord -- Macros and Insertion](#m-chord----macros-and-insertion)
   - [^K Chord -- Block and File](#k-chord----block-and-file)
+  - [Column Blocks](#column-blocks)
   - [^O Chord -- Onscreen Format](#o-chord----onscreen-format)
   - [^Q Chord -- Quick Functions](#q-chord----quick-functions)
   - [^P Chord -- Print Controls and Styles](#p-chord----print-controls-and-styles)
@@ -190,6 +191,8 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | ' | ^K,' | Alt+K,' | Convert block to lowercase |
 | . | ^K,. | Alt+K,. | Convert block to sentence case |
 | Z,A / Z,D | ^K,Z,A / ^K,Z,D | -- | Sort block ascending/descending (WS only) |
+| N | ^K,N | -- | Column block mode on or off (WS only). See Column Blocks |
+| I | ^K,I | -- | Column replace mode on or off (WS only). See Column Blocks |
 | ? | ^K,? | Alt+K,? | Word/character count for block |
 | 0-9 | ^K,0-9 | Alt+K,0-9 | Save cursor position to marker |
 | R | ^K,R | -- | Insert file at cursor (WS only) |
@@ -428,8 +431,8 @@ yet done.
 | -- Convert Note | ^ONV | -- | Reports not implemented | Greyed |
 | -- Endnote Location | .pe | -- | Insert a .pe line | Enabled |
 | **Editing Settings submenu** | | | | |
-| -- Column Block Mode | ^KN | -- | Reports not implemented | Greyed |
-| -- Column Replace Mode | ^KI | -- | Reports not implemented | Greyed |
+| -- Column Block Mode | ^KN | -- | Turn column mode on or off. The GUI item has a check mark when it is on. The ws item has a bullet before the title when it is on | Enabled |
+| -- Column Replace Mode | ^KI | -- | Turn column replace on or off. The GUI item has a check mark when it is on. The ws item has a bullet before the title when it is on | Enabled |
 | -- Auto Align | ^OA | -- | The key says "Auto-align is always on" | Greyed |
 | -- Closes Dialog | ^O Enter | -- | WordStar 7 lets Enter close a dialog. The key reports an invalid command | Greyed |
 
@@ -792,10 +795,24 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^KF | Run DOS command | Reports not implemented | No |
 | ^KM | Block math | Reports not implemented | No |
 | ^KZ | Sort block | Sort block, ascending (^KZA) or descending (^KZD) | Yes |
-| ^KN | Column mode on | Reports not implemented | No |
-| ^KI | Column replace on | Reports not implemented | No |
+| ^KN | Column mode on/off | Turns column mode on or off. See Column Blocks below. Not done: ^KR as a column, a rectangle marked with the mouse, and ^KW, ^K" ^K' ^K. and ^K? on a column block | Partly |
+| ^KI | Column replace on/off | Turns column replace on or off. It only matters while column mode is on. See Column Blocks below | Partly |
 | ^KA | Copy between windows | Reports not implemented | No |
 | ^KG | Move between windows | Reports not implemented | No |
+
+### Column Blocks
+
+^KN turns column mode on. The block is then the rectangle between the ^KB and ^KK markers, not the text between them. The status line shows Column.
+
+With column mode on, ^KC, ^KV, ^KY, ^K] and ^KZ work on the rectangle. Each of ^KC, ^KV and ^KY is one undo step and marks the result as the block. ^K] copies the rows as plain lines. ^KZ sorts the whole lines of the rows by their part in the rectangle.
+
+Dot command lines are never changed or copied by a column command. In a line with tabs, the rectangle takes whole cells and one separator tab, so tab tables keep their columns. A line without tabs is cut at character positions.
+
+^KI turns column replace on. The status line shows Column-Repl. A copy then overwrites the text at the cursor, and a move or delete leaves a hole at the source. With it off, a copy pushes the text at the cursor to the right, and a move or delete closes the gap.
+
+Both modes are off at start, are one setting for every window, and are not saved. The macro settings ColMode and ColReplace (also written ColRepl) turn them on or off, and AutoRestore puts them back when the macro ends.
+
+Not done: ^KR as a column, a rectangle marked with the mouse, and ^KW, the case commands and word count on a column block. They use the marked text, not the rectangle.
 
 ### ^O Chord -- Onscreen Format
 
