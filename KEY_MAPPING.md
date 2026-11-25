@@ -84,7 +84,7 @@ Every Ctrl+letter key has a different meaning in WordStar vs Modern mode.
 | Ctrl+M | Macro/Insert prefix (chord) | -- |
 | Ctrl+N | Line break (Enter) | **New** document |
 | Ctrl+O | Format prefix (chord) | **Open** file |
-| Ctrl+P | Style prefix (chord) | **Print** preview |
+| Ctrl+P | Style prefix (chord) | **Print** |
 | Ctrl+Q | Quick nav prefix (chord) | -- |
 | Ctrl+R | Page up | **Right** align paragraph |
 | Ctrl+S | Cursor left | **Save** file |
@@ -202,7 +202,7 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | D | ^K,D | -- | Save and Close (WS only) |
 | X | ^K,X | -- | Save file then quit (WS only) |
 | Q | ^K,Q | -- | Abandon without saving (WS only) |
-| P | ^K,P | -- | Print preview (WS only) |
+| P | ^K,P | -- | Print the document (WS only) |
 
 ### Q Chord -- Quick Navigation and Deletion
 
@@ -225,7 +225,7 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | V | ^Q,V | Alt+Q,V | Go to last find/replace location |
 | = | ^Q,= | Alt+Q,= | Jump to font tag |
 | U | ^Q,U | Alt+Q,U | Force re-layout document |
-| L | ^Q,L | -- | Spell check entire document (WS only) |
+| L | ^Q,L | -- | Spell check from the cursor to the end of the document (WS only) |
 | N | ^Q,N | -- | Spell check current word (WS only) |
 | O | ^Q,O | -- | Add word to dictionary (WS only) |
 | J | ^Q,J | -- | Look up synonyms for word at cursor (WS only) |
@@ -365,23 +365,17 @@ A greyed item whose key is implemented, or an enabled item whose key is not, is 
 | Save As | ^KT | Ctrl+Shift+S | Save with new name | Enabled |
 | Save and Close | ^KD | -- | Save and close. The text interface returns to the Opening screen; the graphical interface clears to a new, unnamed document | Enabled |
 | Recent Files | -- | -- | List of recently opened files (a submenu in the GUI, a dialog in ws) | Enabled |
-| Print | ^KP | Ctrl+P | Opens print preview [^print-deviation] | Enabled |
+| Print | ^KP | Ctrl+P | Print the document [^print-deviation] | Enabled |
 | Print Preview | ^OP | -- | Print preview | Enabled |
 | Preferences | -- | -- | System Preferences dialog. The GUI shows Cmd+, | Enabled |
 | Exit WordTsar | ^KX | Cmd+Q (GUI), Alt+F4 (ws) | Quit application | Enabled |
 
-[^print-deviation]: Real WordStar's ^KP prints directly, without a preview
-step -- that's what `cEditorCtrl::Print()` / `cWSEditorCtrl::Print()`
-implement in the GUI and TUI backends respectively (system print dialog on
-GUI; CUPS `lp` in the TUI).
-Currently, though, neither the ^K,P keystroke nor the GUI's File > Print menu
-item reaches that code path -- both are wired to Print Preview instead (a
-`QPrintPreviewDialog`, which does have its own Print button, so printing is
-still reachable, just always via preview first). The TUI's own File > Print
-**menu item** (mouse-selected, not the ^K,P keystroke) is the one place that
-still calls direct Print. This is a known deviation from the WordStar 7 spec
-and from wordtsar.ca's documented ^KP, tracked as a bug to fix in code, not
-yet done.
+[^print-deviation]: ^KP, File > Print and Modern Ctrl+P print the document
+without a preview, as in WordStar 7. File > Print does not save the document
+first. In the GUI they make the PDF and show the macOS Print dialog. In ws
+they run the same code as File > Print: the PDF goes to the default printer
+with CUPS `lp`, or the printer is chosen from a list. ^OP and File > Print
+Preview open the print preview.
 
 ### Edit Menu
 
@@ -473,7 +467,7 @@ yet done.
 | -- Annotation | ^ONA | -- | Reports not implemented | Greyed |
 | **Index/TOC Entry submenu** | | | | |
 | -- TOC Entry | .tc | -- | Ask for the text, insert a .tc line | Enabled |
-| -- Index Entry | ^ONI | -- | Ask for the text, insert an .ix line | Enabled. The key ^ONI reports not implemented |
+| -- Index Entry | ^ONI | -- | Ask for the text, insert an .ix line. The key is invalid in a note editor | Enabled |
 | -- Mark for Index | ^PK | Alt+P,K | Insert an index mark | Enabled |
 | -- Dot Leader to Tab | ^P. | -- | Reports not implemented | Greyed |
 | Par. Outline Number (ws: Outline Number) | ^OZ | -- | Reports not implemented | Greyed |
@@ -530,21 +524,21 @@ yet done.
 | -- Optional Hyphen | ^OE | -- | Insert a soft hyphen | Enabled |
 | -- Vertically Center Text on Page | ^OV | -- | Center text vertically on the page | Enabled |
 | -- Keep Word Together on Line | ^PO | -- | Reports not implemented | Greyed |
-| -- Keep Lines Together on Page | .cp | -- | Insert a .cp line | Greyed in the GUI, enabled in ws |
+| -- Keep Lines Together on Page | .cp | -- | Ask for the number of lines, insert a .cp n line. Nothing is inserted for Cancel or a number that is not a positive whole number | Enabled |
 | -- Keep Lines Together on Column | .cc | -- | Insert a .cc line | Greyed |
 
-In Modern mode the GUI labels Center Line "Center Paragraph Ctrl+E" and Right Align Line "Right Align Paragraph Ctrl+R", but the items still run the center-line and right-line commands. ws shows Alt+O,C and Alt+O,] for them.
+In Modern mode Center Line and Right Align Line show Alt+O,C and Alt+O,] in both apps.
 
 ### Utilities Menu
 
 | Item | WordStar Shortcut | Modern Shortcut | Action | State |
 |------|------------------|----------------|--------|-------|
-| Spell Check Global | ^QR ^QL (GUI label), ^QL (ws label) | -- | Spell check entire document. The GUI item moves to the document start first | Enabled |
+| Spell Check Global | ^QL | -- | Spell check from the cursor to the end of the document. The item sends ^QL | Enabled |
 | **Spell Check Other submenu** | | | | |
-| -- Rest of Document | ^QL | -- | Spell check from cursor | Enabled |
+| -- Rest of Document | ^QL | -- | Spell check from the cursor to the end of the document. The item sends ^QL | Enabled |
 | -- Word | ^QN | -- | Check current word | Enabled |
 | -- Type Word | ^QO | -- | Enter word for dictionary | Enabled |
-| Thesaurus | ^QJ | -- | Look up synonyms for the word at the cursor | Enabled in the GUI, greyed in ws. The key ^QJ works in both |
+| Thesaurus | ^QJ | -- | Look up synonyms for the word at the cursor | Enabled |
 | Inset | ^P& | -- | Reports not implemented | Greyed |
 | Calculator | ^QM | -- | Reports not implemented | Greyed |
 | Block Math | ^KM | -- | Reports not implemented | Greyed |
@@ -584,10 +578,7 @@ Contextual per-command help is `F1` (WordStar mode only), matching real WordStar
 
 ### Known menu and key mismatches
 
-- Thesaurus: the ws menu item is greyed, but ^QJ works.
-- Index Entry: the menu item is enabled in both apps, but ^ONI reports not implemented.
-- Keep Lines Together on Page: enabled in ws, greyed in the GUI.
-- Modern mode, GUI: the Center Line and Right Align Line items carry the paragraph labels and shortcuts, as noted under the Layout menu.
+- Generate Table of Contents and Generate Index: in the GUI Utilities menu, not in the ws Utilities menu. ws runs them from the Opening screen.
 
 ---
 
@@ -786,7 +777,7 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^KD | Save and Close | Save file and close it. The text interface returns to the Opening screen; the graphical interface clears to a new, unnamed document | Yes |
 | ^KX | Save and exit | Save file and exit | Yes |
 | ^KQ | Abandon file | Abandon changes and close | Yes |
-| ^KP | Print preview | Print preview | Yes |
+| ^KP | Print | Print the document | Yes |
 | ^KO | Copy file | Reports not implemented | No |
 | ^KE | Rename file | Reports not implemented | No |
 | ^KJ | Delete file | Reports not implemented | No |
@@ -851,7 +842,7 @@ Not done: ^KR as a column, a rectangle marked with the mouse, and ^KW, the case 
 | ^OM | Size window | Reports not implemented | No |
 | ^OZ | Paragraph number | Reports not implemented | No |
 | ^O# | Page numbering | Reports not implemented | No |
-| ^ON | Notes | Waits for a note key: F new footnote, E new endnote, D edit the note at the cursor, G go to the next note. A, C, V, I, U and the other note keys report not implemented | Partly |
+| ^ON | Notes | Waits for a note key: F new footnote, E new endnote, D edit the note at the cursor, G go to the next note, I ask for an index entry and insert an .ix line. A, C, V, U and the other note keys report not implemented | Partly |
 
 ### ^Q Chord -- Quick Functions
 
@@ -874,7 +865,7 @@ Not done: ^KR as a column, a rectangle marked with the mouse, and ^KW, the case 
 | ^QH | Goto character backward | Go to character (backward) | Yes |
 | ^QI | Goto page | Go to page number | Yes |
 | ^QU | Reformat document | Reformat entire document | Yes |
-| ^QL | Spell check document | Spell check document | Yes |
+| ^QL | Spell check document | Spell check from the cursor to the end of the document | Yes |
 | ^QN | Spell check word | Spell check word at cursor | Yes |
 | ^QO | Add word to dictionary | Add word to spell dictionary | Yes |
 | ^Q0-9 | Goto marker 0-9 | Go to position marker 0-9 | Yes |
@@ -884,7 +875,7 @@ Not done: ^KR as a column, a rectangle marked with the mouse, and ^KW, the case 
 | ^QT | Delete to character | Delete to specified character | Yes |
 | ^Q< | Next style | Reports not implemented | No |
 | ^QM | Math | Reports not implemented | No |
-| ^QJ | Thesaurus | Look up synonyms for word at cursor. The ws Utilities > Thesaurus menu item is greyed | Yes |
+| ^QJ | Thesaurus | Look up synonyms for word at cursor | Yes |
 | ^QW | Scroll up repeat | Reports not implemented | No |
 | ^QZ | Scroll down repeat | Reports not implemented | No |
 
@@ -948,7 +939,7 @@ Every key recognized by the Modern (CUA) input handler. Modern mode uses standar
 | Ctrl+M | -- | -- | -- |
 | Ctrl+N | New document | New document | Yes |
 | Ctrl+O | Open file | Open file | Yes |
-| Ctrl+P | Print preview | Print preview | Yes |
+| Ctrl+P | Print | Print the document | Yes |
 | Ctrl+Q | -- | -- | -- |
 | Ctrl+R | Right align paragraph | Right align paragraph (bracketed) | Yes |
 | Ctrl+S | Save | Save file | Yes |
