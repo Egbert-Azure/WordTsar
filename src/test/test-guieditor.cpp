@@ -4057,15 +4057,13 @@ TEST_CASE("P1: Replace - Single replacement")
     SUBCASE("Replace from start position")
     {
         // "Hello World Hello"
-        // Searching from position 0 searches from position+1=1
-        // Skips "Hello" at 0, finds "Hello" at 12, replaces with "Hi"
+        // Replace searches from the cursor, so the "Hello" at 0 is replaced
         doc->SetPosition(0);
         editor.Replace();
 
-        // Should have replaced SECOND "Hello" with "Hi"
         std::string text = doc->GetText();
-        CHECK(text.find("Hello World Hi") != std::string::npos);
-        CHECK(doc->GetPosition() == 14);  // After replacement at position 12
+        CHECK(text.find("Hi World Hello") == 0);
+        CHECK(doc->GetPosition() == 2);  // After replacement at position 0
     }
 
     SUBCASE("Replace saves starting position")
