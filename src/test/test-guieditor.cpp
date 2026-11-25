@@ -3993,6 +3993,47 @@ TEST_CASE("P1: Find - Saves position and calls FindAgain")
 }
 
 
+TEST_CASE("Find starts at the cursor and G searches the whole document")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+
+    // "technofeudalism" starts at 6
+    doc->Insert("alpha technofeudalism omega");
+
+    editor.mSearchText = "technofeudalism";
+    editor.mSearchBackwards = false;
+    editor.mCaseCmp = false;
+    editor.mWildCard = false;
+    editor.mWholeWord = false;
+    editor.mWholeFile = false;
+
+    SUBCASE("Find finds a match at the cursor and FindAgain does not repeat it")
+    {
+        doc->SetPosition(6);
+        editor.Find();
+        CHECK(doc->GetPosition() == 6);
+        CHECK(editor.mSearchBlockSet == true);
+
+        editor.FindAgain();
+        CHECK(doc->GetPosition() == 6);
+    }
+
+    SUBCASE("Find with G finds a match before the cursor")
+    {
+        doc->SetPosition(22);
+        editor.mWholeFile = true;
+        editor.Find();
+        CHECK(doc->GetPosition() == 6);
+
+        editor.FindAgain();
+        CHECK(doc->GetPosition() == 6);
+    }
+}
+
+
 TEST_CASE("P1: Replace - Single replacement")
 {
     ensureQApplication();
