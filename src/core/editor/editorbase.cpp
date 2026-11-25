@@ -2596,6 +2596,28 @@ void cEditorBase::IndexEntry(void)
 /// @return nothing
 ///
 /// @brief
+/// Prompts for the number of lines to keep together on a page and inserts
+/// ".cp <n>" as its own line. Cancel, or anything but a positive whole
+/// number, inserts nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::KeepLinesTogetherPage(void)
+{
+    std::string count = PromptText("Keep Lines Together on Page", "Number of lines to keep together:");
+    if ((count.empty() == true) || (count.find_first_not_of("0123456789") != std::string::npos) ||
+        (count.find_first_not_of('0') == std::string::npos))
+    {
+        return;
+    }
+    InsertDotCommandEntry(".cp", count);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
 /// Move caret to the end of the current line (End key in WordStar).
 ///
 /////////////////////////////////////////////////////////////////////////////

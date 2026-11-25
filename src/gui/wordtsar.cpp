@@ -2088,7 +2088,6 @@ OverprintLineAction->setEnabled(false) ;
     QAction *KeepWordsTogetherAction = new QAction(mMenuProvider->GetLayoutKeepWordsTogetherLabel(), mMenuBar) ;
 KeepWordsTogetherAction->setEnabled(false) ;
     QAction *KeepLinesTogetherPageAction = new QAction(mMenuProvider->GetLayoutKeepLinesTogetherPageLabel(), mMenuBar) ;
-KeepLinesTogetherPageAction->setEnabled(false) ;
     QAction *KeepLinesTogetherColumnAction = new QAction(mMenuProvider->GetLayoutKeepLinesTogetherColumnLabel(), mMenuBar) ;
 KeepLinesTogetherColumnAction->setEnabled(false) ;
 
@@ -3616,10 +3615,7 @@ void cWordTsar::KeepWordsTogether(void)
 
 void cWordTsar::KeepLinesTogetherPage(void)
 {
-    Active()->MoveCursorStartLine() ;
-
-    Active()->GetDocument()->MaybeInsertHardReturn() ;
-    Active()->GetDocument()->Insert(".cp\n") ;
+    Active()->KeepLinesTogetherPage() ;
 }
 
 

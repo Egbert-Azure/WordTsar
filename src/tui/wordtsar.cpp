@@ -1622,11 +1622,7 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Optional Hyphen") + SC("^OE", ""), [this](void) { InjectChord(CTRL_O, 'e'); });
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Vertically Center") + SC("^OV", ""), [this](void) { InjectChord(CTRL_O, 'v'); });
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Word Together") + SC("^PO", ""), unavailable, false);
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Page") + SC(".cp", ""), [this](void) {
-        Active()->MoveCursorStartLine();
-        Active()->GetDocument()->MaybeInsertHardReturn();
-        Active()->GetDocument()->Insert(".cp\n");
-    });
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Page") + SC(".cp", ""), [this](void) { Active()->KeepLinesTogetherPage(); });
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Column") + SC(".cc", ""), unavailable, false);
 
     // ----------------------------- Utilities ----------------------------

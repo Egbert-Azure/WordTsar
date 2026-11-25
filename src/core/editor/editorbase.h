@@ -367,6 +367,7 @@ public:
     void MoveCursorEndLine(void);
     void InsertDotCommandEntry(const std::string &dotPrefix, const std::string &text);
     void IndexEntry(void);                                    // Prompt for an index entry, insert .ix (^ONI)
+    void KeepLinesTogetherPage(void);                         // Prompt for a line count, insert .cp n
     void GotoPreviousPosition(void);
     void GotoLastFindandReplace(void);
     void GotoFontTag(void);
