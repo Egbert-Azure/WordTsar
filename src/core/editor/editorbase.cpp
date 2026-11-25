@@ -6298,6 +6298,8 @@ void cEditorBase::GetStatus(sStatus& status)
 
     // Editor mode
     status.mode = mInsertMode;
+    status.columnMode = mColumnMode;
+    status.columnReplace = mColumnReplace;
     // Command-tags/show-control indicator: on when formatting marks are fully
     // revealed (^OD -> SHOW_ALL). Drives the GUI and wstui top-status "*".
     status.showcontrol = (mLayout != nullptr) && (mLayout->GetShowControl() == SHOW_ALL);

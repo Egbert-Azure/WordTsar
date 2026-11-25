@@ -3535,13 +3535,15 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
 
     // Right: markers, mode, block, position, counts.
     std::string mode = (status.mode == true) ? "Insert" : "Overwrite";
+    std::string columns = std::string((status.columnMode == true) ? " Column" : "") +
+                          ((status.columnReplace == true) ? " Column-Repl" : "");
     std::string block = (status.blockSet == true) ? "<B><K>" : "      ";
     std::string suffix = status.measureSuffix;
 
     char buffer[256];
     std::snprintf(buffer, sizeof(buffer),
-                  "%s %s %s  P%ld/%ld  L%ld V%.2f%s  C%ld H%.2f%s  W:%ld Ch:%ld ",
-                  status.markers.c_str(), mode.c_str(), block.c_str(),
+                  "%s %s%s %s  P%ld/%ld  L%ld V%.2f%s  C%ld H%.2f%s  W:%ld Ch:%ld ",
+                  status.markers.c_str(), mode.c_str(), columns.c_str(), block.c_str(),
                   status.page, status.pagecount,
                   status.line, status.vPosition, suffix.c_str(),
                   status.column, status.hPosition, suffix.c_str(),
@@ -3556,7 +3558,7 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
     screen.PutText(row, col, right, style);
 
     // Record clickable field ranges (absolute columns) matching the format
-    // string above: "<markers> <mode> <block>  P<page>/<count> ...". The mode
+    // string above: "<markers> <mode><columns> <block>  P<page>/<count> ...". The mode
     // field toggles Insert/Overwrite; the page field opens Go To Page.
     char pageBuffer[64];
     int pageLen = std::snprintf(pageBuffer, sizeof(pageBuffer), "P%ld/%ld",
@@ -3564,7 +3566,7 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
     int modeOffset = static_cast<int>(status.markers.size()) + 1;
     mModeClickStart = col + modeOffset;
     mModeClickEnd = mModeClickStart + static_cast<int>(mode.size());
-    int pageOffset = modeOffset + static_cast<int>(mode.size()) + 1
+    int pageOffset = modeOffset + static_cast<int>(mode.size()) + static_cast<int>(columns.size()) + 1
                      + static_cast<int>(block.size()) + 2;
     mPageClickStart = col + pageOffset;
     mPageClickEnd = mPageClickStart + pageLen;

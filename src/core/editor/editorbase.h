@@ -69,6 +69,8 @@ struct sStatus
     double hPosition;               // Horizontal position in user measurement units
     std::string measureSuffix;      // Measurement suffix: "\"", " cm", " mm"
     bool blockSet;                  // Whether a block selection is active
+    bool columnMode;                // Column blocks on (^KN)
+    bool columnReplace;             // Column replace on (^KI)
     bool backgroundBusy;            // Whether background layout is in progress
     std::string markers;            // Active place markers (e.g. "150" if markers 1, 5, 0 are set)
     std::string macroState;         // "Recording", "Type, then press Enter" (macro pause) or empty

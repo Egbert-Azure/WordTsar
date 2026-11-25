@@ -1239,6 +1239,19 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
         POSITION_T paraStart = line->documentPosition - line->linestart;
         sStyle markerStyle = StyleFor(mEditor->mHighlightFgColour, mEditor->mHighlightColour, wordstartui::CELL_ATTR_NONE);
 
+        // A column block marks the line's part in the rectangle, not segments
+        bool columnBlock = mEditor->IsColumnBlock();
+        POSITION_T columnFrom = 0;
+        POSITION_T columnTo = 0;
+        if ((columnBlock == true) && (mEditor->GetColumnLineRange(*line, columnFrom, columnTo) == false))
+        {
+            columnFrom = columnTo = 0;
+        }
+        auto inColumn = [&](POSITION_T position)
+        {
+            return (position >= columnFrom) && (position < columnTo);
+        };
+
         // Paint inline block / place marker cells, advancing col
         auto drawMarkers = [&](const sSegmentLayout& markerSeg, size_t index)
         {
@@ -1266,8 +1279,9 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
 
             sColor segFg = mEditor->mTextColour;
             sColor segBg = mEditor->mBGroundColour;
+            bool segBlock = (columnBlock == false) && (seg.isBlock == true);
 
-            if (seg.isBlock == true)
+            if ((segBlock == true) || (inColumn(docPos) == true && seg.isTab == true))
             {
                 segFg = mEditor->mBlockFgColour;
                 segBg = mEditor->mBlockColour;
@@ -1421,7 +1435,12 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
                 // marked block (block wins) and the control-code highlight.
                 sColor gFg = segFg;
                 sColor gBg = segBg;
-                if ((isSearch == true) && (seg.isBlock == false))
+                if (inColumn(docPos) == true)
+                {
+                    gFg = mEditor->mBlockFgColour;
+                    gBg = mEditor->mBlockColour;
+                }
+                else if ((isSearch == true) && (segBlock == false))
                 {
                     gFg = mEditor->mSearchFgColour;
                     gBg = mEditor->mSearchColour;

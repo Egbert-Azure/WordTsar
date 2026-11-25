@@ -821,9 +821,11 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
 
     // Build WordStar-style status line in 3 parts (mode, page, info)
     // Split into separate labels so mode and page are clickable
-    std::string modeStr = string_sprintf("%s%s%s",
+    std::string modeStr = string_sprintf("%s%s%s%s%s",
                          placeMarkers.c_str(),
                          (cstatus.mode ? "Insert" : "Overwrite"),
+                         (cstatus.columnMode ? " Column" : ""),
+                         (cstatus.columnReplace ? " Column-Repl" : ""),
                          blockMarkers.c_str()) ;
 
     std::string pageStr = string_sprintf("  Page %ld of %ld",

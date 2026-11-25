@@ -4546,6 +4546,38 @@ QPainterPath cEditorCtrl::BuildBlockPolygon(void)
         return path;
     }
 
+    // A column block: one rectangle per visible line, over the line's part
+    // in the rectangle
+    if (IsColumnBlock())
+    {
+        COORD_T viewportTop = mScrollOffset;
+        COORD_T viewportBottom = mScrollOffset + GetViewportHeight();
+        PARAGRAPH_T startPara = (mVisibleStart > 0) ? mVisibleStart - 1 : 0;
+        PARAGRAPH_T endPara = std::min(GetLastVisibleParagraph() + 1, mLayout->GetNumberOfParagraphs());
+
+        for (PARAGRAPH_T paraNum = startPara; paraNum < endPara; paraNum++)
+        {
+            const sParagraphLayout* paragraph = mLayout->GetParagraphLayout(paraNum);
+            if (!paragraph)
+            {
+                continue;
+            }
+            for (const sLineLayout& line : paragraph->lines)
+            {
+                POSITION_T from = 0, to = 0;
+                if (line.screeny < viewportTop || line.screeny > viewportBottom ||
+                    !GetColumnLineRange(line, from, to))
+                {
+                    continue;
+                }
+                COORD_T startX = mLayout->FindCoordInLine(from, line.rawLineNumber);
+                COORD_T endX = mLayout->FindCoordInLine(to, line.rawLineNumber);
+                path.addRect(QRectF(startX, ScreenYToViewportY(&line), endX - startX, line.lineheight));
+            }
+        }
+        return path;
+    }
+
     // Get margins (left margin is the box left edge, right margin is box right)
     COORD_T mLeftMargin = mLayout->GetBoxLeft();
     COORD_T mRightMargin = mLayout->GetBoxRight();
