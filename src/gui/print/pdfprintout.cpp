@@ -419,13 +419,9 @@ void cGUIPDFPrintout::RenderSegment(CGContextRef ctx, const sSegmentLayout& segm
             if ((controlType == STYLE_FOOTNOTE || controlType == STYLE_ENDNOTE) &&
                 mLayout->GetNoteMarkerText(docPos, label))
             {
-                // Note reference: the label, superscript
-                double noteX = TwipsToPoints(lineX + static_cast<COORD_T>(segment.position[i]));
-                double noteY = pageHeightPt - TwipsToPoints(lineY + lineHeight - mLayout->GetSubSuperRoll());
-                DrawGrapheme(ctx, ctFont, segment.textcolor, label, noteX, noteY);
-                continue;
+                displayGrapheme = label;
             }
-            if (controlType == STYLE_VARIABLE)
+            else if (controlType == STYLE_VARIABLE)
             {
                 eVariableType varType = mDocument->GetVariable(docPos);
                 displayGrapheme = mLayout->GetVariableExpansion(varType);
