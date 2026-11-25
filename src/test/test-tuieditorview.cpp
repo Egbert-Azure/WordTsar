@@ -1077,6 +1077,66 @@ TEST_CASE("cWSEditorCtrl - spell check Replace with a suggestion that ends in th
 }
 
 
+namespace
+{
+
+// Counts which print command a key reaches.
+class cPrintCountEditor : public cWSEditorCtrl
+{
+public:
+    void Print(void)
+    {
+        mPrints = mPrints + 1;
+    }
+
+    void PrintPreview(void)
+    {
+        mPreviews = mPreviews + 1;
+    }
+
+    int mPrints = 0;
+    int mPreviews = 0;
+};
+
+}
+
+
+TEST_CASE("cWSEditorCtrl - ^KP prints and ^QL spell checks from the cursor's paragraph")
+{
+    cPrintCountEditor printer;
+    printer.SetInputMode(INPUT_WORDSTAR);
+    printer.mInput->HandleKey(CTRL_K, false);
+    printer.mInput->HandleKey('p', false);
+    CHECK(printer.mPrints == 1);
+    CHECK(printer.mPreviews == 0);
+
+    const std::string language = "en_US";
+    cSpellChecker checker(language);
+    REQUIRE(checker.CheckWord("recieve") == false);
+    REQUIRE(checker.suggestions("recieve").empty() == false);
+
+    cWSEditorCtrl editor;
+    cSpellScriptHost host;
+    editor.SetDialogHost(&host);
+    editor.SetInputMode(INPUT_WORDSTAR);
+    editor.mSpellCheckLanguage = language;
+    cDocument* doc = editor.GetDocument();
+    doc->Insert("recieve\rrecieve\r");
+    editor.LayoutDocument(true);
+    POSITION_T secondStart = 0;
+    POSITION_T secondEnd = 0;
+    doc->GetParagraphStartandEnd(1, secondStart, secondEnd);
+    doc->SetPosition(secondStart + 1);
+
+    host.QueueText("1");
+    editor.mInput->HandleKey(CTRL_Q, false);
+    editor.mInput->HandleKey('l', false);
+
+    CHECK(doc->GetParagraphText(0) == "recieve\r");
+    CHECK(doc->GetParagraphText(1) != "recieve\r");
+}
+
+
 TEST_CASE("cWSEditorCtrl - a tab inserted as text is stored as the Tab key stores it")
 {
     std::string pattern =
