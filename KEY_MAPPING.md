@@ -34,6 +34,7 @@ Both apps -- the terminal `ws` and the GUI `WordTsar` -- support both modes inde
   - [Layout Menu](#layout-menu)
   - [Utilities Menu](#utilities-menu)
   - [Help Menu](#help-menu)
+  - [Known menu and key mismatches](#known-menu-and-key-mismatches)
 - [Detailed Binding Reference](#detailed-binding-reference)
   - [How Modern Mode Works](#how-modern-mode-works)
   - [Input Mode Switching](#input-mode-switching)
@@ -86,7 +87,7 @@ Every Ctrl+letter key has a different meaning in WordStar vs Modern mode.
 | Ctrl+Q | Quick nav prefix (chord) | -- |
 | Ctrl+R | Page up | **Right** align paragraph |
 | Ctrl+S | Cursor left | **Save** file |
-| Ctrl+T | Delete word right | -- |
+| Ctrl+T | Delete word right | Insert tab |
 | Ctrl+U | Undo | **Underline** toggle |
 | Ctrl+V | Toggle insert/overwrite | **Paste** from clipboard |
 | Ctrl+W | Scroll up | Close (**Window**) |
@@ -240,10 +241,10 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | ] | ^O,] | Alt+O,] | Insert right-aligned tab stop |
 | T | ^O,T | Alt+O,T | Toggle page/continuous mode (GUI); center view (TUI) |
 | J | ^O,J | Alt+O,J | Toggle justification on/off |
-| < | ^O,< | Alt+O,< | Left align paragraph (bracketed) |
-| > | ^O,> | Alt+O,> | Right align paragraph (bracketed) |
-| = | ^O,= | Alt+O,= | Center paragraph (bracketed) |
-| + | ^O,+ | Alt+O,+ | Justify paragraph (bracketed) |
+| < | ^O,< | -- | Left align paragraph (bracketed) (WS only; Modern uses Ctrl+L) |
+| > | ^O,> | -- | Right align paragraph (bracketed) (WS only; Modern uses Ctrl+R) |
+| = | ^O,= | -- | Center paragraph (bracketed) (WS only; Modern uses Ctrl+E) |
+| + | ^O,+ | -- | Justify paragraph (bracketed) (WS only; Modern uses Ctrl+J) |
 | G | ^O,G | -- | Temporary indent (WS only) |
 | Y | ^O,Y | Alt+O,Y | Open page layout dialog |
 | P | ^O,P | -- | Print preview (WS only) |
@@ -251,6 +252,10 @@ In WordStar mode, chords use Ctrl-prefix (e.g., ^K,B). In Modern mode, the same 
 | B | ^O,B | -- | Screen Settings dialog (WS only) |
 | E | ^O,E | -- | Insert soft hyphen (WS only) |
 | H | ^O,H | -- | Toggle auto-hyphenation on/off (WS only) |
+| W | ^O,W | -- | Toggle word wrap on/off (WS only) |
+| A | ^O,A | -- | Status line says "Auto-align is always on" (WS only) |
+| N | ^O,N | -- | Notes: F, E, D, G run; other note keys report not implemented (WS only) |
+| L R X I O U F S K M Z # | ^O,L etc. | -- | Report not implemented (WS only) |
 
 ### P Chord -- Style and Print Formatting
 
@@ -275,7 +280,7 @@ The M chord has no Alt+letter equivalent in Modern mode, but Alt+M does work as 
 | @ | ^M,@ | Insert current date |
 | ! | ^M,! | Insert current time |
 | * | ^M,* | Insert current filename |
-| : | ^M,: | Insert drive letter (Windows) |
+| : | ^M,: | Reports an invalid command (no drive letter on macOS) |
 | . | ^M,. | Insert current directory path |
 | \ | ^M,\ | Insert full path + filename |
 | P | ^M,P | Play a macro |
@@ -344,23 +349,28 @@ instead of GUI.
 
 Menu shortcuts shown to the user change based on the active input mode. The functionality is identical -- only the displayed shortcut differs.
 
+Each table lists every item of the menu, in menu order, as it is in the GUI. The State column says whether the item is enabled or greyed. "ws" is the terminal app. A greyed item does nothing when chosen. Where the GUI and ws differ, the State column says so. In ws, some labels are shorter (for example "Left Align Para") and a few differ in Modern mode (for example "Show Formatting" for Command Tags).
+
+A greyed item whose key is implemented, or an enabled item whose key is not, is a known mismatch. They are listed under the tables and in the State column.
+
 ### File Menu
 
-| Item | WordStar Shortcut | Modern Shortcut | Action |
-|------|------------------|----------------|--------|
-| Open/Read | -- | Ctrl+O | Load file, replacing the current document |
-| Save | ^KS | Ctrl+S | Save file |
-| Save As | ^KT | Ctrl+Shift+S | Save with new name |
-| Save and Close | ^KD | -- | Save and close. The text interface returns to the Opening screen; the graphical interface clears to a new, unnamed document |
-| Print | ^KP | Ctrl+P | Opens print preview [^print-deviation] |
-| Print Preview | ^OP | -- | Print preview |
-| Preferences | -- | -- | System Preferences dialog |
-| Exit WordTsar | ^KX | Cmd+Q | Quit application |
+| Item | WordStar Shortcut | Modern Shortcut | Action | State |
+|------|------------------|----------------|--------|-------|
+| Open/Read | -- | Ctrl+O | Load file, replacing the current document | Enabled |
+| Save | ^KS | Ctrl+S | Save file | Enabled |
+| Save As | ^KT | Ctrl+Shift+S | Save with new name | Enabled |
+| Save and Close | ^KD | -- | Save and close. The text interface returns to the Opening screen; the graphical interface clears to a new, unnamed document | Enabled |
+| Recent Files | -- | -- | List of recently opened files (a submenu in the GUI, a dialog in ws) | Enabled |
+| Print | ^KP | Ctrl+P | Opens print preview [^print-deviation] | Enabled |
+| Print Preview | ^OP | -- | Print preview | Enabled |
+| Preferences | -- | -- | System Preferences dialog. The GUI shows Cmd+, | Enabled |
+| Exit WordTsar | ^KX | Cmd+Q (GUI), Alt+F4 (ws) | Quit application | Enabled |
 
 [^print-deviation]: Real WordStar's ^KP prints directly, without a preview
 step -- that's what `cEditorCtrl::Print()` / `cWSEditorCtrl::Print()`
 implement in the GUI and TUI backends respectively (system print dialog on
-GUI; CUPS `lp` on macOS/Linux or the print spooler on Windows, in the TUI).
+GUI; CUPS `lp` in the TUI).
 Currently, though, neither the ^K,P keystroke nor the GUI's File > Print menu
 item reaches that code path -- both are wired to Print Preview instead (a
 `QPrintPreviewDialog`, which does have its own Print button, so printing is
@@ -372,135 +382,209 @@ yet done.
 
 ### Edit Menu
 
-| Item | WordStar Shortcut | Modern Shortcut | Action |
-|------|------------------|----------------|--------|
-| Undo | ^U | Ctrl+Z | Undo last action |
-| Redo | Alt+U | Ctrl+Y | Redo last undo |
-| Mark Block Beginning | ^KB | Alt+K,B | Set block start |
-| Mark Block End | ^KK | Alt+K,K | Set block end |
-| **Move submenu** | | | |
-| -- Block | ^KV | Alt+K,V | Move block to cursor |
-| **Copy submenu** | | | |
-| -- Block | ^KC | Alt+K,C | Copy block to cursor |
-| -- From Clipboard | ^K[ | Ctrl+V | Paste from clipboard |
-| -- To Clipboard | ^K] | Ctrl+C | Copy to clipboard |
-| **Delete submenu** | | | |
-| -- Block | ^KY | Alt+K,Y | Delete selected block |
-| -- Word | ^T | Ctrl+Del | Delete word right |
-| -- Line | ^Y | -- | Delete entire line |
-| -- Line Left | ^Q Del | Alt+Q,DEL | Delete to line start |
-| -- Line Right | ^QY | Alt+Q,Y | Delete to line end |
-| -- To Character | ^QT | Alt+Q,T | Delete to character |
-| Mark Previous Block | ^KU | -- | Restore previous block |
-| Find | ^QF | Ctrl+F | Find text |
-| Find and Replace | ^QA | Ctrl+H | Find and replace |
-| Find Next | ^L | F3 | Find next occurrence |
-| Go to Character | ^QG | -- | Jump to character position |
-| Goto Page | ^QI | -- | Jump to page number |
-| **Goto Marker submenu** | | | |
-| -- 0-9 | ^Q0-^Q9 | Alt+Q,0-9 | Jump to saved position |
-| **Goto Other submenu** | | | |
-| -- Font Tag | ^Q= | -- | Jump to font tag |
-| -- Previous Position | ^QP | -- | Return to previous pos |
-| -- Last Find/Replace | ^QV | -- | Goto last search pos |
-| -- Beginning of Block | ^QB | -- | Goto block start |
-| -- End of Block | ^QK | -- | Goto block end |
-| -- Document Beginning | ^QR | -- | Goto document start |
-| -- Document End | ^QC | -- | Goto document end |
-| **Set Marker submenu** | | | |
-| -- 0-9 | ^K0-^K9 | Alt+K,0-9 | Save position to marker |
+| Item | WordStar Shortcut | Modern Shortcut | Action | State |
+|------|------------------|----------------|--------|-------|
+| Undo | ^U | Ctrl+Z | Undo last action | Enabled |
+| Redo | Alt+U (the menu shows Ctrl+Alt+U) | Ctrl+Y | Redo last undo | Enabled |
+| Mark Block Beginning | ^KB | Alt+K,B | Set block start | Enabled |
+| Mark Block End | ^KK | Alt+K,K | Set block end | Enabled |
+| **Move submenu** | | | | |
+| -- Block | ^KV | Alt+K,V | Move block to cursor | Enabled |
+| **Copy submenu** | | | | |
+| -- Block | ^KC | Alt+K,C | Copy block to cursor | Enabled |
+| -- From Clipboard | ^K[ | Ctrl+V | Paste from clipboard | Enabled |
+| -- To Clipboard | ^K] | Ctrl+C | Copy to clipboard | Enabled |
+| **Delete submenu** | | | | |
+| -- Block | ^KY | Alt+K,Y | Delete selected block | Enabled |
+| -- Word | ^T | Ctrl+Del | Delete word right | Enabled |
+| -- Line | ^Y | -- | Delete entire line | Enabled |
+| -- Line Left of Cursor | ^Q Del | Alt+Q,DEL | Delete to line start | Enabled |
+| -- Line Right of Cursor | ^QY | Alt+Q,Y | Delete to line end | Enabled |
+| -- To Character | ^QT | Alt+Q,T | Delete to character | Enabled |
+| Mark Previous Block | ^KU | Alt+K,U | Restore previous block | Enabled |
+| Find | ^QF | Ctrl+F | Find text | Enabled |
+| Find and Replace | ^QA | Ctrl+H | Find and replace | Enabled |
+| Find Next | ^L | F3 | Find next occurrence | Enabled |
+| Go to Character | ^QG | Alt+Q,G | Jump to character position | Enabled |
+| Goto Page | ^QI | Ctrl+G | Jump to page number | Enabled |
+| **Go to Marker submenu** | | | | |
+| -- 1-9, 0 | ^Q1-^Q9, ^Q0 | Alt+Q,0-9 | Jump to saved position | Enabled |
+| **Go to Other submenu** | | | | |
+| -- Font Tag | ^Q= | Alt+Q,= | Jump to font tag | Enabled |
+| -- Style Tag | ^Q< | -- | Reports not implemented | Greyed |
+| -- Note | ^ONG | -- | Go to the next note | Enabled |
+| -- Previous Position | ^QP | Alt+Q,P | Return to previous position | Enabled |
+| -- Last Find/Replace | ^QV | Alt+Q,V | Go to last search position | Enabled |
+| -- Beginning of Block | ^QB | Alt+Q,B | Go to block start | Enabled |
+| -- End of Block | ^QK | Alt+Q,K | Go to block end | Enabled |
+| -- Document Beginning | ^QR | Ctrl+Home | Go to document start | Enabled |
+| -- Document End | ^QC | Ctrl+End | Go to document end | Enabled |
+| -- Scroll Continuously Up (ws: Scroll Up) | ^QW | -- | Reports not implemented | Greyed |
+| -- Scroll Continuously Down (ws: Scroll Down) | ^QZ | -- | Reports not implemented | Greyed |
+| **Set Marker submenu** | | | | |
+| -- 1-9, 0 | ^K1-^K9, ^K0 | Alt+K,0-9 | Save position to marker | Enabled |
+| Edit Note | ^OND | -- | Edit the note at the cursor | Enabled |
+| **Note Options submenu** | | | | |
+| -- Convert Note | ^ONV | -- | Reports not implemented | Greyed |
+| -- Endnote Location | .pe | -- | Insert a .pe line | Enabled |
+| **Editing Settings submenu** | | | | |
+| -- Column Block Mode | ^KN | -- | Reports not implemented | Greyed |
+| -- Column Replace Mode | ^KI | -- | Reports not implemented | Greyed |
+| -- Auto Align | ^OA | -- | The key says "Auto-align is always on" | Greyed |
+| -- Closes Dialog | ^O Enter | -- | WordStar 7 lets Enter close a dialog. The key reports an invalid command | Greyed |
 
 ### View Menu
 
-| Item | WordStar Shortcut | Modern Shortcut | Action |
-|------|------------------|----------------|--------|
-| Print Preview | ^OP | -- | Print preview |
-| Command Tags | ^OD | -- | Toggle control code display |
-| Block Highlighting | ^KH | -- | Toggle block visibility |
-| Screen Settings | ^OB | -- | Screen Settings dialog |
+| Item | WordStar Shortcut | Modern Shortcut | Action | State |
+|------|------------------|----------------|--------|-------|
+| Print Preview | ^OP | -- | Print preview | Enabled |
+| Command Tags (Modern: Show Formatting) | ^OD | Alt+O,D | Toggle control code display | Enabled |
+| Block Highlighting | ^KH | Alt+K,H | Toggle block visibility | Enabled |
+| Screen Settings | ^OB | -- | Screen Settings dialog | Enabled |
+| Switch Modes | ^OT | Alt+O,T | Toggle page/continuous mode (GUI); center view (ws) | Enabled |
 
 ### Insert Menu
 
-| Item | WordStar Shortcut | Modern Shortcut | Action |
-|------|------------------|----------------|--------|
-| Page Break | .pa | -- | Insert page break |
-| Today's Date | ^M@ | -- | Insert current date |
-| **Other Value submenu** | | | |
-| -- Current Time | ^M! | -- | Insert current time |
-| -- Current Filename | ^M* | -- | Insert filename |
-| -- Current Directory | ^M. | -- | Insert directory path |
-| -- Current Path | ^M\ | -- | Insert full path |
-| **Variable submenu** | | | |
-| -- Date/Time/Page/etc. | &&@&&, &&!&&, etc. | -- | Insert variable placeholders |
-| File | ^KR | -- | Insert file at cursor |
-| **Index/TOC Entry submenu** | | | |
-| -- Mark for Index | ^PK | Alt+P,K | Insert an index mark (GUI and ws menu) |
+| Item | WordStar Shortcut | Modern Shortcut | Action | State |
+|------|------------------|----------------|--------|-------|
+| Page Break | .pa | -- | Insert a .pa line | Enabled |
+| Today's Date | ^M@ | -- | Insert current date | Enabled |
+| **Other Value submenu** | | | | |
+| -- Current Time | ^M! | -- | Insert current time | Enabled |
+| -- Last Math Result | ^M= | -- | Reports not implemented | Greyed |
+| -- Last Math Expression | ^M# | -- | Reports not implemented | Greyed |
+| -- Last Math as Dollar | ^M$ | -- | Reports not implemented | Greyed |
+| -- Current Filename | ^M* | -- | Insert filename | Enabled |
+| -- Current Directory | ^M. | -- | Insert directory path | Enabled |
+| -- Current Path | ^M\ | -- | Insert full path | Enabled |
+| **Variable submenu** | | | | |
+| -- Date, Time, Page, Filename, Drive, Directory, Path, Word Count | &&@&&, &&!&&, &&#&&, &&*&&, &&:&&, &&.&&, &&\&&, &&?&& | -- | Insert variable placeholders | Enabled |
+| Extended Character | ^P0 | -- | Reports not implemented | Greyed |
+| File | ^KR | -- | Insert file at cursor | Enabled |
+| File at Print Time | .fi | -- | Insert a .fi line | Greyed |
+| Graphic | ^P* | -- | Reports not implemented | Greyed |
+| **Note submenu** | | | | |
+| -- Comment | ^ONC | -- | Reports not implemented | Greyed |
+| -- Footnote | ^ONF | -- | Open a new footnote | Enabled |
+| -- Endnote | ^ONE | -- | Open a new endnote | Enabled |
+| -- Annotation | ^ONA | -- | Reports not implemented | Greyed |
+| **Index/TOC Entry submenu** | | | | |
+| -- TOC Entry | .tc | -- | Ask for the text, insert a .tc line | Enabled |
+| -- Index Entry | ^ONI | -- | Ask for the text, insert an .ix line | Enabled. The key ^ONI reports not implemented |
+| -- Mark for Index | ^PK | Alt+P,K | Insert an index mark | Enabled |
+| -- Dot Leader to Tab | ^P. | -- | Reports not implemented | Greyed |
+| Par. Outline Number (ws: Outline Number) | ^OZ | -- | Reports not implemented | Greyed |
 
 ### Style Menu
 
-| Item | WordStar Shortcut | Modern Shortcut | Action |
-|------|------------------|----------------|--------|
-| Bold | ^PB | Ctrl+B | Toggle bold |
-| Italic | ^PY | Ctrl+I | Toggle italic |
-| Underline | ^PS | Ctrl+U | Toggle underline |
-| Font | ^P= | Ctrl+D | Select font |
-| **Other Styles submenu** | | | |
-| -- Strikeout | ^PX | Alt+P,X | Toggle strikethrough |
-| -- Subscript | ^PV | Alt+P,V | Toggle subscript |
-| -- Superscript | ^PT | Alt+P,T | Toggle superscript |
-| -- Color | ^P- | Alt+P,- | Select text color |
-| **Convert Case submenu** | | | |
-| -- Uppercase | ^K" | Alt+K," | Block to uppercase |
-| -- Lowercase | ^K' | Alt+K,' | Block to lowercase |
-| -- Sentence Case | ^K. | Alt+K,. | Block to sentence case |
+| Item | WordStar Shortcut | Modern Shortcut | Action | State |
+|------|------------------|----------------|--------|-------|
+| Bold | ^PB | Ctrl+B | Toggle bold | Enabled |
+| Italic | ^PY | Ctrl+I | Toggle italic | Enabled |
+| Underline | ^PS | Ctrl+U | Toggle underline | Enabled |
+| Font | ^P= | Ctrl+D | Select font | Enabled |
+| **Other submenu** | | | | |
+| -- Strikeout | ^PX | Alt+P,X | Toggle strikethrough | Enabled |
+| -- Subscript | ^PV | Alt+P,V | Toggle subscript | Enabled |
+| -- Superscript | ^PT | Alt+P,T | Toggle superscript | Enabled |
+| -- Doublestrike | ^PD | -- | Reports not implemented | Greyed |
+| -- Color | ^P- | Alt+P,- | Select text color | Enabled |
+| Select Paragraph Style | ^OFS | -- | Reports not implemented | Greyed |
+| Return to Previous Style | ^OFP | -- | Reports not implemented | Greyed |
+| Define Paragraph Style | ^OFD | -- | Reports not implemented | Greyed |
+| **Manage Paragraph Styles submenu** | | | | |
+| -- Copy Style to Library | ^OFO | -- | Reports not implemented | Greyed |
+| -- Delete Library Style | ^OFY | -- | Reports not implemented | Greyed |
+| -- Rename Library Style | ^OFR | -- | Reports not implemented | Greyed |
+| -- Rename Document Style | ^OFE | -- | Reports not implemented | Greyed |
+| **Convert Case submenu** | | | | |
+| -- Uppercase | ^K" | Alt+K," | Block to uppercase | Enabled |
+| -- Lowercase | ^K' | Alt+K,' | Block to lowercase | Enabled |
+| -- Sentence Case | ^K. | Alt+K,. | Block to sentence case | Enabled |
 
 ### Layout Menu
 
-| Item | WordStar Shortcut | Modern Shortcut | Action |
-|------|------------------|----------------|--------|
-| Center Line | ^OC | Alt+O,C | Insert center tab |
-| Right Align Line | ^O] | Alt+O,] | Insert right tab |
-| Left Align Paragraph | ^O< | Ctrl+L | Bracket paragraph with .oj left |
-| Center Paragraph | ^O= | Ctrl+E | Bracket paragraph with .oj center |
-| Right Align Paragraph | ^O> | Ctrl+R | Bracket paragraph with .oj right |
-| Justify Paragraph | ^O+ | Ctrl+J | Bracket paragraph with .oj justify |
-| Page | ^OY | Alt+O,Y | Page layout dialog |
-| **Headers/Footers submenu** | | | |
-| -- Header | .he | -- | Insert header |
-| -- Footer | .fo | -- | Insert footer |
+| Item | WordStar Shortcut | Modern Shortcut | Action | State |
+|------|------------------|----------------|--------|-------|
+| Center Line | ^OC | Alt+O,C | Insert center tab | Enabled |
+| Right Align Line | ^O] | Alt+O,] | Insert right tab | Enabled |
+| Left Align Paragraph | ^O< | Ctrl+L | Bracket paragraph with .oj left | Enabled |
+| Center Paragraph | ^O= | Ctrl+E | Bracket paragraph with .oj center | Enabled |
+| Right Align Paragraph | ^O> | Ctrl+R | Bracket paragraph with .oj right | Enabled |
+| Justify Paragraph | ^O+ | Ctrl+J | Bracket paragraph with .oj justify | Enabled |
+| Ruler Line | ^OL | -- | Reports not implemented | Greyed |
+| Columns | ^OU | -- | Reports not implemented | Greyed |
+| Page | ^OY | Alt+O,Y | Page layout dialog | Enabled |
+| **Headers/Footers submenu** | | | | |
+| -- Header | .he | -- | Insert a .he line | Enabled |
+| -- Footer | .fo | -- | Insert a .fo line | Enabled |
+| Page Numbering | ^O# | -- | Reports not implemented | Greyed |
+| Line Numbering | .l# | -- | Insert a .l# line | Greyed |
+| Alignment and Spacing | ^OS | -- | Reports not implemented | Greyed |
+| **Special Effects submenu** | | | | |
+| -- Overprint Character | ^PH | -- | Reports not implemented | Greyed |
+| -- Overprint Line | ^P Enter | -- | The key reports an invalid command | Greyed |
+| -- Optional Hyphen | ^OE | -- | Insert a soft hyphen | Enabled |
+| -- Vertically Center Text on Page | ^OV | -- | Center text vertically on the page | Enabled |
+| -- Keep Word Together on Line | ^PO | -- | Reports not implemented | Greyed |
+| -- Keep Lines Together on Page | .cp | -- | Insert a .cp line | Greyed in the GUI, enabled in ws |
+| -- Keep Lines Together on Column | .cc | -- | Insert a .cc line | Greyed |
+
+In Modern mode the GUI labels Center Line "Center Paragraph Ctrl+E" and Right Align Line "Right Align Paragraph Ctrl+R", but the items still run the center-line and right-line commands. ws shows Alt+O,C and Alt+O,] for them.
 
 ### Utilities Menu
 
-| Item | WordStar Shortcut | Modern Shortcut | Action |
-|------|------------------|----------------|--------|
-| Spell Check Global | ^QL | -- | Spell check entire document |
-| **Spell Check submenu** | | | |
-| -- Rest of Document | ^QL | -- | Spell check from cursor |
-| -- Word | ^QN | -- | Check current word |
-| -- Type Word | ^QO | -- | Enter word for dictionary |
-| Word Count | ^K? | Alt+K,? | Count words in block |
-| Generate Table of Contents... | -- | -- | Write name.TOC and name.TO1-TO9 from a chosen file's .tc entries |
-| Generate Index... | -- | -- | Write name.IDX from a chosen file's .ix entries and index marks |
-| **Macros submenu** | | | |
-| -- Record | ^MR | -- | Start recording a macro |
-| -- Stop Recording | ^MR | Alt+= | Stop recording and ask for a name |
-| -- Play... | ^MP | -- | Play a macro |
-| -- Edit... | ^MD | -- | Open a macro file as text |
-| -- Rename... | ^ME | -- | Rename a macro |
-| -- Copy... | ^MO | -- | Copy a macro |
-| -- Delete... | ^MY | -- | Delete a macro |
-| -- Single Step... | ^MS | -- | Not yet implemented |
-| **Reformat submenu** | | | |
-| -- Rest of Document | ^QU | Alt+Q,U | Reformat/relayout |
-| System Preferences | -- | -- | Full configuration dialog |
+| Item | WordStar Shortcut | Modern Shortcut | Action | State |
+|------|------------------|----------------|--------|-------|
+| Spell Check Global | ^QR ^QL (GUI label), ^QL (ws label) | -- | Spell check entire document. The GUI item moves to the document start first | Enabled |
+| **Spell Check Other submenu** | | | | |
+| -- Rest of Document | ^QL | -- | Spell check from cursor | Enabled |
+| -- Word | ^QN | -- | Check current word | Enabled |
+| -- Type Word | ^QO | -- | Enter word for dictionary | Enabled |
+| Thesaurus | ^QJ | -- | Look up synonyms for the word at the cursor | Enabled in the GUI, greyed in ws. The key ^QJ works in both |
+| Inset | ^P& | -- | Reports not implemented | Greyed |
+| Calculator | ^QM | -- | Reports not implemented | Greyed |
+| Block Math | ^KM | -- | Reports not implemented | Greyed |
+| **Sort Block submenu** | | | | |
+| -- Ascending | ^KZA | -- | Sort the block ascending | Enabled |
+| -- Descending | ^KZD | -- | Sort the block descending | Enabled |
+| Word Count | ^K? | Alt+K,? | Count words in block | Enabled |
+| Generate Table of Contents | -- | -- | Write name.TOC and name.TO1-TO9 from a chosen file's .tc entries | Enabled in the GUI; not in the ws menu |
+| Generate Index | -- | -- | Write name.IDX from a chosen file's .ix entries and index marks | Enabled in the GUI; not in the ws menu |
+| **Macros submenu** | | | | |
+| -- Record | ^MR | -- | Start recording a macro | Enabled while no macro records or plays |
+| -- Stop Recording | ^MR | Alt+= | Stop recording and ask for a name | Enabled while recording |
+| -- Play | ^MP | -- | Play a macro | Enabled while no macro records or plays |
+| -- Edit | ^MD | -- | Open a macro file as text | Enabled unless a macro plays |
+| -- Rename | ^ME | -- | Rename a macro | Enabled unless a macro plays |
+| -- Copy | ^MO | -- | Copy a macro | Enabled unless a macro plays |
+| -- Delete | ^MY | -- | Delete a macro | Enabled unless a macro plays |
+| -- Single Step | ^MS | -- | Reports not implemented | Greyed |
+| **Merge Print Commands submenu** | | | | |
+| -- Data File, Name Variables, Set Variable, Set Variable to Math Result, Ask for Variable | .df, .rv, .sv, .ma, .av | -- | Insert the dot command | Greyed |
+| -- If, Else, End If, Go to Top, Go to Bottom | .if, .el, .ei, .go t, .go b | -- | Insert the dot command | Greyed |
+| -- Clear Screen While Printing, Display Message, Print File n Times | .cs, .dm, .rp | -- | Insert the dot command | Greyed |
+| **Reformat submenu** | | | | |
+| -- Rest of Document | ^QU | Alt+Q,U | Reformat/relayout | Enabled |
+| -- Rest of Notes | ^ONU | -- | Reports not implemented | Greyed |
+| System Preferences | -- | -- | Full configuration dialog. The GUI shows Cmd+, | Enabled |
 
 ### Help Menu
 
-| Item | WordStar Shortcut | Modern Shortcut | Action |
-|------|------------------|----------------|--------|
-| About WordTsar | -- | -- | Version and license info |
+| Item | WordStar Shortcut | Modern Shortcut | Action | State |
+|------|------------------|----------------|--------|-------|
+| Help | F1 | -- | Same as pressing F1 | Enabled in ws; not in the GUI menu |
+| Change Help Level | -- | -- | Ask for a help level (0-4) | Enabled in ws; not in the GUI menu |
+| About WordTsar | -- | -- | Version and license info | Enabled |
 
-Contextual per-command help isn't a menu item -- it's `F1` (WordStar mode only), matching real WordStar 7. Press `F1`, then any command key, to see a description of that command; press `F1` twice to change the help level. See Function Keys above.
+Contextual per-command help is `F1` (WordStar mode only), matching real WordStar 7. Press `F1`, then any command key, to see a description of that command; press `F1` twice to change the help level. See Function Keys above.
+
+### Known menu and key mismatches
+
+- Thesaurus: the ws menu item is greyed, but ^QJ works.
+- Index Entry: the menu item is enabled in both apps, but ^ONI reports not implemented.
+- Keep Lines Together on Page: enabled in ws, greyed in the GUI.
+- Modern mode, GUI: the Center Line and Right Align Line items carry the paragraph labels and shortcuts, as noted under the Layout menu.
 
 ---
 
@@ -546,7 +630,7 @@ The keyboard mode is configured in **System Preferences > Editor > Keyboard Mode
 
 Some Ctrl+letter keys have no binding in Modern mode:
 - Ctrl+K (without Alt) -- marks block start as a convenience
-- Ctrl+M, Ctrl+Q, Ctrl+T -- unassigned (return unhandled)
+- Ctrl+M, Ctrl+Q -- unassigned (return unhandled)
 
 ### Shared Bindings
 
@@ -562,7 +646,7 @@ F1 is **not** shared: it's contextual help in WordStar mode (matching real WordS
 
 ## Complete WordStar Input Handler Reference
 
-Every key recognized by the WordStar input handler. Status column: **Yes** = functional, **No** = not yet implemented, **--** = unassigned.
+Every key recognized by the WordStar input handler. Implemented column: **Yes** = works, **Partly** = works with a gap that the Action column names, **No** = not implemented (the key reports "not implemented" or an invalid command, as the Action column says), **--** = unassigned.
 
 ### Single Control Keys (^A-^Z)
 
@@ -659,16 +743,16 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^M@ | Insert date | Insert current date | Yes |
 | ^M! | Insert time | Insert current time | Yes |
 | ^M* | Insert filename | Insert current filename | Yes |
-| ^M: | Insert drive letter | Insert drive letter (Windows only) | Yes |
+| ^M: | Insert drive letter | Reports an invalid command | No |
 | ^M. | Insert directory | Insert current directory | Yes |
 | ^M\ | Insert full path | Insert full file path | Yes |
-| ^M= | Insert math result | -- | No |
-| ^M# | Insert math expression | -- | No |
-| ^M$ | Insert math as dollar | -- | No |
+| ^M= | Insert math result | Reports not implemented | No |
+| ^M# | Insert math expression | Reports not implemented | No |
+| ^M$ | Insert math as dollar | Reports not implemented | No |
 | ^MP | Play macro | Play the chosen macro | Yes |
 | ^MR | Record macro | Start recording; ^MR again stops and asks for a name | Yes |
 | ^MD | Edit/create macro | Open the chosen macro file as a text document | Yes |
-| ^MS | Single-step macro | -- | No |
+| ^MS | Single-step macro | Reports not implemented | No |
 | ^ME | Rename macro | Rename the chosen macro | Yes |
 | ^MO | Copy macro | Copy the chosen macro under a new name | Yes |
 | ^MY | Delete macro | Delete the chosen macro | Yes |
@@ -700,18 +784,18 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^KX | Save and exit | Save file and exit | Yes |
 | ^KQ | Abandon file | Abandon changes and close | Yes |
 | ^KP | Print preview | Print preview | Yes |
-| ^KO | Copy file | -- | No |
-| ^KE | Rename file | -- | No |
-| ^KJ | Delete file | -- | No |
-| ^K\ | Fax | -- | No |
-| ^KL | Change drive/directory | -- | No |
-| ^KF | Run DOS command | -- | No |
-| ^KM | Block math | -- | No |
+| ^KO | Copy file | Reports not implemented | No |
+| ^KE | Rename file | Reports not implemented | No |
+| ^KJ | Delete file | Reports not implemented | No |
+| ^K\ | Fax | Reports not implemented | No |
+| ^KL | Change drive/directory | Reports not implemented | No |
+| ^KF | Run DOS command | Reports not implemented | No |
+| ^KM | Block math | Reports not implemented | No |
 | ^KZ | Sort block | Sort block, ascending (^KZA) or descending (^KZD) | Yes |
-| ^KN | Column mode on | -- | No |
-| ^KI | Column replace on | -- | No |
-| ^KA | Copy between windows | -- | No |
-| ^KG | Move between windows | -- | No |
+| ^KN | Column mode on | Reports not implemented | No |
+| ^KI | Column replace on | Reports not implemented | No |
+| ^KA | Copy between windows | Reports not implemented | No |
+| ^KG | Move between windows | Reports not implemented | No |
 
 ### ^O Chord -- Onscreen Format
 
@@ -730,26 +814,27 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^O= | Center paragraph | Center paragraph (bracketed) | Yes |
 | ^O> | Right align paragraph | Right align paragraph (bracketed) | Yes |
 | ^O+ | Justify paragraph | Justify paragraph (bracketed) | Yes |
-| ^OL | Set left margin | -- | No |
-| ^OR | Set right margin | -- | No |
+| ^OL | Set left margin | Reports not implemented | No |
+| ^OR | Set right margin | Reports not implemented | No |
 | ^OG | Temporary indent | Indent current paragraph one more tab stop, reverting after it | Yes |
-| ^OX | Release margin | -- | No |
-| ^OI | Set/clear tabs | -- | No |
-| ^OO | Ruler from text | -- | No |
-| ^OU | Column layout | -- | No |
-| ^OF | Paragraph styles | -- | No |
-| ^OS | Set line spacing | -- | No |
+| ^OX | Release margin | Reports not implemented | No |
+| ^OI | Set/clear tabs | Reports not implemented | No |
+| ^OO | Ruler from text | Reports not implemented | No |
+| ^OU | Column layout | Reports not implemented | No |
+| ^OF | Paragraph styles | Reports not implemented | No |
+| ^OS | Set line spacing | Reports not implemented | No |
 | ^OV | Vertically center | Center cursor-to-page-break text on the page | Yes |
-| ^OE | Soft hyphen | -- | No |
-| ^OH | Auto-hyphenation off | -- | No |
-| ^OA | Auto-align off | -- | No |
+| ^OE | Soft hyphen | Insert a soft hyphen | Yes |
+| ^OH | Auto-hyphenation on/off | Toggle automatic hyphenation | Yes |
+| ^OA | Auto-align on/off | Status line says "Auto-align is always on"; it cannot be turned off | Partly |
 | ^OW | Word wrap on/off | Toggles word wrap (inserts .aw on/off) | Yes |
-| ^O(space) | (reserved) | -- | No |
-| ^OK | Open/switch window | -- | No |
-| ^OM | Size window | -- | No |
-| ^OZ | Paragraph number | -- | No |
-| ^O# | Page numbering | -- | No |
-| ^ON | Notes | Waits for a note key: F new footnote, E new endnote, D edit the note at the cursor, G go to the next note. A, C and V do nothing | Partly |
+| ^O(space) | (none) | Opens the Screen Settings dialog, as ^OB | No |
+| ^O Enter | Enter closes dialog on/off | Reports an invalid command | No |
+| ^OK | Open/switch window | Reports not implemented | No |
+| ^OM | Size window | Reports not implemented | No |
+| ^OZ | Paragraph number | Reports not implemented | No |
+| ^O# | Page numbering | Reports not implemented | No |
+| ^ON | Notes | Waits for a note key: F new footnote, E new endnote, D edit the note at the cursor, G go to the next note. A, C, V, I, U and the other note keys report not implemented | Partly |
 
 ### ^Q Chord -- Quick Functions
 
@@ -780,11 +865,11 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^Q(DEL) | Delete line left | Delete from cursor to line start | Yes |
 | ^QY | Delete line right | Delete from cursor to line end | Yes |
 | ^QT | Delete to character | Delete to specified character | Yes |
-| ^Q< | Next style | -- | No |
-| ^QM | Math | -- | No |
-| ^QJ | Thesaurus | Look up synonyms for word at cursor | Yes |
-| ^QW | Scroll up repeat | -- | No |
-| ^QZ | Scroll down repeat | -- | No |
+| ^Q< | Next style | Reports not implemented | No |
+| ^QM | Math | Reports not implemented | No |
+| ^QJ | Thesaurus | Look up synonyms for word at cursor. The ws Utilities > Thesaurus menu item is greyed | Yes |
+| ^QW | Scroll up repeat | Reports not implemented | No |
+| ^QZ | Scroll down repeat | Reports not implemented | No |
 
 ### ^P Chord -- Print Controls and Styles
 
@@ -800,26 +885,26 @@ Not a chord (F1 is a function key, not `^`-anything), but this is where WordStar
 | ^P= | Select font | Select font | Yes |
 | ^P+ | Select font (alt) | Select font | Yes |
 | ^P- | Select color | Select color | Yes |
-| ^PD | Double strike | -- | No |
-| ^PN | Normal font | -- | No |
-| ^PA | Alternate font | -- | No |
-| ^PH | Overprint character | -- | No |
-| ^P(space) | Overprint line | -- | No |
-| ^PF | Phantom space | -- | No |
-| ^PG | Phantom rubout | -- | No |
-| ^P* | Graphics tag | -- | No |
-| ^P& | Start inset | -- | No |
-| ^PO | Binding space | -- | No |
-| ^PC | Print pause | -- | No |
-| ^PI | 8-column tab | -- | No |
-| ^P. | Dot leader | -- | No |
-| ^P0 | Extended characters | -- | No |
-| ^PQ | Custom font Q | -- | No |
-| ^PW | Custom font W | -- | No |
-| ^PE | Custom font E | -- | No |
-| ^PR | Custom font R | -- | No |
-| ^P! | Custom font ! | -- | No |
-| ^P? | Select printer | -- | No |
+| ^PD | Double strike | Reports not implemented | No |
+| ^PN | Normal font | Reports not implemented | No |
+| ^PA | Alternate font | Reports not implemented | No |
+| ^PH | Overprint character | Reports not implemented | No |
+| ^P(space) | Overprint line | Reports not implemented | No |
+| ^PF | Phantom space | Reports not implemented | No |
+| ^PG | Phantom rubout | Reports not implemented | No |
+| ^P* | Graphics tag | Reports not implemented | No |
+| ^P& | Start inset | Reports not implemented | No |
+| ^PO | Keep word together on line | Reports not implemented | No |
+| ^PC | Print pause | Reports not implemented | No |
+| ^PI | 8-column tab | Reports not implemented | No |
+| ^P. | Dot leader | Reports not implemented | No |
+| ^P0 | Extended characters | Reports not implemented | No |
+| ^PQ | Custom font Q | Reports not implemented | No |
+| ^PW | Custom font W | Reports not implemented | No |
+| ^PE | Custom font E | Reports not implemented | No |
+| ^PR | Custom font R | Reports not implemented | No |
+| ^P! | Custom font ! | Reports not implemented | No |
+| ^P? | Select printer | Reports not implemented | No |
 
 ---
 
