@@ -841,7 +841,7 @@ QString cWordStarMenuProvider::GetLayoutOverprintLineLabel(void) const
 
 QString cWordStarMenuProvider::GetLayoutOptionalHyphenLabel(void) const
 {
-    return "Option &Hyphen\t^OE";
+    return "Optional &Hyphen\t^OE";
 }
 
 QString cWordStarMenuProvider::GetLayoutVerticalCenterLabel(void) const

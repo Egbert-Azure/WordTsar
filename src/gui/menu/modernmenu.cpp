@@ -1249,7 +1249,7 @@ QString cModernMenuProvider::GetLayoutOverprintLineLabel(void) const
 
 QString cModernMenuProvider::GetLayoutOptionalHyphenLabel(void) const
 {
-    return "Option &Hyphen";
+    return "Optional &Hyphen";
 }
 
 QString cModernMenuProvider::GetLayoutVerticalCenterLabel(void) const

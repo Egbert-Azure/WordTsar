@@ -1614,8 +1614,8 @@ void cWSWordTsar::BuildMenus(void)
     int layoutSpecial = mMenu.AddSubMenu(layout, "Special &Effects");
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Overprint Char") + SC("^PH", ""), unavailable, false);
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Overprint Line") + SC("^P Enter", ""), unavailable, false);
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Option Hyphen") + SC("^OE", ""), unavailable, false);
-    mMenu.AddSubMenuItem(layoutSpecial, std::string("Vertically Center") + SC("^OV", ""), unavailable, false);
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Optional Hyphen") + SC("^OE", ""), [this](void) { InjectChord(CTRL_O, 'e'); });
+    mMenu.AddSubMenuItem(layoutSpecial, std::string("Vertically Center") + SC("^OV", ""), [this](void) { InjectChord(CTRL_O, 'v'); });
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Word Together") + SC("^PO", ""), unavailable, false);
     mMenu.AddSubMenuItem(layoutSpecial, std::string("Keep Lines/Page") + SC(".cp", ""), [this](void) {
         Active()->MoveCursorStartLine();
