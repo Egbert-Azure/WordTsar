@@ -3257,7 +3257,8 @@ void cWSEditorCtrl::Print(void)
 /// @return nothing
 ///
 /// @brief
-/// Spell check the whole document, prompting to correct each misspelled word.
+/// Spell check from the start of the cursor's paragraph to the end of the
+/// document, prompting to correct each misspelled word.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSEditorCtrl::SpellCheckDocument(void)
@@ -3272,11 +3273,12 @@ void cWSEditorCtrl::SpellCheckDocument(void)
     std::map<std::string, std::string> corrections;     // Global Replacement: word -> correction
     bool global = false;
     PARAGRAPH_T total = mDocument->GetNumberofParagraphs();
+    PARAGRAPH_T first = mDocument->GetParagraphFromPosition(mDocument->GetPosition());
     int misspelled = 0;
 
     mDocument->SaveBlocks();
 
-    for (PARAGRAPH_T para = 0; para < total; ++para)
+    for (PARAGRAPH_T para = first; para < total; ++para)
     {
         bool rescan = true;
         size_t resume = 0;      // grapheme index the next scan starts at
