@@ -2373,7 +2373,7 @@ void cWSEditorCtrl::FindAgain(void)
 
     if (mSearchBackwards == false)
     {
-        fpos = mDocument->FindNext(mSearchText, mDocument->GetPosition() + 1, mWildCard, mCaseCmp, mWholeWord);
+        fpos = mDocument->FindNext(mSearchText, NextSearchStart(), mWildCard, mCaseCmp, mWholeWord);
 
         if (fpos == mDocument->GetTextSize())
         {
@@ -2397,7 +2397,7 @@ void cWSEditorCtrl::FindAgain(void)
     }
     else
     {
-        fpos = mDocument->FindPrev(mSearchText, mDocument->GetPosition() - 1, mWildCard, mCaseCmp, mWholeWord);
+        fpos = mDocument->FindPrev(mSearchText, NextSearchStart(), mWildCard, mCaseCmp, mWholeWord);
 
         if (fpos == NOT_SET)
         {
@@ -2451,7 +2451,7 @@ bool cWSEditorCtrl::ReplaceAgain(bool noquery)
             mDocument->SetPosition(0);
         }
 
-        fpos = mDocument->FindNext(mSearchText, mDocument->GetPosition() + 1, mWildCard, mCaseCmp, mWholeWord);
+        fpos = mDocument->FindNext(mSearchText, NextSearchStart(), mWildCard, mCaseCmp, mWholeWord);
 
         if (fpos == mDocument->GetTextSize())
         {
@@ -2517,7 +2517,7 @@ bool cWSEditorCtrl::ReplaceAgain(bool noquery)
             mDocument->SetPosition(mDocument->GetTextSize() - 2);
         }
 
-        fpos = mDocument->FindPrev(mSearchText, mDocument->GetPosition() - 1, mWildCard, mCaseCmp, mWholeWord);
+        fpos = mDocument->FindPrev(mSearchText, NextSearchStart(), mWildCard, mCaseCmp, mWholeWord);
 
         if (fpos == NOT_SET)
         {

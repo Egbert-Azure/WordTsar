@@ -464,6 +464,9 @@ protected:
     // Find and Replace prompt: request holds the current values on entry
     bool RequestFind(sFindRequest& request, bool replace);
 
+    // Start position for the next FindNext/FindPrev call; clears mSearchFromCursor
+    POSITION_T NextSearchStart(void);
+
     // Caret Coordinate Helpers
     void AdjustCaretYForPageMode(const sLineLayout* line);
     COORD_T ScreenYToViewportY(const sLineLayout* line) const;
@@ -593,6 +596,7 @@ public:
     bool mWildCard;                     // Use wildcard matching
     bool mWholeWord;                    // Match whole words only
     bool mWholeFile;                    // Search entire file
+    bool mSearchFromCursor;             // Next search includes a match at the cursor
     POSITION_T mLastFindandReplace;     // Position before search started
     POSITION_T mStartSearchBlock;       // Start of search highlight
     POSITION_T mEndSearchBlock;         // End of search highlight

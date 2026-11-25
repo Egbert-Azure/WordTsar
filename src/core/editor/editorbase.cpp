@@ -140,6 +140,7 @@ cEditorBase::cEditorBase(void)
     , mWildCard(false)
     , mWholeWord(false)
     , mWholeFile(false)
+    , mSearchFromCursor(false)
     , mLastFindandReplace(0)
     , mStartSearchBlock(0)
     , mEndSearchBlock(0)
@@ -2859,7 +2860,49 @@ void cEditorBase::Find(void)
     mWildCard = request.wildcard;
     mWholeFile = (request.scope == 1);
 
+    mSearchFromCursor = true;
     FindAgain();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the start position to pass to FindNext (forward) or FindPrev
+///         (backward)
+///
+/// @brief
+/// A repeated search starts one past the cursor, so it does not find the
+/// same match again. A search started from the Find or Replace prompt
+/// (mSearchFromCursor) includes a match at the cursor; with G (mWholeFile)
+/// it covers the whole document. Clears mSearchFromCursor.
+///
+/////////////////////////////////////////////////////////////////////////////
+POSITION_T cEditorBase::NextSearchStart(void)
+{
+    bool fromCursor = mSearchFromCursor;
+    mSearchFromCursor = false;
+
+    POSITION_T pos = mDocument->GetPosition();
+    POSITION_T size = mDocument->GetTextSize();
+
+    if (mSearchBackwards == false)
+    {
+        if (fromCursor == false)
+        {
+            return pos + 1;
+        }
+        return (mWholeFile == true) ? 0 : pos;
+    }
+
+    if (fromCursor == false)
+    {
+        return pos - 1;
+    }
+    if ((mWholeFile == true) || (pos + 1 > size))
+    {
+        return size;
+    }
+    return pos + 1;
 }
 
 
@@ -2908,6 +2951,7 @@ void cEditorBase::Replace(void)
 
     if (mReplaceScope == 0)
     {
+        mSearchFromCursor = true;
         ReplaceAgain();
         return;
     }
@@ -2929,6 +2973,7 @@ void cEditorBase::Replace(void)
     BeginBatchUpdate();
     bool done = false;
     long count = -1;
+    mSearchFromCursor = true;
     while (done == false)
     {
         count++;

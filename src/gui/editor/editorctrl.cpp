@@ -5279,8 +5279,8 @@ bool cEditorCtrl::PromptFind(sFindRequest& request)
 ///
 /// @brief
 /// Repeats the last search operation using saved search parameters.
-/// Searches for mSearchText from current position + 1 (forward) or
-/// current position - 1 (backward), using saved wildcard/case/wholeword flags.
+/// Searches for mSearchText from NextSearchStart(), using saved
+/// wildcard/case/wholeword flags.
 ///
 /// Updates mStartSearchBlock, mEndSearchBlock, and mSearchBlockSet when found.
 /// Scrolls found text into view. Search highlighting is computed at paint time
@@ -5306,8 +5306,8 @@ void cEditorCtrl::FindAgain(void)
 
     if (mSearchBackwards == false)
     {
-        // Search forward from current position + 1
-        fpos = mDocument->FindNext(mSearchText, mDocument->GetPosition() + 1, mWildCard, mCaseCmp, mWholeWord);
+        // Search forward from NextSearchStart()
+        fpos = mDocument->FindNext(mSearchText, NextSearchStart(), mWildCard, mCaseCmp, mWholeWord);
 
         if (fpos == mDocument->GetTextSize())
         {
@@ -5342,8 +5342,8 @@ void cEditorCtrl::FindAgain(void)
     }
     else
     {
-        // Search backward from current position - 1
-        fpos = mDocument->FindPrev(mSearchText, mDocument->GetPosition() - 1, mWildCard, mCaseCmp, mWholeWord);
+        // Search backward from NextSearchStart()
+        fpos = mDocument->FindPrev(mSearchText, NextSearchStart(), mWildCard, mCaseCmp, mWholeWord);
 
         if (fpos == NOT_SET)
         {
@@ -5422,7 +5422,7 @@ bool cEditorCtrl::ReplaceAgain(bool noquery)
             mDocument->SetPosition(0);
         }
 
-        fpos = mDocument->FindNext(mSearchText, mDocument->GetPosition() + 1, mWildCard, mCaseCmp, mWholeWord);
+        fpos = mDocument->FindNext(mSearchText, NextSearchStart(), mWildCard, mCaseCmp, mWholeWord);
 
         if (fpos == mDocument->GetTextSize())
         {
@@ -5520,7 +5520,7 @@ bool cEditorCtrl::ReplaceAgain(bool noquery)
             mDocument->SetPosition(mDocument->GetTextSize() - 2);
         }
 
-        fpos = mDocument->FindPrev(mSearchText, mDocument->GetPosition() - 1, mWildCard, mCaseCmp, mWholeWord);
+        fpos = mDocument->FindPrev(mSearchText, NextSearchStart(), mWildCard, mCaseCmp, mWholeWord);
 
         if (fpos == NOT_SET)
         {
