@@ -1009,6 +1009,8 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
     if (mEditor->GetLayout() != nullptr)
     {
         mEditor->GetLayout()->SetHyphenationLanguage(config.mSpellCheckLanguage);
+        mEditor->GetLayout()->SetNoteFont(NOTE_KIND_FOOTNOTE, config.GetFootnoteFontDescriptor().value_or(""));
+        mEditor->GetLayout()->SetNoteFont(NOTE_KIND_ENDNOTE, config.GetEndnoteFontDescriptor().value_or(""));
     }
     mEditor->mSpellCheckDotCommands = config.mSpellCheckDotCommands;
     mEditor->mCaretBlinkRate = config.mCaretBlinkRate;

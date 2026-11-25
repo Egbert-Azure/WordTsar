@@ -2325,6 +2325,10 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
     cDropdown* measurementPtr = nullptr;
     cTextField* defaultFontPtr = nullptr;
     cTextField* fontSizePtr = nullptr;
+    cTextField* footnoteFontPtr = nullptr;
+    cTextField* footnoteSizePtr = nullptr;
+    cTextField* endnoteFontPtr = nullptr;
+    cTextField* endnoteSizePtr = nullptr;
     cDropdown* defaultFormatPtr = nullptr;
     cTextField* defaultDirPtr = nullptr;
 
@@ -2345,9 +2349,34 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         generalFocus.push_back(fontSizePtr);
         generalWidgets.push_back(std::move(fontSize));
 
-        // Row 3: Measurement section header + indented dropdown
-        generalLabels.push_back({contentTop + 3, contentLeft, "Measurement:", true});
-        auto measurement = std::make_unique<cDropdown>(MakeIndentRect(4, fieldWidth));
+        // Rows 2-5: Footnote and Endnote Font and Size; an empty font name
+        // leaves the notes in the default font
+        auto addNoteFont = [&](int line, const char* fontLabel, const char* sizeLabel,
+                               const std::string& font, double size,
+                               cTextField*& fontPtr, cTextField*& sizePtr)
+        {
+            generalLabels.push_back({contentTop + line, contentLeft, fontLabel, false});
+            auto fontField = std::make_unique<cTextField>(MakeFieldRect(line, fieldWidth), font);
+            fontPtr = fontField.get();
+            generalFocus.push_back(fontPtr);
+            generalWidgets.push_back(std::move(fontField));
+
+            generalLabels.push_back({contentTop + line + 1, contentLeft, sizeLabel, false});
+            char buffer[32];
+            std::snprintf(buffer, sizeof(buffer), "%.1f", size);
+            auto sizeField = std::make_unique<cTextField>(MakeFieldRect(line + 1, 10), std::string(buffer));
+            sizePtr = sizeField.get();
+            generalFocus.push_back(sizePtr);
+            generalWidgets.push_back(std::move(sizeField));
+        };
+        addNoteFont(2, "Footnote Font:", "Footnote Size:", config.mFootnoteFont, config.mFootnoteFontSize,
+                    footnoteFontPtr, footnoteSizePtr);
+        addNoteFont(4, "Endnote Font:", "Endnote Size:", config.mEndnoteFont, config.mEndnoteFontSize,
+                    endnoteFontPtr, endnoteSizePtr);
+
+        // Row 7: Measurement section header + indented dropdown
+        generalLabels.push_back({contentTop + 7, contentLeft, "Measurement:", true});
+        auto measurement = std::make_unique<cDropdown>(MakeIndentRect(8, fieldWidth));
         measurement->SetItems({"Inches", "Centimeters", "Millimeters"});
 
         int measureIndex = 0;
@@ -2366,32 +2395,32 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         generalFocus.push_back(measurementPtr);
         generalWidgets.push_back(std::move(measurement));
 
-        // Row 6: Code Page (inline label + field)
-        generalLabels.push_back({contentTop + 6, contentLeft, "Code Page:", false});
-        auto codePage = std::make_unique<cTextField>(MakeFieldRect(6, 10), std::to_string(config.mCodePage));
+        // Row 10: Code Page (inline label + field)
+        generalLabels.push_back({contentTop + 10, contentLeft, "Code Page:", false});
+        auto codePage = std::make_unique<cTextField>(MakeFieldRect(10, 10), std::to_string(config.mCodePage));
         codePagePtr = codePage.get();
         generalFocus.push_back(codePagePtr);
         generalWidgets.push_back(std::move(codePage));
 
-        // Row 8: Show control characters checkbox
-        auto showControls = std::make_unique<cCheckBox>(MakeIndentRect(8, fieldWidth),
+        // Row 12: Show control characters checkbox
+        auto showControls = std::make_unique<cCheckBox>(MakeIndentRect(12, fieldWidth),
                                                         "Show control characters", BoolToTri(config.mShowControls));
         showControlsPtr = showControls.get();
         generalFocus.push_back(showControlsPtr);
         generalWidgets.push_back(std::move(showControls));
 
-        // Row 10: Default Format (inline label + dropdown selector)
-        generalLabels.push_back({contentTop + 10, contentLeft, "Default Format:", false});
-        auto defaultFormat = std::make_unique<cDropdown>(MakeFieldRect(10, fieldWidth));
+        // Row 14: Default Format (inline label + dropdown selector)
+        generalLabels.push_back({contentTop + 14, contentLeft, "Default Format:", false});
+        auto defaultFormat = std::make_unique<cDropdown>(MakeFieldRect(14, fieldWidth));
         defaultFormat->SetItems({"WordStar (.ws)", "RTF (.rtf)"});
         defaultFormat->SetSelectedIndex((config.mDefaultFormat == "rtf") ? 1 : 0);
         defaultFormatPtr = defaultFormat.get();
         generalFocus.push_back(defaultFormatPtr);
         generalWidgets.push_back(std::move(defaultFormat));
 
-        // Row 12: Default Directory (inline label + wide field)
-        generalLabels.push_back({contentTop + 12, contentLeft, "Default Directory:", false});
-        auto defaultDir = std::make_unique<cTextField>(MakeFieldRect(12, rect.cols - 4 - labelWidth), config.mDefaultDirectory);
+        // Row 16: Default Directory (inline label + wide field)
+        generalLabels.push_back({contentTop + 16, contentLeft, "Default Directory:", false});
+        auto defaultDir = std::make_unique<cTextField>(MakeFieldRect(16, rect.cols - 4 - labelWidth), config.mDefaultDirectory);
         defaultDirPtr = defaultDir.get();
         generalFocus.push_back(defaultDirPtr);
         generalWidgets.push_back(std::move(defaultDir));
@@ -4060,6 +4089,10 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
 
     config.mDefaultFont = defaultFontPtr->GetText();
     config.mDefaultFontSize = ParseDouble(fontSizePtr->GetText());
+    config.mFootnoteFont = footnoteFontPtr->GetText();
+    config.mFootnoteFontSize = ParseDouble(footnoteSizePtr->GetText());
+    config.mEndnoteFont = endnoteFontPtr->GetText();
+    config.mEndnoteFontSize = ParseDouble(endnoteSizePtr->GetText());
     config.mDefaultFormat = (defaultFormatPtr->GetSelectedIndex() == 1) ? "rtf" : "ws";
     config.mDefaultDirectory = defaultDirPtr->GetText();
 
