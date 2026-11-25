@@ -21,6 +21,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 std::string string_sprintf(const char *fmt, ...)
@@ -40,5 +42,11 @@ std::string ToRomanNumeralUpper(long num) ;
 // and the TUI's Recent Files dialog so a long directory doesn't push the
 // filename (the part that actually tells two entries apart) off screen.
 std::string AbbreviatePathForDisplay(const std::string &fullPath, size_t maxWidth) ;
+
+// Decodes one UTF-8 character at p (remaining bytes available) into cp and
+// returns the number of bytes it takes, 1 with cp = U+FFFD for an invalid
+// lead byte. Shared by the RTF and DOCX writers, which advance one document
+// position per character.
+size_t DecodeUtf8CodePoint(const char *p, size_t remaining, uint32_t &cp) ;
 
 #endif // UTILS_H

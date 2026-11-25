@@ -239,3 +239,57 @@ std::string AbbreviatePathForDisplay(const std::string &fullPath, size_t maxWidt
     return filename.substr(0, head) + "..." + filename.substr(filename.size() - tail);
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  p         - [in] pointer to start of UTF-8 sequence
+/// @param  remaining - [in] number of bytes remaining in buffer
+/// @param  cp        - [out] decoded Unicode code point
+///
+/// @return size_t - number of bytes consumed (1-4), or 1 on error (replacement)
+///
+/// @brief
+/// Decodes a single UTF-8 code point from a byte sequence.
+/////////////////////////////////////////////////////////////////////////////
+size_t DecodeUtf8CodePoint(const char *p, size_t remaining, uint32_t &cp)
+{
+    unsigned char b = static_cast<unsigned char>(p[0]) ;
+
+    // Single byte (ASCII)
+    if (b < 0x80)
+    {
+        cp = b ;
+        return 1 ;
+    }
+
+    // Two bytes
+    if ((b & 0xE0) == 0xC0 && remaining >= 2)
+    {
+        cp = (static_cast<uint32_t>(b & 0x1F) << 6)
+           | (static_cast<uint32_t>(static_cast<unsigned char>(p[1])) & 0x3F) ;
+        return 2 ;
+    }
+
+    // Three bytes
+    if ((b & 0xF0) == 0xE0 && remaining >= 3)
+    {
+        cp = (static_cast<uint32_t>(b & 0x0F) << 12)
+           | ((static_cast<uint32_t>(static_cast<unsigned char>(p[1])) & 0x3F) << 6)
+           | (static_cast<uint32_t>(static_cast<unsigned char>(p[2])) & 0x3F) ;
+        return 3 ;
+    }
+
+    // Four bytes
+    if ((b & 0xF8) == 0xF0 && remaining >= 4)
+    {
+        cp = (static_cast<uint32_t>(b & 0x07) << 18)
+           | ((static_cast<uint32_t>(static_cast<unsigned char>(p[1])) & 0x3F) << 12)
+           | ((static_cast<uint32_t>(static_cast<unsigned char>(p[2])) & 0x3F) << 6)
+           | (static_cast<uint32_t>(static_cast<unsigned char>(p[3])) & 0x3F) ;
+        return 4 ;
+    }
+
+    // Invalid -- return replacement character
+    cp = 0xFFFD ;
+    return 1 ;
+}
