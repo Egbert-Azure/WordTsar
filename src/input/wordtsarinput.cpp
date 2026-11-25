@@ -634,8 +634,8 @@ const sCommandKeys COMMAND_KEYS[] =
 
     { 'o',           WSCMD_RUNS,            "dc]tjwvgeha<>=+" },
     { 'o',           WSCMD_SUBKEY,          "n" },
-    { 'o',           WSCMD_DIALOG,          "?pylxiouf sb" },
-    { 'o',           WSCMD_NOT_IMPLEMENTED, "kmz#" },
+    { 'o',           WSCMD_DIALOG,          "?py b" },
+    { 'o',           WSCMD_NOT_IMPLEMENTED, "kmz#lxioufsr" },
 
     { 'q',           WSCMD_FIND,            "f" },
     { 'q',           WSCMD_REPLACE,         "a" },
@@ -1950,13 +1950,6 @@ void cWordStarInput::OnControlOChar(char ch)
             mEditor->TemporaryIndent() ;
             break ;
 
-        case 'l' :
-        case 'x' :
-        case 'i' :
-        case 'o' :
-        case 'u' :
-        case 'f' :
-        case 's' :
         case ' ' :
         case 'b' :
             {
