@@ -329,7 +329,7 @@ QString cWordStarMenuProvider::GetEditGotoScrollUpLabel(void) const
 
 QString cWordStarMenuProvider::GetEditGotoScrollDownLabel(void) const
 {
-    return "&Scroll COntinuously Down\t^QZ";
+    return "&Scroll Continuously Down\t^QZ";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -700,7 +700,7 @@ QString cWordStarMenuProvider::GetStyleReturnToPrevStyleLabel(void) const
 
 QString cWordStarMenuProvider::GetStyleDefineParStyleLabel(void) const
 {
-    return "&Defne Paragraph Style\t^OFD";
+    return "&Define Paragraph Style\t^OFD";
 }
 
 QString cWordStarMenuProvider::GetStyleCopyStyleToLibraryLabel(void) const
