@@ -354,6 +354,9 @@ public:
     sPageFootnotes GetPageFootnotes(PAGE_T page) const;
     std::vector<sHeaderFooterLine> GetPageEndnotes(PAGE_T page) const;
     virtual cLayoutBase* CreateNoteLayout(void) const;
+    void SetNoteFont(eNoteKind kind, const std::string& font);
+    std::string GetNoteFont(eNoteKind kind) const;
+    bool GetNoteFont(eNoteKind kind, std::string& name, double& size) const;
 
     // ----- Query Methods - Control Code Visibility -----
     eShowControl GetShowControl(void) const;
@@ -556,6 +559,8 @@ private:
     std::vector<sHeaderFooterLine> mFootnoteCarry;  // Note lines that continue on the next page
     std::vector<sNoteNumber> mPrintEndnotes;        // Endnotes of the print layout, in marker order
     std::map<PAGE_T, std::vector<sHeaderFooterLine>> mEndnoteLines; // Placed endnote lines by page
+    std::string mFootnoteFont;                      // Font descriptor footnotes start in, empty = default font
+    std::string mEndnoteFont;                       // Font descriptor endnotes start in, empty = default font
 
     // Margin change tracking handled by cPageManager
 

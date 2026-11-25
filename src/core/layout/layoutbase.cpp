@@ -3071,6 +3071,77 @@ cLayoutBase* cLayoutBase::CreateNoteLayout(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  kind [in] NOTE_KIND_FOOTNOTE or NOTE_KIND_ENDNOTE
+/// @param  font [in] font descriptor the notes of the kind start in, empty
+///                   for the default font
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::SetNoteFont(eNoteKind kind, const std::string& font)
+{
+    if (kind == NOTE_KIND_ENDNOTE)
+    {
+        mEndnoteFont = font;
+    }
+    else if (kind == NOTE_KIND_FOOTNOTE)
+    {
+        mFootnoteFont = font;
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  kind [in] NOTE_KIND_FOOTNOTE or NOTE_KIND_ENDNOTE
+///
+/// @return the font descriptor the notes of the kind start in, empty for
+///         the default font
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cLayoutBase::GetNoteFont(eNoteKind kind) const
+{
+    if (kind == NOTE_KIND_ENDNOTE)
+    {
+        return mEndnoteFont;
+    }
+    if (kind == NOTE_KIND_FOOTNOTE)
+    {
+        return mFootnoteFont;
+    }
+    return std::string();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  kind [in]  NOTE_KIND_FOOTNOTE or NOTE_KIND_ENDNOTE
+/// @param  name [out] font name
+/// @param  size [out] font size in points
+///
+/// @return true when a font is set for the notes of the kind
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cLayoutBase::GetNoteFont(eNoteKind kind, std::string& name, double& size) const
+{
+    std::string font = GetNoteFont(kind);
+    if (font.empty())
+    {
+        return false;
+    }
+    std::istringstream fields(font);
+    fields.imbue(std::locale::classic());
+    std::string sizeField;
+    std::getline(fields, name, '|');
+    std::getline(fields, sizeField, '|');
+    std::istringstream sizeStream(sizeField);
+    sizeStream.imbue(std::locale::classic());
+    size = 0.0;
+    sizeStream >> size;
+    return !name.empty() && size > 0.0;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  page [in] page number
 ///
 /// @return the rule and the footnote lines of the page, positioned above
@@ -3220,8 +3291,9 @@ void cLayoutBase::AddLineFootnotes(PARAGRAPH_T paragraphNum, const sLineLayout& 
 ///
 /// @brief
 /// Decodes the note into a document of its own and lays it out with a
-/// second layout of the same kind (CreateNoteLayout()) in the default font,
-/// within the left and right margins in effect. Empty lines at the end are
+/// second layout of the same kind (CreateNoteLayout()) in the font set for
+/// the note's kind (SetNoteFont()), else in the default font, within the
+/// left and right margins in effect. Empty lines at the end are
 /// dropped.
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -3264,7 +3336,8 @@ std::vector<sHeaderFooterLine> cLayoutBase::LayoutNoteLines(POSITION_T position)
     {
         return result;
     }
-    noteLayout->SetDefaultFont(mLayoutState->GetDefaultFont());
+    std::string noteFont = GetNoteFont(note.kind);
+    noteLayout->SetDefaultFont(noteFont.empty() ? mLayoutState->GetDefaultFont() : noteFont);
     noteLayout->SetDefaultTextColor(mLayoutState->GetDefaultTextColor());
     noteLayout->SetShowControl(SHOW_NONE);
     noteLayout->SetMarkersVisible(false);

@@ -100,6 +100,10 @@ cConfig::cConfig(void)
     mMeasurement = "0i";
     mDefaultFont = "Courier New";
     mDefaultFontSize = 12.0;
+    mFootnoteFont = "";
+    mFootnoteFontSize = 12.0;
+    mEndnoteFont = "";
+    mEndnoteFontSize = 12.0;
     mDefaultFormat = "ws";
     mAutoSaveInterval = 60;
     mCaretBlinkRate = 500;
@@ -713,6 +717,10 @@ bool cConfig::Load(void)
     mMeasurement = ini.GetValue("editor", "measurement", mMeasurement.c_str());
     mDefaultFont = ini.GetValue("editor", "defaultFont", mDefaultFont.c_str());
     mDefaultFontSize = ini.GetDoubleValue("editor", "defaultFontSize", mDefaultFontSize);
+    mFootnoteFont = ini.GetValue("editor", "footnoteFont", mFootnoteFont.c_str());
+    mFootnoteFontSize = ini.GetDoubleValue("editor", "footnoteFontSize", mFootnoteFontSize);
+    mEndnoteFont = ini.GetValue("editor", "endnoteFont", mEndnoteFont.c_str());
+    mEndnoteFontSize = ini.GetDoubleValue("editor", "endnoteFontSize", mEndnoteFontSize);
     mDefaultFormat = ini.GetValue("editor", "defaultFormat", mDefaultFormat.c_str());
     mAutoSaveInterval = static_cast<int>(ini.GetLongValue("editor", "autoSaveInterval", mAutoSaveInterval));
     mCaretBlinkRate = static_cast<int>(ini.GetLongValue("editor", "caretBlinkRate", mCaretBlinkRate));
@@ -901,6 +909,10 @@ bool cConfig::Save(void)
     ini.SetValue("editor", "measurement", mMeasurement.c_str());
     ini.SetValue("editor", "defaultFont", mDefaultFont.c_str());
     ini.SetDoubleValue("editor", "defaultFontSize", mDefaultFontSize);
+    ini.SetValue("editor", "footnoteFont", mFootnoteFont.c_str());
+    ini.SetDoubleValue("editor", "footnoteFontSize", mFootnoteFontSize);
+    ini.SetValue("editor", "endnoteFont", mEndnoteFont.c_str());
+    ini.SetDoubleValue("editor", "endnoteFontSize", mEndnoteFontSize);
     ini.SetValue("editor", "defaultFormat", mDefaultFormat.c_str());
     ini.SetLongValue("editor", "autoSaveInterval", mAutoSaveInterval);
     ini.SetLongValue("editor", "caretBlinkRate", mCaretBlinkRate);
@@ -1104,20 +1116,22 @@ void cConfig::AddRecentFile(const std::string& filename)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return std::optional<std::string> - the Preferences default font as a
-///         layout font descriptor; no value when no default font is set
+/// @param  name [in] font name
+/// @param  size [in] font size in points
+///
+/// @return std::optional<std::string> - the font as a layout font
+///         descriptor; no value when the name is empty or the size is not
+///         positive
 ///
 /// @brief
 /// Build the layout font descriptor ("Name|Size|Bold|Italic|Underline|
-/// Superscript|Subscript", regular style) of the Preferences default font
-/// ([editor] defaultFont and defaultFontSize). The GUI and the TUI start with
-/// this font. No value when the name is empty or the size is not positive
-/// (the TUI Preferences dialog takes both as free text).
+/// Superscript|Subscript", regular style) of a Preferences font. The TUI
+/// Preferences dialog takes name and size as free text.
 ///
 /////////////////////////////////////////////////////////////////////////////
-std::optional<std::string> cConfig::GetDefaultFontDescriptor(void) const
+std::optional<std::string> cConfig::FontDescriptor(const std::string& name, double size)
 {
-    if (mDefaultFont.empty() == true || mDefaultFontSize <= 0.0)
+    if (name.empty() == true || size <= 0.0)
     {
         return std::nullopt;
     }
@@ -1125,8 +1139,56 @@ std::optional<std::string> cConfig::GetDefaultFontDescriptor(void) const
     // Classic locale: '.' as the decimal separator whatever the user's locale
     std::ostringstream descriptor;
     descriptor.imbue(std::locale::classic());
-    descriptor << mDefaultFont << '|' << std::fixed << std::setprecision(1) << mDefaultFontSize << "|0|0|0|0|0";
+    descriptor << name << '|' << std::fixed << std::setprecision(1) << size << "|0|0|0|0|0";
     return descriptor.str();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return std::optional<std::string> - the Preferences default font as a
+///         layout font descriptor; no value when no default font is set
+///
+/// @brief
+/// The Preferences default font ([editor] defaultFont and defaultFontSize).
+/// The GUI and the TUI start with this font.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::optional<std::string> cConfig::GetDefaultFontDescriptor(void) const
+{
+    return FontDescriptor(mDefaultFont, mDefaultFontSize);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return std::optional<std::string> - the Preferences footnote font as a
+///         layout font descriptor; no value when none is set
+///
+/// @brief
+/// The font footnotes start in ([editor] footnoteFont and footnoteFontSize).
+/// Without one footnotes start in the default font.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::optional<std::string> cConfig::GetFootnoteFontDescriptor(void) const
+{
+    return FontDescriptor(mFootnoteFont, mFootnoteFontSize);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return std::optional<std::string> - the Preferences endnote font as a
+///         layout font descriptor; no value when none is set
+///
+/// @brief
+/// The font endnotes start in ([editor] endnoteFont and endnoteFontSize).
+/// Without one endnotes start in the default font.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::optional<std::string> cConfig::GetEndnoteFontDescriptor(void) const
+{
+    return FontDescriptor(mEndnoteFont, mEndnoteFontSize);
 }
 
 
@@ -1157,6 +1219,7 @@ void cConfig::WriteCommentedTemplate(const std::string& path)
     file << "; mCodePage: WordStar code page (0 = CP437, 1 = CP737)\n";
     file << "; mMeasurement: ruler/status display units (0i = inches, 0cm = centimeters)\n";
     file << "; mDefaultFormat: file format for saving (ws, rtf)\n";
+    file << "; footnoteFont/endnoteFont: font of footnotes/endnotes, empty = default font\n";
     file << "; mAutoSaveInterval: seconds between auto-saves (0 = disabled)\n";
     file << "; mCaretBlinkRate: cursor blink speed in milliseconds\n";
     file << "[editor]\n";

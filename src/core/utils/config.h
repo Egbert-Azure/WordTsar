@@ -147,6 +147,8 @@ public:
 
     // --- Default font ---
     std::optional<std::string> GetDefaultFontDescriptor(void) const;
+    std::optional<std::string> GetFootnoteFontDescriptor(void) const;
+    std::optional<std::string> GetEndnoteFontDescriptor(void) const;
 
     // --- Palette application ---
     void ApplyGUIPalette(const sGUIPalette& palette);
@@ -160,6 +162,7 @@ public:
     static COORD_T ParseMeasurement(const char* value);
     static std::string FormatMeasurement(COORD_T twips, char unit);
     static short BlendChannel(short a, short b, float t);
+    static std::optional<std::string> FontDescriptor(const std::string& name, double size);
 
     // --- Static palette getters ---
     static std::vector<sGUIPalette> GetGUIPalettes(void);
@@ -192,6 +195,10 @@ public:
     std::string mMeasurement;
     std::string mDefaultFont;
     double mDefaultFontSize;
+    std::string mFootnoteFont;       // empty = default font
+    double mFootnoteFontSize;
+    std::string mEndnoteFont;        // empty = default font
+    double mEndnoteFontSize;
     std::string mDefaultFormat;
     int mAutoSaveInterval;           // seconds (0 = disabled)
     int mCaretBlinkRate;             // milliseconds
