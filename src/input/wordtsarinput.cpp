@@ -292,6 +292,22 @@ const char *LookupKChordHelp(char lower)
             return "^KQ - Abandon file\n\n"
                    "Closes the current file without saving, discarding any changes "
                    "made this session." ;
+        case 'n' :
+            return "^KN - Column block mode\n\n"
+                   "Turns column block mode on and off. With column block mode on, "
+                   "the beginning and end block markers define the top-left and "
+                   "bottom-right corners of the block, and block operations work "
+                   "on that rectangle. The status line shows Column. A dot command "
+                   "is not part of a column block." ;
+        case 'i' :
+            return "^KI - Column replace mode\n\n"
+                   "Turns column replace mode on and off. It works only when column "
+                   "block mode is on, and the status line shows Column-Repl. When it "
+                   "is on, a moved or deleted block is replaced by spaces, leaving a "
+                   "hole, and a moved or copied block replaces the text at the cursor. "
+                   "When it is off, surrounding text fills the gap of a moved or "
+                   "deleted block, and a moved or copied block pushes the text at the "
+                   "cursor to the right." ;
         case 'p' :
             return "^KP - Print preview\n\n"
                    "Opens print preview for the current document." ;
