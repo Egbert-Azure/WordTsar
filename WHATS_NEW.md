@@ -22,6 +22,7 @@ Release history for WordTsar, in reverse chronological order.
 - Changed: saving to a code page that cannot hold a character writes a plain stand-in. Curly quotes become ' and ", en and em dashes become -, the em dash is written as --, and the ellipsis becomes ... (#93, #94).
 - Changed: a superscript digit the code page cannot hold is saved as a digit between ^T toggles (#93).
 - Changed: the save warning counts only the characters that are lost (#93).
+- Changed: ^OL, ^OX, ^OI, ^OO, ^OU, ^OF, ^OS, ^OR, ^ONA, ^ONC and ^ONV say they are not implemented, and ^OA says auto-align is always on. Optional Hyphen, Vertically Center, Type Word and Sort Block are enabled in the menus where the keys already worked (#100).
 
 **Fixes**
 
