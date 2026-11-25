@@ -2424,8 +2424,11 @@ void cDOCXFile::SaveParagraph(pugi::xml_node &body, std::string &text)
             continue ;
         }
 
-        buffer += static_cast<char>(byte) ;
-        pos++ ;
+        // one document position per character, however many bytes it takes
+        uint32_t code = 0 ;
+        size_t byteCount = DecodeUtf8CodePoint(text.data() + pos, text.size() - pos, code) ;
+        buffer.append(text, pos, byteCount) ;
+        pos += byteCount ;
         mWCurrentPosition++ ;
     }
 
