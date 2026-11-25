@@ -2749,7 +2749,8 @@ void cWordTsar::ColumnReplaceMode(void)
 
 void cWordTsar::AutoAlign(void)
 {
-    mEditor->Preferences() ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('a') ;
 }
 
 

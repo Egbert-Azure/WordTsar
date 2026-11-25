@@ -632,9 +632,9 @@ const sCommandKeys COMMAND_KEYS[] =
     { 'k',           WSCMD_DIALOG,          "tpw" },
     { 'k',           WSCMD_NOT_IMPLEMENTED, "oej\\lfmniag" },
 
-    { 'o',           WSCMD_RUNS,            "dc]tjwvgeh<>=+" },
+    { 'o',           WSCMD_RUNS,            "dc]tjwvgeha<>=+" },
     { 'o',           WSCMD_SUBKEY,          "n" },
-    { 'o',           WSCMD_DIALOG,          "?pylxiouf sab" },
+    { 'o',           WSCMD_DIALOG,          "?pylxiouf sb" },
     { 'o',           WSCMD_NOT_IMPLEMENTED, "kmz#" },
 
     { 'q',           WSCMD_FIND,            "f" },
@@ -1957,12 +1957,15 @@ void cWordStarInput::OnControlOChar(char ch)
         case 'u' :
         case 'f' :
         case 's' :
-        case 'a' :
         case ' ' :
         case 'b' :
             {
                 mEditor->Preferences() ;
             }
+            break ;
+
+        case 'a' :          // Paragraphs reflow on their own
+            mEditor->SetStatusMessage("Auto-align is always on") ;
             break ;
 
         case 'e' :          // Insert soft hyphen (real WordStar 7 ^OE)
