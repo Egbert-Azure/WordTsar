@@ -4279,16 +4279,21 @@ void cEditorBase::GotoSavePosition(int offset)
 ///
 /// @brief
 /// Real WordStar 7 ^KZ,A/^KZ,D: sorts the marked block's paragraphs as
-/// whole lines (WordTsar has no column-mode selection to sort by a
-/// highlighted sub-range instead, so this always sorts on full line text,
-/// matching WS7's own "if column mode is off" behavior). Block remains
-/// selected after sorting.
+/// whole lines, keyed by their full text. With a column block the whole
+/// lines are keyed by their part in the rectangle (ColumnSort). Block
+/// remains selected after sorting.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::SortBlock(bool ascending)
 {
     if (!mDocument || mDocument->mBlockSet == false)
     {
+        return ;
+    }
+
+    if (IsColumnBlock())
+    {
+        ColumnSort(ascending) ;
         return ;
     }
 
@@ -5180,7 +5185,8 @@ cEditorBase::eWriteBlockResult cEditorBase::WriteBlock(POSITION_T start, POSITIO
 /// @return the marked block as ClipboardCopy() writes it, empty if no block
 ///
 /// @brief
-/// Plain text (cDocument::GetPlainText) with LF line endings.
+/// Plain text (cDocument::GetPlainText) with LF line endings. A column
+/// block gives one line per row.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cEditorBase::GetClipboardText(void)
@@ -5189,6 +5195,11 @@ std::string cEditorBase::GetClipboardText(void)
     if (!mDocument || !mDocument->GetBlock(start, end))
     {
         return std::string() ;
+    }
+
+    if (IsColumnBlock())
+    {
+        return ColumnClipboardText() ;
     }
 
     return mDocument->GetPlainText(start, end, "\n") ;
