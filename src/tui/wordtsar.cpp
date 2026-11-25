@@ -1638,7 +1638,7 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(utilSpell, std::string("Word") + SC("^QN", ""), [this](void) { Active()->SpellCheckWord(); });
     mMenu.AddSubMenuItem(utilSpell, std::string("Type Word...") + SC("^QO", ""), [this](void) { InjectChord(CTRL_Q, 'o'); });
 
-    mMenu.AddSubItem(util, std::string("&Thesaurus") + SC("^QJ", ""), unavailable, false);
+    mMenu.AddSubItem(util, std::string("&Thesaurus") + SC("^QJ", ""), [this](void) { InjectChord(CTRL_Q, 'j'); });
     mMenu.AddSeparator(util);
     mMenu.AddSubItem(util, std::string("&Inset") + SC("^P&", ""), unavailable, false);
     mMenu.AddSubItem(util, std::string("&Calculator") + SC("^QM", ""), unavailable, false);

@@ -2882,7 +2882,7 @@ TEST_CASE("TUI edit screen - a menu entry WordTsar does not implement says so")
     {
         app.TestHandleEvent(OpeningAltText("u"));
         REQUIRE(menu.IsOpen() == true);
-        CHECK(app.TestHandleEvent(OpeningText("t")) == true);
+        CHECK(app.TestHandleEvent(OpeningText("c")) == true);
         CHECK(StatusMessage(app) == kNotAvailable);
         CHECK(menu.IsOpen() == false);
         CHECK(app.TestInEditor() == true);
@@ -2892,8 +2892,10 @@ TEST_CASE("TUI edit screen - a menu entry WordTsar does not implement says so")
     {
         app.TestHandleEvent(OpeningAltText("u"));
         REQUIRE(menu.IsOpen() == true);
-        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
-        app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+        for (int down = 0; down < 4; ++down)
+        {
+            app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ARROW_DOWN));
+        }
         CHECK(app.TestHandleEvent(OpeningSpecial(wordstartui::SPECIAL_KEY_ENTER)) == true);
         CHECK(StatusMessage(app) == kNotAvailable);
         CHECK(menu.IsOpen() == false);
