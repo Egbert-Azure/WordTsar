@@ -1133,20 +1133,20 @@ QString cModernMenuProvider::GetStyleSentenceCaseLabel(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
-/// @return QString - menu label with CUA shortcut
+/// @return QString - menu label with its Alt+O chord
 ///
 /// @brief
-/// Returns the layout alignment menu labels with CUA shortcuts.
+/// Returns the line alignment menu labels with their Alt+O chords.
 ///
 /////////////////////////////////////////////////////////////////////////////
 QString cModernMenuProvider::GetLayoutCenterLineLabel(void) const
 {
-    return "&Center Paragraph\tCtrl+E";
+    return "&Center Line\tAlt+O, C";
 }
 
 QString cModernMenuProvider::GetLayoutRightAlignLabel(void) const
 {
-    return "R&ight Align Paragraph\tCtrl+R";
+    return "R&ight Align Line\tAlt+O, ]";
 }
 
 /////////////////////////////////////////////////////////////////////////////

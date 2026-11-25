@@ -1588,8 +1588,8 @@ void cWSWordTsar::BuildMenus(void)
 
     // ------------------------------ Layout ------------------------------
     int layout = mMenu.AddMenu("Layout", 'L');
-    mMenu.AddSubItem(layout, LB("&Center Line", "&Center Paragraph") + SC("^OC", "Alt+O, C"), [this](void) { InjectChord(CTRL_O, 'c'); });
-    mMenu.AddSubItem(layout, LB("R&ight Align Line", "R&ight Align Paragraph") + SC("^O]", "Alt+O, ]"), [this](void) { InjectChord(CTRL_O, ']'); });
+    mMenu.AddSubItem(layout, std::string("&Center Line") + SC("^OC", "Alt+O, C"), [this](void) { InjectChord(CTRL_O, 'c'); });
+    mMenu.AddSubItem(layout, std::string("R&ight Align Line") + SC("^O]", "Alt+O, ]"), [this](void) { InjectChord(CTRL_O, ']'); });
     mMenu.AddSeparator(layout);
     mMenu.AddSubItem(layout, std::string("&Left Align Para") + SC("^O<", "Ctrl+L"), [this](void) { InjectChord(CTRL_O, '<'); });
     mMenu.AddSubItem(layout, std::string("Center &Paragraph") + SC("^O=", "Ctrl+E"), [this](void) { InjectChord(CTRL_O, '='); });
