@@ -564,7 +564,7 @@ QString cWordStarMenuProvider::GetInsertVarWordCountLabel(void) const
 
 QString cWordStarMenuProvider::GetInsertExtendedCharLabel(void) const
 {
-    return "&Extended Character...\t^PO";
+    return "&Extended Character...\t^P0";
 }
 
 QString cWordStarMenuProvider::GetInsertFileLabel(void) const

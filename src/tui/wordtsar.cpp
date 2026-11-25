@@ -1529,7 +1529,7 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSubMenuItem(insertVar, "Path", [this](void) { Active()->InsertText("&\\&"); });
     mMenu.AddSubMenuItem(insertVar, "Word Count", [this](void) { Active()->InsertText("&?&"); });
 
-    mMenu.AddSubItem(insert, std::string("&Extended Char...") + SC("^PO", ""), unavailable, false);
+    mMenu.AddSubItem(insert, std::string("&Extended Char...") + SC("^P0", ""), unavailable, false);
     mMenu.AddSeparator(insert);
     mMenu.AddSubItem(insert, std::string("&File...") + SC("^KR", ""), [this](void) { InjectChord(CTRL_K, 'r'); });
     mMenu.AddSubItem(insert, std::string("File at Print Time") + SC(".fi", ""), unavailable, false);
