@@ -508,13 +508,30 @@ void cRTFWriter::CreateFontTable(void)
 
     mFinalfont.clear() ;
 
-    // build a map of fonts used in document
+    // the notes fonts set in Preferences go into the table as well
+    std::vector<std::string> fontnames ;
     for (auto &fontiter : fontlist)
+    {
+        fontnames.push_back(fontiter.fontname) ;
+    }
+    for (eNoteKind kind : {NOTE_KIND_FOOTNOTE, NOTE_KIND_ENDNOTE})
+    {
+        std::string name ;
+        double size = 0.0 ;
+        if (mEditor->GetLayout() != nullptr && mEditor->GetLayout()->GetNoteFont(kind, name, size) &&
+            name != "Times New Roman")
+        {
+            fontnames.push_back(name) ;
+        }
+    }
+
+    // build a map of fonts used in document
+    for (auto &fontname : fontnames)
     {
         std::string fonttype ;
 
         // Classify font using keyword-based font classifier
-        sFontProperties props = mFontClassifier.classify(fontiter.fontname) ;
+        sFontProperties props = mFontClassifier.classify(fontname) ;
 
         // Map font properties to RTF font family
         if (props.math || props.symbol)
@@ -548,7 +565,7 @@ void cRTFWriter::CreateFontTable(void)
         }
 
         // Use the real font name directly from the internal font struct
-        mFinalfont[fontiter.fontname] = fonttype ;
+        mFinalfont[fontname] = fonttype ;
     }
 
     StartGroup() ;
@@ -1073,11 +1090,39 @@ void cRTFWriter::CreateNote(void)
     }
     ControlWord("pard") ;
     ControlWord("plain") ;
+
+    // the note starts in the notes font set in Preferences
+    std::string noteFontName ;
+    double noteFontSize = 0.0 ;
+    bool noteFont = mEditor->GetLayout() != nullptr &&
+                    mEditor->GetLayout()->GetNoteFont(note.kind, noteFontName, noteFontSize) ;
+    size_t noteFontIndex = 0 ;
+    int noteFontHalfPoints = static_cast<int>(std::lround(noteFontSize * 2.0)) ;
+    if (noteFont)
+    {
+        size_t fontnum = 1 ;
+        for (auto &ffiter : mFinalfont)
+        {
+            if (noteFontName != "Times New Roman" && noteFontName == ffiter.first)
+            {
+                noteFontIndex = fontnum ;
+                break ;
+            }
+            fontnum++ ;
+        }
+        ControlWord("f", noteFontIndex) ;
+        ControlWord("fs", noteFontHalfPoints) ;
+    }
     NewLine() ;
 
     cDocument *savedDocument = mDocument ;
     POSITION_T savedPosition = mCurrentPosition ;
     sRTFParaFormat savedParagraph = paragraph ;
+    if (noteFont)
+    {
+        paragraph.fontindex = noteFontIndex ;
+        paragraph.fontsize = noteFontHalfPoints ;
+    }
     paragraph.character.bold = false ;
     paragraph.character.italics = false ;
     paragraph.character.underline = false ;

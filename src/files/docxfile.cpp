@@ -2543,6 +2543,16 @@ void cDOCXFile::SaveNote(pugi::xml_node &paragraph)
     mWColor.blue = -1 ;
     mWColor.alpha = -1 ;
 
+    // the note starts in the notes font set in Preferences
+    std::string noteFontName ;
+    double noteFontSize = 0.0 ;
+    if (mEditor != nullptr && mEditor->GetLayout() != nullptr &&
+        mEditor->GetLayout()->GetNoteFont(note.kind, noteFontName, noteFontSize))
+    {
+        mWFontName = noteFontName ;
+        mWFontSize = noteFontSize ;
+    }
+
     mDocument = &content ;
     mWNoteIsEndnote = endnote ;
     mWNoteNumberPos = -1 ;
