@@ -21,6 +21,7 @@
 #include "doctest.h"
 
 #include "src/input/wordtsarinput.h"
+#include "src/input/macroscript.h"
 #include "src/gui/editor/editorctrl.h"
 #include "src/core/document/document.h"
 #include <QApplication>
@@ -28,6 +29,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include <unistd.h>
 
@@ -166,4 +168,60 @@ TEST_CASE("GUI key - a typed non-ASCII character is inserted, not taken as a con
 
     CHECK(editor.mInput->CheckControlMode() == false);
     CHECK(editor.GetDocument()->GetText().find("\xC4\x8B") != std::string::npos);
+}
+
+
+namespace {
+class cKeyCountEditor : public cEditorCtrl
+{
+public:
+    void Preferences(void) override
+    {
+        mPreferences++;
+    }
+
+    void NotImplemented(const std::string& command) override
+    {
+        mNotImplemented.push_back(command);
+    }
+
+    int mPreferences = 0;
+    std::vector<std::string> mNotImplemented;
+};
+
+bool MacroKeysPass(const std::string& keys)
+{
+    cMacroScript script;
+    REQUIRE(script.Parse({ "Sub MAIN", "Key(\"" + keys + "\")", "End Sub" }) == true);
+    return script.CheckKeys();
+}
+}
+
+
+TEST_CASE("cWordStarInput - ^OA opens nothing; ^OL and ^ONV are not implemented")
+{
+    ensureQApplication();
+
+    cKeyCountEditor editor;
+    cWordStarInput input(&editor);
+    editor.GetDocument()->Insert("some text");
+    const std::string before = editor.GetDocument()->GetText();
+
+    input.HandleKey(CTRL_O);
+    input.HandleKey('a');
+    CHECK(editor.mPreferences == 0);
+    CHECK(editor.mNotImplemented.empty());
+    CHECK(editor.GetDocument()->GetText() == before);
+    CHECK(editor.GetStatusMessage() == "Auto-align is always on");
+
+    input.HandleKey(CTRL_O);
+    input.HandleKey('l');
+    input.HandleKey(CTRL_O);
+    input.HandleKey('n');
+    input.HandleKey('v');
+    CHECK(editor.mPreferences == 0);
+    CHECK(editor.mNotImplemented == std::vector<std::string>{ "^O-l", "^O-n-v" });
+
+    CHECK(MacroKeysPass("ab^OAc") == true);
+    CHECK(MacroKeysPass("^ONC") == false);
 }
