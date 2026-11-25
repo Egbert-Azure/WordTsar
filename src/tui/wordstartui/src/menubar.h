@@ -46,6 +46,7 @@ struct sMenuEntry
     int hotKeyPos;
     bool isSeparator;
     bool enabled;
+    std::function<bool(void)> checked;   // when set and true, a dot is drawn before the title
     std::vector<sMenuEntry> submenu;
 };
 
@@ -100,7 +101,8 @@ public:
     // populate it via AddSubMenuItem / AddSubMenuSeparator.
     int AddSubMenu(int menuIndex, const std::string& title);
     void AddSubMenuItem(int subHandle, const std::string& title,
-                        std::function<void(void)> callback, bool enabled = true);
+                        std::function<void(void)> callback, bool enabled = true,
+                        std::function<bool(void)> checked = nullptr);
     void AddSubMenuSeparator(int subHandle);
 
     void Draw(cScreen& screen, const cTheme& theme);

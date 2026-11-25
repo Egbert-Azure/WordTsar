@@ -428,7 +428,8 @@ int cMenuBar::AddSubMenu(int menuIndex, const std::string& title)
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cMenuBar::AddSubMenuItem(int subHandle, const std::string& title,
-                              std::function<void(void)> callback, bool enabled)
+                              std::function<void(void)> callback, bool enabled,
+                              std::function<bool(void)> checked)
 {
     if ((subHandle < 0) || (subHandle >= static_cast<int>(mSubHandles.size())))
     {
@@ -441,6 +442,7 @@ void cMenuBar::AddSubMenuItem(int subHandle, const std::string& title,
     sMenuEntry entry = MakeEntry(title);
     entry.callback = callback;
     entry.enabled = enabled;
+    entry.checked = checked;
 
     mItems[static_cast<size_t>(menuIndex)].entries[static_cast<size_t>(entryIndex)].submenu.push_back(entry);
 }
@@ -913,6 +915,10 @@ void cMenuBar::Draw(cScreen& screen, const cTheme& theme)
             screen.FillRect(lineRect, " ", rowStyle);
 
             screen.PutText(entryRow, box.col + 2, entry.title, rowStyle);
+            if (entry.checked && entry.checked() == true)
+            {
+                screen.PutCell(entryRow, box.col + 1, "\xe2\x80\xa2", rowStyle);   // bullet
+            }
 
             if ((entry.hotKeyPos >= 0) &&
                 (entry.hotKeyPos < static_cast<int>(entry.title.size())))

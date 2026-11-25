@@ -1672,9 +1672,9 @@ NoteConvertAction->setEnabled(false) ;
     QAction *NotEndnoteLocationAction = new QAction(mMenuProvider->GetEditNoteEndnoteLocationLabel(), mMenuBar) ;
 
     QAction *ColumnBlockModeAction = new QAction(mMenuProvider->GetEditColumnBlockModeLabel(), mMenuBar) ;
-ColumnBlockModeAction->setEnabled(false) ;
+    ColumnBlockModeAction->setCheckable(true) ;
     QAction *ColumnReplaceModeAction = new QAction(mMenuProvider->GetEditColumnReplaceModeLabel(), mMenuBar) ;
-ColumnReplaceModeAction->setEnabled(false) ;
+    ColumnReplaceModeAction->setCheckable(true) ;
     QAction *AutoAlineAction = new QAction(mMenuProvider->GetEditAutoAlignLabel(), mMenuBar) ;
 AutoAlineAction->setEnabled(false) ;
     QAction *CloseDialogAction = new QAction(mMenuProvider->GetEditCloseDialogLabel(), mMenuBar) ;
@@ -1758,6 +1758,11 @@ CloseDialogAction->setEnabled(false) ;
     EditSettingsMenu->addAction(ColumnReplaceModeAction) ;
     EditSettingsMenu->addAction(AutoAlineAction) ;
     EditSettingsMenu->addAction(CloseDialogAction) ;
+    connect(EditSettingsMenu, &QMenu::aboutToShow, this, [ColumnBlockModeAction, ColumnReplaceModeAction]()
+    {
+        ColumnBlockModeAction->setChecked(cEditorBase::GetColumnMode()) ;
+        ColumnReplaceModeAction->setChecked(cEditorBase::GetColumnReplace()) ;
+    }) ;
 
     // connect things up
     connect(UndoAction, &QAction::triggered, this, &cWordTsar::Undo) ;
@@ -2737,13 +2742,13 @@ void cWordTsar::NoteEndNoteLocation(void)
 
 void cWordTsar::ColumnBlockMode(void)
 {
-    Active()->NotImplemented("^K-n") ;
+    Active()->ToggleColumnMode() ;
 }
 
 
 void cWordTsar::ColumnReplaceMode(void)
 {
-    Active()->NotImplemented("^K-i") ;
+    Active()->ToggleColumnReplace() ;
 }
 
 

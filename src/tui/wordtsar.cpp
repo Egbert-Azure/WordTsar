@@ -1488,8 +1488,12 @@ void cWSWordTsar::BuildMenus(void)
     });
 
     int editSettings = mMenu.AddSubMenu(edit, "Editing Se&ttings");
-    mMenu.AddSubMenuItem(editSettings, std::string("Column Block Mode") + SC("^KN", ""), unavailable, false);
-    mMenu.AddSubMenuItem(editSettings, std::string("Column Replace") + SC("^KI", ""), unavailable, false);
+    mMenu.AddSubMenuItem(editSettings, std::string("Column Block Mode") + SC("^KN", ""),
+                         [this](void) { InjectChord(CTRL_K, 'n'); }, true,
+                         [](void) { return cEditorBase::GetColumnMode(); });
+    mMenu.AddSubMenuItem(editSettings, std::string("Column Replace") + SC("^KI", ""),
+                         [this](void) { InjectChord(CTRL_K, 'i'); }, true,
+                         [](void) { return cEditorBase::GetColumnReplace(); });
     mMenu.AddSubMenuItem(editSettings, std::string("Auto Align") + SC("^OA", ""), unavailable, false);
     mMenu.AddSubMenuItem(editSettings, LB("Closes Dialog", "Close Dialog") + SC("^O Enter", ""), unavailable, false);
 
