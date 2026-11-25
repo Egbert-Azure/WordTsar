@@ -14,6 +14,7 @@ Release history for WordTsar, in reverse chronological order.
 - Footnotes and endnotes export to RTF and DOCX (#91).
 - Closing a note that holds characters the code page cannot write shows a warning. You can keep the note open (#91).
 - &%& gives the total page count (#87).
+- Column blocks. ^KN turns column mode on, so ^KC, ^KV, ^KY, ^K] and ^KZ work on the rectangle between ^KB and ^KK. ^KI turns column replace on. Both are in Edit > Editing Settings, and the macro settings ColMode and ColReplace work (#101).
 
 **Changes**
 
