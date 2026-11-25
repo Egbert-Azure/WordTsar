@@ -409,9 +409,7 @@ const char *LookupQChordHelp(char lower)
 /////////////////////////////////////////////////////////////////////////////
 /// Per-command help text for the ^O (Onscreen Format) chord's sub-letters,
 /// reached via F1, O, <letter>. See KEY_MAPPING.md's "^O Chord" table for
-/// what's actually implemented -- most letters not covered here route to
-/// the shared Preferences dialog rather than their own real WS4/WS7 screen;
-/// that's covered by one shared entry below rather than a guess per letter.
+/// what's actually implemented. Letters WordTsar lacks say so.
 /////////////////////////////////////////////////////////////////////////////
 const char *LookupOChordHelp(char lower)
 {
@@ -465,23 +463,80 @@ const char *LookupOChordHelp(char lower)
             return "^OH - Toggle auto-hyphenation\n\n"
                    "Turns automatic end-of-line hyphenation on or off for the rest "
                    "of the document (on by default)." ;
-        case 'l' :
         case 'g' :
-        case 'x' :
-        case 'i' :
-        case 'o' :
-        case 'u' :
-        case 'f' :
-        case 's' :
+            return "^OG - Temporary indent\n\n"
+                   "Indents the current paragraph one more tab stop. The indent ends "
+                   "after the paragraph." ;
         case 'v' :
-        case 'a' :
+            return "^OV - Center text vertically\n\n"
+                   "Centers the text from the cursor to the next page break between "
+                   "the top and bottom margins of the page." ;
         case 'w' :
+            return "^OW - Word wrap on or off\n\n"
+                   "Turns word wrap off or on by inserting an .aw off or .aw on "
+                   "command." ;
+        case 'a' :
+            return "^OA - Auto align\n\n"
+                   "In WordStar 7, turns auto align off or on. In WordTsar a paragraph "
+                   "is aligned within the margins whenever you edit it, so auto align "
+                   "is always on. The status line says so." ;
+        case 'n' :
+            return "^ON - Notes\n\n"
+                   "Waits for a note key. F opens a new footnote, E a new endnote, "
+                   "D edits the note at the cursor, G goes to the next note. The other "
+                   "note keys are not implemented." ;
         case ' ' :
         case 'b' :
-            return "^O<letter> - Opens Preferences\n\n"
-                   "This Onscreen Format letter doesn't have its own screen in "
-                   "WordTsar; it opens the Preferences dialog instead, where the "
-                   "matching setting lives." ;
+            return "^OB - Screen settings\n\n"
+                   "Opens the Screen Settings dialog." ;
+        case 'l' :
+            return "^OL - Ruler line (not implemented)\n\n"
+                   "In WordStar 7, changes the settings for the left, right, and "
+                   "paragraph margins, and for tabs. WordTsar does not have this "
+                   "command." ;
+        case 'r' :
+            return "^OR - Right margin (not implemented)\n\n"
+                   "In WordStar 7, sets the right margin. WordTsar does not have "
+                   "this command." ;
+        case 'x' :
+            return "^OX - Margin release (not implemented)\n\n"
+                   "WordStar 7 has a margin release command here. WordTsar does not "
+                   "have it." ;
+        case 'i' :
+            return "^OI - Tab settings (not implemented)\n\n"
+                   "In WordStar 7, sets and clears tab stops. WordTsar does not have "
+                   "this command." ;
+        case 'o' :
+            return "^OO - Ruler to text (not implemented)\n\n"
+                   "WordStar 7 has a ruler to text command here. WordTsar does not "
+                   "have it." ;
+        case 'u' :
+            return "^OU - Columns (not implemented)\n\n"
+                   "In WordStar 7, sets up newspaper-style columns. WordTsar does not "
+                   "have this command." ;
+        case 'f' :
+            return "^OF - Paragraph styles (not implemented)\n\n"
+                   "In WordStar 7, selects, defines, and manages paragraph styles. "
+                   "WordTsar does not have this command." ;
+        case 's' :
+            return "^OS - Alignment and spacing (not implemented)\n\n"
+                   "In WordStar 7, opens the Alignment and Spacing dialog for "
+                   "alignment, line spacing, kerning, word wrap, hyphenation, and "
+                   "leading. WordTsar does not have this command." ;
+        case 'k' :
+            return "^OK - Open or switch window (not implemented)\n\n"
+                   "WordTsar has no windows to switch between." ;
+        case 'm' :
+            return "^OM - Size window (not implemented)\n\n"
+                   "WordTsar has no windows to size." ;
+        case 'z' :
+            return "^OZ - Paragraph number (not implemented)\n\n"
+                   "In WordStar 7, inserts a paragraph outline number. WordTsar does "
+                   "not have this command." ;
+        case '#' :
+            return "^O# - Page numbering (not implemented)\n\n"
+                   "In WordStar 7, opens the Page Numbering dialog. WordTsar does "
+                   "not have this command." ;
         default  : return nullptr ;
     }
 }

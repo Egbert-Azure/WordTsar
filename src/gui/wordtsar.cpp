@@ -303,7 +303,7 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
         " <i>I set/clear tabs</i>    <i>E enter soft hyphen</i>             <i>K open or switch window</i>\n"
         " <i>O ruler to text</i>     <i>H turn auto-hyphenation off</i>     <i>M size current window</i>\n"
         " <i>U column layout</i>     <b>J</b> turn justification on         <b>?</b> status\n"
-        " <b>Y</b> page layout       <i>A turn auto-align off</i>           <i>Z paragraph number</i>\n"
+        " <b>Y</b> page layout       <i>A auto-align always on</i>          <i>Z paragraph number</i>\n"
         " <i>F paragraph styles</i>  <i>W turn word wrap off</i>            <i># page numbering</i>\n"
         "                     --------\n"
         "                     <b>&lt;</b> left align paragraph\n"

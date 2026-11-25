@@ -2272,7 +2272,7 @@ std::string cWSWordTsar::GetHelpText(eHelpDisplay help) const
                    " \001I\001 set/clear tabs    \001E\001 enter soft hyphen             \001K\001 open or switch window\n"
                    " \001O\001 ruler to text     \001H\001 turn auto-hyphenation off     \001M\001 size current window\n"
                    " \001U\001 column layout     \001J\001 turn justification on         \001?\001 status\n"
-                   " \001Y\001 page layout       \001A\001 turn auto-align off           \001Z\001 paragraph number\n"
+                   " \001Y\001 page layout       \001A\001 auto-align always on          \001Z\001 paragraph number\n"
                    " \001F\001 paragraph styles  \001W\001 turn word wrap off            \001#\001 page numbering\n"
                    "                     --------\n"
                    "                     \001<\001 left align paragraph\n"
