@@ -2580,6 +2580,22 @@ void cEditorBase::InsertDotCommandEntry(const std::string &dotPrefix, const std:
 /// @return nothing
 ///
 /// @brief
+/// Prompts for the word or phrase to appear in the index and inserts
+/// ".ix <text>" as its own line (^ONI). Cancel or empty text inserts
+/// nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::IndexEntry(void)
+{
+    InsertDotCommandEntry(".ix", PromptText("Index Entry", "Word or phrase to appear in the index:"));
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
 /// Move caret to the end of the current line (End key in WordStar).
 ///
 /////////////////////////////////////////////////////////////////////////////

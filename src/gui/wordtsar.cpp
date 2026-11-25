@@ -3310,16 +3310,9 @@ void cWordTsar::TOCEntry(void)
 
 void cWordTsar::IndexEntry(void)
 {
-    bool ok = false ;
-    QString text = QInputDialog::getText(this, "Index Entry",
-        "Word or phrase to appear in the index:", QLineEdit::Normal, "", &ok) ;
-
-    if (!ok || text.isEmpty())
-    {
-        return ;
-    }
-
-    Active()->InsertDotCommandEntry(".ix", text.toStdString()) ;
+    MenuInput()->HandleKey(CTRL_O) ;
+    MenuInput()->HandleKey('n') ;
+    MenuInput()->HandleKey('i') ;
 }
 
 

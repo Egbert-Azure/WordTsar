@@ -616,7 +616,7 @@ private:
         return true;
     }
 
-    // The key after ^ON: F, E, D and G run, any other key is refused.
+    // The key after ^ON: F, E, D, G and I run, any other key is refused.
     bool NoteKey(const sKeyStroke& key, std::string& refused)
     {
         char c = '\0';
@@ -630,7 +630,7 @@ private:
             c = key.utf8[0];
         }
         c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-        if ((c != '\0') && (std::strchr("fedg", c) != nullptr))
+        if ((c != '\0') && (std::strchr("fedgi", c) != nullptr))
         {
             return true;
         }

@@ -255,7 +255,6 @@ private:
     void GenerateTOCFromFile(void);
     void GenerateIndexFromFile(void);
     void InsertTOCEntry(void);
-    void InsertIndexEntry(void);
 
     void DrawEditor(wordstartui::cScreen& screen, const wordstartui::cTheme& theme);
     void DrawTitleBar(wordstartui::cScreen& screen, int row);

@@ -1548,7 +1548,7 @@ void cWSWordTsar::BuildMenus(void)
     mMenu.AddSeparator(insert);
     int insertIndex = mMenu.AddSubMenu(insert, "&Index/TOC Entry");
     mMenu.AddSubMenuItem(insertIndex, std::string("TOC Entry...") + SC(".tc", ""), [this](void) { InsertTOCEntry(); });
-    mMenu.AddSubMenuItem(insertIndex, std::string("Index Entry...") + SC("^ONI", ""), [this](void) { InsertIndexEntry(); });
+    mMenu.AddSubMenuItem(insertIndex, std::string("Index Entry...") + SC("^ONI", ""), [this](void) { InjectNoteKey('i'); });
     mMenu.AddSubMenuItem(insertIndex, std::string("Mark for Index") + SC("^PK", "Alt+P, K"), [this](void) { InjectChord(CTRL_P, 'k'); });
     mMenu.AddSubMenuItem(insertIndex, std::string("Dot Leader to Tab") + SC("^P.", ""), unavailable, false);
 
@@ -4322,34 +4322,6 @@ void cWSWordTsar::InsertTOCEntry(void)
     }
 
     mEditor->InsertDotCommandEntry(".tc", text);
-}
-
-/////////////////////////////////////////////////////////////////////////////
-///
-/// @return nothing
-///
-/// @brief
-/// Real WS7's own Insert -> Index/TOC Entry -> Index Entry command
-/// (classic ^ONI). Prompts for the word or phrase to appear in the index
-/// -- a leading + bolds its page number, a leading - marks a
-/// cross-reference, a comma adds a subreference -- then inserts
-/// ".ix <text>" as its own line, the same way TOC Entry does.
-///
-/////////////////////////////////////////////////////////////////////////////
-void cWSWordTsar::InsertIndexEntry(void)
-{
-    std::string text;
-    if (wsdialogs::InputBox(this, "Index Entry",
-            "Word or phrase to appear in the index:", text) == false)
-    {
-        return;
-    }
-    if (text.empty())
-    {
-        return;
-    }
-
-    mEditor->InsertDotCommandEntry(".ix", text);
 }
 
 /////////////////////////////////////////////////////////////////////////////
