@@ -23,6 +23,8 @@
 #include "src/gui/editor/editorctrl.h"
 #include "src/gui/layout/layout.h"
 #include "src/core/document/document.h"
+#include "src/input/macroscript.h"
+#include "src/input/wordtsarinput.h"
 
 #include <QApplication>
 #include <algorithm>
@@ -674,6 +676,104 @@ TEST_CASE("SortBlock does nothing without a marked block")
     REQUIRE(doc->GetNumberofParagraphs() == 2);
     CHECK(StartsWith(doc->GetParagraphText(0), "banana"));
     CHECK(StartsWith(doc->GetParagraphText(1), "apple"));
+}
+
+namespace {
+const char COLUMN_TB[] = ".tb 1i 2i";
+
+// .tb line, row 1, the same .tb line, row 2, "end"; the cells of a row
+// are separated by tabs
+std::vector<std::string> ColumnTableCells(const std::vector<std::vector<std::string>>& rows)
+{
+    std::vector<std::string> cells;
+    auto addText = [&cells](const std::string& text)
+    {
+        for (char c : text)
+        {
+            cells.push_back(std::string(1, c));
+        }
+    };
+    for (const auto& row : rows)
+    {
+        addText(COLUMN_TB);
+        cells.push_back("\\r");
+        for (size_t i = 0; i < row.size(); i++)
+        {
+            if (i > 0)
+            {
+                cells.push_back(TAB);
+            }
+            addText(row[i]);
+        }
+        cells.push_back("\\r");
+    }
+    addText("end");
+    return cells;
+}
+
+void PressKeys(cWordStarInput& input, char prefix, char key)
+{
+    input.HandleKey(prefix);
+    input.HandleKey(key);
+}
+}
+
+TEST_CASE("Column block moves and copies a tab column, dot lines stay, one undo each")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cWordStarInput input(&editor);
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+    layout->SetDocument(doc);
+
+    // .tb 0-9 | a1 TAB b1 TAB c1 \r 10-18 | .tb 19-28 | a2 TAB b2 TAB c2 \r 29-37 | end
+    doc->Insert(std::string(COLUMN_TB) + "\ra1");
+    InsertTabMarker(doc);
+    doc->Insert("b1");
+    InsertTabMarker(doc);
+    doc->Insert(std::string("c1\r") + COLUMN_TB + "\ra2");
+    InsertTabMarker(doc);
+    doc->Insert("b2");
+    InsertTabMarker(doc);
+    doc->Insert("c2\rend");
+    layout->LayoutDocument(doc);
+
+    const std::vector<std::string> before = ColumnTableCells({ { "a1", "b1", "c1" }, { "a2", "b2", "c2" } });
+    REQUIRE(Join(Cells(doc)) == Join(before));
+
+    cMacroScript script;
+    REQUIRE(script.Parse({ "Sub MAIN", "Key(\"^KN^KI\")", "End Sub" }) == true);
+    CHECK(script.CheckKeys() == true);
+
+    PressKeys(input, CTRL_K, 'n');
+
+    // the middle column: ^KB at b1, ^KK at c2
+    doc->SetPosition(13);
+    PressKeys(input, CTRL_K, 'b');
+    doc->SetPosition(35);
+    PressKeys(input, CTRL_K, 'k');
+
+    // move it to the end of the rows
+    doc->SetPosition(18);
+    PressKeys(input, CTRL_K, 'v');
+    const std::vector<std::string> moved = ColumnTableCells({ { "a1", "c1", "b1" }, { "a2", "c2", "b2" } });
+    CHECK(Join(Cells(doc)) == Join(moved));
+
+    // column replace: the moved column copied over the first column
+    PressKeys(input, CTRL_K, 'i');
+    doc->SetPosition(10);
+    PressKeys(input, CTRL_K, 'c');
+    CHECK(Join(Cells(doc)) == Join(ColumnTableCells({ { "b1", "c1", "b1" }, { "b2", "c2", "b2" } })));
+
+    input.HandleKey(CTRL_U);
+    CHECK(Join(Cells(doc)) == Join(moved));
+    input.HandleKey(CTRL_U);
+    CHECK(Join(Cells(doc)) == Join(before));
+
+    PressKeys(input, CTRL_K, 'i');
+    PressKeys(input, CTRL_K, 'n');
 }
 
 TEST_CASE("TemporaryIndent brackets the current paragraph with .lm before and after")
