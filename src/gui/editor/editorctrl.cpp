@@ -96,6 +96,7 @@
 #include <QFontDialog>
 #include <QDialog>
 #include <QFontInfo>
+#include <QFontDatabase>
 #include <algorithm>  // for std::sort, std::min
 #include <cmath>      // for std::abs
 #include <ctime>      // for time(), strftime()
@@ -8453,6 +8454,28 @@ void cEditorCtrl::SystemPreferences(void)
     ui.mDefaultFont->setCurrentFont(QFont(QString::fromStdString(config.mDefaultFont)));
     ui.mDefaultFontSize->setValue(config.mDefaultFontSize);
 
+    // Notes fonts: the first item is no font, notes then use the default font
+    auto fillNoteFont = [](QComboBox* box, const std::string& font)
+    {
+        box->addItem(QObject::tr("(Default Font)"), QString());
+        for (const QString& family : QFontDatabase::families())
+        {
+            box->addItem(family, family);
+        }
+        QString name = QString::fromStdString(font);
+        int index = name.isEmpty() ? 0 : box->findData(name);
+        if (index < 0)
+        {
+            box->addItem(name, name);
+            index = box->count() - 1;
+        }
+        box->setCurrentIndex(index);
+    };
+    fillNoteFont(ui.mFootnoteFont, config.mFootnoteFont);
+    ui.mFootnoteFontSize->setValue(config.mFootnoteFontSize);
+    fillNoteFont(ui.mEndnoteFont, config.mEndnoteFont);
+    ui.mEndnoteFontSize->setValue(config.mEndnoteFontSize);
+
     // Measurement: read from in-memory state (set by LoadConfig and ^OB Preferences)
     std::string meas = GetMeasurement();
     if (meas.find('i') != std::string::npos || meas.find('"') != std::string::npos)
@@ -9110,6 +9133,10 @@ void cEditorCtrl::SystemPreferences(void)
         // --- Read back Tab 1: General ---
         config.mDefaultFont = ui.mDefaultFont->currentFont().family().toStdString();
         config.mDefaultFontSize = ui.mDefaultFontSize->value();
+        config.mFootnoteFont = ui.mFootnoteFont->currentData().toString().toStdString();
+        config.mFootnoteFontSize = ui.mFootnoteFontSize->value();
+        config.mEndnoteFont = ui.mEndnoteFont->currentData().toString().toStdString();
+        config.mEndnoteFontSize = ui.mEndnoteFontSize->value();
 
         int newMeasIdx = ui.mMeasurement->currentIndex();
         if (newMeasIdx == 0)
@@ -9235,6 +9262,8 @@ void cEditorCtrl::SystemPreferences(void)
         if (mLayout != nullptr)
         {
             mLayout->SetHyphenationLanguage(mSpellCheckLanguage);
+            mLayout->SetNoteFont(NOTE_KIND_FOOTNOTE, config.GetFootnoteFontDescriptor().value_or(""));
+            mLayout->SetNoteFont(NOTE_KIND_ENDNOTE, config.GetEndnoteFontDescriptor().value_or(""));
         }
         mSpellCheckDotCommands = config.mSpellCheckDotCommands;
         mCaretBlinkRate = config.mCaretBlinkRate;

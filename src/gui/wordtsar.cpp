@@ -1148,6 +1148,10 @@ void cWordTsar::ReadConfig(void)
         mEditor->SetFont(*defaultFont) ;
     }
 
+    // Preferences notes fonts; without one notes use the default font
+    mEditor->GetLayout()->SetNoteFont(NOTE_KIND_FOOTNOTE, config.GetFootnoteFontDescriptor().value_or("")) ;
+    mEditor->GetLayout()->SetNoteFont(NOTE_KIND_ENDNOTE, config.GetEndnoteFontDescriptor().value_or("")) ;
+
     // Show controls
     if (config.mShowControls)
     {
