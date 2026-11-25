@@ -639,25 +639,43 @@ std::vector<sSegmentLayout> cLayout::BuildParagraphSegments(PARAGRAPH_T paragrap
                 continue;
             }
 
-            // Footnote / endnote marker: the width of its reference label in
-            // every mode; with control codes shown, a tag with the note's
-            // first words
+            // Footnote / endnote marker: its own superscript segment, the
+            // width of its reference label at the superscript font in every
+            // mode; with control codes shown, a tag with the note's first words
             if (controlType == STYLE_FOOTNOTE || controlType == STYLE_ENDNOTE)
             {
                 std::string label;
                 std::string tag;
                 if (GetNoteMarkerText(documentPos, label, &tag))
                 {
-                    AddSegmentMarker(currentSegment, pendingMarker);
+                    FlushSegmentIfNonEmpty(segments, currentSegment, currentX);
+
+                    bool wasSubscript = mLayoutState->IsSubscriptActive();
+                    bool wasSuperscript = mLayoutState->IsSuperscriptActive();
+                    mLayoutState->SetSuperscriptActive(true);
+                    mLayoutState->SetSubscriptActive(false);
+                    UpdateCurrentFont();
+
+                    sSegmentLayout noteSegment;
+                    InitializeSegment(noteSegment, paragraphNum, i, lineHeight);
+                    AddSegmentMarker(noteSegment, pendingMarker);
                     if (GetShowControl() == SHOW_ALL)
                     {
-                        AddSegmentTag(currentSegment, tag);
-                        currentSegment.hasControlCodes = true;
-                        currentSegment.controlCodeIndices.push_back(currentSegment.length);
+                        AddSegmentTag(noteSegment, tag);
+                        noteSegment.hasControlCodes = true;
+                        noteSegment.controlCodeIndices.push_back(0);
                     }
-                    currentSegment.position.push_back(currentX);
-                    currentSegment.length++;
-                    currentX += GetTextWidth(label);
+                    noteSegment.position.push_back(0);
+                    noteSegment.length = 1;
+                    noteSegment.totalWidth = GetTextWidth(label);
+                    segments.push_back(noteSegment);
+
+                    mLayoutState->SetSubscriptActive(wasSubscript);
+                    mLayoutState->SetSuperscriptActive(wasSuperscript);
+                    UpdateCurrentFont();
+
+                    InitializeSegment(currentSegment, paragraphNum, i + 1, lineHeight);
+                    currentX = 0;
                     continue;
                 }
             }
