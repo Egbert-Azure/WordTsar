@@ -14522,3 +14522,47 @@ TEST_CASE("Layout: GetDisplayCharacter shows a soft tab as '>' in SHOW_ALL")
     std::string grapheme = doc->GetCharNoAdvance(0);
     CHECK(layout->GetDisplayCharacter(0, grapheme) == ">");
 }
+
+
+TEST_CASE("Footnote number is laid out as superscript and keeps the line height")
+{
+    ensureQApplication();
+
+    sNote note;
+    note.symbol = NOTE_NUMBER;
+    note.text = "a note";
+
+    cDocument plain;
+    plain.Insert("Hello world\r");
+    cLayout plainLayout;
+    plainLayout.SetShowControl(SHOW_NONE);
+    plainLayout.LayoutDocument(&plain);
+
+    cDocument noted;
+    noted.Insert("Hello");
+    noted.InsertFootnote(note);
+    noted.Insert(" world\r");
+    cLayout notedLayout;
+    notedLayout.SetShowControl(SHOW_NONE);
+    notedLayout.LayoutDocument(&noted);
+
+    const sLineLayout* plainLine = plainLayout.GetLineByRawLineNumber(0);
+    const sLineLayout* notedLine = notedLayout.GetLineByRawLineNumber(0);
+    REQUIRE(plainLine != nullptr);
+    REQUIRE(notedLine != nullptr);
+    REQUIRE(plainLine->segments.empty() == false);
+
+    const sSegmentLayout* number = nullptr;
+    for (const sSegmentLayout& seg : notedLine->segments)
+    {
+        if (seg.startPosition == 5)
+        {
+            number = &seg;
+        }
+    }
+    REQUIRE(number != nullptr);
+    CHECK(number->isSuperscript);
+    CHECK(FontUtils::FontFromDescriptor(number->font).pointSizeF() <
+          FontUtils::FontFromDescriptor(plainLine->segments[0].font).pointSizeF());
+    CHECK(notedLine->lineheight == plainLine->lineheight);
+}
