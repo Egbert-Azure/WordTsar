@@ -4031,6 +4031,18 @@ TEST_CASE("Find starts at the cursor and G searches the whole document")
         editor.FindAgain();
         CHECK(doc->GetPosition() == 6);
     }
+
+    SUBCASE("Backward Find on a hard return does not find a match after the cursor")
+    {
+        // "alpha technofeudalism omega" HARD_RETURN at 27, "technofeudalism" at 28
+        doc->SetPosition(27);
+        doc->Insert(HARD_RETURN);
+        doc->Insert("technofeudalism");
+        doc->SetPosition(27);
+        editor.mSearchBackwards = true;
+        editor.Find();
+        CHECK(doc->GetPosition() == 6);
+    }
 }
 
 
