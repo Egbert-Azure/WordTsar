@@ -24,6 +24,7 @@ Release history for WordTsar, in reverse chronological order.
 - Changed: a superscript digit the code page cannot hold is saved as a digit between ^T toggles (#93).
 - Changed: the save warning counts only the characters that are lost (#93).
 - Changed: ^OL, ^OX, ^OI, ^OO, ^OU, ^OF, ^OS, ^OR, ^ONA, ^ONC and ^ONV say they are not implemented, and ^OA says auto-align is always on. Optional Hyphen, Vertically Center, Type Word and Sort Block are enabled in the menus where the keys already worked (#100).
+- Changed: ^KP, File > Print and Ctrl+P in Modern mode print instead of opening the print preview. ^QL checks from the cursor in both apps. ^ONI inserts an index entry. Keep Lines Together on Page asks for the line count and inserts .cp n. Thesaurus is enabled in ws. In Modern mode, Center Line and Right Align Line show Alt+O,C and Alt+O,] (#100).
 
 **Fixes**
 
