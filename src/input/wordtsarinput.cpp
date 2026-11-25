@@ -309,8 +309,8 @@ const char *LookupKChordHelp(char lower)
                    "deleted block, and a moved or copied block pushes the text at the "
                    "cursor to the right." ;
         case 'p' :
-            return "^KP - Print preview\n\n"
-                   "Opens print preview for the current document." ;
+            return "^KP - Print\n\n"
+                   "Prints the current document." ;
         default  : return nullptr ;
     }
 }
@@ -386,13 +386,17 @@ const char *LookupQChordHelp(char lower)
                    "Forces the entire document to be fully re-paginated and redrawn." ;
         case 'l' :
             return "^QL - Spell check document\n\n"
-                   "Checks the spelling of every word in the document." ;
+                   "Checks the spelling of the words from the cursor to the end of the "
+                   "document." ;
         case 'n' :
             return "^QN - Spell check word\n\n"
                    "Checks the spelling of the word at the cursor." ;
         case 'o' :
             return "^QO - Add word to dictionary\n\n"
                    "Adds a word you specify to the spelling dictionary." ;
+        case 'j' :
+            return "^QJ - Thesaurus\n\n"
+                   "Shows synonyms for the word at the cursor." ;
         case '0' :
         case '1' :
         case '2' :
@@ -499,8 +503,9 @@ const char *LookupOChordHelp(char lower)
         case 'n' :
             return "^ON - Notes\n\n"
                    "Waits for a note key. F opens a new footnote, E a new endnote, "
-                   "D edits the note at the cursor, G goes to the next note. The other "
-                   "note keys are not implemented." ;
+                   "D edits the note at the cursor, G goes to the next note, I asks for "
+                   "an index entry and inserts an .ix line. The other note keys are "
+                   "not implemented." ;
         case ' ' :
         case 'b' :
             return "^OB - Screen settings\n\n"
