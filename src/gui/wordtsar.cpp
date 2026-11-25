@@ -3642,8 +3642,6 @@ void cWordTsar::KeepLinesTogetherColumn(void)
 void cWordTsar::SpellCheckGlobal(void)
 {
     MenuInput()->HandleKey(CTRL_Q) ;
-    MenuInput()->HandleKey('r') ;
-    MenuInput()->HandleKey(CTRL_Q) ;
     MenuInput()->HandleKey('l') ;
 }
 

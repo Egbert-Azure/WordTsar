@@ -870,7 +870,7 @@ QString cWordStarMenuProvider::GetLayoutKeepLinesTogetherColumnLabel(void) const
 
 QString cWordStarMenuProvider::GetUtilSpellCheckGlobalLabel(void) const
 {
-    return "&Spell Check Global\t^QR^QL";
+    return "&Spell Check Global\t^QL";
 }
 
 QString cWordStarMenuProvider::GetUtilSpellCheckRestLabel(void) const

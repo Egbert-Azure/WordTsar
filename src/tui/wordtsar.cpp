@@ -1631,10 +1631,10 @@ void cWSWordTsar::BuildMenus(void)
 
     // ----------------------------- Utilities ----------------------------
     int util = mMenu.AddMenu("Utilities", 'U');
-    mMenu.AddSubItem(util, std::string("&Spell Check Global") + SC("^QL", ""), [this](void) { Active()->SpellCheckDocument(); });
+    mMenu.AddSubItem(util, std::string("&Spell Check Global") + SC("^QL", ""), [this](void) { InjectChord(CTRL_Q, 'l'); });
 
     int utilSpell = mMenu.AddSubMenu(util, "Spell Check Ot&her");
-    mMenu.AddSubMenuItem(utilSpell, std::string("Rest of Document") + SC("^QL", ""), [this](void) { Active()->SpellCheckDocument(); });
+    mMenu.AddSubMenuItem(utilSpell, std::string("Rest of Document") + SC("^QL", ""), [this](void) { InjectChord(CTRL_Q, 'l'); });
     mMenu.AddSubMenuItem(utilSpell, std::string("Word") + SC("^QN", ""), [this](void) { Active()->SpellCheckWord(); });
     mMenu.AddSubMenuItem(utilSpell, std::string("Type Word...") + SC("^QO", ""), [this](void) { InjectChord(CTRL_Q, 'o'); });
 
