@@ -1581,3 +1581,40 @@ TEST_CASE("ws - ^ONF opens a footnote pane below the text that ^KD writes as one
     CHECK_FALSE(doc->GetNote(3, note));
     CHECK_FALSE(doc->CanUndo());
 }
+
+
+TEST_CASE("cWSEditorView - the footnote number is a superscript segment with ^OD on and off")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    sNote note;
+    note.symbol = NOTE_NUMBER;
+    note.text = "a note";
+
+    doc->Insert("Hello");
+    doc->InsertFootnote(note);
+    doc->Insert(" world\r");
+
+    for (eShowControl mode : { SHOW_ALL, SHOW_NONE })
+    {
+        CAPTURE(static_cast<int>(mode));
+        layout->SetShowControl(mode);
+        editor.LayoutDocument(true);
+
+        const sLineLayout* line = layout->GetLineByRawLineNumber(0);
+        REQUIRE(line != nullptr);
+        const sSegmentLayout* number = nullptr;
+        for (const sSegmentLayout& seg : line->segments)
+        {
+            if (seg.startPosition == 5)
+            {
+                number = &seg;
+            }
+        }
+        REQUIRE(number != nullptr);
+        CHECK(number->isSuperscript);
+    }
+}
