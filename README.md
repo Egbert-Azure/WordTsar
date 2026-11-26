@@ -80,7 +80,7 @@ And, **WordTsar** has simplicity. A quality people miss in our pressured time!
 - WordTsar uses UTF-8 for all in-memory storage of the document and supports Unicode version 16.
 - File → Print currently opens print preview, same as File → Print Preview — real WordStar's `^KP` prints directly instead, a known deviation not yet fixed (see `KEY_MAPPING.md`). The preview dialog has its own Print button, so printing is still reachable. The TUI's own Print menu item (not the `^KP` keystroke) does print directly via CUPS.
 - Spell check dictionary language (System Preferences > Editor) is applied on macOS via `NSSpellChecker`, so any installed system dictionary (not just English) works.
-- DOCX import is partial: paragraph text, character formatting, and basic page setup come through, but tables, list numbering, images, and header/footer content do not import yet. DOCX export doesn't cover tables or headers/footers either. See `WHATS_NEW.md` for the full state.
+- Word import brings over text, character formatting and basic page setup. Tables come in as rows on tab stops and numbered lists with their numbers as text; images, headers and footers don't come in yet. DOCX export doesn't cover tables or headers/footers either. See `WHATS_NEW.md` for the full state.
 
 ## Credit where it belongs
 
