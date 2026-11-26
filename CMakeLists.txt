@@ -600,6 +600,8 @@ set(WORDTSAR_AUTO_INCREMENT_BUILD OFF CACHE BOOL "Auto-increment build number on
 # Read version from persistent version.txt file
 set(VERSION_FILE "${CMAKE_SOURCE_DIR}/version.txt")
 if(EXISTS "${VERSION_FILE}")
+    # A change to version.txt reconfigures, so Info.plist follows version.h.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${VERSION_FILE}")
     file(STRINGS "${VERSION_FILE}" VERSION_LINES)
     foreach(LINE ${VERSION_LINES})
         if(LINE MATCHES "^MAJOR=([0-9]+)")
