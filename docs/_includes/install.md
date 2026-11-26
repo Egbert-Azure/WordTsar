@@ -5,3 +5,7 @@
 On macOS 14 Sonoma and earlier, right-click `WordTsar.app`, choose **Open**, and confirm instead.
 
 Comfortable in Terminal? `xattr -dr com.apple.quarantine /Applications/WordTsar.app` does the same. You may need to repeat this after installing a new release.
+
+`ws`, the terminal version, isn't in the 0.18.0 download. Build it from source with `-DBUILD_TUI=ON`; see [BUILDING.md](https://github.com/Egbert-Azure/WordTsar/blob/main/BUILDING.md).
+
+The [templates folder](https://github.com/Egbert-Azure/WordTsar/blob/main/templates/README.md) holds the book template BOOK.WS and the macro kit.
