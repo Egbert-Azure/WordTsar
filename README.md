@@ -19,7 +19,7 @@ WordTsar is still Beta, but stable. I write in it every day. It isn't a project 
 
 Checked against Robert J. Sawyer's archive: 238 of its 259 WordStar files come back identical after saving and loading again. The other 21 are known and on the list for 1.0.
 
-This is version **0.18.0**, macOS only.
+This is version **0.19.0**, macOS only.
 
 ## Install
 
