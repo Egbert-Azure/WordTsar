@@ -7866,6 +7866,53 @@ TEST_CASE("Mousewheel - Multiple events accumulate")
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// Test small trackpad pixel deltas scroll by their pixel distance
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Mousewheel - Small pixel deltas scroll by pixels")
+{
+    if (!QApplication::instance())
+    {
+        static int argc = 0;
+        static char* argv[] = {nullptr};
+        new QApplication(argc, argv);
+    }
+
+    cEditorCtrl editor;
+
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+
+    for (int i = 0; i < 100; ++i)
+    {
+        doc->Insert("Line ");
+        doc->Insert(std::to_string(i));
+        doc->Insert(".\r");
+    }
+
+    layout->SetDocument(doc);
+    layout->LayoutDocument(doc);
+
+    editor.resize(800, 600);
+    editor.SetScrollOffset(0);
+
+    for (int i = 0; i < 10; ++i)
+    {
+        QWheelEvent event(QPointF(400, 300), QPointF(400, 300),
+                         QPoint(0, -4), QPoint(0, -4),
+                         Qt::NoButton, Qt::NoModifier,
+                         Qt::ScrollPhase::ScrollUpdate, false);
+        QCoreApplication::sendEvent(&editor, &event);
+    }
+
+    REQUIRE(editor.GetPageScale() > 0);
+    COORD_T expectedOffset = 40.0 / editor.GetPageScale();
+    CHECK(editor.GetScrollOffset() == doctest::Approx(expectedOffset).epsilon(0.001));
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @brief
 /// Test ParseDotCommand with math expressions in dot commands
 ///

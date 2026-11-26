@@ -388,6 +388,7 @@ private:
     bool mIdleLayoutRunning = false;      // OnIdle() has rescheduled itself
     double mPageScale;                    // Dynamic page zoom scale
     COORD_T mHorizScrollOffset;           // Horizontal scroll in twips (follows the caret)
+    int mWheelAngleRemainder = 0;         // Wheel angle delta not yet turned into whole lines
 
     // Visual display colors (Qt-specific)
     QColor mBGroundColour;                // Background color

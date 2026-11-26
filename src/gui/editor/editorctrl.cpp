@@ -1488,21 +1488,31 @@ void cEditorCtrl::wheelEvent(QWheelEvent* event)
         return;
     }
 
-    // Get wheel delta
+    QPoint pixelDelta = event->pixelDelta();
     QPoint angleDelta = event->angleDelta();
 
-    if (angleDelta.y() == 0)
+    if (pixelDelta.y() == 0 && angleDelta.y() == 0)
     {
         event->ignore();
         return;
     }
 
-    // Calculate scroll amount
-    int numDegrees = angleDelta.y() / 8;
-    int numSteps = numDegrees / 15;
+    COORD_T scrollAmount = 0;
+    if (pixelDelta.y() != 0 && mPageScale > 0)
+    {
+        // Trackpad: scroll by the pixel distance, converted to twips
+        scrollAmount = -static_cast<COORD_T>(pixelDelta.y()) / mPageScale;
+    }
+    else
+    {
+        // Wheel: 120 units scroll one line; the remainder carries to the next event
+        mWheelAngleRemainder += angleDelta.y();
+        int numSteps = mWheelAngleRemainder / 120;
+        mWheelAngleRemainder -= numSteps * 120;
 
-    COORD_T lineHeight = mLayout->GetAverageLineHeight();
-    COORD_T scrollAmount = -numSteps * lineHeight;
+        COORD_T lineHeight = mLayout->GetAverageLineHeight();
+        scrollAmount = -numSteps * lineHeight;
+    }
 
     // Apply scroll (base class method handles everything)
     SetScrollOffset(mScrollOffset + scrollAmount);
