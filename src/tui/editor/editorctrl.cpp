@@ -1115,6 +1115,7 @@ void cWSEditorCtrl::LayoutDocument(bool force)
     {
         mLayout->LayoutDocument(mDocument);
         mLayoutParagraph = mDocument->GetNumberofParagraphs();
+        mChangedSinceUpdate = false;
     }
     else
     {

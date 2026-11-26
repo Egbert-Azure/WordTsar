@@ -7849,6 +7849,8 @@ void cEditorCtrl::LayoutDocument(bool force)
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
     });
 
+    mChangedSinceUpdate = false ;
+
     // Stop formatting progress indicator
     StopProgress();
 
