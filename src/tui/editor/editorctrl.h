@@ -175,6 +175,8 @@ public:
     void RelayoutAndRedraw(void);
     bool IdleLayout(void);
     bool HasPendingLayout(void) const;
+    bool IsIdleLayoutRunning(void) const override;
+    void GetParagraphsOnScreen(PARAGRAPH_T& first, PARAGRAPH_T& last) override;
 
     // ---- Quit state ----
     bool QuitRequested(void) const { return mQuit; }

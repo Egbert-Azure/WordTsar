@@ -1167,6 +1167,8 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
         return;
     }
 
+    mEditor->LayoutOutdatedParagraphsOnScreen();
+
     sStyle normal = StyleFor(mEditor->mTextColour, mEditor->mBGroundColour, wordstartui::CELL_ATTR_NONE);
     sStyle flagStyle = StyleFor(mEditor->mFlagFg, mEditor->mFlagBg, wordstartui::CELL_ATTR_NONE);
 

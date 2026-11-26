@@ -1047,6 +1047,56 @@ bool cWSEditorCtrl::HasPendingLayout(void) const
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true while background layout has work (HasPendingLayout())
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSEditorCtrl::IsIdleLayoutRunning(void) const
+{
+    return HasPendingLayout();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  first [out] paragraph of the view's first line
+/// @param  last  [out] paragraph of the last line the view's rows can hold
+///
+/// @return nothing
+///
+/// @brief
+/// The paragraphs in the window from the line range the view reported
+/// with SetViewport().
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::GetParagraphsOnScreen(PARAGRAPH_T& first, PARAGRAPH_T& last)
+{
+    first = 0;
+    last = 0;
+    if (!mLayout)
+    {
+        return;
+    }
+
+    LINE_T total = mLayout->GetNumberOfLines();
+    if (total <= 0)
+    {
+        return;
+    }
+
+    LINE_T top = std::min(std::max(mViewFirstLine, LINE_T(0)), total - 1);
+    LINE_T bottom = std::min(top + std::max(mViewRows, 1) - 1, total - 1);
+    PARAGRAPH_T topPara = mLayout->GetParagraphFromLine(top);
+    PARAGRAPH_T bottomPara = mLayout->GetParagraphFromLine(bottom);
+    if (topPara >= 0)
+    {
+        first = topPara;
+    }
+    last = std::max(bottomPara, first);
+}
+
+
 // =========================================================================
 // Undo / Redo
 // =========================================================================
