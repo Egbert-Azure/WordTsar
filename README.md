@@ -17,6 +17,8 @@ All credit for WordTsar's design and implementation goes to Gerald Brandt — th
 
 WordTsar is still Beta, but stable. I write in it every day. It isn't a project I test and set aside, it's the tool I'm using right now. I still find things as I go and fix them as I find them; see `WHATS_NEW.md` for the running list.
 
+Checked against Robert J. Sawyer's archive: 238 of its 259 WordStar files come back identical after saving and loading again. The other 21 are known and on the list for 1.0.
+
 This is version **0.18.0**, macOS only.
 
 ## Install
