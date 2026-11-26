@@ -696,13 +696,19 @@ void cDOCXFile::HandleParagraphNode(pugi::xml_node node, int depth)
 
     for(pugi::xml_node run : ParagraphRuns(node))
     {
-        std::string text = run.child("w:t").text().get() ;
+        // a run counts if it holds text or a tab
+        bool content = false ;
+        for(pugi::xml_node child = run.first_child() ; child && !content ; child = child.next_sibling())
+        {
+            std::string name = child.name() ;
+            content = (name == "w:t" && *child.text().get() != '\0') || name == "w:tab" || name == "w:ptab" ;
+        }
         // Hidden runs (w:vanish) are how comment lines get preserved on
         // export (SaveDotCommand) -- bringing them back as ordinary visible
         // text on import would surface hidden content instead of keeping it
         // hidden, so skip their text entirely.
         bool hidden = !run.child("w:rPr").child("w:vanish").empty() ;
-        if(!text.empty() && !hidden)
+        if(content && !hidden)
         {
             // see if we have a style associated with this run
             std::string stylename = run.child("w:rPr").child("w:rStyle").attribute("w:val").value() ;
@@ -747,7 +753,7 @@ void cDOCXFile::HandleParagraphNode(pugi::xml_node node, int depth)
                 virtual bool for_each(pugi::xml_node& node)
                 {
                     std::string name = node.name() ;
-                    if(name == "w:tab")
+                    if(name == "w:tab" || name == "w:ptab")
                     {
                         sWSTab tab ;
                         tab.abstabsize = 0 ;
