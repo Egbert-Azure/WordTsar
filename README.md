@@ -23,9 +23,9 @@ This is version **0.18.0**, macOS only.
 
 ## Install
 
-Download `WordTsar.dmg` from the [Releases page](https://github.com/Egbert-Azure/WordTsar/releases), open it, and drag `WordTsar` onto `Applications`.
+See the [install steps on the website](https://wordtsar.myvortexcloud.com/#install).
 
-The build is self-signed, so macOS warns about an unidentified developer. Right-click `WordTsar.app`, choose Open, then confirm.
+Developers can build from source, see [BUILDING.md](BUILDING.md).
 
 ## Building
 
