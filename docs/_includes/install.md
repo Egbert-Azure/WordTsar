@@ -14,6 +14,6 @@ Comfortable in Terminal? `xattr -dr com.apple.quarantine /Applications/WordTsar.
 2. `rm -f ~/bin/ws && cp /Volumes/WordTsar/ws ~/bin/`
 3. `echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc` puts `~/bin` on your PATH. You only need this once.
 4. `xattr -d com.apple.quarantine ~/bin/ws` lets macOS run it. If it says there is no such attribute, carry on.
-5. Open a new Terminal window and type `ws` and a file name, such as `ws mybook.ws`.
+5. Open a new Terminal window and type `ws`, on its own or followed by the name of an existing file. `ws` doesn't keep the name of a file that doesn't exist yet.
 
 The templates folder in the download holds BOOK.WS and the macro kit; see [templates/README.md](https://github.com/Egbert-Azure/WordTsar/blob/main/templates/README.md).
