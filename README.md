@@ -44,20 +44,20 @@ TUI (terminal-based version):
 
 <table>
   <tr>
-    <td width="33%"><img src="docs/screenshots/ws-look-block-menu.png" width="100%" alt="Block and Save menu in the WordStar 7 look"></td>
-    <td width="33%"><img src="docs/screenshots/ws-look-edit-menu.png" width="100%" alt="Edit menu in the WordStar 7 look"></td>
+    <td width="33%"><img src="docs/screenshots/ws-look-block-menu.png" width="100%" alt="A document with footnote numbers and a page break line in the WordStar 7 look"></td>
+    <td width="33%"><img src="docs/screenshots/ws-look-edit-menu.png" width="100%" alt="System Preferences in the WordStar 7 look"></td>
     <td width="33%"><img src="docs/screenshots/ws-look-utilities-menu.png" width="100%" alt="Utilities menu in the WordStar 7 look"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Block &amp; Save menu</sub></td>
-    <td align="center"><sub>Edit menu</sub></td>
+    <td align="center"><sub>Footnotes and page break</sub></td>
+    <td align="center"><sub>System Preferences</sub></td>
     <td align="center"><sub>Utilities menu</sub></td>
   </tr>
 </table>
 
 GUI (macOS app version):
 
-![WordTsar running as a macOS app](docs/screenshots/WordTsar-gui.png)
+![WordTsar running as a macOS app, with System Preferences open](docs/screenshots/WordTsar-gui.png)
 
 You get the best of both worlds: the classic terminal view, or the macOS GUI — install whichever you prefer, or both. Distraction-free writing, no bloat, one keystroke away.
 And, **WordTsar** has simplicity. A quality people miss in our pressured time!
