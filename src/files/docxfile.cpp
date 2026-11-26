@@ -66,7 +66,8 @@
  *   wasn't part of what this pass was asked to cover
  * - Header/footer text content is not imported (only the page margin
  *   distances reserved for them are read from w:pgMar)
- * - Advanced features (tracked changes, comments) are skipped
+ * - Tracked changes import as accepted; comments are skipped
+ * - Links import as their text; the address is dropped
  *
  * @author Gerald Brandt
  * @copyright GNU Affero General Public License v3.0
@@ -170,6 +171,53 @@ const char* node_types[] =
 
 
 cDOCXFile * gDOCXFile = nullptr ;
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  parent [in] a w:p or an inline wrapper inside one
+/// @param  runs [out] receives the w:r nodes in document order
+///
+/// @brief
+/// Collect the runs of a paragraph, including runs inside links, tracked
+/// insertions, moves, smart tags, custom XML, bidi wrappers, simple fields
+/// and inline content controls. Runs in w:del and w:moveFrom are left out.
+///
+/////////////////////////////////////////////////////////////////////////////
+static void CollectRuns(pugi::xml_node parent, std::vector<pugi::xml_node> &runs)
+{
+    for(pugi::xml_node child = parent.first_child() ; child ; child = child.next_sibling())
+    {
+        std::string name = child.name() ;
+        if(name == "w:r")
+        {
+            runs.push_back(child) ;
+        }
+        else if(name == "w:hyperlink" || name == "w:ins" || name == "w:moveTo" ||
+                name == "w:smartTag" || name == "w:customXml" || name == "w:dir" ||
+                name == "w:bdo" || name == "w:fldSimple")
+        {
+            CollectRuns(child, runs) ;
+        }
+        else if(name == "w:sdt")
+        {
+            CollectRuns(child.child("w:sdtContent"), runs) ;
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  paragraph [in] a w:p node
+///
+/// @return the paragraph's runs in document order (see CollectRuns)
+///
+/////////////////////////////////////////////////////////////////////////////
+static std::vector<pugi::xml_node> ParagraphRuns(pugi::xml_node paragraph)
+{
+    std::vector<pugi::xml_node> runs ;
+    CollectRuns(paragraph, runs) ;
+    return runs ;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -613,8 +661,7 @@ void cDOCXFile::HandleParagraphNode(pugi::xml_node node, int depth)
     EmitTabs(node, basestyle) ;
     EmitNumbering(node) ;
 
-    pugi::xml_node run = node.child("w:r") ;
-    while(run)
+    for(pugi::xml_node run : ParagraphRuns(node))
     {
         std::string text = run.child("w:t").text().get() ;
         // Hidden runs (w:vanish) are how comment lines get preserved on
@@ -703,9 +750,7 @@ void cDOCXFile::HandleParagraphNode(pugi::xml_node node, int depth)
         if(page == "page")
         {
             EmitPage() ;
-        }        
-
-        run = run.next_sibling("w:r") ;
+        }
     }
 
     mDocument->Insert(HARD_RETURN) ;
@@ -755,7 +800,7 @@ std::string cDOCXFile::ExtractCellText(pugi::xml_node cellNode)
         }
         firstParagraph = false ;
 
-        for(pugi::xml_node run = para.child("w:r") ; run ; run = run.next_sibling("w:r"))
+        for(pugi::xml_node run : ParagraphRuns(para))
         {
             text += run.child("w:t").text().get() ;
         }

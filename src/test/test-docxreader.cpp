@@ -401,3 +401,52 @@ TEST_CASE("DOCX reader - custom tab stops emit a real .tb dot command")
     }
     CHECK(sawTabCommand) ;
 }
+
+
+TEST_CASE("DOCX reader - links, tracked changes, fields and content controls import as accepted text")
+{
+    std::string body =
+        "<w:p>"
+        "<w:r><w:t xml:space=\"preserve\">Plain </w:t></w:r>"
+        "<w:hyperlink w:anchor=\"top\"><w:r><w:rPr><w:b/></w:rPr><w:t>link</w:t></w:r></w:hyperlink>"
+        "<w:ins w:id=\"1\" w:author=\"A\"><w:r><w:t xml:space=\"preserve\"> inserted</w:t></w:r></w:ins>"
+        "<w:del w:id=\"2\" w:author=\"A\"><w:r><w:delText xml:space=\"preserve\"> deleted</w:delText></w:r></w:del>"
+        "<w:fldSimple w:instr=\" DATE \"><w:r><w:t xml:space=\"preserve\"> field</w:t></w:r></w:fldSimple>"
+        "<w:sdt><w:sdtPr/><w:sdtContent><w:r><w:t xml:space=\"preserve\"> control</w:t></w:r></w:sdtContent></w:sdt>"
+        "</w:p>"
+        "<w:sdt><w:sdtPr/><w:sdtContent><w:p><w:r><w:t>Block</w:t></w:r></w:p></w:sdtContent></w:sdt>" ;
+
+    std::string path = "/tmp/wordtsar_docxtest_wrappers.docx" ;
+    BuildTestDocx(path, body) ;
+
+    ensureQApplication() ;
+    cEditorCtrl editor ;
+    editor.GetDocument()->Clear() ;
+    cDOCXFile reader(&editor) ;
+    reader.LoadFile(path) ;
+
+    // Visible text with bold toggles shown as <b>; other markers dropped.
+    cDocument *doc = editor.GetDocument() ;
+    std::string text ;
+    for (POSITION_T pos = 0 ; pos < doc->GetTextSize() - 1 ; pos++)
+    {
+        std::string g = doc->GetCharNoAdvance(pos) ;
+        if (g.size() == 1 && static_cast<unsigned char>(g[0]) == MARKER_CHAR)
+        {
+            if (doc->GetControlChar(pos) == STYLE_BOLD)
+            {
+                text += "<b>" ;
+            }
+        }
+        else if (g == "\r")
+        {
+            text += "|" ;
+        }
+        else
+        {
+            text += g ;
+        }
+    }
+
+    CHECK(text == "Plain <b>link<b> inserted field control|Block|") ;
+}
