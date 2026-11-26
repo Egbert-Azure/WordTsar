@@ -1127,8 +1127,8 @@ void cWSEditorCtrl::LayoutDocument(bool force)
         mLayoutParagraph = std::min(totalParas, static_cast<PARAGRAPH_T>(10));
     }
 
-    // Refresh cached column width after layout (font may have changed)
-    mColumnWidth = mLayout->GetTextWidth("x");
+    // Column width is the width of "x" in the default font
+    mColumnWidth = mLayout->GetTextWidth("x", mLayout->GetDefaultFont());
 }
 
 

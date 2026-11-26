@@ -1894,3 +1894,55 @@ TEST_CASE("cWSEditorView - a decimal stop lines up proportional text in screen c
     CHECK(ScreenText(screen, secondRow, secondCol + stopCol - 2, 5) == "12.50");
     CHECK(ScreenText(screen, thirdRow, thirdCol + stopCol - 7, 9) == "1234567.5");
 }
+
+
+TEST_CASE("cWSEditorView - a whole number ends where a decimal stop's units digit is, in ws's own column width")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+    COORD_T courierX = layout->GetTextWidth("x", "Courier New|12.0|0|0|0|0|0");
+    REQUIRE(courierX > 0);
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 60, 200});
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    sInternalFonts font;
+    font.fontname = "Helvetica";
+    font.size = 10.0;
+    font.haveWSFont = false;
+    font.name = "Helvetica";
+
+    doc->Insert(".tb #3i\r");
+    POSITION_T firstPos = doc->GetPosition();
+    doc->Insert("Fee");
+    doc->InsertTab(tab);
+    doc->Insert("10");
+    POSITION_T zeroPos = doc->GetPosition();
+    doc->Insert("0\r");
+    POSITION_T secondPos = doc->GetPosition();
+    doc->Insert("Tax");
+    doc->InsertTab(tab);
+    doc->Insert("1");
+    POSITION_T twoPos = doc->GetPosition();
+    doc->Insert("2.50\r");
+    doc->InsertFont(font);
+    doc->Insert("Note\r");
+
+    layout->SetShowControl(SHOW_NONE);
+    editor.LayoutDocument(true);
+    CHECK(editor.GetColumnWidth() == courierX);
+
+    int firstCol = CaretColumnAt(editor, view, firstPos);
+    int zeroCol = CaretColumnAt(editor, view, zeroPos);
+    int secondCol = CaretColumnAt(editor, view, secondPos);
+    int twoCol = CaretColumnAt(editor, view, twoPos);
+    CHECK(zeroCol - firstCol == twoCol - secondCol);
+}
