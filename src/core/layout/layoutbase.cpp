@@ -5239,10 +5239,13 @@ void cLayoutBase::JustifyLine(sLineLayout& line, bool isFinalLineOfParagraph, CO
 /////////////////////////////////////////////////////////////////////////////
 sTabStop cLayoutBase::FindNextTabStop(COORD_T currentPosition) const
 {
-    // Find first tab stop > currentPosition
+    // Find first tab stop > currentPosition. A position within a hundredth
+    // of a twip of a stop counts as on that stop, so floating point rounding
+    // (1.35i is 1944.0000000000002 twips) does not return the same stop again.
+    const COORD_T tolerance = 0.01;
     for (const sTabStop& tab : mLayoutState->GetTabs())
     {
-        if (tab.position > currentPosition)
+        if (tab.position > currentPosition + tolerance)
         {
             return tab;
         }

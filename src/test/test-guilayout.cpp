@@ -1803,3 +1803,51 @@ TEST_CASE("BuildParagraphSegments() - an index mark shows K with ^OD on, nothing
     }
     layout.SetMarkersVisible(true);
 }
+
+
+TEST_CASE("Layout - two tabs in a row in a .tb table skip a stop and keep the row on one line")
+{
+    ensureQApplication();
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    sInternalFonts font;
+    font.fontname = "Courier New";
+    font.size = 18.0;
+    font.haveWSFont = false;
+    font.name = "Courier New";
+
+    cDocument doc;
+    doc.Insert(".pr or=l\r.tb 1.35i 4.8i 6.15i\r");
+    doc.InsertFont(font);
+    doc.Insert("CURSOR");
+    doc.InsertTab(tab);
+    doc.InsertTab(tab);
+    POSITION_T deletePos = doc.GetPosition();
+    doc.Insert("DELETE\r");
+
+    cLayout layout;
+    layout.SetDocument(&doc);
+    layout.SetShowControl(SHOW_NONE);
+    layout.SetActiveParagraph(-1);
+    layout.SetMarkersVisible(false);
+    layout.SetPrintLayout(true);
+    layout.LayoutDocument(&doc);
+
+    PARAGRAPH_T paraNum = doc.GetParagraphFromPosition(deletePos);
+    const sParagraphLayout* para = layout.GetParagraphLayout(paraNum);
+    REQUIRE(para != nullptr);
+    CHECK(para->lines.size() == 1);
+
+    // DELETE starts at the 4.8i stop, 4.8 inches right of CURSOR
+    COORD_T deleteX = layout.FindCoordInLine(deletePos, layout.GetLineFromPosition(deletePos));
+    COORD_T lineStartX = layout.FindCoordInLine(deletePos - 8, layout.GetLineFromPosition(deletePos - 8));
+    CHECK(deleteX - lineStartX == doctest::Approx(4.8 * TWIPSPERINCH).epsilon(0.001));
+
+    layout.SetMarkersVisible(true);
+    layout.SetPrintLayout(false);
+}
