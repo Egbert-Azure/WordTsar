@@ -841,7 +841,19 @@ std::string cDOCXFile::ExtractCellText(pugi::xml_node cellNode)
 
         for(pugi::xml_node run : ParagraphRuns(para))
         {
-            text += run.child("w:t").text().get() ;
+            // tabs and line breaks inside a cell become spaces
+            for(pugi::xml_node child = run.first_child() ; child ; child = child.next_sibling())
+            {
+                std::string name = child.name() ;
+                if(name == "w:t")
+                {
+                    text += child.text().get() ;
+                }
+                else if(name == "w:tab" || name == "w:ptab" || name == "w:br" || name == "w:cr")
+                {
+                    text += " " ;
+                }
+            }
         }
     }
 

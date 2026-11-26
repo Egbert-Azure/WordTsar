@@ -476,3 +476,29 @@ TEST_CASE("DOCX reader - a run holding only a space keeps the space")
     }
     CHECK(text == "bold word") ;
 }
+
+
+TEST_CASE("DOCX reader - a table cell keeps all text of a run with a tab or break")
+{
+    std::string body =
+        "<w:tbl>"
+        "<w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc>"
+               "<w:tc><w:p><w:r><w:t>b</w:t><w:tab/><w:t>c</w:t><w:br/><w:t>d</w:t></w:r></w:p></w:tc></w:tr>"
+        "</w:tbl>" ;
+
+    std::string path = "/tmp/wordtsar_docxtest_cellrun.docx" ;
+    BuildTestDocx(path, body) ;
+    std::vector<std::string> paragraphs = LoadDOCXParagraphs(path) ;
+
+    // The row: "a", one tab stop, then the whole second cell on the same line.
+    std::string row ;
+    for (auto &p : paragraphs)
+    {
+        if (p.rfind("a", 0) == 0)
+        {
+            row = p ;
+        }
+    }
+    std::string expected = std::string("a") + static_cast<char>(MARKER_CHAR) + "b c d" ;
+    CHECK(row.substr(0, row.find_last_not_of("\r\n") + 1) == expected) ;
+}
