@@ -450,3 +450,29 @@ TEST_CASE("DOCX reader - links, tracked changes, fields and content controls imp
 
     CHECK(text == "Plain <b>link<b> inserted field control|Block|") ;
 }
+
+
+TEST_CASE("DOCX reader - a run holding only a space keeps the space")
+{
+    std::string body =
+        "<w:p>"
+        "<w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r>"
+        "<w:r><w:t xml:space=\"preserve\"> </w:t></w:r>"
+        "<w:r><w:t>word</w:t></w:r>"
+        "</w:p>" ;
+
+    std::string path = "/tmp/wordtsar_docxtest_spacerun.docx" ;
+    BuildTestDocx(path, body) ;
+    std::vector<std::string> paragraphs = LoadDOCXParagraphs(path) ;
+    REQUIRE(!paragraphs.empty()) ;
+
+    std::string text ;
+    for (char c : paragraphs[0])
+    {
+        if (static_cast<unsigned char>(c) != static_cast<unsigned char>(MARKER_CHAR) && c != '\r')
+        {
+            text += c ;
+        }
+    }
+    CHECK(text == "bold word") ;
+}

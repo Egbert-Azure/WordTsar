@@ -345,7 +345,7 @@ bool cDOCXFile::LoadFile(std::string filename)
         zip_entry_close(zip);
         zip_close(zip);
 
-        document.load_buffer(docbuf, bufsize);
+        document.load_buffer(docbuf, bufsize, pugi::parse_default | pugi::parse_ws_pcdata_single);
 
         parent = document.child("w:document").child("w:body") ;
 
