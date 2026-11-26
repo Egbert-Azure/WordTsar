@@ -3618,7 +3618,41 @@ bool cEditorCtrl::IdleLayout(void)
 
     // LAYOUT ONE PARAGRAPH (Requirement #1: Equality-based stopping)
     // LayoutParagraph returns true if layout unchanged from previous, false if changed
+    // Repaint when the paragraph's old or new lines are on screen
+    // (page view: pagey + page offset, as GetLastVisibleParagraph)
+    COORD_T viewportTop = mScrollOffset;
+    COORD_T viewportBottom = mScrollOffset + GetViewportHeight();
+    auto lineY = [this](const sLineLayout& line) -> COORD_T
+    {
+        if (mDisplaySettings.mode == DISPLAY_PAGE)
+        {
+            return line.pagey + (line.pagenumber - 1) * (mLayout->GetPaperHeight() + mDisplaySettings.pageGap);
+        }
+        return line.screeny;
+    };
+    auto onScreen = [&](PARAGRAPH_T para)
+    {
+        if (para >= mLayout->GetNumberOfParagraphs())
+        {
+            return false;
+        }
+        const sParagraphLayout* paragraph = mLayout->GetParagraphLayout(para);
+        if (!paragraph || paragraph->lines.empty())
+        {
+            return false;
+        }
+        const sLineLayout& lastLine = paragraph->lines.back();
+        return lineY(lastLine) + lastLine.lineheight >= viewportTop
+               && lineY(paragraph->lines.front()) <= viewportBottom;
+    };
+    bool wasOnScreen = onScreen(mLayoutParagraph);
+
     bool same = mLayout->LayoutParagraph(mLayoutParagraph);
+
+    if (wasOnScreen || onScreen(mLayoutParagraph))
+    {
+        update();
+    }
 
     // CHECKPOINT-BASED EARLY STOPPING
     // If formatting state at a checkpoint boundary matches the old checkpoint,
