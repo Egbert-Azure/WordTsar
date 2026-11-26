@@ -1721,3 +1721,51 @@ TEST_CASE("cWSEditorView - two tabs in a row in a .tb table put the text at the 
     view.Draw(screen);
     CHECK(ScreenText(screen, view.GetCaretRow(), cursorCol + stopCols, 6) == "DELETE");
 }
+
+
+TEST_CASE("cWSEditorView - each .tb table puts its rows at its own stops")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 60, 200});
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    doc->Insert(".tb 1i 5i\r");
+    POSITION_T firstPos = doc->GetPosition();
+    doc->Insert("A");
+    doc->InsertTab(tab);
+    doc->Insert("FIRST\r");
+    doc->Insert(".tb 3i 5i\r");
+    POSITION_T secondPos = doc->GetPosition();
+    doc->Insert("A");
+    doc->InsertTab(tab);
+    doc->Insert("SECOND\r");
+
+    layout->SetShowControl(SHOW_NONE);
+    editor.LayoutDocument(true);
+
+    COORD_T twipsPerCol = editor.GetColumnWidth();
+    REQUIRE(twipsPerCol > 0);
+    int firstStop = static_cast<int>(1 * TWIPSPERINCH / twipsPerCol);
+    int secondStop = static_cast<int>(3 * TWIPSPERINCH / twipsPerCol);
+
+    int firstCol = CaretColumnAt(editor, view, firstPos);
+    int firstRow = view.GetCaretRow();
+    int secondCol = CaretColumnAt(editor, view, secondPos);
+    int secondRow = view.GetCaretRow();
+
+    wordstartui::cScreen screen;
+    screen.Resize(60, 200);
+    view.Draw(screen);
+    CHECK(ScreenText(screen, firstRow, firstCol + firstStop, 5) == "FIRST");
+    CHECK(ScreenText(screen, secondRow, secondCol + secondStop, 6) == "SECOND");
+}

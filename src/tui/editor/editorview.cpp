@@ -453,8 +453,6 @@ int cWSEditorView::LineEndCol(const sLineLayout* line, COORD_T twipsPerCol) cons
     int col = LineStartCol(line, twipsPerCol);
     POSITION_T docPos = line->documentPosition;
     POSITION_T paraStart = line->documentPosition - line->linestart;
-    int tabStopCol = -1;
-    COORD_T tabStopTwips = 0;
 
     for (const sSegmentLayout& seg : line->segments)
     {
@@ -469,7 +467,7 @@ int cWSEditorView::LineEndCol(const sLineLayout* line, COORD_T twipsPerCol) cons
                 docPos++;
                 continue;
             }
-            int nextCol = TabEndCol(col, twipsPerCol, tabStopCol, tabStopTwips);
+            int nextCol = TabEndCol(line, seg, col, twipsPerCol);
             col = nextCol;
             docPos++;
             continue;
@@ -609,39 +607,50 @@ bool cWSEditorView::IsAlignmentTab(const sSegmentLayout& seg) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  const sLineLayout* line [in] line that holds the tab
+/// @param  const sSegmentLayout& seg [in] the tab segment, an element of line->segments
 /// @param  int col [in] screen column where the tab starts
 /// @param  COORD_T twipsPerCol [in] monospace column width in twips
-/// @param  int& stopCol [in/out] column of the last tab stop reached, -1 for none
-/// @param  COORD_T& stopTwips [in/out] position of that tab stop in twips
 ///
 /// @return the screen column where the tab ends
 ///
 /// @brief
-/// A tab that starts on the column of the previous tab stop looks up the next
-/// stop from that stop's position, so a stop between two columns is not found
-/// again. Otherwise the lookup starts at col * twipsPerCol.
+/// The tab ends at the column of the stop the layout gave it, rounded down:
+/// the widths and tab widths of the segments before it plus its own tabWidth,
+/// from the line's indent. A tab that would not move past col ends at col + 1.
 ///
 /////////////////////////////////////////////////////////////////////////////
-int cWSEditorView::TabEndCol(int col, COORD_T twipsPerCol, int& stopCol, COORD_T& stopTwips) const
+int cWSEditorView::TabEndCol(const sLineLayout* line, const sSegmentLayout& seg, int col, COORD_T twipsPerCol) const
 {
-    COORD_T currentTwips = static_cast<COORD_T>(col) * twipsPerCol;
-    if (col == stopCol)
+    COORD_T stopTwips = 0;
+    const sBoxes* box = mEditor->GetLayout()->GetBoxByIndex(line->boxIndex);
+    if ((box != nullptr) && (line->pagex > box->left))
     {
-        currentTwips = stopTwips;
+        stopTwips = line->pagex - box->left;
     }
 
-    sTabStop nextStop = mEditor->GetLayout()->GetNextTabStop(currentTwips);
-    int nextCol = static_cast<int>(nextStop.position / twipsPerCol);
+    for (const sSegmentLayout& before : line->segments)
+    {
+        if (&before == &seg)
+        {
+            break;
+        }
+        stopTwips += before.totalWidth;
+        if (before.isTab == true)
+        {
+            stopTwips += before.tabWidth;
+        }
+    }
+    stopTwips += seg.tabWidth;
+
+    int nextCol = static_cast<int>(stopTwips / twipsPerCol);
     if (nextCol <= col)
     {
-        stopCol = -1;
         return col + 1;
     }
-
-    stopCol = nextCol;
-    stopTwips = nextStop.position;
     return nextCol;
 }
+
 
 /////////////////////////////////////////////////////////////////////////////
 ///
@@ -709,8 +718,6 @@ int cWSEditorView::LogicalColumnAt(const sLineLayout* line, POSITION_T position)
     int col = LineStartCol(line, twipsPerCol);
     POSITION_T docPos = line->documentPosition;
     POSITION_T paraStart = line->documentPosition - line->linestart;
-    int tabStopCol = -1;
-    COORD_T tabStopTwips = 0;
 
     for (const sSegmentLayout& seg : line->segments)
     {
@@ -729,7 +736,7 @@ int cWSEditorView::LogicalColumnAt(const sLineLayout* line, POSITION_T position)
                 docPos++;
                 continue;
             }
-            int nextCol = TabEndCol(col, twipsPerCol, tabStopCol, tabStopTwips);
+            int nextCol = TabEndCol(line, seg, col, twipsPerCol);
             col = nextCol;
             docPos++;
             continue;
@@ -882,8 +889,6 @@ POSITION_T cWSEditorView::PositionInLine(const sLineLayout* line, int targetScre
     int col = LineStartCol(line, twipsPerCol);
     POSITION_T docPos = line->documentPosition;
     POSITION_T paraStart = line->documentPosition - line->linestart;
-    int tabStopCol = -1;
-    COORD_T tabStopTwips = 0;
 
     if (targetCol <= col)
     {
@@ -909,7 +914,7 @@ POSITION_T cWSEditorView::PositionInLine(const sLineLayout* line, int targetScre
                 docPos++;
                 continue;
             }
-            int nextCol = TabEndCol(col, twipsPerCol, tabStopCol, tabStopTwips);
+            int nextCol = TabEndCol(line, seg, col, twipsPerCol);
 
             if (targetCol < nextCol)
             {
@@ -1261,8 +1266,6 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
         int col = startCol;
         POSITION_T docPos = line->documentPosition;
         POSITION_T paraStart = line->documentPosition - line->linestart;
-        int tabStopCol = -1;
-        COORD_T tabStopTwips = 0;
         sStyle markerStyle = StyleFor(mEditor->mHighlightFgColour, mEditor->mHighlightColour, wordstartui::CELL_ATTR_NONE);
 
         // A column block marks the line's part in the rectangle, not segments
@@ -1360,7 +1363,7 @@ void cWSEditorView::Draw(wordstartui::cScreen& screen)
                 }
 
                 int currentCol = col;
-                int nextCol = TabEndCol(currentCol, twipsPerCol, tabStopCol, tabStopTwips);
+                int nextCol = TabEndCol(line, seg, currentCol, twipsPerCol);
 
                 // Tab-type marker shown at the tab's start in Show-All mode.
                 std::string tabMarker = ">";
