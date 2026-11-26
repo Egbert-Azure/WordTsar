@@ -185,7 +185,7 @@ codesign --force --sign - build/release/ws
 packaging/macos/make-dmg.sh build/release
 ```
 
-The image is written to `build/release/WordTsar.dmg`. Before it makes the image, the script checks the app's version against `version.txt`, the signatures, links to Homebrew or `~/Qt`, and the minimum macOS version. If a check fails, it stops and leaves no `.dmg`.
+The image is written to `build/release/WordTsar.dmg`. Before it makes the image, the script checks the app's version against `version.txt`, the signatures, links to Homebrew or `~/Qt`, rpaths outside `@executable_path` or `@loader_path`, Qt frameworks missing from the app, and the minimum macOS version. If a check fails, it stops and leaves no `.dmg`.
 
 ## Testing
 

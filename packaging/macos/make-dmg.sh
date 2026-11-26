@@ -7,7 +7,8 @@
 #
 # The image holds WordTsar.app, ws, templates/ (from the files committed in
 # HEAD) and an Applications link. It is written to <build-folder>/WordTsar.dmg.
-# An existing WordTsar.dmg there is removed first, so a failed run leaves none.
+# An existing WordTsar.dmg there is removed first, and a run that fails after
+# the image was made deletes it, so a failed run leaves none.
 # All checks run on the staged copies before the image is made.
 
 set -u
@@ -28,9 +29,13 @@ OUT_DMG="$BUILD_DIR/WordTsar.dmg"
 
 WORK=""
 MOUNTED=""
+DMG_UNFINISHED=""
 cleanup() {
     if [ -n "$MOUNTED" ]; then
         hdiutil detach -quiet "$MOUNTED" >/dev/null 2>&1 || hdiutil detach -quiet -force "$MOUNTED" >/dev/null 2>&1
+    fi
+    if [ -n "$DMG_UNFINISHED" ]; then
+        rm -f "$OUT_DMG"
     fi
     if [ -n "$WORK" ] && [ -d "$WORK" ]; then
         rm -rf "$WORK"
@@ -68,6 +73,19 @@ min_versions() {
         /cmd LC_VERSION_MIN_MACOSX$/ { want = "version" }
         want != "" && $1 == want     { print $2; want = "" }
         /^Load command/              { want = "" }'
+}
+
+# Prints every LC_RPATH path of a Mach-O file, one per line.
+rpaths() {
+    otool -l "$1" | awk '
+        /cmd LC_RPATH$/          { want = 1; next }
+        /^Load command/          { want = 0 }
+        want && $1 == "path"     { sub(/^[ \t]*path /, ""); sub(/ \(offset [0-9]+\)$/, ""); print; want = 0 }'
+}
+
+# Prints every library path otool -L lists for a Mach-O file, one per line.
+linked_paths() {
+    otool -L "$1" | grep "$(printf '\t')" | sed -e 's/^[[:space:]]*//' -e 's/ (compatibility version .*)$//'
 }
 
 is_macho() {
@@ -122,6 +140,8 @@ STRAY=$(find "$STAGE" -name '.DS_Store' -o -name '._*')
 [ -z "$STRAY" ] || fail "stray files in the image: $STRAY"
 
 BAD_LINKS=""
+BAD_RPATHS=""
+MISSING_FW=""
 MACHO_COUNT=0
 while IFS= read -r -d '' f; do
     is_macho "$f" || continue
@@ -133,10 +153,44 @@ while IFS= read -r -d '' f; do
 $hits
 "
     fi
+    while IFS= read -r r; do
+        case "$r" in
+            ""|@executable_path|@executable_path/*|@loader_path|@loader_path/*) ;;
+            *) BAD_RPATHS="$BAD_RPATHS${f#$STAGE/}: $r
+" ;;
+        esac
+    done <<< "$(rpaths "$f")"
+    case "$f" in
+        "$APP"/*)
+            while IFS= read -r dep; do
+                case "$dep" in
+                    *Qt*.framework/*) ;;
+                    *) continue ;;
+                esac
+                fw=$(echo "$dep" | sed 's#^\(.*/\)\{0,1\}\(Qt[^/]*\.framework\)/.*#\2#')
+                case "$fw" in
+                    Qt*.framework) ;;
+                    *) continue ;;
+                esac
+                if [ ! -d "$APP/Contents/Frameworks/$fw" ]; then
+                    case "$MISSING_FW" in
+                        *"$fw
+"*) ;;
+                        *) MISSING_FW="$MISSING_FW$fw
+" ;;
+                    esac
+                fi
+            done <<< "$(linked_paths "$f")"
+            ;;
+    esac
 done < <(find "$APP" "$WS" -type f -print0)
 [ "$MACHO_COUNT" -ge 2 ] || fail "no Mach-O files found in WordTsar.app"
 [ -z "$BAD_LINKS" ] || fail "links to /opt/homebrew or $HOME/Qt:
 $BAD_LINKS"
+[ -z "$BAD_RPATHS" ] || fail "LC_RPATH outside @executable_path or @loader_path:
+$BAD_RPATHS"
+[ -z "$MISSING_FW" ] || fail "Qt frameworks missing from WordTsar.app/Contents/Frameworks:
+$MISSING_FW"
 
 codesign --verify --deep --strict "$APP" || fail "codesign --verify failed for WordTsar.app"
 codesign --verify --deep --strict "$WS" || fail "codesign --verify failed for ws"
@@ -162,6 +216,7 @@ done
 TMP_DMG="$WORK/WordTsar.dmg"
 hdiutil create -quiet -volname "WordTsar" -srcfolder "$STAGE" -format UDZO "$TMP_DMG" \
     || fail "hdiutil create failed"
+DMG_UNFINISHED=1
 mv "$TMP_DMG" "$OUT_DMG" || fail "cannot move image to $OUT_DMG"
 
 MNT="$WORK/mnt"
@@ -170,8 +225,9 @@ hdiutil attach -quiet -readonly -nobrowse -noautoopen -mountpoint "$MNT" "$OUT_D
     || fail "cannot attach $OUT_DMG to list it"
 MOUNTED="$MNT"
 echo "$OUT_DMG (WordTsar $VERSION):"
-ls -la "$MNT"
+ls -la "$MNT" || fail "cannot list $MNT"
 echo "templates:"
-(cd "$MNT" && find templates | sort)
+(set -o pipefail; cd "$MNT" && find templates | sort) || fail "cannot list templates in $MNT"
 hdiutil detach -quiet "$MNT" || fail "cannot detach $MNT"
 MOUNTED=""
+DMG_UNFINISHED=""
