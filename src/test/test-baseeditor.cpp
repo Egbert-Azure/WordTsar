@@ -3014,6 +3014,73 @@ TEST_CASE("Paste of paragraphs at the bottom of the window leaves no old layout 
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Pasting six short paragraphs with the caret above the window: before
+/// idle layout runs, every pasted paragraph has the line positions of a
+/// full layout.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Paste of paragraphs with the caret above the window lays out every pasted paragraph")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    for (int i = 0; i < 80; i++)
+    {
+        doc->Insert("Long paragraph text that wraps over more than one line "
+                    "in a narrow window, with enough words to wrap twice.\r");
+    }
+    editor.resize(400, 300);
+    editor.SetShowControls(SHOW_NONE);
+    editor.SetDisplayMode(DISPLAY_CONTINUOUS);
+    layout->LayoutDocument(doc);
+    REQUIRE(layout->GetParagraphLayout(0)->lines.size() >= 2);
+
+    // caret in paragraph 2, window scrolled down to paragraph 40
+    PARAGRAPH_T caretPara = 2;
+    POSITION_T start = 0;
+    POSITION_T end = 0;
+    doc->GetParagraphStartandEnd(caretPara, start, end);
+    doc->SetPosition(start);
+    editor.SetScrollOffset(layout->GetParagraphLayout(40)->lines.front().screeny);
+    int passes = 0;
+    while (editor.IdleLayout() && passes < 100000)
+    {
+        passes++;
+    }
+    editor.GetLastVisibleParagraph();
+    REQUIRE(layout->GetParagraphLayout(caretPara)->lines.back().screeny < editor.GetScrollOffset());
+
+    editor.InsertPastedText("A\rB\rC\rD\rE\rF\r");
+    editor.PerformPostCommandUpdate();
+
+    std::vector<std::vector<sLineLayout>> incremental;
+    for (PARAGRAPH_T para = caretPara; para < caretPara + 6; para++)
+    {
+        incremental.push_back(layout->GetParagraphLayout(para)->lines);
+    }
+
+    layout->LayoutDocument(doc);
+
+    for (PARAGRAPH_T para = caretPara; para < caretPara + 6; para++)
+    {
+        const std::vector<sLineLayout>& full = layout->GetParagraphLayout(para)->lines;
+        const std::vector<sLineLayout>& inc = incremental[para - caretPara];
+        CAPTURE(para);
+        REQUIRE(inc.size() == full.size());
+        for (size_t i = 0; i < full.size(); i++)
+        {
+            CHECK(inc[i].screeny == full[i].screeny);
+        }
+    }
+}
+
+
 namespace
 {
 

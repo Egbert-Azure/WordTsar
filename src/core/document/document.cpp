@@ -871,9 +871,10 @@ void cDocument::Insert(const std::string &text)
         EndUndoGroup() ;
     }
 
-    // notify listeners of document content change
-    // (mIsLoading was restored above, so this fires only for normal edits)
-    NotifyChanged(GetParagraphFromPosition(mCurrentPosition)) ;
+    // notify listeners of document content change from the paragraph where
+    // the insert began (mIsLoading was restored above, so this fires only
+    // for normal edits)
+    NotifyChanged(GetParagraphFromPosition(insertPosition)) ;
 }
 
 
@@ -1898,7 +1899,7 @@ void cDocument::InsertRaw(const std::string &text)
                      CaptureCharacters(insertPosition, length), insertPosition) ;
     }
 
-    NotifyChanged(GetParagraphFromPosition(mCurrentPosition)) ;
+    NotifyChanged(GetParagraphFromPosition(insertPosition)) ;
 }
 
 
