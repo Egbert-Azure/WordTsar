@@ -2,7 +2,7 @@
 
 Release history for WordTsar, in reverse chronological order.
 
-## Next release
+## 0.19.0 (2026-11-26)
 
 **Additions**
 
@@ -29,6 +29,7 @@ Release history for WordTsar, in reverse chronological order.
 - Fixed: in ws, text at right, centre and decimal tab stops now lines up on the stop (#104).
 - Fixed: in ws, the tab stops and ruler no longer move when the document ends in another font (#104).
 - Fixed: after a paste or block copy, paragraphs on screen could be drawn from their old layout until a cursor key (#105).
+- Fixed: DOCX import dropped the text of links, tracked insertions, simple fields and content controls, including a table of contents kept in one. It also dropped runs holding only a tab or a space (#107).
 
 ## 0.18.0 (2026-11-24)
 
