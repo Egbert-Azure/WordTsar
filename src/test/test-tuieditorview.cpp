@@ -1769,3 +1769,56 @@ TEST_CASE("cWSEditorView - each .tb table puts its rows at its own stops")
     CHECK(ScreenText(screen, firstRow, firstCol + firstStop, 5) == "FIRST");
     CHECK(ScreenText(screen, secondRow, secondCol + secondStop, 6) == "SECOND");
 }
+
+
+TEST_CASE("cWSEditorView - right and decimal .tb stops line up their columns as in print")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 60, 200});
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    doc->Insert(".tb >3i #5i\r");
+    POSITION_T firstPos = doc->GetPosition();
+    doc->Insert("Total");
+    doc->InsertTab(tab);
+    doc->Insert("Amount");
+    doc->InsertTab(tab);
+    doc->Insert("12.50\r");
+    POSITION_T secondPos = doc->GetPosition();
+    doc->Insert("Sum");
+    doc->InsertTab(tab);
+    doc->Insert("Tax");
+    doc->InsertTab(tab);
+    doc->Insert("1234.5\r");
+
+    layout->SetShowControl(SHOW_NONE);
+    editor.LayoutDocument(true);
+
+    COORD_T twipsPerCol = editor.GetColumnWidth();
+    REQUIRE(twipsPerCol > 0);
+    int rightStop = static_cast<int>(3 * TWIPSPERINCH / twipsPerCol);
+    int decimalStop = static_cast<int>(5 * TWIPSPERINCH / twipsPerCol);
+
+    int firstCol = CaretColumnAt(editor, view, firstPos);
+    int firstRow = view.GetCaretRow();
+    int secondCol = CaretColumnAt(editor, view, secondPos);
+    int secondRow = view.GetCaretRow();
+
+    wordstartui::cScreen screen;
+    screen.Resize(60, 200);
+    view.Draw(screen);
+    CHECK(ScreenText(screen, firstRow, firstCol + rightStop - 6, 6) == "Amount");
+    CHECK(ScreenText(screen, secondRow, secondCol + rightStop - 3, 3) == "Tax");
+    CHECK(ScreenText(screen, firstRow, firstCol + decimalStop - 2, 5) == "12.50");
+    CHECK(ScreenText(screen, secondRow, secondCol + decimalStop - 4, 6) == "1234.5");
+}

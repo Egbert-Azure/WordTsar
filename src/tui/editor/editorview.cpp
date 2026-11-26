@@ -617,7 +617,11 @@ bool cWSEditorView::IsAlignmentTab(const sSegmentLayout& seg) const
 /// @brief
 /// The tab ends at the column of the stop the layout gave it, rounded down:
 /// the widths and tab widths of the segments before it plus its own tabWidth,
-/// from the line's indent. A tab that would not move past col ends at col + 1.
+/// from the line's indent. When text follows, the tab ends at the column of
+/// that text's first x position, so right, centre and decimal stops align it
+/// as in print. Text that the layout moved back to the preceding text starts
+/// at col, or at col + 1 right after another tab. Any other tab that would
+/// not move past col ends at col + 1.
 ///
 /////////////////////////////////////////////////////////////////////////////
 int cWSEditorView::TabEndCol(const sLineLayout* line, const sSegmentLayout& seg, int col, COORD_T twipsPerCol) const
@@ -629,10 +633,18 @@ int cWSEditorView::TabEndCol(const sLineLayout* line, const sSegmentLayout& seg,
         stopTwips = line->pagex - box->left;
     }
 
-    for (const sSegmentLayout& before : line->segments)
+    COORD_T indentTwips = stopTwips;
+    const sSegmentLayout* previous = nullptr;
+    const sSegmentLayout* following = nullptr;
+    for (size_t si = 0; si < line->segments.size(); ++si)
     {
+        const sSegmentLayout& before = line->segments[si];
         if (&before == &seg)
         {
+            if (si + 1 < line->segments.size())
+            {
+                following = &line->segments[si + 1];
+            }
             break;
         }
         stopTwips += before.totalWidth;
@@ -640,8 +652,28 @@ int cWSEditorView::TabEndCol(const sLineLayout* line, const sSegmentLayout& seg,
         {
             stopTwips += before.tabWidth;
         }
+        previous = &before;
     }
     stopTwips += seg.tabWidth;
+
+    // Text after the tab starts where the layout placed it
+    if ((following != nullptr) && (following->isTab == false) && (following->position.empty() == false))
+    {
+        int textCol = static_cast<int>((indentTwips + following->position[0]) / twipsPerCol);
+        if ((textCol < static_cast<int>(stopTwips / twipsPerCol)) && (textCol <= col))
+        {
+            // Text wider than the room before an aligned stop follows the preceding text
+            if ((previous != nullptr) && (previous->isTab == true))
+            {
+                return col + 1;
+            }
+            return col;
+        }
+        if (textCol > col)
+        {
+            return textCol;
+        }
+    }
 
     int nextCol = static_cast<int>(stopTwips / twipsPerCol);
     if (nextCol <= col)
