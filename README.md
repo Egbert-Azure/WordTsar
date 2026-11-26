@@ -61,7 +61,7 @@ GUI (macOS app version):
 
 ![WordTsar running as a macOS app, with System Preferences open](docs/screenshots/WordTsar-gui.png)
 
-You get the best of both worlds: the classic terminal view, or the macOS GUI. The download holds the Mac app; `ws` is built from source (see [Building](#building)). Distraction-free writing, no bloat, one keystroke away.
+You get the best of both worlds: the classic terminal view, or the macOS GUI — install whichever you prefer, or both. Distraction-free writing, no bloat, one keystroke away.
 And, **WordTsar** has simplicity. A quality people miss in our pressured time!
 
 ## Notes
