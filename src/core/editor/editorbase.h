@@ -679,6 +679,7 @@ protected:
     bool mOwnsDocument;                   // true if this editor created the document
     bool mDocumentDirty;                  // set by listener, cleared after relayout
     PARAGRAPH_T mDirtyFromParagraph;      // earliest paragraph affected by change
+    bool mChangedSinceUpdate;             // document changed since the last post-command update
     int mBatchUpdateCount;                // > 0 suppresses listener visual updates
     bool mListenerHandledUpdate;          // set by OnDocumentChanged, checked by keyPressEvent
     cEditorBase* mSiblingEditor;          // sibling editor for reveal codes caret sync (nullptr when no reveal codes)

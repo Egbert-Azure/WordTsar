@@ -161,6 +161,7 @@ cEditorBase::cEditorBase(void)
     , mOwnsDocument(true)
     , mDocumentDirty(false)
     , mDirtyFromParagraph(0)
+    , mChangedSinceUpdate(false)
     , mBatchUpdateCount(0)
     , mListenerHandledUpdate(false)
     , mSiblingEditor(nullptr)
@@ -271,6 +272,7 @@ cEditorBase::~cEditorBase(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::OnDocumentChanged(PARAGRAPH_T fromParagraph)
 {
+    mChangedSinceUpdate = true ;
     if (mDocumentDirty)
     {
         // already dirty -- track earliest affected paragraph
@@ -304,6 +306,7 @@ void cEditorBase::OnDocumentCleared(void)
     }
     mDocumentDirty = true ;
     mDirtyFromParagraph = 0 ;
+    mChangedSinceUpdate = true ;
 }
 
 
@@ -451,10 +454,99 @@ void cEditorBase::PerformPostCommandUpdate(void)
         endPara = totalParas - 1 ;
     }
 
-    for (PARAGRAPH_T para = startPara ; para <= endPara ; ++para)
+    if (mChangedSinceUpdate)
     {
-        mLayout->LayoutParagraph(para) ;
+        // Lay out from the first changed paragraph through the visible range
+        // and on until a paragraph starts below the window bottom after
+        // scrolling to the caret
+        PARAGRAPH_T visibleEnd = endPara ;
+        startPara = std::max(std::min(startPara, mDirtyFromParagraph), PARAGRAPH_T(0)) ;
+        PARAGRAPH_T caretPara = mDocument->GetParagraphFromPosition(mDocument->GetPosition()) ;
+        COORD_T viewportHeight = GetViewportHeight() ;
+        if (mDisplaySettings.mode == DISPLAY_PAGE)
+        {
+            viewportHeight -= mDisplaySettings.pageBorder ;
+        }
+        COORD_T viewportTop = mScrollOffset ;
+        COORD_T viewportBottom = mScrollOffset + viewportHeight ;
+        COORD_T stopY = 0 ;
+        bool haveStopY = false ;
+
+        endPara = startPara ;
+        for (PARAGRAPH_T para = startPara ; para < totalParas ; ++para)
+        {
+            mLayout->LayoutParagraph(para) ;
+            endPara = para ;
+
+            const sParagraphLayout* paraLayout = mLayout->GetParagraphLayout(para) ;
+            if (!haveStopY && para >= caretPara)
+            {
+                // Caret line: the line holding the caret, or the first line
+                // of the next visible paragraph when the caret's is hidden
+                const sLineLayout* caretLine = nullptr ;
+                const sParagraphLayout* caretLayout = mLayout->GetParagraphLayout(caretPara) ;
+                if (caretLayout && !caretLayout->lines.empty())
+                {
+                    POSITION_T paraStart = 0 ;
+                    POSITION_T paraEnd = 0 ;
+                    mDocument->GetParagraphStartandEnd(caretPara, paraStart, paraEnd) ;
+                    POSITION_T offset = mDocument->GetPosition() - paraStart ;
+                    caretLine = &caretLayout->lines.back() ;
+                    for (const sLineLayout& line : caretLayout->lines)
+                    {
+                        POSITION_T count = 0 ;
+                        for (const auto& segment : line.segments)
+                        {
+                            count += segment.GetGraphemeCount() ;
+                        }
+                        if (offset >= line.linestart && offset < line.linestart + count)
+                        {
+                            caretLine = &line ;
+                            break ;
+                        }
+                    }
+                }
+                else if (paraLayout && !paraLayout->lines.empty())
+                {
+                    caretLine = &paraLayout->lines.front() ;
+                }
+
+                if (caretLine)
+                {
+                    COORD_T caretTop = ScreenYToViewportY(caretLine) + mScrollOffset ;
+                    COORD_T caretBottom = caretTop + caretLine->lineheight ;
+                    if (caretBottom > viewportBottom)
+                    {
+                        stopY = caretBottom ;
+                    }
+                    else if (caretTop < viewportTop)
+                    {
+                        stopY = caretTop + viewportHeight ;
+                    }
+                    else
+                    {
+                        stopY = viewportBottom ;
+                    }
+                    haveStopY = true ;
+                }
+            }
+
+            if (para >= visibleEnd && haveStopY && paraLayout && !paraLayout->lines.empty()
+                && ScreenYToViewportY(&paraLayout->lines.front()) + mScrollOffset > stopY)
+            {
+                break ;
+            }
+        }
     }
+    else
+    {
+        for (PARAGRAPH_T para = startPara ; para <= endPara ; ++para)
+        {
+            mLayout->LayoutParagraph(para) ;
+        }
+    }
+
+    mChangedSinceUpdate = false ;
 
     // Invalidate checkpoints from edit point forward
     mLayout->InvalidateCheckpointsFrom(startPara) ;

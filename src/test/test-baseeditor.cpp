@@ -2934,6 +2934,86 @@ TEST_CASE("Idle layout completes the re-layout after leaving a shown dot command
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Pasting four short paragraphs with the caret on the last visible line:
+/// before idle layout runs, every paragraph on screen has the line
+/// positions of a full layout.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Paste of paragraphs at the bottom of the window leaves no old layout on screen")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    for (int i = 0; i < 60; i++)
+    {
+        doc->Insert("Long paragraph text that wraps over more than one line "
+                    "in a narrow window, with enough words to wrap twice.\r");
+    }
+    editor.resize(400, 300);
+    editor.SetShowControls(SHOW_NONE);
+    editor.SetDisplayMode(DISPLAY_CONTINUOUS);
+    layout->LayoutDocument(doc);
+    REQUIRE(layout->GetParagraphLayout(0)->lines.size() >= 2);
+
+    // caret on the last visible line
+    PARAGRAPH_T lastVisible = editor.GetLastVisibleParagraph();
+    POSITION_T start = 0;
+    POSITION_T end = 0;
+    doc->GetParagraphStartandEnd(lastVisible, start, end);
+    doc->SetPosition(start);
+    editor.PerformPostCommandUpdate();
+    lastVisible = editor.GetLastVisibleParagraph();
+    doc->GetParagraphStartandEnd(lastVisible, start, end);
+    doc->SetPosition(start);
+    editor.PerformPostCommandUpdate();
+
+    editor.InsertPastedText("A\rB\rC\rD\r");
+    editor.PerformPostCommandUpdate();
+
+    PARAGRAPH_T total = doc->GetNumberofParagraphs();
+    std::vector<std::vector<sLineLayout>> incremental;
+    for (PARAGRAPH_T para = 0; para < total; para++)
+    {
+        const sParagraphLayout* p = layout->GetParagraphLayout(para);
+        incremental.push_back(p ? p->lines : std::vector<sLineLayout>());
+    }
+
+    layout->LayoutDocument(doc);
+
+    COORD_T top = editor.GetScrollOffset();
+    COORD_T bottom = top + editor.GetViewportHeight();
+    auto onScreen = [&](const std::vector<sLineLayout>& lines)
+    {
+        return !lines.empty() && lines.back().screeny + lines.back().lineheight >= top
+               && lines.front().screeny <= bottom;
+    };
+
+    int checked = 0;
+    for (PARAGRAPH_T para = 0; para < total; para++)
+    {
+        const std::vector<sLineLayout>& full = layout->GetParagraphLayout(para)->lines;
+        if (!onScreen(full) && !onScreen(incremental[para]))
+        {
+            continue;
+        }
+        checked++;
+        CAPTURE(para);
+        REQUIRE(incremental[para].size() == full.size());
+        for (size_t i = 0; i < full.size(); i++)
+        {
+            CHECK(incremental[para][i].screeny == full[i].screeny);
+        }
+    }
+    CHECK(checked > 4);
+}
+
+
 namespace
 {
 
