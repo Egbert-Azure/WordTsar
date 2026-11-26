@@ -2,6 +2,33 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## Next release
+
+**Additions**
+
+- Column blocks. ^KN turns column mode on, so ^KC, ^KV, ^KY, ^K] and ^KZ work on the rectangle between ^KB and ^KK. ^KI turns column replace on. Both are in Edit > Editing Settings, and the macro settings ColMode and ColReplace work (#101).
+- Footnote Font and Endnote Font, each with a size, in System Preferences > General. Notes are shown, printed and exported to RTF and DOCX in them. Without them, notes use the default font (#99).
+
+**Changes**
+
+- Changed: ^OL, ^OX, ^OI, ^OO, ^OU, ^OF, ^OS, ^OR, ^ONA, ^ONC and ^ONV say they are not implemented, and ^OA says auto-align is always on. Optional Hyphen, Vertically Center, Type Word and Sort Block are enabled in the menus where the keys already worked (#100).
+- Changed: ^KP, File > Print and Ctrl+P in Modern mode print instead of opening the print preview. ^QL checks from the cursor in both apps. ^ONI inserts an index entry. Keep Lines Together on Page asks for the line count and inserts .cp n. Thesaurus is enabled in ws. In Modern mode, Center Line and Right Align Line show Alt+O,C and Alt+O,] (#100).
+- Changed: File > Print no longer saves the document first. In the GUI, Utilities > Spell Check Global no longer jumps to the top first (#100).
+- Changed: F1 help for ^O, ^KP, ^QL, ^QJ and ^ON matches what the keys do. A macro that uses ^ONA, ^ONC or ^ONV no longer runs (#100).
+
+**Fixes**
+
+- Fixed: ^QF and ^QA now find a match at the cursor, forward and backward. ^L still starts one past the cursor. With the G option, ^QF searches the whole text (#95).
+- Fixed: a backward search from a hard return could find a match after the cursor (#95).
+- Fixed: DOCX export put styles, fonts, colours and notes in the wrong place after a non-ASCII character in a paragraph. Italics could run on and a note could be lost (#96).
+- Fixed: footnote and endnote numbers show and print as superscript in the smaller size. In ws they have the superscript colour (#97).
+- Fixed: Scroll Continuously Down and Define Paragraph Style are spelled correctly in the GUI menus. Insert > Extended Character shows ^P0, not ^PO (#100).
+- Fixed: two tabs in a row no longer wrap the line at some tab stops, such as 1.35i. In ws, the text now lands at the second stop (#102).
+- Fixed: in ws, rows of a table above a later .tb line showed at the later table's tab stops (#102).
+- Fixed: in ws, text at right, centre and decimal tab stops now lines up on the stop (#104).
+- Fixed: in ws, the tab stops and ruler no longer move when the document ends in another font (#104).
+- Fixed: after a paste or block copy, paragraphs on screen could be drawn from their old layout until a cursor key (#105).
+
 ## 0.18.0 (2026-11-24)
 
 **Additions**
@@ -14,7 +41,6 @@ Release history for WordTsar, in reverse chronological order.
 - Footnotes and endnotes export to RTF and DOCX (#91).
 - Closing a note that holds characters the code page cannot write shows a warning. You can keep the note open (#91).
 - &%& gives the total page count (#87).
-- Column blocks. ^KN turns column mode on, so ^KC, ^KV, ^KY, ^K] and ^KZ work on the rectangle between ^KB and ^KK. ^KI turns column replace on. Both are in Edit > Editing Settings, and the macro settings ColMode and ColReplace work (#101).
 
 **Changes**
 
@@ -23,8 +49,6 @@ Release history for WordTsar, in reverse chronological order.
 - Changed: saving to a code page that cannot hold a character writes a plain stand-in. Curly quotes become ' and ", en and em dashes become -, the em dash is written as --, and the ellipsis becomes ... (#93, #94).
 - Changed: a superscript digit the code page cannot hold is saved as a digit between ^T toggles (#93).
 - Changed: the save warning counts only the characters that are lost (#93).
-- Changed: ^OL, ^OX, ^OI, ^OO, ^OU, ^OF, ^OS, ^OR, ^ONA, ^ONC and ^ONV say they are not implemented, and ^OA says auto-align is always on. Optional Hyphen, Vertically Center, Type Word and Sort Block are enabled in the menus where the keys already worked (#100).
-- Changed: ^KP, File > Print and Ctrl+P in Modern mode print instead of opening the print preview. ^QL checks from the cursor in both apps. ^ONI inserts an index entry. Keep Lines Together on Page asks for the line count and inserts .cp n. Thesaurus is enabled in ws. In Modern mode, Center Line and Right Align Line show Alt+O,C and Alt+O,] (#100).
 
 **Fixes**
 
