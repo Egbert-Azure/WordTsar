@@ -1822,3 +1822,75 @@ TEST_CASE("cWSEditorView - right and decimal .tb stops line up their columns as 
     CHECK(ScreenText(screen, firstRow, firstCol + decimalStop - 2, 5) == "12.50");
     CHECK(ScreenText(screen, secondRow, secondCol + decimalStop - 4, 6) == "1234.5");
 }
+
+
+TEST_CASE("cWSEditorView - a decimal stop lines up proportional text in screen columns")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 60, 200});
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    sInternalFonts font;
+    font.fontname = "Helvetica";
+    font.size = 10.0;
+    font.haveWSFont = false;
+    font.name = "Helvetica";
+
+    doc->InsertFont(font);
+    POSITION_T firstPos = doc->GetPosition();
+    doc->Insert("Opening balance carried in");
+    POSITION_T firstTabPos = doc->GetPosition();
+    doc->InsertTab(tab);
+    POSITION_T firstNumberPos = doc->GetPosition();
+    doc->Insert("12.50\r");
+    POSITION_T secondPos = doc->GetPosition();
+    doc->Insert("Sum");
+    doc->InsertTab(tab);
+    doc->Insert("12.50\r");
+    POSITION_T thirdPos = doc->GetPosition();
+    doc->Insert("Tax");
+    doc->InsertTab(tab);
+    doc->Insert("1234567.5\r");
+
+    layout->SetShowControl(SHOW_NONE);
+    editor.LayoutDocument(true);
+    COORD_T twipsPerCol = editor.GetColumnWidth();
+    REQUIRE(twipsPerCol > 0);
+
+    // The 26 column label is wider than the stop in ws but fits before it in print
+    int stopCol = 25;
+    std::string tb = ".tb #" + std::to_string(stopCol * twipsPerCol / 20) + "p\r";
+    doc->SetPosition(0);
+    doc->Insert(tb);
+    POSITION_T shift = static_cast<POSITION_T>(tb.size());
+    editor.LayoutDocument(true);
+    REQUIRE(editor.GetColumnWidth() == twipsPerCol);
+
+    int firstCol = CaretColumnAt(editor, view, firstPos + shift);
+    int firstRow = view.GetCaretRow();
+    int labelEndCol = CaretColumnAt(editor, view, firstTabPos + shift);
+    int numberCol = CaretColumnAt(editor, view, firstNumberPos + shift);
+    int secondCol = CaretColumnAt(editor, view, secondPos + shift);
+    int secondRow = view.GetCaretRow();
+    int thirdCol = CaretColumnAt(editor, view, thirdPos + shift);
+    int thirdRow = view.GetCaretRow();
+
+    wordstartui::cScreen screen;
+    screen.Resize(60, 200);
+    view.Draw(screen);
+    CHECK(labelEndCol - firstCol == 26);
+    CHECK(numberCol > labelEndCol);
+    CHECK(ScreenText(screen, firstRow, numberCol, 5) == "12.50");
+    CHECK(ScreenText(screen, secondRow, secondCol + stopCol - 2, 5) == "12.50");
+    CHECK(ScreenText(screen, thirdRow, thirdCol + stopCol - 7, 9) == "1234567.5");
+}

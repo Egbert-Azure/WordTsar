@@ -615,13 +615,14 @@ bool cWSEditorView::IsAlignmentTab(const sSegmentLayout& seg) const
 /// @return the screen column where the tab ends
 ///
 /// @brief
-/// The tab ends at the column of the stop the layout gave it, rounded down:
-/// the widths and tab widths of the segments before it plus its own tabWidth,
-/// from the line's indent. When text follows, the tab ends at the column of
-/// that text's first x position, so right, centre and decimal stops align it
-/// as in print. Text that the layout moved back to the preceding text starts
-/// at col, or at col + 1 right after another tab. Any other tab that would
-/// not move past col ends at col + 1.
+/// The stop's column is the stop the layout gave the tab, rounded down: the
+/// widths and tab widths of the segments before it plus its own tabWidth,
+/// from the line's indent. ws lines the text after the tab, up to the next
+/// tab, up on that column in the columns ws draws it in: a left stop starts
+/// it there, a right stop ends it there, a centre stop starts it half its
+/// columns, rounded down, before it, and a decimal stop puts its first "."
+/// there, or ends it there when it has no ".". The tab takes at least one
+/// column.
 ///
 /////////////////////////////////////////////////////////////////////////////
 int cWSEditorView::TabEndCol(const sLineLayout* line, const sSegmentLayout& seg, int col, COORD_T twipsPerCol) const
@@ -633,18 +634,13 @@ int cWSEditorView::TabEndCol(const sLineLayout* line, const sSegmentLayout& seg,
         stopTwips = line->pagex - box->left;
     }
 
-    COORD_T indentTwips = stopTwips;
-    const sSegmentLayout* previous = nullptr;
-    const sSegmentLayout* following = nullptr;
+    size_t followingIndex = line->segments.size();
     for (size_t si = 0; si < line->segments.size(); ++si)
     {
         const sSegmentLayout& before = line->segments[si];
         if (&before == &seg)
         {
-            if (si + 1 < line->segments.size())
-            {
-                following = &line->segments[si + 1];
-            }
+            followingIndex = si + 1;
             break;
         }
         stopTwips += before.totalWidth;
@@ -652,35 +648,56 @@ int cWSEditorView::TabEndCol(const sLineLayout* line, const sSegmentLayout& seg,
         {
             stopTwips += before.tabWidth;
         }
-        previous = &before;
     }
     stopTwips += seg.tabWidth;
+    int stopCol = static_cast<int>(stopTwips / twipsPerCol);
 
-    // Text after the tab starts where the layout placed it
-    if ((following != nullptr) && (following->isTab == false) && (following->position.empty() == false))
+    bool isDecimal = (seg.tabStopType == TAB_DECIMAL) || (seg.tabType == TAB_DECIMAL);
+    int startCol = stopCol;
+    if ((seg.tabStopType == TAB_RIGHT) || (seg.tabStopType == TAB_CENTER) || (isDecimal == true))
     {
-        int textCol = static_cast<int>((indentTwips + following->position[0]) / twipsPerCol);
-        if ((textCol < static_cast<int>(stopTwips / twipsPerCol)) && (textCol <= col))
+        // Columns of the text up to the next tab, and before its first "."
+        cDocument* doc = mEditor->GetDocument();
+        POSITION_T paraStart = line->documentPosition - line->linestart;
+        int textCols = 0;
+        int dotCols = -1;
+        for (size_t si = followingIndex; (si < line->segments.size()) && (line->segments[si].isTab == false); ++si)
         {
-            // Text wider than the room before an aligned stop follows the preceding text
-            if ((previous != nullptr) && (previous->isTab == true))
+            const sSegmentLayout& text = line->segments[si];
+            POSITION_T docPos = paraStart + text.startPosition;
+            std::vector<std::string> graphemes;
+            text.GetGraphemes(doc, graphemes);
+            for (size_t gi = 0; gi < graphemes.size(); ++gi)
             {
-                return col + 1;
+                textCols += MarkerColumns(text, gi);
+                if ((dotCols < 0) && (graphemes[gi] == "."))
+                {
+                    dotCols = textCols;
+                }
+                textCols += GraphemeColumns(docPos, graphemes[gi], line->pagenumber);
+                docPos++;
             }
-            return col;
         }
-        if (textCol > col)
+
+        if ((isDecimal == true) && (dotCols >= 0))
         {
-            return textCol;
+            startCol = stopCol - dotCols;
+        }
+        else if (seg.tabStopType == TAB_CENTER)
+        {
+            startCol = stopCol - textCols / 2;
+        }
+        else
+        {
+            startCol = stopCol - textCols;
         }
     }
 
-    int nextCol = static_cast<int>(stopTwips / twipsPerCol);
-    if (nextCol <= col)
+    if (startCol <= col)
     {
         return col + 1;
     }
-    return nextCol;
+    return startCol;
 }
 
 
