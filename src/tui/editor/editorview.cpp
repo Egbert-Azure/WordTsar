@@ -621,8 +621,8 @@ bool cWSEditorView::IsAlignmentTab(const sSegmentLayout& seg) const
 /// tab, up on that column in the columns ws draws it in: a left stop starts
 /// it there, a right stop ends it there, a centre stop starts it half its
 /// columns, rounded down, before it, and a decimal stop puts its first "."
-/// there, or ends it there when it has no ".". The tab takes at least one
-/// column.
+/// there, or ends it there when it has no ".". The hard return that ends
+/// the line takes no columns. The tab takes at least one column.
 ///
 /////////////////////////////////////////////////////////////////////////////
 int cWSEditorView::TabEndCol(const sLineLayout* line, const sSegmentLayout& seg, int col, COORD_T twipsPerCol) const
@@ -669,6 +669,10 @@ int cWSEditorView::TabEndCol(const sLineLayout* line, const sSegmentLayout& seg,
             text.GetGraphemes(doc, graphemes);
             for (size_t gi = 0; gi < graphemes.size(); ++gi)
             {
+                if ((graphemes[gi].empty() == false) && (static_cast<unsigned char>(graphemes[gi][0]) == HARDCR))
+                {
+                    break;
+                }
                 textCols += MarkerColumns(text, gi);
                 if ((dotCols < 0) && (graphemes[gi] == "."))
                 {
