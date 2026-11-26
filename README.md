@@ -6,7 +6,7 @@
 
 ## This is a macOS-focused fork of [WordTsar](https://sourceforge.net/p/wordtsar/mercurial/ci/default/tree/), created by Gerald Brandt.
 
-WordStar for the 21st Century. WordTsar is a WordStar 7.0D document mode clone. It loads WordStar 4, WordStar 7, RTF (partial), and DOCX (partial) files, and saves in WordStar 7, RTF, and Word (.docx) format.
+A WordStar 7 clone for the 21st century. WordTsar is a WordStar 7.0D document mode clone. It loads WordStar 4, WordStar 7, RTF (partial), and DOCX (partial) files, and saves in WordStar 7, RTF, and Word (.docx) format.
 
 All credit for WordTsar's design and implementation goes to Gerald Brandt — this fork simply trims the project down to a macOS-only build. The original, cross-platform project (Windows, Linux, and macOS) is developed at the link above on SourceForge — go there for the code and the Windows/Linux builds. [wordtsar.ca](http://wordtsar.ca) is the project's original home; its newest posted release is 0.3 (March 2023), so it's no longer where current builds live, but it's still the place for the project's history and forums. This fork is not endorsed by or affiliated with the upstream WordTsar project — the AGPL grants no rights in the name "WordTsar." macOS fork begun 2025, actively maintained through 2026.
 
