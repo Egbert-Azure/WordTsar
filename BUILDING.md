@@ -161,6 +161,32 @@ macOS will prompt once to confirm the trust-setting change (Touch ID or password
 
 This is a local, free, self-signed identity — it does **not** remove the Gatekeeper "unidentified developer" warning for anyone else you share the app with. That requires a paid Apple Developer Program membership and a real Developer ID certificate, which is a separate, deliberate step if you ever need it.
 
+## Release
+
+These steps make `WordTsar.dmg` with `WordTsar.app`, `ws`, the `templates` folder and an Applications link. They use the official Qt in `~/Qt/6.11.1/macos`. Run them from the repository root.
+
+`version.txt` sets the version of the app, `ws` and `Info.plist`. Change it before you configure. Configuring writes `src/core/include/version.h` from it, so commit both files. Commit any changes in `templates/` too: the script takes the folder from the last commit.
+
+```bash
+# Configure in an empty folder (this removes an earlier release build)
+rm -rf build/release
+cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DBUILD_TUI=ON -DCMAKE_PREFIX_PATH="$HOME/Qt/6.11.1/macos"
+
+# Build the app and ws
+cmake --build build/release --target WordTsar ws -j "$(sysctl -n hw.ncpu)"
+
+# Copy Qt into the app bundle and sign it ad hoc
+"$HOME/Qt/6.11.1/macos/bin/macdeployqt" build/release/WordTsar.app -codesign=-
+
+# Sign ws ad hoc
+codesign --force --sign - build/release/ws
+
+# Check and make the disk image
+packaging/macos/make-dmg.sh build/release
+```
+
+The image is written to `build/release/WordTsar.dmg`. Before it makes the image, the script checks the app's version against `version.txt`, the signatures, links to Homebrew or `~/Qt`, and the minimum macOS version. If a check fails, it stops and leaves no `.dmg`.
+
 ## Testing
 
 ```bash
