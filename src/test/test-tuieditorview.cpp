@@ -1678,3 +1678,46 @@ TEST_CASE("cWSEditorView - the footnote number is a superscript segment with ^OD
         CHECK(number->isSuperscript);
     }
 }
+
+
+TEST_CASE("cWSEditorView - two tabs in a row in a .tb table put the text at the second stop")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayoutBase* layout = editor.GetLayout();
+    REQUIRE(layout != nullptr);
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 60, 200});
+
+    sWSTab tab;
+    tab.type = TAB_TAB;
+    tab.tabsize = 0;
+    tab.abstabsize = 0;
+    tab.size = 0;
+
+    doc->Insert(".tb 1.35i 4.8i 6.15i\r");
+    POSITION_T cursorPos = doc->GetPosition();
+    doc->Insert("CURSOR");
+    doc->InsertTab(tab);
+    doc->InsertTab(tab);
+    POSITION_T deletePos = doc->GetPosition();
+    doc->Insert("DELETE\r");
+
+    layout->SetShowControl(SHOW_NONE);
+    editor.LayoutDocument(true);
+
+    COORD_T twipsPerCol = editor.GetColumnWidth();
+    REQUIRE(twipsPerCol > 0);
+    int stopCols = static_cast<int>(4.8 * TWIPSPERINCH / twipsPerCol);
+
+    int cursorCol = CaretColumnAt(editor, view, cursorPos);
+    int deleteCol = CaretColumnAt(editor, view, deletePos);
+    CHECK(deleteCol == cursorCol + stopCols);
+
+    doc->SetPosition(cursorPos);
+    wordstartui::cScreen screen;
+    screen.Resize(60, 200);
+    view.Draw(screen);
+    CHECK(ScreenText(screen, view.GetCaretRow(), cursorCol + stopCols, 6) == "DELETE");
+}

@@ -77,6 +77,7 @@ private:
     int MarkerColumns(const sSegmentLayout& seg, size_t index) const;
     int TagColumns(const sSegmentLayout& seg, size_t index) const;
     bool IsAlignmentTab(const sSegmentLayout& seg) const;
+    int TabEndCol(int col, COORD_T twipsPerCol, int& stopCol, COORD_T& stopTwips) const;
     int LineScreenRows(LINE_T rawLine) const;
     int LineStartCol(const sLineLayout* line, COORD_T twipsPerCol) const;
     int LineEndCol(const sLineLayout* line, COORD_T twipsPerCol) const;
