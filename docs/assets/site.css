@@ -177,7 +177,7 @@ section p:last-child { margin-bottom: 0; }
 .pair { display: grid; gap: 2rem; margin-top: 2rem; }
 @media (min-width: 52rem) { .pair { grid-template-columns: 1fr 1fr; align-items: start; } }
 .pair > * { min-width: 0; }
-.pair img { width: 100%; aspect-ratio: 1453 / 924; object-fit: cover; object-position: top left; }
+.pair img { width: 100%; }
 .pair h3 { margin: 1rem 0 0.25rem; font-family: var(--mono); font-size: 1.0625rem; font-weight: 600; }
 .pair p { font-size: 1rem; margin: 0; }
 
