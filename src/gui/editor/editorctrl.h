@@ -81,6 +81,7 @@ public:
     // --- Background layout hook ---
     // Hook: trigger background layout via QTimer (for sibling editor updates)
     void TriggerIdleLayout(void) override ;
+    bool IsIdleLayoutRunning(void) const override ;
 
     // --- Visual update ---
     // Single visual update method -- incremental layout + caret + scroll + paint
@@ -383,6 +384,8 @@ private:
     QRectF mCaretPosQt;                   // Qt rectangle for rendering (synced from base class coords)
     QRectF mLastPaintedCaretPosQt;         // Caret rect as of the last FULL repaint (not a blink-only tick)
     COORD_T mLastPaintedScrollOffset;     // Scroll offset as of the last FULL repaint
+    uint64_t mLastPaintedChangeCount = 0; // Document change count as of the last FULL repaint
+    bool mIdleLayoutRunning = false;      // OnIdle() has rescheduled itself
     double mPageScale;                    // Dynamic page zoom scale
     COORD_T mHorizScrollOffset;           // Horizontal scroll in twips (follows the caret)
 

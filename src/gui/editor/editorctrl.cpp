@@ -535,6 +535,17 @@ void cEditorCtrl::TriggerIdleLayout(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return true if the last OnIdle() rescheduled itself
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorCtrl::IsIdleLayoutRunning(void) const
+{
+    return mIdleLayoutRunning ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return nothing
 ///
 /// @brief
@@ -1539,8 +1550,11 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
         // the cheap path if nothing has moved since the last full repaint.
         // The caret-only path paints nothing outside the caret, so it also
         // requires the paint region to lie inside the caret area.
+        // A change to the text since the last full repaint needs a full
+        // repaint of the whole window.
         SyncCaretToQt();
-        if (mScrollOffset == mLastPaintedScrollOffset && mCaretPosQt == mLastPaintedCaretPosQt
+        bool textChanged = mDocument && mDocument->GetChangeCount() != mLastPaintedChangeCount;
+        if (!textChanged && mScrollOffset == mLastPaintedScrollOffset && mCaretPosQt == mLastPaintedCaretPosQt
             && event->region().subtracted(QRegion(CaretPixelRect())).isEmpty())
         {
             painter.save();
@@ -1556,6 +1570,10 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
         }
 
         // Stale -- fall through to a full repaint below instead.
+        if (textChanged)
+        {
+            update();
+        }
         mDoDrawCaret = false;
     }
 
@@ -1575,6 +1593,14 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
     if (mLayout->InFullLayout())
     {
         return;
+    }
+
+    // Paragraphs on screen laid out before the last change to the text are
+    // laid out again; the whole window is repainted when this paint covers
+    // less
+    if (LayoutOutdatedParagraphsOnScreen() && !QRegion(rect()).subtracted(event->region()).isEmpty())
+    {
+        update();
     }
 
     // Fill entire widget background first (pixel coordinates, no scaling)
@@ -1932,6 +1958,10 @@ void cEditorCtrl::paintEvent(QPaintEvent* event)
     // XOR-only caret toggle.
     mLastPaintedScrollOffset = mScrollOffset;
     mLastPaintedCaretPosQt = mCaretPosQt;
+    if (mDocument)
+    {
+        mLastPaintedChangeCount = mDocument->GetChangeCount();
+    }
 
     // Update ruler to reflect current caret position and layout settings
     UpdateRuler();
@@ -3387,6 +3417,8 @@ void cEditorCtrl::OnAutoSaveTimer(void)
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::OnIdle(void)
 {
+    mIdleLayoutRunning = false;
+
     // SAFETY CHECKS (matches old editorctrl.cpp lines 1465-1486)
 
     // Don't layout while loading file
@@ -3410,6 +3442,7 @@ void cEditorCtrl::OnIdle(void)
     // PROCESS ONE PARAGRAPH
     // IdleLayout() returns true if more work remains (matches old line 1488)
     bool ret = IdleLayout();
+    mIdleLayoutRunning = ret;
 
     // RESCHEDULE IF MORE WORK (matches old editorctrl.cpp lines 1490-1493)
     // Uses 0ms delay for aggressive continuous processing
