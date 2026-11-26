@@ -8,6 +8,7 @@ Release history for WordTsar, in reverse chronological order.
 
 - Column blocks. ^KN turns column mode on, so ^KC, ^KV, ^KY, ^K] and ^KZ work on the rectangle between ^KB and ^KK. ^KI turns column replace on. Both are in Edit > Editing Settings, and the macro settings ColMode and ColReplace work (#101).
 - Footnote Font and Endnote Font, each with a size, in System Preferences > General. Notes are shown, printed and exported to RTF and DOCX in them. Without them, notes use the default font (#99).
+- WordTsar.dmg holds ws and the templates folder as well as WordTsar.app (#108).
 
 **Changes**
 
