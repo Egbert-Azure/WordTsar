@@ -221,6 +221,51 @@ static std::vector<pugi::xml_node> ParagraphRuns(pugi::xml_node paragraph)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  parent [in] a container (w:body, w:tbl, w:tr, w:tc)
+/// @param  names [in] element names to collect
+/// @param  out [out] receives the matching nodes in document order
+///
+/// @brief
+/// Collect the children of a container with one of the given names,
+/// looking through w:sdt/w:sdtContent and w:customXml at any depth.
+///
+/////////////////////////////////////////////////////////////////////////////
+static void CollectBlocks(pugi::xml_node parent, std::initializer_list<const char *> names, std::vector<pugi::xml_node> &out)
+{
+    for(pugi::xml_node child = parent.first_child() ; child ; child = child.next_sibling())
+    {
+        std::string name = child.name() ;
+        if(name == "w:sdt")
+        {
+            CollectBlocks(child.child("w:sdtContent"), names, out) ;
+        }
+        else if(name == "w:customXml")
+        {
+            CollectBlocks(child, names, out) ;
+        }
+        else
+        {
+            for(const char *wanted : names)
+            {
+                if(name == wanted)
+                {
+                    out.push_back(child) ;
+                    break ;
+                }
+            }
+        }
+    }
+}
+
+static std::vector<pugi::xml_node> ChildBlocks(pugi::xml_node parent, std::initializer_list<const char *> names)
+{
+    std::vector<pugi::xml_node> out ;
+    CollectBlocks(parent, names, out) ;
+    return out ;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  filename [in] path to the DOCX file to load
 ///
 /// @return true on success, false on failure
@@ -314,35 +359,23 @@ bool cDOCXFile::LoadFile(std::string filename)
 
         gDOCXFile = this ;
 
-        // walk the document
-        struct simple_walker: pugi::xml_tree_walker
+        // walk the body's blocks, including those inside content controls
+        for(pugi::xml_node node : ChildBlocks(parent, {"w:p", "w:tbl", "w:sectPr"}))
         {
-            virtual bool for_each(pugi::xml_node& node)
+            std::string name = node.name() ;
+            if(name == "w:p")
             {
-                if(depth() == 2)
-                {
-                    std::string name = node.name() ;
-                    if(name == "w:p")
-                    {
-                        gDOCXFile->HandleParagraphNode(node, depth()) ;
-                    }
-                    else if(name == "w:tbl")
-                    {
-                        gDOCXFile->HandleTableNode(node, depth()) ;
-                    }
-                    // a section
-                    if(name == "w:sectPr")
-                    {
-                        gDOCXFile->HandleSection(node) ;
-                    }
-                }
-
-                return true; // continue traversal
+                HandleParagraphNode(node, 0) ;
             }
-        };
-
-        simple_walker walker ;
-        document.traverse(walker) ;
+            else if(name == "w:tbl")
+            {
+                HandleTableNode(node, 0) ;
+            }
+            else if(name == "w:sectPr")
+            {
+                HandleSection(node) ;
+            }
+        }
     }
 
     return retval ;
@@ -792,7 +825,7 @@ std::string cDOCXFile::ExtractCellText(pugi::xml_node cellNode)
     std::string text ;
     bool firstParagraph = true ;
 
-    for(pugi::xml_node para = cellNode.child("w:p") ; para ; para = para.next_sibling("w:p"))
+    for(pugi::xml_node para : ChildBlocks(cellNode, {"w:p"}))
     {
         if(!firstParagraph)
         {
@@ -863,17 +896,14 @@ void cDOCXFile::HandleTableNode(pugi::xml_node node, int depth)
 {
     UNUSED_ARGUMENT(depth) ;
 
-    // Column count from the widest row, not just the first -- a first row
-    // whose cells are wrapped in w:sdt (a common Word content-control
-    // pattern) has zero direct w:tc children even though the table is
-    // otherwise normal, and a ragged table can have more cells in a later
-    // row than in its first. Count each cell by its grid span so a row
-    // with a merged cell doesn't under-report the table's true column count.
+    // Column count from the widest row, each cell counted by its grid span.
+    // Rows and cells inside w:sdt or w:customXml count as direct children.
+    std::vector<pugi::xml_node> rows = ChildBlocks(node, {"w:tr"}) ;
     int columnCount = 0 ;
-    for(pugi::xml_node row = node.child("w:tr") ; row ; row = row.next_sibling("w:tr"))
+    for(pugi::xml_node row : rows)
     {
         int rowCells = 0 ;
-        for(pugi::xml_node cell = row.child("w:tc") ; cell ; cell = cell.next_sibling("w:tc"))
+        for(pugi::xml_node cell : ChildBlocks(row, {"w:tc"}))
         {
             rowCells += GetCellGridSpan(cell) ;
         }
@@ -922,10 +952,10 @@ void cDOCXFile::HandleTableNode(pugi::xml_node node, int depth)
     tabcmd += "\n" ;
     mDocument->Insert(tabcmd) ;
 
-    for(pugi::xml_node row = node.child("w:tr") ; row ; row = row.next_sibling("w:tr"))
+    for(pugi::xml_node row : rows)
     {
         int prevSpan = 0 ;
-        for(pugi::xml_node cell = row.child("w:tc") ; cell ; cell = cell.next_sibling("w:tc"))
+        for(pugi::xml_node cell : ChildBlocks(row, {"w:tc"}))
         {
             // Advance one tab stop per grid column the previous cell spanned,
             // so a cell after a merged cell still lands on its own column
