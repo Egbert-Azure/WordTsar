@@ -439,6 +439,9 @@ public:
     void MarkSaved(void) ;
     bool IsModified(void) const ;
 
+    // --- Change Count (raised by every change to the text) ---
+    uint64_t GetChangeCount(void) const ;
+
     // --- Listener Management ---
     void AddListener(cDocumentListener* listener) ;
     void RemoveListener(cDocumentListener* listener) ;
@@ -587,6 +590,9 @@ private:
     uint64_t mSavedUndoGroupId ;                         ///< top undo group id when saved (0 = empty stack)
     bool mSavePointLost ;                                ///< saved state no longer reachable by undo / redo
     bool mUnrecordedChange ;                             ///< content changed without an undo record (loading)
+
+    // --- Change Count ---
+    uint64_t mChangeCount = 0 ;                          ///< raised by every change to the text, notified or not
 
     // --- Listeners ---
     std::vector<cDocumentListener*> mListeners ;        ///< registered listeners (not owned)

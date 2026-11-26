@@ -756,6 +756,7 @@ bool cLayoutBase::LayoutParagraph(PARAGRAPH_T para)
     // Empty paragraphs should not exist -- skip silently
     if (text.empty())
     {
+        mParagraphLayout[para].changeCount = mDocument->GetChangeCount();
 
 #ifdef LAYOUT_TIMER
         mLayoutParagraphTotalTimeNs += lpTotalTimer.time_elapsed_nanoseconds();
@@ -861,6 +862,8 @@ bool cLayoutBase::LayoutParagraph(PARAGRAPH_T para)
     {
         result = LayoutTextParagraph(para, oldLayout, hadPreviousLayout, wasDirty);
     }
+
+    mParagraphLayout[para].changeCount = mDocument->GetChangeCount();
 
 #ifdef LAYOUT_TIMER
     mLayoutParagraphTotalTimeNs += lpTotalTimer.time_elapsed_nanoseconds();

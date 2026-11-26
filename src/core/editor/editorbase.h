@@ -262,6 +262,10 @@ public:
     // Post-Command Update
     void PerformPostCommandUpdate(void);
 
+    // Before drawing the text: lay out again from the first paragraph on
+    // screen whose layout is older than the text; true if any was laid out
+    bool LayoutOutdatedParagraphsOnScreen(void);
+
     // Keyboard input: every typed key goes through FeedKey, which runs
     // BeforeKey, DispatchKey and, if the key was handled, AfterKey.
     virtual IInputHandler* GetInput(void) const = 0;          // Active input handler
@@ -623,6 +627,8 @@ private:
 
     // Idle Layout Hook
     virtual void TriggerIdleLayout(void) ;
+    virtual bool IsIdleLayoutRunning(void) const ;                       // Idle layout has work scheduled
+    virtual void GetParagraphsOnScreen(PARAGRAPH_T& first, PARAGRAPH_T& last) ; // First and last paragraph drawn
 
     // =================================================================
     //  MEMBER VARIABLES

@@ -24,6 +24,7 @@
 #include <vector>
 #include <deque>
 #include <string>
+#include <cstdint>
 
 #include "src/core/include/config.h"
 #include "src/core/include/papersize.h"
@@ -518,6 +519,9 @@ struct sParagraphLayout
     // Header / footer defined by this paragraph (.HE / .FO / .Hn / .Fn)
     bool hasHeaderFooter = false;
     sHeaderFooterDefinition headerFooter;
+
+    // cDocument::GetChangeCount() when this layout was made
+    uint64_t changeCount = 0;
 
     // Constructor
     sParagraphLayout() : number(0), pageBreak(false),

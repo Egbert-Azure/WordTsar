@@ -573,6 +573,115 @@ void cEditorBase::PerformPostCommandUpdate(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return true if paragraphs were laid out
+///
+/// @brief
+/// Called before the text is drawn. If a paragraph on screen, or the one
+/// just above or below it, has a layout made before the last change to the
+/// text, lays out from the first such paragraph through the paragraph below
+/// the window bottom, then recalculates the caret. Restarts idle layout
+/// after that range if idle layout has stopped. Does nothing during a full
+/// layout or loading, or when every paragraph on screen is current.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::LayoutOutdatedParagraphsOnScreen(void)
+{
+    if (!mLayout || !mDocument || mLayout->InFullLayout() || mDocument->GetLoading())
+    {
+        return false ;
+    }
+
+    PARAGRAPH_T totalParas = mDocument->GetNumberofParagraphs() ;
+    if (totalParas <= 0)
+    {
+        return false ;
+    }
+
+    uint64_t changeCount = mDocument->GetChangeCount() ;
+    PARAGRAPH_T first = 0 ;
+    PARAGRAPH_T last = 0 ;
+    GetParagraphsOnScreen(first, last) ;
+    PARAGRAPH_T from = std::max(first - 1, PARAGRAPH_T(0)) ;
+    PARAGRAPH_T to = std::min(last + 1, totalParas - 1) ;
+
+    PARAGRAPH_T outdated = -1 ;
+    for (PARAGRAPH_T para = from ; para <= to ; ++para)
+    {
+        const sParagraphLayout* paraLayout = mLayout->GetParagraphLayout(para) ;
+        if (!paraLayout || paraLayout->changeCount < changeCount)
+        {
+            outdated = para ;
+            break ;
+        }
+    }
+    if (outdated < 0)
+    {
+        return false ;
+    }
+
+    // Lay out to the paragraph below the window bottom; the window can
+    // take more paragraphs once the new layout is in
+    PARAGRAPH_T laidOut = outdated - 1 ;
+    while (laidOut < to)
+    {
+        for (PARAGRAPH_T para = laidOut + 1 ; para <= to ; ++para)
+        {
+            mLayout->LayoutParagraph(para) ;
+        }
+        laidOut = to ;
+        GetParagraphsOnScreen(first, last) ;
+        to = std::min(last + 1, totalParas - 1) ;
+    }
+
+    if (!IsIdleLayoutRunning())
+    {
+        if (mDocumentDirty && mDirtyFromParagraph >= outdated && mDirtyFromParagraph <= laidOut)
+        {
+            mDirtyFromParagraph = laidOut + 1 ;
+        }
+        mLayoutParagraph = laidOut + 1 ;
+        mLayoutInt = false ;
+        mLayoutRest = false ;
+        TriggerIdleLayout() ;
+    }
+
+    CalculateCaretPosition() ;
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true if idle layout has work scheduled; the base class has none
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::IsIdleLayoutRunning(void) const
+{
+    return false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  first [out] first paragraph on screen
+/// @param  last  [out] last paragraph on screen
+///
+/// @return nothing
+///
+/// @brief
+/// The paragraphs in the window at the scroll offset, from the existing
+/// layout (GetLastVisibleParagraph()).
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::GetParagraphsOnScreen(PARAGRAPH_T& first, PARAGRAPH_T& last)
+{
+    last = GetLastVisibleParagraph() ;
+    first = std::max(std::min(mVisibleStart, last), PARAGRAPH_T(0)) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  key [in] key stroke
 ///
 /// @return true if the key was handled

@@ -431,6 +431,8 @@ void cDocument::RemoveListener(cDocumentListener* listener)
 /////////////////////////////////////////////////////////////////////////////
 void cDocument::NotifyChanged(PARAGRAPH_T fromParagraph)
 {
+    ++mChangeCount ;
+
     // suppress during loading, undo/redo, or batch paste
     if (mIsLoading || mUndoDisabled || mSuppressNotify)
     {
@@ -505,6 +507,7 @@ void cDocument::Clear(void)
 {
     // clear tabs, color, etc tables
     mParagraphData.clear();
+    ++mChangeCount ;
 
     mRedrawFullDisplay = true;
     mIsLoading = false;
@@ -634,6 +637,7 @@ void cDocument::Insert(CHAR_T ch)
     {
         mUnrecordedChange = true ;
     }
+    ++mChangeCount ;
 
     // save original codepoint before it gets converted to MARKER_CHAR
     CHAR_T originalCodepoint = ch ;
@@ -919,6 +923,7 @@ bool cDocument::Delete(POSITION_T position, POSITION_T length)
     {
         mUnrecordedChange = true ;
     }
+    ++mChangeCount ;
 
     mCurrentPosition = position ;
 
@@ -4535,6 +4540,22 @@ bool cDocument::IsModified(void) const
     }
 
     return TopUndoGroupId() != mSavedUndoGroupId ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the change count
+///
+/// @brief
+/// A count raised by every change to the text, its attributes and its
+/// markers, whether or not listeners are notified. A layout made at a lower
+/// count may be out of date.
+///
+/////////////////////////////////////////////////////////////////////////////
+uint64_t cDocument::GetChangeCount(void) const
+{
+    return mChangeCount ;
 }
 
 /////////////////////////////////////////////////////////////////////////////
