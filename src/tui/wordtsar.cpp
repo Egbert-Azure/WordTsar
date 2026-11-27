@@ -3503,7 +3503,7 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
     screen.FillRect(bar, " ", style);
 
     // Left: transient status message, or an animated busy indicator while a
-    // background layout is in progress.
+    // background layout of Active() is in progress and has work left.
     std::string message = Active()->GetStatusMessage();
     Active()->TickStatusMessage();
     if (status.macroState.empty() == false)
@@ -3515,7 +3515,7 @@ void cWSWordTsar::DrawBottomStatus(cScreen& screen)
         screen.PutText(row, 1, " " + message + " ", style);
         mBusyFrame = 0;
     }
-    else if (status.backgroundBusy == true)
+    else if ((status.backgroundBusy == true) && (Active()->HasPendingLayout() == true))
     {
         // Rising/falling block glyphs.
         static const char* busyFrames[15] =
