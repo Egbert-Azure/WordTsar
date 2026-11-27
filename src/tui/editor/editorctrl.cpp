@@ -1744,7 +1744,8 @@ std::string cWSEditorCtrl::PromptForLoadFile(void)
 ///
 /// @brief
 /// Prompt for a file to save to via the file browser dialog; returns the chosen
-/// path or empty on cancel.
+/// path or empty on cancel. An existing file other than the document's own
+/// is replaced only after MayWriteSaveAsTarget() asks.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cWSEditorCtrl::PromptForSaveFile(void)
@@ -1760,7 +1761,7 @@ std::string cWSEditorCtrl::PromptForSaveFile(void)
         startDir = ".";
     }
 
-    // A Word or RTF original offers NAME.ws and asks before replacing a file
+    // A Word or RTF original offers NAME.ws
     std::string suggestion = SaveAsSuggestion();
     std::string startName;
     if (suggestion.empty() == false)
@@ -1774,14 +1775,9 @@ std::string cWSEditorCtrl::PromptForSaveFile(void)
         return "";
     }
 
-    std::error_code ec;
-    if ((suggestion.empty() == false) && (std::filesystem::exists(result, ec) == true))
+    if (MayWriteSaveAsTarget(result) == false)
     {
-        std::string name = std::filesystem::path(result).filename().string();
-        if (AskReplaceFile("Save File", name + " exists. Replace it?") == false)
-        {
-            return "";
-        }
+        return "";
     }
 
     return result;

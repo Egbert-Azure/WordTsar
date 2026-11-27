@@ -1316,6 +1316,36 @@ bool cEditorBase::AskReplaceFile(const std::string& title, const std::string& qu
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  path [in] file Save As writes
+///
+/// @return true when Save As may write path
+///
+/// @brief
+/// True when path does not exist or is the same file on disk as
+/// CurrentSavePath(); otherwise AskReplaceFile() decides.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::MayWriteSaveAsTarget(const std::string& path)
+{
+    std::error_code ec ;
+    if (std::filesystem::exists(path, ec) == false)
+    {
+        return true ;
+    }
+
+    std::string own = CurrentSavePath() ;
+    if ((own.empty() == false) && (std::filesystem::equivalent(own, path, ec) == true))
+    {
+        return true ;
+    }
+
+    std::string name = std::filesystem::path(path).filename().string() ;
+    return AskReplaceFile("Save File", name + " exists. Replace it?") ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return the file a plain save writes, empty when Save As must name it
 ///
 /// @brief

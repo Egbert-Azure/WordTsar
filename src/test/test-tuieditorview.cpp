@@ -31,6 +31,7 @@
 #include "src/input/wordtsarinput.h"
 #include "src/core/spellcheck/spellcheck.h"
 #include "src/files/docxfile.h"
+#include "src/files/wordstar/wordstarfile.h"
 #include "src/tui/dialogs/dialoghost.h"
 #include "src/tui/wordstartui/src/dialog.h"
 #include "src/tui/wordstartui/src/theme.h"
@@ -1147,6 +1148,141 @@ TEST_CASE("cWSEditorCtrl - ^KS on an opened Word file saves NAME.ws, Save As .do
     CHECK(reader.LoadFile((dir / "copy.docx").string()));
     CHECK(plainText(reloaded) == text);
     CHECK(ReadFileBytes(original) == originalBytes);
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+
+namespace
+{
+
+// Dialog host that focuses a dialog as cWSWordTsar::HostRunModal does and
+// feeds it queued key events; an empty queue is Esc.
+class cRunFocusScriptHost : public iWSDialogHost
+{
+public:
+    void QueueSpecial(wordstartui::eSpecialKey key)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_SPECIAL;
+        event.special = key;
+        mEvents.push_back(event);
+    }
+
+    void QueueText(const std::string& text)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_TEXT;
+        event.textUtf8 = text;
+        mEvents.push_back(event);
+    }
+
+    void HostRunModal(wordstartui::cDialog& dialog) override
+    {
+        dialog.FocusForRun();
+        while (dialog.GetResult() == wordstartui::DIALOG_RESULT_NONE)
+        {
+            dialog.HandleEvent(NextEvent());
+        }
+    }
+
+    void HostRunModalRaw(
+        const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
+        const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
+    {
+        wordstartui::cScreen screen;
+        screen.Resize(40, 120);
+        draw(screen, mTheme);
+        while (handle(NextEvent()) == true)
+        {
+        }
+    }
+
+    const wordstartui::cTheme& HostTheme(void) override
+    {
+        return mTheme;
+    }
+
+    wordstartui::sTerminalSize HostScreenSize(void) override
+    {
+        wordstartui::sTerminalSize size;
+        size.rows = 40;
+        size.cols = 120;
+        return size;
+    }
+
+    wordstartui::sTerminalCapabilities HostCapabilities(void) override
+    {
+        wordstartui::sTerminalCapabilities caps{};
+        return caps;
+    }
+
+    void HostShowLoadProgress(const std::string& message, int percent) override
+    {
+        (void)message;
+        (void)percent;
+    }
+
+    void HostHideLoadProgress(void) override
+    {
+    }
+
+private:
+    wordstartui::sInputEvent NextEvent(void)
+    {
+        wordstartui::sInputEvent event{};
+        event.type = wordstartui::INPUT_TYPE_SPECIAL;
+        event.special = wordstartui::SPECIAL_KEY_ESCAPE;
+        if (mEvents.empty() == false)
+        {
+            event = mEvents.front();
+            mEvents.pop_front();
+        }
+        return event;
+    }
+
+    std::deque<wordstartui::sInputEvent> mEvents;
+    wordstartui::cTheme mTheme;
+};
+
+}
+
+
+TEST_CASE("cWSEditorCtrl - Save As onto another existing file, Enter at the replace question leaves it unchanged")
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-tui-saveas-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    std::filesystem::path mine = dir / "mine.ws";
+    std::filesystem::path other = dir / "other.ws";
+    for (const std::filesystem::path& path : { mine, other })
+    {
+        cWSEditorCtrl source;
+        source.GetDocument()->Insert("Text of " + path.filename().string() + "\r");
+        cWordstarFile writer(&source);
+        REQUIRE(writer.SaveFile(path.string(), source.GetDocument()->GetTextSize()));
+    }
+    std::string otherBytes = ReadFileBytes(other);
+
+    cWSEditorCtrl editor;
+    cRunFocusScriptHost host;
+    editor.SetDialogHost(&host);
+    REQUIRE(editor.LoadFile(mine.string()));
+    editor.GetDocument()->Insert("Changed ");
+
+    // ^KT, other.ws, Enter in Save As, Enter at the replace question
+    host.QueueText("other.ws");
+    host.QueueSpecial(wordstartui::SPECIAL_KEY_ENTER);
+    host.QueueSpecial(wordstartui::SPECIAL_KEY_ENTER);
+    editor.mInput->HandleKey(CTRL_K, false);
+    editor.mInput->HandleKey('t', false);
+
+    CHECK(ReadFileBytes(other) == otherBytes);
+    CHECK(editor.mFileName == "mine.ws");
+    CHECK(editor.GetDocument()->IsModified() == true);
 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);

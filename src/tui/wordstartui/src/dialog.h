@@ -47,6 +47,7 @@ public:
     void FocusFirst(void);
     void FocusLast(void);
     bool IsFocusChosen(void) const;     // FocusLast() chose the focus
+    void FocusForRun(void);             // Host focus before a run: the chosen one, else the first
     cWidget* GetFocusedWidget(void);
 
 private:

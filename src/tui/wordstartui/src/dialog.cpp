@@ -287,6 +287,23 @@ bool cDialog::IsFocusChosen(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return nothing
+///
+/// @brief
+/// The focus a host gives the dialog before running it: the focus
+/// FocusLast() chose, otherwise the first focusable widget.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cDialog::FocusForRun(void)
+{
+    if (mFocusChosen == false)
+    {
+        FocusFirst();
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return focused widget or nullptr
 ///
 /// @brief

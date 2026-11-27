@@ -310,6 +310,7 @@ public:
     virtual eSaveChoice AskSaveChanges(const std::string& name);   // "Save changes to NAME first?": Save default, Esc Cancel; Cancel here
     bool SaveBeforeReplace(void);                             // Before a modified document is replaced: false when it stays
     bool AskReplaceFile(const std::string& title, const std::string& question);   // AskYesNo before an existing file is replaced; ws focuses No
+    bool MayWriteSaveAsTarget(const std::string& path);      // Save As target is new or the document's own file, or AskReplaceFile said Yes
 
     // Notes (^ONF, ^ONE): the note text is edited by a second editor on a
     // document of its own, shown by the front end below this editor. Keys
