@@ -68,6 +68,9 @@ protected:
     // operation that cannot pump the main loop.
     void PresentFrame(const std::function<void(cScreen&, const cTheme&)>& draw);
 
+    // The terminal driver exists: Initialize() has run.
+    bool HasTerminal(void) const { return mDriver != nullptr; }
+
 private:
     void PumpEvent(cTerminalDriver& driver, int timeoutMs);
     bool Initialize(void);

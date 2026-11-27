@@ -175,6 +175,7 @@ public:
     wordstartui::sTerminalCapabilities HostCapabilities(void) override;
     void HostShowLoadProgress(const std::string& message, int percent) override;
     void HostHideLoadProgress(void) override;
+    bool HostCanRunModal(void) override;
 
 protected:
     void Draw(wordstartui::cScreen& screen, const wordstartui::cTheme& theme) override;

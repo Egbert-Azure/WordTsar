@@ -75,6 +75,9 @@ public:
     // (no event loop), so they can be called from inside a synchronous load.
     virtual void HostShowLoadProgress(const std::string& message, int percent) = 0;
     virtual void HostHideLoadProgress(void) = 0;
+
+    // False while no dialog can be shown yet (before the terminal is open).
+    virtual bool HostCanRunModal(void) { return true; }
 };
 
 #endif // WORDTSAR_WSTUI_DIALOGHOST_H

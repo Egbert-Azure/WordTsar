@@ -1941,13 +1941,19 @@ void cWSEditorCtrl::SetTitle(const std::string& title)
 /// @return nothing
 ///
 /// @brief
-/// Display an error message as a modal dialog.
+/// Display an error message as a modal dialog; held for
+/// ShowPendingMessages() while the host cannot run one.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSEditorCtrl::ShowError(const std::string& title, const std::string& message)
 {
     if (!mHost)
     {
+        return;
+    }
+    if (mHost->HostCanRunModal() == false)
+    {
+        mPendingMessages.push_back({ "ERROR: " + title, message });
         return;
     }
     wsdialogs::MessageBox(mHost, "ERROR: " + title, message);
@@ -1962,7 +1968,8 @@ void cWSEditorCtrl::ShowError(const std::string& title, const std::string& messa
 /// @return nothing
 ///
 /// @brief
-/// Display an informational message as a modal dialog.
+/// Display an informational message as a modal dialog; held for
+/// ShowPendingMessages() while the host cannot run one.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cWSEditorCtrl::ShowMessage(const std::string& title, const std::string& message)
@@ -1975,7 +1982,36 @@ void cWSEditorCtrl::ShowMessage(const std::string& title, const std::string& mes
     {
         return;
     }
+    if (mHost->HostCanRunModal() == false)
+    {
+        mPendingMessages.push_back({ title, message });
+        return;
+    }
     wsdialogs::MessageBox(mHost, title, message);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Show, in order, the messages ShowError() and ShowMessage() held while
+/// the host could not run a dialog.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWSEditorCtrl::ShowPendingMessages(void)
+{
+    if ((mHost == nullptr) || (mHost->HostCanRunModal() == false) || mPendingMessages.empty())
+    {
+        return;
+    }
+    std::vector<std::pair<std::string, std::string>> pending;
+    pending.swap(mPendingMessages);
+    for (const std::pair<std::string, std::string>& message : pending)
+    {
+        wsdialogs::MessageBox(mHost, message.first, message.second);
+    }
 }
 
 

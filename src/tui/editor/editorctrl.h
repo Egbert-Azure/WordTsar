@@ -28,6 +28,8 @@
 
 #include <functional>
 #include <string>
+#include <utility>
+#include <vector>
 
 // Forward declarations
 class IInputHandler;
@@ -73,6 +75,7 @@ public:
     void SetTitle(const std::string& title) override;
     void ShowError(const std::string& title, const std::string& message) override;
     void ShowMessage(const std::string& title, const std::string& message) override;
+    void ShowPendingMessages(void);              // Show the messages held while no dialog could run
     bool AskYesNo(const std::string& title, const std::string& question) override;
     eSaveChoice AskSaveChanges(const std::string& name) override;
     std::string PromptText(const std::string& title, const std::string& label) override;
@@ -299,6 +302,9 @@ private:
 
     // Display name of the file currently loading (for the progress overlay).
     std::string mLoadingFileName;
+
+    // Title and text of messages held while the host could not run a dialog
+    std::vector<std::pair<std::string, std::string>> mPendingMessages;
 
     // Preferences hook (invoked by Preferences() -- shows the app's dialog)
     std::function<void()> mPreferencesHook;

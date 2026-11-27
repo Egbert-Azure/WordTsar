@@ -451,6 +451,23 @@ void cWSWordTsar::EndStartupScreen(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @return true once the terminal is open; with the test modal counter on,
+///         always true
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cWSWordTsar::HostCanRunModal(void)
+{
+#ifdef WORDTSAR_TUI_TEST_HOOKS
+    if (mTestCountModals == true)
+    {
+        return true;
+    }
+#endif
+    return HasTerminal();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  cDialog& dialog [in,out] the dialog to run
 ///
 /// @return nothing
@@ -471,6 +488,13 @@ void cWSWordTsar::HostRunModal(wordstartui::cDialog& dialog)
         return;
     }
 #endif
+
+    // No terminal yet: the dialog is cancelled
+    if (HasTerminal() == false)
+    {
+        dialog.SetResult(wordstartui::DIALOG_RESULT_CANCEL);
+        return;
+    }
 
     dialog.FocusForRun();
 
@@ -509,6 +533,12 @@ void cWSWordTsar::HostRunModalRaw(
         return;
     }
 #endif
+
+    // No terminal yet: the modal closes unanswered
+    if (HasTerminal() == false)
+    {
+        return;
+    }
 
     // Redraw the editor/opening background (with the menu closed) each frame so
     // custom modals never show a stale frame -- e.g. an open menu pull-down
@@ -4378,6 +4408,9 @@ void cWSWordTsar::OnAfterDraw(cTerminalDriver& driver)
     }
 
     TickStartupScreen();
+
+    // Messages from before the terminal opened, such as a command-line load's
+    mEditor->ShowPendingMessages();
 
     // Periodic auto-save of the -bak backup, driven off the frame loop instead
     // of a background thread. An interval of 0 disables it.
