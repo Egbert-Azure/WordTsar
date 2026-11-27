@@ -9,6 +9,7 @@ Release history for WordTsar, in reverse chronological order.
 - Fixed: after a menu command, WordTsar.app updates the screen as it does after the same key, so Find and Replace from the Edit menu shows the cursor at the last replacement (#112).
 - Fixed: saving a document opened from a Word or RTF file no longer writes over the original. ^KS, ^KD and ^KX open Save As with NAME.ws in the same folder, and ws writes a real Word file when you save under a .docx name (#113).
 - Fixed: opening a file, from the menu, Recent Files, Finder or Ctrl+O, no longer drops unsaved changes. Both apps ask whether to save first, Esc at Modern Ctrl+N's question cancels, ws's question before replacing a file defaults to No, and a failed write of a Word file is reported (#114).
+- Fixed: ws asks before Save As replaces another existing file, with No as the default, a failed RTF write is reported, and a damaged .ws file is reported after it opens and saves through Save As with NAME-recovered.ws, so it is never written over (#114).
 
 ## 0.19.0 (2026-11-26)
 
