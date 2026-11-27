@@ -64,6 +64,7 @@
 
 #include "src/gui/wordtsar.h"
 #include "src/core/include/version.h"
+#include "src/core/include/utils.h"
 #include "src/gui/debugreport/debugreport.h"
 #include "src/gui/utils/terminatesignal.h"
 #include "src/gui/utils/maceditmenu.h"
@@ -166,6 +167,9 @@ int main(int argc, char *argv[])
     InstallMacEditMenuCleanup();
 
     cWordTsarApplication app(argc, argv);
+
+    // QApplication sets the locale from the environment
+    UseCDecimalPoint();
 
     // install crash handler
     cDebugReport mReport ;

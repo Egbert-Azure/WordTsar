@@ -4,8 +4,12 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <clocale>
+#include <cstdlib>
+#include <optional>
 
 #include "src/core/include/config.h"
+#include "src/core/include/utils.h"
 #include "src/core/document/document.h"
 
 // these strings are the same, except one is escape sequences
@@ -6516,6 +6520,63 @@ TEST_CASE("Page layout writes only the changed settings")
     lines = document.PageLayoutLines(fields, false, true, MSR_MILLIMETERS);
     REQUIRE(lines.size() == 1);
     CHECK(lines[0] == ".pr or=l");
+}
+
+TEST_CASE("Measurements use a decimal point under a comma locale")
+{
+    // environment and process locale, restored on every exit path
+    struct sLocaleGuard
+    {
+        std::vector<std::pair<std::string, std::optional<std::string>>> env ;
+        std::string processLocale ;
+
+        sLocaleGuard()
+        {
+            for (const char *name : {"LANG", "LC_ALL", "LC_CTYPE", "LC_NUMERIC", "LC_COLLATE",
+                                     "LC_MONETARY", "LC_TIME", "LC_MESSAGES"})
+            {
+                const char *value = getenv(name) ;
+                env.emplace_back(name, value != nullptr ? std::optional<std::string>(value) : std::nullopt) ;
+            }
+            processLocale = setlocale(LC_ALL, nullptr) ;
+        }
+
+        ~sLocaleGuard()
+        {
+            for (const auto &entry : env)
+            {
+                if (entry.second.has_value())
+                {
+                    setenv(entry.first.c_str(), entry.second->c_str(), 1) ;
+                }
+                else
+                {
+                    unsetenv(entry.first.c_str()) ;
+                }
+            }
+            setlocale(LC_ALL, processLocale.c_str()) ;
+        }
+    } guard ;
+
+    for (const auto &entry : guard.env)
+    {
+        unsetenv(entry.first.c_str()) ;
+    }
+    setenv("LANG", "de_DE.UTF-8", 1) ;
+
+    // the calls ws makes at start
+    REQUIRE(setlocale(LC_ALL, "") != nullptr) ;
+    REQUIRE(std::string(localeconv()->decimal_point) == ",") ;
+    UseCDecimalPoint() ;
+
+    REQUIRE(std::string(setlocale(LC_CTYPE, nullptr)) == "de_DE.UTF-8") ;
+
+    cDocument document ;
+    double twips = 0.0 ;
+    bool incdec = false ;
+    REQUIRE(document.EvaluateMeasurement("1.5i", TWIPSPERINCH, twips, incdec)) ;
+    CHECK(twips == doctest::Approx(2160.0)) ;
+    CHECK(cDocument::FormatPageLayoutValue(2160.0, MSR_INCHES) == "1.50\"") ;
 }
 
 // =====================================================================

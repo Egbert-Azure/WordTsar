@@ -24,6 +24,7 @@
 
 #include "utf8helper.h"
 #include "colorutils.h"
+#include "src/core/include/utils.h"
 
 #include <cerrno>
 #include <clocale>
@@ -180,6 +181,7 @@ bool cTerminalDriverPosix::Open(void)
     }
 
     std::setlocale(LC_ALL, "");
+    UseCDecimalPoint();
 
     DetectCapabilities();
 

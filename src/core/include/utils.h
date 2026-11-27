@@ -49,4 +49,8 @@ std::string AbbreviatePathForDisplay(const std::string &fullPath, size_t maxWidt
 // position per character.
 size_t DecodeUtf8CodePoint(const char *p, size_t remaining, uint32_t &cp) ;
 
+// Numbers use a decimal point whatever the user's locale. Called by both
+// apps at start, after anything that sets the locale from the environment.
+void UseCDecimalPoint(void) ;
+
 #endif // UTILS_H

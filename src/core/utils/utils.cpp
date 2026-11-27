@@ -51,6 +51,7 @@
 
 #include <cstdio>
 #include <cstdarg>
+#include <clocale>
 
 #include "src/core/include/utils.h"
 
@@ -292,4 +293,19 @@ size_t DecodeUtf8CodePoint(const char *p, size_t remaining, uint32_t &cp)
     // Invalid -- return replacement character
     cp = 0xFFFD ;
     return 1 ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// Set LC_NUMERIC to "C" so numbers are read and written with a decimal
+/// point. The other categories keep the user's locale.
+///
+/////////////////////////////////////////////////////////////////////////////
+void UseCDecimalPoint(void)
+{
+    std::setlocale(LC_NUMERIC, "C") ;
 }
