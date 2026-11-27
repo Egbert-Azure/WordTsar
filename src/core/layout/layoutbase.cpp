@@ -3373,6 +3373,7 @@ std::vector<sHeaderFooterLine> cLayoutBase::LayoutNoteLines(POSITION_T position)
     {
         return result;
     }
+    noteLayout->SetPaperSize(mStartPaperWidth, mStartPaperHeight);
     std::string noteFont = GetNoteFont(note.kind);
     noteLayout->SetDefaultFont(noteFont.empty() ? mLayoutState->GetDefaultFont() : noteFont);
     noteLayout->SetDefaultTextColor(mLayoutState->GetDefaultTextColor());

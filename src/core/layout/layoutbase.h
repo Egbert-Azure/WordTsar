@@ -285,6 +285,8 @@ public:
     void SetHyphenationLanguage(const std::string& language);
     void SetDocument(cDocument* doc);
     bool SetPaperSize(COORD_T width, COORD_T height);
+    COORD_T GetStartPaperWidth(void) const { return mStartPaperWidth; }
+    COORD_T GetStartPaperHeight(void) const { return mStartPaperHeight; }
     std::string GetDefaultFont(void) const { return mLayoutState->GetDefaultFont(); }
 
     // ----- Query Methods - Margin Getters -----

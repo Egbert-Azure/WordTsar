@@ -933,6 +933,10 @@ bool cEditorBase::OpenNoteEditor(const sNote& note, eNoteKind kind, POSITION_T p
     pane->mOwnsDocument = true ;
     pane->mNoteOwner = this ;
     mNoteEditor = pane ;
+    if (mLayout != nullptr)
+    {
+        pane->SetPaperSize(mLayout->GetStartPaperWidth(), mLayout->GetStartPaperHeight()) ;
+    }
     mNoteKind = kind ;
     mNotePosition = position ;
     mNoteIsNew = isNew ;
@@ -1556,6 +1560,10 @@ cLayoutBase* cEditorBase::GetLayout(void) const
 void cEditorBase::SetSiblingEditor(cEditorBase* sibling)
 {
     mSiblingEditor = sibling ;
+    if (sibling != nullptr && mLayout != nullptr)
+    {
+        sibling->SetPaperSize(mLayout->GetStartPaperWidth(), mLayout->GetStartPaperHeight()) ;
+    }
 }
 
 
@@ -5965,14 +5973,28 @@ bool cEditorBase::GetShowDot(void) const
 ///
 /// @brief
 /// Set the paper size every layout of the document starts with and lay the
-/// document out again when it changed. A zero or negative size is ignored.
+/// document out again when it changed. The reveal codes editor, the note
+/// editor and the note's owner follow. A zero or negative size is ignored.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::SetPaperSize(COORD_T width, COORD_T height)
 {
-    if (mLayout != nullptr && mLayout->SetPaperSize(width, height) && mDocument != nullptr)
+    if (mLayout == nullptr || !mLayout->SetPaperSize(width, height))
+    {
+        return;
+    }
+
+    if (mDocument != nullptr)
     {
         LayoutDocument(true);
+    }
+
+    for (cEditorBase* other : {mSiblingEditor, mNoteEditor, mNoteOwner})
+    {
+        if (other != nullptr)
+        {
+            other->SetPaperSize(width, height);
+        }
     }
 }
 
