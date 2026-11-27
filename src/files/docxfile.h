@@ -223,6 +223,8 @@ private :
 
     // --- DOCX writing (Save As Word) ---
     bool WriteDocx(const std::string &filename) ;
+    static bool DocxHasParts(const std::string &filename,
+                             const std::vector<std::pair<const char *, std::string>> &parts) ;   // written file holds exactly these parts
     std::string BuildDocumentXml(void) ;
     static std::string BuildContentTypesXml(bool footnotes, bool endnotes) ;
     static std::string BuildRelsXml(void) ;

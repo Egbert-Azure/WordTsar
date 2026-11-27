@@ -90,6 +90,7 @@
 #include <string>
 #include <deque>
 #include <iomanip>
+#include <cstring>
 
 #include "docxfile.h"
 
@@ -3251,46 +3252,94 @@ bool cDOCXFile::WriteDocx(const std::string &filename)
     bool footnotes = mWFootnoteCount > 0 ;
     bool endnotes = mWEndnoteCount > 0 ;
 
+    std::vector<std::pair<const char *, std::string>> parts ;
+    parts.emplace_back("[Content_Types].xml", BuildContentTypesXml(footnotes, endnotes)) ;
+    parts.emplace_back("_rels/.rels", BuildRelsXml()) ;
+    parts.emplace_back("word/document.xml", documentXml) ;
+    parts.emplace_back("word/_rels/document.xml.rels", BuildDocumentRelsXml(footnotes, endnotes)) ;
+    if (footnotes)
+    {
+        std::ostringstream oss ;
+        mWFootnotes.save(oss) ;
+        parts.emplace_back("word/footnotes.xml", oss.str()) ;
+    }
+    if (endnotes)
+    {
+        std::ostringstream oss ;
+        mWEndnotes.save(oss) ;
+        parts.emplace_back("word/endnotes.xml", oss.str()) ;
+    }
+    parts.emplace_back("word/styles.xml", BuildStylesXml()) ;
+    parts.emplace_back("docProps/core.xml", BuildCoreXml()) ;
+    parts.emplace_back("docProps/app.xml", BuildAppXml()) ;
+
     zip_t *zip = zip_open(filename.c_str(), ZIP_DEFAULT_COMPRESSION_LEVEL, 'w') ;
     if (zip == nullptr)
     {
         return false ;
     }
 
-    auto writeEntry = [zip](const char *name, const std::string &content) -> bool
-    {
-        if (zip_entry_open(zip, name) != 0)
-        {
-            return false ;
-        }
-        bool ok = zip_entry_write(zip, content.data(), content.size()) == 0 ;
-        zip_entry_close(zip) ;
-        return ok ;
-    } ;
-
     bool ok = true ;
-    ok = ok && writeEntry("[Content_Types].xml", BuildContentTypesXml(footnotes, endnotes)) ;
-    ok = ok && writeEntry("_rels/.rels", BuildRelsXml()) ;
-    ok = ok && writeEntry("word/document.xml", documentXml) ;
-    ok = ok && writeEntry("word/_rels/document.xml.rels", BuildDocumentRelsXml(footnotes, endnotes)) ;
-    if (footnotes)
+    for (const auto &part : parts)
     {
-        std::ostringstream oss ;
-        mWFootnotes.save(oss) ;
-        ok = ok && writeEntry("word/footnotes.xml", oss.str()) ;
+        if (zip_entry_open(zip, part.first) != 0)
+        {
+            ok = false ;
+            break ;
+        }
+        bool written = zip_entry_write(zip, part.second.data(), part.second.size()) == 0 ;
+        bool closed = zip_entry_close(zip) == 0 ;
+        if ((written == false) || (closed == false))
+        {
+            ok = false ;
+            break ;
+        }
     }
-    if (endnotes)
-    {
-        std::ostringstream oss ;
-        mWEndnotes.save(oss) ;
-        ok = ok && writeEntry("word/endnotes.xml", oss.str()) ;
-    }
-    ok = ok && writeEntry("word/styles.xml", BuildStylesXml()) ;
-    ok = ok && writeEntry("docProps/core.xml", BuildCoreXml()) ;
-    ok = ok && writeEntry("docProps/app.xml", BuildAppXml()) ;
 
+    // zip_close reports no error when writing the central directory or
+    // closing the file fails: the written file is read back instead
     zip_close(zip) ;
 
+    return ok && DocxHasParts(filename, parts) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  filename [in] path of the written .docx
+/// @param  parts    [in] name and content of each part written
+///
+/// @return true if the file opens as a zip archive with exactly these
+///         parts, each with this content
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDOCXFile::DocxHasParts(const std::string &filename,
+                             const std::vector<std::pair<const char *, std::string>> &parts)
+{
+    zip_t *zip = zip_open(filename.c_str(), 0, 'r') ;
+    if (zip == nullptr)
+    {
+        return false ;
+    }
+
+    bool ok = zip_entries_total(zip) == static_cast<ssize_t>(parts.size()) ;
+    for (const auto &part : parts)
+    {
+        if ((ok == false) || (zip_entry_open(zip, part.first) != 0))
+        {
+            ok = false ;
+            break ;
+        }
+        void *buffer = nullptr ;
+        size_t size = 0 ;
+        ssize_t read = zip_entry_read(zip, &buffer, &size) ;
+        ok = (read >= 0) && (size == part.second.size()) &&
+             ((size == 0) || (std::memcmp(buffer, part.second.data(), size) == 0)) ;
+        free(buffer) ;
+        zip_entry_close(zip) ;
+    }
+
+    zip_close(zip) ;
     return ok ;
 }
 
