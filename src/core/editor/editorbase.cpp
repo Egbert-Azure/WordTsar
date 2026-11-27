@@ -636,10 +636,11 @@ bool cEditorBase::LayoutOutdatedParagraphsOnScreen(void)
     }
 
     // Idle layout goes on to the end of the document without stopping
-    // early, from where it is or from after this range if that comes first
+    // early, from where it is or from after this range if that comes first;
+    // with nothing left to lay out nothing is forced
     mLayoutParagraph = std::min(mLayoutParagraph, laidOut + 1) ;
     mLayoutInt = false ;
-    mLayoutRest = true ;
+    mLayoutRest = mLayoutParagraph < totalParas || mDocumentDirty ;
     if (!IsIdleLayoutRunning())
     {
         TriggerIdleLayout() ;
