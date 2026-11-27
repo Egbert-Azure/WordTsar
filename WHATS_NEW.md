@@ -2,6 +2,10 @@
 
 Release history for WordTsar, in reverse chronological order.
 
+## Next release
+
+- Fixed: Page Layout OK writes only the settings you changed, with .pr or=l or .pr or=p for the orientation you pick, and shows mm and cm values with their unit. Paper Size sets the Preferences paper size instead of writing a line nothing reads (#103).
+
 ## 0.19.0 (2026-11-26)
 
 **Additions**
