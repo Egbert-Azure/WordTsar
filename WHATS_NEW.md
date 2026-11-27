@@ -2,10 +2,14 @@
 
 Release history for WordTsar, in reverse chronological order.
 
-## Next release
+## 0.19.1 (2026-11-27)
+
+**Fixes**
 
 - Fixed: Page Layout OK writes only the settings you changed, with .pr or=l or .pr or=p for the orientation you pick, and shows mm and cm values with their unit. Paper Size sets the Preferences paper size instead of writing a line nothing reads (#103).
 - Fixed: under a locale with a decimal comma, such as German, measurements like .mt 1.5" were read as 1 and Page Layout wrote 1,50". Both apps now always use a decimal point (#103).
+- Fixed: a paragraph on screen could be drawn from an old layout, with letters in the wrong places or lines on top of each other, until a cursor key (#109).
+- Fixed: in WordTsar.app, scrolling with the trackpad stopped when scrolling slowly or coasting. The trackpad now scrolls by pixels, and small mouse wheel steps add up instead of being lost (#110).
 - Fixed: after a menu command, WordTsar.app updates the screen as it does after the same key, so Find and Replace from the Edit menu shows the cursor at the last replacement (#112).
 - Fixed: saving a document opened from a Word or RTF file no longer writes over the original. ^KS, ^KD and ^KX open Save As with NAME.ws in the same folder, and ws writes a real Word file when you save under a .docx name (#113).
 - Fixed: opening a file, from the menu, Recent Files, Finder or Ctrl+O, no longer drops unsaved changes. Both apps ask whether to save first, Esc at Modern Ctrl+N's question cancels, ws's question before replacing a file defaults to No, and a failed write of a Word file is reported (#114).
