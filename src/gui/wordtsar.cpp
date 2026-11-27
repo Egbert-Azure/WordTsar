@@ -76,7 +76,6 @@
 #include <QFont>
 #include <QInputDialog>
 
-#include "src/core/include/version.h"
 #include "src/core/include/utils.h"
 #include "src/gui/wordtsar.h"
 #include "src/gui/editor/editorctrl.h"
