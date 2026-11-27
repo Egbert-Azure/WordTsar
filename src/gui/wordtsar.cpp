@@ -90,6 +90,7 @@
 
 #include "src/core/utils/config.h"
 
+#include <type_traits>
 
 #ifdef Q_OS_WINDOWS
 #include <psapi.h>
@@ -1565,12 +1566,20 @@ void cWordTsar::CreateMenus(void)
     // (QFontMetrics doesn't have correct DPI info until window is shown)
 
     // Runs the handler, then the screen update a key gets: incremental
-    // layout, caret, scroll and paint
+    // layout, caret, scroll and paint. One slot per action, so the update
+    // also runs when the handler rebuilds the menus and deletes the action.
     auto connectMenuAction = [this](QAction *action, auto handler)
     {
-        connect(action, &QAction::triggered, this, handler) ;
-        connect(action, &QAction::triggered, this, [this]()
+        connect(action, &QAction::triggered, this, [this, handler]()
         {
+            if constexpr (std::is_member_function_pointer_v<decltype(handler)>)
+            {
+                (this->*handler)() ;
+            }
+            else
+            {
+                handler() ;
+            }
             Active()->PerformPostCommandUpdate() ;
             QTimer::singleShot(1, Active(), SLOT(OnIdle())) ;
         }) ;
