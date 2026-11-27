@@ -97,6 +97,19 @@
     </rect>
    </property>
   </widget>
+  <widget class="QLabel" name="mPaperSizeNote">
+   <property name="geometry">
+    <rect>
+     <x>340</x>
+     <y>198</y>
+     <width>271</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Paper size applies to all documents.</string>
+   </property>
+  </widget>
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>

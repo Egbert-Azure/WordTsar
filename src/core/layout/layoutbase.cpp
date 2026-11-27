@@ -2576,6 +2576,25 @@ bool cLayoutBase::SaveLine(PARAGRAPH_T paragraphNum, sLineLayout& line)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  width  [in] paper width in twips
+/// @param  height [in] paper height in twips
+///
+/// @return nothing
+///
+/// @brief
+/// Sets the paper size the next LayoutDocument() starts with. .pr or=l
+/// and .pr or=p swap it.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cLayoutBase::SetPaperSize(COORD_T width, COORD_T height)
+{
+    mLayoutState->SetPaperWidth(width);
+    mLayoutState->SetPaperHeight(height);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  doc [in] pointer to document
 ///
 /// @return nothing

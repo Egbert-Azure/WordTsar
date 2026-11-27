@@ -278,7 +278,6 @@ void cEditorCtrl::Init(void)
     mSearchColour = QColor(50, 100, 200, 75);      // Darker blue, more opaque (75%)
 
     // Initialize UI dialog state
-    mPaperId = QPageSize::Letter;                   // Default to Letter size
     mPrintLayout = nullptr;                         // Created on-demand for print preview
     mInPrintPreview = false;                        // Not in print preview mode
 
@@ -6290,8 +6289,44 @@ void cEditorCtrl::PageLayout(void)
     Ui::PageLayout pagelayout;
     pagelayout.setupUi(&dialog);
 
-    // Populate page size combo list
-    for (int loop = 1; loop < 200; loop++)
+    cLayoutBase* layout = GetLayout();
+    cDocument* doc = GetDocument();
+
+    auto sizeText = [this](const QString& name, double widthTwips, double heightTwips) -> QString
+    {
+        if (mMeasure == MSR_CENTIMETERS || mMeasure == MSR_MILLIMETERS)
+        {
+            return string_sprintf("%s, %d x %d mm", name.toUtf8().constData(),
+                                  static_cast<int>(std::lround(widthTwips / TWIPSPERMM)),
+                                  static_cast<int>(std::lround(heightTwips / TWIPSPERMM))).c_str();
+        }
+        return string_sprintf("%s, %.2f x %.2f in", name.toUtf8().constData(),
+                              widthTwips / TWIPSPERINCH, heightTwips / TWIPSPERINCH).c_str();
+    };
+
+    // Page size in twips from its exact definition
+    auto pageTwips = [](const QPageSize& psize) -> QSizeF
+    {
+        QSizeF size = psize.definitionSize();
+        switch (psize.definitionUnits())
+        {
+            case QPageSize::Millimeter:
+                return size * TWIPSPERMM;
+            case QPageSize::Inch:
+                return size * TWIPSPERINCH;
+            default:
+                return QSizeF(psize.sizePoints()) * POINTSTOTWIPS;
+        }
+    };
+
+    // Paper size in effect, either way round since .pr or=l swaps it
+    COORD_T paperShort = std::min(layout->GetPaperWidth(), layout->GetPaperHeight());
+    COORD_T paperLong = std::max(layout->GetPaperWidth(), layout->GetPaperHeight());
+    constexpr double PAPER_TOLERANCE = 30.0;      // twips
+    int paperIndex = -1;
+
+    // Populate page size combo list; item data is the QPageSize id
+    for (int loop = 0; loop <= QPageSize::LastPageSize; loop++)
     {
         QPageSize psize(static_cast<QPageSize::PageSizeId>(loop));
         if (psize.isValid() == false)
@@ -6299,29 +6334,26 @@ void cEditorCtrl::PageLayout(void)
             continue;
         }
 
-        QString name = psize.name();
+        QSizeF pageSize = pageTwips(psize);
+        double widthTwips = pageSize.width();
+        double heightTwips = pageSize.height();
 
-        QString full;
-        QSizeF size;
-
-        if (mMeasure == MSR_CENTIMETERS || mMeasure == MSR_MILLIMETERS)
+        if (paperIndex < 0 &&
+            std::fabs(std::min(widthTwips, heightTwips) - paperShort) <= PAPER_TOLERANCE &&
+            std::fabs(std::max(widthTwips, heightTwips) - paperLong) <= PAPER_TOLERANCE)
         {
-            size = psize.size(QPageSize::Millimeter);
-            full = string_sprintf("%s, %d x %d mm", name.toUtf8().constData(), static_cast<int>(size.width()), static_cast<int>(size.height())).c_str();
-        }
-        else
-        {
-            size = psize.size(QPageSize::Inch);
-            full = string_sprintf("%s, %.2f x %.2f in", name.toUtf8().constData(), size.width(), size.height()).c_str();
+            paperIndex = pagelayout.mPaperSize->count();
         }
 
-        pagelayout.mPaperSize->addItem(full, loop);
+        pagelayout.mPaperSize->addItem(sizeText(psize.name(), widthTwips, heightTwips), loop);
     }
 
-    pagelayout.mPaperSize->setCurrentIndex(mPaperId - 1);
-
-    cLayoutBase* layout = GetLayout();
-    cDocument* doc = GetDocument();
+    if (paperIndex < 0)
+    {
+        paperIndex = pagelayout.mPaperSize->count();
+        pagelayout.mPaperSize->addItem(sizeText("Custom", paperShort, paperLong), -1);
+    }
+    pagelayout.mPaperSize->setCurrentIndex(paperIndex);
 
     // Orientation in effect at the start of the cursor's paragraph: the last
     // .pr or= before it, portrait when there is none.
@@ -6402,6 +6434,24 @@ void cEditorCtrl::PageLayout(void)
                 doc->Insert(line);
                 doc->Insert(HARD_RETURN);
             }
+        }
+
+        // Paper size has no dot command: it goes to Preferences, not the document
+        int newPaper = pagelayout.mPaperSize->currentData().toInt();
+        if (pagelayout.mPaperSize->currentIndex() != paperIndex && newPaper >= 0)
+        {
+            QSizeF newSize = pageTwips(QPageSize(static_cast<QPageSize::PageSizeId>(newPaper)));
+            COORD_T width = static_cast<COORD_T>(std::lround(newSize.width()));
+            COORD_T height = static_cast<COORD_T>(std::lround(newSize.height()));
+
+            cConfig config;
+            config.Load();
+            config.mPaperWidth = width;
+            config.mPaperHeight = height;
+            config.Save();
+
+            layout->SetPaperSize(width, height);
+            LayoutDocument(true);
         }
     }
 }

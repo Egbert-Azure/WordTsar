@@ -353,7 +353,6 @@ public:
     QProgressDialog* mProgress;           // Progress dialog for file I/O operations
 
     // P3: UI Dialog state (for PageLayout, PrintPreview)
-    QPageSize::PageSizeId mPaperId;       // Current paper type
     cLayout* mPrintLayout;               // Layout for printing (temporary, created for print preview)
     bool mInPrintPreview;                 // Flag: currently in print preview mode
 

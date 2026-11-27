@@ -284,6 +284,7 @@ public:
     void SetFileDir(const std::string& dir);
     void SetHyphenationLanguage(const std::string& language);
     void SetDocument(cDocument* doc);
+    void SetPaperSize(COORD_T width, COORD_T height);
     std::string GetDefaultFont(void) const { return mLayoutState->GetDefaultFont(); }
 
     // ----- Query Methods - Margin Getters -----
