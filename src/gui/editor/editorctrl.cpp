@@ -6844,6 +6844,13 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
         loadedAsText = true;
     }
 
+    // A Word or RTF name is an original whatever reader its content needs
+    if (qfilename.endsWith(".docx", Qt::CaseInsensitive) ||
+        qfilename.endsWith(".rtf", Qt::CaseInsensitive))
+    {
+        loadedAsExport = true;
+    }
+
     // Clear the current document before loading new content -- otherwise the
     // new file's content is inserted into whatever the current document
     // already contains (at its current cursor position), "merging" the two

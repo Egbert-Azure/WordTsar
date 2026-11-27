@@ -1238,6 +1238,15 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
         loadedAsText = true;
     }
 
+    // A Word or RTF name is an original whatever reader its content needs
+    std::string ext = filepath.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+        [](unsigned char c) { return std::tolower(c); });
+    if ((ext == ".docx") || (ext == ".rtf"))
+    {
+        loadedAsExport = true;
+    }
+
     // Clear the current document before loading new content -- otherwise the
     // new file's content is inserted into whatever the current document
     // already contains (at its current cursor position), "merging" the two
