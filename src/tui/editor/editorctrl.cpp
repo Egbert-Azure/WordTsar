@@ -1778,7 +1778,7 @@ std::string cWSEditorCtrl::PromptForSaveFile(void)
     if ((suggestion.empty() == false) && (std::filesystem::exists(result, ec) == true))
     {
         std::string name = std::filesystem::path(result).filename().string();
-        if (AskYesNo("Save File", name + " exists. Replace it?") == false)
+        if (AskReplaceFile("Save File", name + " exists. Replace it?") == false)
         {
             return "";
         }
@@ -1982,7 +1982,7 @@ void cWSEditorCtrl::ShowMessage(const std::string& title, const std::string& mes
 ///
 /// @brief
 /// Ask the user a yes/no question via a modal dialog. Defaults to no when
-/// no dialog host is available.
+/// no dialog host is available. No is focused for AskReplaceFile().
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::AskYesNo(const std::string& title, const std::string& question)
@@ -1996,7 +1996,7 @@ bool cWSEditorCtrl::AskYesNo(const std::string& title, const std::string& questi
     {
         return false;
     }
-    return wsdialogs::YesNo(mHost, title, question);
+    return wsdialogs::YesNo(mHost, title, question, mAskingReplaceFile);
 }
 
 
@@ -3739,7 +3739,7 @@ cEditorBase::eFileExistsChoice cWSEditorCtrl::ConfirmOverwriteOrAppend(const std
 
     int choice = wsdialogs::ThreeChoice(mHost, "Write Block",
                                         "\"" + filename + "\" already exists.",
-                                        "Overwrite", "Append", "Cancel");
+                                        "Overwrite", "Append", "Cancel", true);
     if (choice == 1)
     {
         return eFileExistsChoice::Append;

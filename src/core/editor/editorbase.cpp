@@ -1295,6 +1295,27 @@ bool cEditorBase::SaveBeforeReplace(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  title    [in] dialog title
+/// @param  question [in] question naming the existing file
+///
+/// @return true to replace the file
+///
+/// @brief
+/// AskYesNo() with mAskingReplaceFile set, so a front end can make No the
+/// default.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::AskReplaceFile(const std::string& title, const std::string& question)
+{
+    mAskingReplaceFile = true ;
+    bool yes = AskYesNo(title, question) ;
+    mAskingReplaceFile = false ;
+    return yes ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return the file a plain save writes, empty when Save As must name it
 ///
 /// @brief

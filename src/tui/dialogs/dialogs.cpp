@@ -548,6 +548,7 @@ void ScrollingMessageBox(iWSDialogHost* host, const std::string& title, const st
 /// @param  iWSDialogHost* host [in] dialog host
 /// @param  const std::string& title [in] dialog title
 /// @param  const std::string& question [in] question text
+/// @param  bool focusNo [in] No has the focus instead of Yes
 ///
 /// @return true when Yes was pressed
 ///
@@ -555,7 +556,8 @@ void ScrollingMessageBox(iWSDialogHost* host, const std::string& title, const st
 /// Display a Yes/No confirmation dialog.
 ///
 /////////////////////////////////////////////////////////////////////////////
-bool YesNo(iWSDialogHost* host, const std::string& title, const std::string& question)
+bool YesNo(iWSDialogHost* host, const std::string& title, const std::string& question,
+           bool focusNo)
 {
     std::vector<std::string> lines = SplitLines(question);
 
@@ -618,7 +620,14 @@ bool YesNo(iWSDialogHost* host, const std::string& title, const std::string& que
         dialogPtr->SetResult(DIALOG_RESULT_CANCEL);
     }));
 
-    dialog.FocusFirst();
+    if (focusNo == true)
+    {
+        dialog.FocusLast();
+    }
+    else
+    {
+        dialog.FocusFirst();
+    }
     host->HostRunModal(dialog);
 
     return yes;
@@ -632,6 +641,7 @@ bool YesNo(iWSDialogHost* host, const std::string& title, const std::string& que
 /// @param  const std::string& button0 [in] first button label
 /// @param  const std::string& button1 [in] second button label
 /// @param  const std::string& button2 [in] third button label
+/// @param  bool focusLast [in] the third button has the focus instead of the first
 ///
 /// @return the index of the pressed button, or -1 on cancel
 ///
@@ -640,7 +650,8 @@ bool YesNo(iWSDialogHost* host, const std::string& title, const std::string& que
 ///
 /////////////////////////////////////////////////////////////////////////////
 int ThreeChoice(iWSDialogHost* host, const std::string& title, const std::string& message,
-                const std::string& button0, const std::string& button1, const std::string& button2)
+                const std::string& button0, const std::string& button1, const std::string& button2,
+                bool focusLast)
 {
     std::vector<std::string> lines = SplitLines(message);
 
@@ -711,7 +722,14 @@ int ThreeChoice(iWSDialogHost* host, const std::string& title, const std::string
         dialogPtr->SetResult(DIALOG_RESULT_OK);
     }));
 
-    dialog.FocusFirst();
+    if (focusLast == true)
+    {
+        dialog.FocusLast();
+    }
+    else
+    {
+        dialog.FocusFirst();
+    }
     host->HostRunModal(dialog);
 
     if (dialog.GetResult() == DIALOG_RESULT_CANCEL)

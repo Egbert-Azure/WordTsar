@@ -909,7 +909,7 @@ void cMacroEngine::StopRecording(void)
     store.CreateDefaults();
     std::error_code ec;
     if ((std::filesystem::exists(store.SavePath(name), ec) == true) &&
-        (mEditor.AskYesNo("Save Macro", "Macro " + name + " exists. Replace it?") == false))
+        (mEditor.AskReplaceFile("Save Macro", "Macro " + name + " exists. Replace it?") == false))
     {
         mEditor.SetStatusMessage("Macro not saved");
         return;
@@ -1093,7 +1093,7 @@ void cMacroEngine::CopyOrRename(bool rename)
         return;
     }
     if ((exists == true) && (same == false) &&
-        (mEditor.AskYesNo(title, "Macro " + newName + " exists. Replace it?") == false))
+        (mEditor.AskReplaceFile(title, "Macro " + newName + " exists. Replace it?") == false))
     {
         mEditor.SetStatusMessage(notDone);
         return;

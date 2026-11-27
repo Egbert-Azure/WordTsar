@@ -45,6 +45,7 @@ public:
     void SetResult(eDialogResult result);
     eDialogResult GetResult(void) const;
     void FocusFirst(void);
+    void FocusLast(void);
     cWidget* GetFocusedWidget(void);
 
 private:

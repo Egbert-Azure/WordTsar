@@ -309,6 +309,7 @@ public:
     enum class eSaveChoice { Save, DontSave, Cancel };
     virtual eSaveChoice AskSaveChanges(const std::string& name);   // "Save changes to NAME first?": Save default, Esc Cancel; Cancel here
     bool SaveBeforeReplace(void);                             // Before a modified document is replaced: false when it stays
+    bool AskReplaceFile(const std::string& title, const std::string& question);   // AskYesNo before an existing file is replaced; ws focuses No
 
     // Notes (^ONF, ^ONE): the note text is edited by a second editor on a
     // document of its own, shown by the front end below this editor. Keys
@@ -693,6 +694,8 @@ protected:
     // Layout and Document
     cLayoutBase* mLayout;
     cDocument* mDocument;
+
+    bool mAskingReplaceFile = false;      // AskYesNo runs for AskReplaceFile
 
     // Listener State
     bool mOwnsDocument;                   // true if this editor created the document

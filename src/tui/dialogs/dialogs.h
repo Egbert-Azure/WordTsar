@@ -40,12 +40,15 @@ void MessageBox(iWSDialogHost* host, const std::string& title, const std::string
 // wheel scroll the text.
 void ScrollingMessageBox(iWSDialogHost* host, const std::string& title, const std::string& message);
 
-// Yes/No question; returns true for Yes.
-bool YesNo(iWSDialogHost* host, const std::string& title, const std::string& question);
+// Yes/No question; returns true for Yes. focusNo: No has the focus.
+bool YesNo(iWSDialogHost* host, const std::string& title, const std::string& question,
+           bool focusNo = false);
 
 // Three-button choice; returns 0/1/2 for the buttons, -1 for cancel/escape.
+// focusLast: the third button has the focus.
 int ThreeChoice(iWSDialogHost* host, const std::string& title, const std::string& message,
-                const std::string& button0, const std::string& button1, const std::string& button2);
+                const std::string& button0, const std::string& button1, const std::string& button2,
+                bool focusLast = false);
 
 // Single-line text prompt. Returns true on OK (value updated), false on cancel.
 bool InputBox(iWSDialogHost* host, const std::string& title, const std::string& prompt,
