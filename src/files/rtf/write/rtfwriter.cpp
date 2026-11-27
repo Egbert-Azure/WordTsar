@@ -361,7 +361,7 @@ cRTFWriter::~cRTFWriter(void)
 ///
 /// @param  infilename - [in] the filename to write RTF to
 ///
-/// @return bool - true if the file was written successfully
+/// @return bool - true if every write, the flush and the close succeeded
 ///
 /// @brief
 /// Main entry point. Opens the output file, writes the RTF header, font
@@ -394,9 +394,14 @@ bool cRTFWriter::Start(std::string &infilename)
 
         CreateRTFClose() ;
 
+        // A failed write, flush or close leaves the stream failed
+        mFile.flush() ;
+        retval = mFile.good() ;
         mFile.close() ;
-
-        retval = true ;
+        if (mFile.fail() == true)
+        {
+            retval = false ;
+        }
     }
 
     return retval ;
