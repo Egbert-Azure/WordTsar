@@ -6816,6 +6816,7 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
     // WordStar CheckType includes content-based detection for unknown extensions
     cFile* fileReader = nullptr;
     bool loadedAsText = false;
+    bool loadedAsExport = false;
 
     cWordstarFile wsCheck(this);
     cRTFFile rtfCheck(this);
@@ -6828,10 +6829,12 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
     else if (rtfCheck.CheckType(filename))
     {
         fileReader = new cRTFFile(this);
+        loadedAsExport = true;
     }
     else if (docxCheck.CheckType(filename))
     {
         fileReader = new cDOCXFile(this);
+        loadedAsExport = true;
     }
     else
     {
@@ -6940,6 +6943,7 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
         mFileName = fi.fileName().toStdString();
         mFileDir = fi.path().toStdString();
         mFileSet = true;
+        mNeedsWordStarName = loadedAsExport;
 
         // Wire filename to layout for variable expansion (&*&, &.&, &\&)
         mLayout->SetFilename(mFileName);
@@ -7164,6 +7168,7 @@ bool cEditorCtrl::SaveFile(const std::string& filename)
         if (isExport == false)
         {
             RecordRecentFile(filename);
+            mNeedsWordStarName = false;
         }
 
         // Update window title with new filename
@@ -7441,11 +7446,18 @@ std::string cEditorCtrl::PromptForLoadFile(void)
 /////////////////////////////////////////////////////////////////////////////
 std::string cEditorCtrl::PromptForSaveFile(void)
 {
+    // A Word or RTF original offers NAME.ws; the dialog asks before replacing a file
+    std::string start = SaveAsSuggestion();
+    if (start.empty() == true)
+    {
+        start = mFileDir;
+    }
+
     QString filters = BuildFileFilterString(true);  // true = save dialog
     QString filename = QFileDialog::getSaveFileName(
         this,
         "Save File",
-        QString::fromStdString(mFileDir),
+        QString::fromStdString(start),
         filters
     );
 
@@ -7523,24 +7535,24 @@ bool cEditorCtrl::Open(void)
 /// @return bool - true on successful save, false otherwise (including no-op for unchanged doc)
 ///
 /// @brief
-/// Save the current document. If no filename is set, fall back to SaveAs.
-/// No-op if document is unchanged. Mirrors cWordStarInput::OnControlKChar
-/// case 's'.
+/// Save the current document. Falls back to SaveAs when CurrentSavePath()
+/// is empty. No-op when PlainSaveNeeded() is false. Mirrors
+/// cWordStarInput::OnControlKChar case 's'.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorCtrl::Save(void)
 {
-    if (GetDocument() == nullptr || GetDocument()->IsModified() == false)
+    if (GetDocument() == nullptr || PlainSaveNeeded() == false)
     {
         return false;
     }
 
-    if (mFileSet == false)
+    std::string fname = CurrentSavePath();
+    if (fname.empty() == true)
     {
         return SaveAs();
     }
 
-    std::string fname = mFileDir + "/" + mFileName;
     bool ok = SaveFile(fname);
     if (ok == false)
     {
@@ -7608,11 +7620,11 @@ bool cEditorCtrl::SaveAndClose(void)
 {
     bool ok = false;
 
-    if (GetDocument() && GetDocument()->IsModified())
+    if (GetDocument() && PlainSaveNeeded())
     {
-        if (mFileSet != false)
+        std::string fname = CurrentSavePath();
+        if (fname.empty() == false)
         {
-            std::string fname = mFileDir + "/" + mFileName;
             ok = SaveFile(fname);
             if (ok == false)
             {
@@ -7636,6 +7648,7 @@ bool cEditorCtrl::SaveAndClose(void)
         mFileDir = DefaultFileDir();
         mFileName = "Unknown.ws";
         mFileSet = false;
+        mNeedsWordStarName = false;
         SetTitle(mFileName);
         GetLayout()->SetFilename(mFileName);
         GetLayout()->SetFileDir(mFileDir);
@@ -7943,10 +7956,10 @@ bool cEditorCtrl::CloseEvent(void)
         if (result == QMessageBox::Yes)
         {
             // Save the file directly (same logic as ^KS/^KT)
-            if (mFileSet)
+            std::string fname = CurrentSavePath();
+            if (fname.empty() == false)
             {
                 // We have a filename, save directly
-                std::string fname = mFileDir + "/" + mFileName;
                 if (!SaveFile(fname))
                 {
                     return false;  // Save failed, cancel close
@@ -8119,11 +8132,23 @@ void cEditorCtrl::GenerateFromFile(bool index)
         }
         if (answer == SAVE_QUESTION_SAVE)
         {
-            if (SaveFile(current) == false)
+            if (CurrentSavePath().empty() == true)
             {
-                return;
+                // A Word or RTF original is saved under a new name, which is the source
+                if (SaveAs() == false)
+                {
+                    return;
+                }
+                source = (std::filesystem::path(mFileDir) / mFileName).string();
             }
-            MarkDocumentSaved();
+            else
+            {
+                if (SaveFile(current) == false)
+                {
+                    return;
+                }
+                MarkDocumentSaved();
+            }
         }
     }
 

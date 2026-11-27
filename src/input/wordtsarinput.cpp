@@ -1703,12 +1703,11 @@ bool cWordStarInput::OnControlKChar(char ch)
             // a document with no unsaved changes has nothing to save, so it
             // must still clear the buffer like real WordStar 7's ^KD does.
             retval = true ;
-            if(mEditor->GetDocument() && mEditor->GetDocument()->IsModified())
+            if(mEditor->GetDocument() && mEditor->PlainSaveNeeded())
             {
-                if(mEditor->mFileSet != false)      // if we have a directory, we have a valid file name
+                std::string fname = mEditor->CurrentSavePath() ;
+                if(fname.empty() == false)
                 {
-                    std::string fname = mEditor->mFileDir + "/" + mEditor->mFileName ;
-
                     bool ok = mEditor->SaveFile(fname) ;
                     if(ok == false)
                     {
@@ -1733,6 +1732,7 @@ bool cWordStarInput::OnControlKChar(char ch)
                 mEditor->mFileDir = cEditorBase::DefaultFileDir() ;
                 mEditor->mFileName = "Unknown.ws" ;
                 mEditor->mFileSet = false ;
+                mEditor->mNeedsWordStarName = false ;
                 mEditor->SetTitle(mEditor->mFileName) ;
                 mEditor->GetLayout()->SetFilename(mEditor->mFileName) ;
                 mEditor->GetLayout()->SetFileDir(mEditor->mFileDir) ;
@@ -1741,12 +1741,11 @@ bool cWordStarInput::OnControlKChar(char ch)
             break ;
 
         case 's' :          // save file
-            if(mEditor->GetDocument() && mEditor->GetDocument()->IsModified())
+            if(mEditor->GetDocument() && mEditor->PlainSaveNeeded())
             {
-                if(mEditor->mFileSet != false)      // if we have a directory, we have a valid file name
+                std::string fname = mEditor->CurrentSavePath() ;
+                if(fname.empty() == false)
                 {
-                    std::string fname =  mEditor->mFileDir + "/" + mEditor->mFileName ;
-
                     bool ok = mEditor->SaveFile(fname) ;
                     if(ok == false)
                     {
@@ -1768,6 +1767,11 @@ bool cWordStarInput::OnControlKChar(char ch)
             break ;
 
         case 'x' :          // save and exit
+            // A Word or RTF original is named by Save As first; Cancel stays
+            if((mEditor->mNeedsWordStarName == true) && (OnControlKChar('T') == false))
+            {
+                break ;
+            }
             mEditor->Quit();
             break ;
 

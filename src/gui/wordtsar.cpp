@@ -2424,7 +2424,10 @@ void cWordTsar::Print(void)
 
 void cWordTsar::PrintPreview(void)
 {
-    mEditor->Save() ;
+    if ((mEditor->GetDocument() != nullptr) && (mEditor->GetDocument()->IsModified() == true))
+    {
+        mEditor->Save() ;
+    }
     mEditor->PrintPreview() ;
 }
 

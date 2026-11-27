@@ -807,6 +807,7 @@ bool InputBox(iWSDialogHost* host, const std::string& title, const std::string& 
 /// @param  bool saveMode [in] true to show a filename field
 /// @param  const std::string& startPath [in] initial directory
 /// @param  std::string& result [out] chosen path
+/// @param  const std::string& startName [in] initial save-mode file name
 ///
 /// @return true when a file was chosen
 ///
@@ -815,7 +816,8 @@ bool InputBox(iWSDialogHost* host, const std::string& title, const std::string& 
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
-                 const std::string& startPath, std::string& result)
+                 const std::string& startPath, std::string& result,
+                 const std::string& startName)
 {
     sTerminalSize size = host->HostScreenSize();
 
@@ -866,7 +868,7 @@ bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
     fieldRect.col = rect.col + 8;
     fieldRect.rows = 1;
     fieldRect.cols = rect.cols - 10;
-    cTextField nameField(fieldRect, "");
+    cTextField nameField(fieldRect, startName);
 
     // In save mode, start with the Name field focused -- the whole point of
     // Save As is typing a filename, and requiring Tab first (with no visible

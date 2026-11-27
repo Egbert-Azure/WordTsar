@@ -252,6 +252,9 @@ public:
     virtual std::string PromptForLoadFile(void) = 0;          // Show file open dialog
     std::string RequestLoadFile(void);                        // File name from the playing macro, otherwise PromptForLoadFile
     virtual std::string PromptForSaveFile(void) = 0;          // Show file save dialog
+    std::string CurrentSavePath(void) const;                  // File a plain save writes; empty when Save As must name it first
+    std::string SaveAsSuggestion(void) const;                 // NAME.ws in the file's folder for a Word or RTF original, otherwise empty
+    bool PlainSaveNeeded(void) const;                         // Modified, or still named after a Word or RTF original
     virtual bool CloseEvent(void) = 0;                        // Handle close (confirm save)
     virtual void FileIOProgress(int /*percent*/) {}           // Report file I/O progress (default no-op)
     virtual void Preferences(void) {}                         // Show preferences dialog (default no-op)
@@ -673,6 +676,7 @@ public:
     bool mLastKeyUpOrDown;              // Track if last key was up/down for sticky X
     std::string mFileDir;               // Current file directory
     bool mFileSet;                      // Has filename been set?
+    bool mNeedsWordStarName;            // Loaded by the DOCX or RTF reader, not saved since in a non-export format
 
     // Configurable Settings
     int mCaretBlinkRate;                // Cursor blink speed in milliseconds

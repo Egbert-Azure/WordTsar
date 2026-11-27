@@ -363,9 +363,9 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
                         "Current document has unsaved changes. Save first?") ;
                     if (save)
                     {
-                        if (mEditor->mFileSet)
+                        std::string fname = mEditor->CurrentSavePath() ;
+                        if (fname.empty() == false)
                         {
-                            std::string fname = mEditor->mFileDir + "/" + mEditor->mFileName ;
                             mEditor->SaveFile(fname) ;
                         }
                         else
@@ -384,6 +384,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
                 mEditor->mFileDir = cEditorBase::DefaultFileDir() ;
                 mEditor->mFileName = "Unknown.ws" ;
                 mEditor->mFileSet = false ;
+                mEditor->mNeedsWordStarName = false ;
                 mEditor->SetTitle(mEditor->mFileName) ;
                 mEditor->GetLayout()->SetFilename(mEditor->mFileName) ;
                 mEditor->GetLayout()->SetFileDir(mEditor->mFileDir) ;
@@ -473,11 +474,11 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
             {
                 // Ctrl+S: Save
                 cDocument* doc = mEditor->GetDocument() ;
-                if (doc && doc->IsModified())
+                if (doc && mEditor->PlainSaveNeeded())
                 {
-                    if (mEditor->mFileSet)
+                    std::string fname = mEditor->CurrentSavePath() ;
+                    if (fname.empty() == false)
                     {
-                        std::string fname = mEditor->mFileDir + "/" + mEditor->mFileName ;
                         bool ok = mEditor->SaveFile(fname) ;
                         if (ok)
                         {

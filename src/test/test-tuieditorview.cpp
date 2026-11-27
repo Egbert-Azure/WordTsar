@@ -30,6 +30,7 @@
 #include "src/core/include/config.h"
 #include "src/input/wordtsarinput.h"
 #include "src/core/spellcheck/spellcheck.h"
+#include "src/files/docxfile.h"
 #include "src/tui/dialogs/dialoghost.h"
 #include "src/tui/wordstartui/src/dialog.h"
 #include "src/tui/wordstartui/src/theme.h"
@@ -1074,6 +1075,81 @@ TEST_CASE("cWSEditorCtrl - spell check Replace with a suggestion that ends in th
     text = text.substr(0, text.find('\x7F'));
     CHECK(host.mModals >= 1);
     CHECK(text == "evtl.");
+}
+
+
+TEST_CASE("cWSEditorCtrl - ^KS on an opened Word file saves NAME.ws, Save As .docx writes a Word file")
+{
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "wordtsar-tui-docxsave-XXXXXX").string();
+    REQUIRE(mkdtemp(pattern.data()) != nullptr);
+    std::filesystem::path dir = pattern;
+
+    // The text lines of the document, without dot commands and empty lines
+    auto plainText = [](cWSEditorCtrl& editor)
+    {
+        std::string text = editor.GetDocument()->GetText();
+        text = text.substr(0, text.find('\x1A'));
+        text = text.substr(0, text.find('\x7F'));
+        std::string lines;
+        size_t start = 0;
+        while (start < text.size())
+        {
+            size_t end = text.find('\r', start);
+            if (end == std::string::npos)
+            {
+                end = text.size();
+            }
+            std::string line = text.substr(start, end - start);
+            if ((line.empty() == false) && (line[0] != '.'))
+            {
+                lines += line + "\n";
+            }
+            start = end + 1;
+        }
+        return lines;
+    };
+
+    std::filesystem::path original = dir / "report.docx";
+    {
+        cWSEditorCtrl source;
+        source.GetDocument()->Insert("Hello Word\r");
+        cDOCXFile writer(&source);
+        REQUIRE(writer.SaveFile(original.string(), source.GetDocument()->GetTextSize()));
+    }
+    std::string originalBytes = ReadFileBytes(original);
+
+    cWSEditorCtrl editor;
+    cSpellScriptHost host;
+    editor.SetDialogHost(&host);
+    REQUIRE(editor.LoadFile(original.string()));
+    std::string text = plainText(editor);
+    REQUIRE(text == "Hello Word\n");
+
+    // ^KS: the Save As name field holds report.ws; Enter accepts it
+    host.QueueSpecial(wordstartui::SPECIAL_KEY_ENTER);
+    editor.mInput->HandleKey(CTRL_K, false);
+    editor.mInput->HandleKey('s', false);
+
+    CHECK(ReadFileBytes(original) == originalBytes);
+    CHECK(std::filesystem::exists(dir / "report.ws"));
+    CHECK(editor.mFileName == "report.ws");
+
+    // ^KT to a new .docx name exports a Word file
+    host.QueueText("copy.docx");
+    host.QueueSpecial(wordstartui::SPECIAL_KEY_ENTER);
+    editor.mInput->HandleKey(CTRL_K, false);
+    editor.mInput->HandleKey('t', false);
+
+    REQUIRE(std::filesystem::exists(dir / "copy.docx"));
+    cWSEditorCtrl reloaded;
+    cDOCXFile reader(&reloaded);
+    CHECK(reader.LoadFile((dir / "copy.docx").string()));
+    CHECK(plainText(reloaded) == text);
+    CHECK(ReadFileBytes(original) == originalBytes);
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
 }
 
 

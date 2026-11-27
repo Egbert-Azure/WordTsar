@@ -151,6 +151,7 @@ cEditorBase::cEditorBase(void)
     , mLastKeyUpOrDown(false)
     , mFileDir(cEditorBase::DefaultFileDir())
     , mFileSet(false)
+    , mNeedsWordStarName(false)
     , mCaretBlinkRate(500)
     , mAutoSaveIntervalSec(60)
     , mDefaultFormat("ws")
@@ -417,6 +418,7 @@ void cEditorBase::AbandonFile(void)
     mFileDir = DefaultFileDir();
     mFileName = "Unknown.ws";
     mFileSet = false;
+    mNeedsWordStarName = false;
     SetTitle(mFileName);
 
     if (GetLayout())
@@ -1213,7 +1215,7 @@ void cEditorBase::MacroDelete(void)
 ///
 /// @brief
 /// Replaces the document with a file. A modified document is saved first
-/// (Save As for an untitled one); No or a failed save leaves the document
+/// (Save As when CurrentSavePath() is empty); No or a failed save leaves the document
 /// open and loads nothing.
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -1228,12 +1230,8 @@ bool cEditorBase::OpenDocument(const std::string& path)
             return false ;
         }
 
-        std::string savePath ;
-        if (mFileSet == true)
-        {
-            savePath = (std::filesystem::path(mFileDir) / mFileName).string() ;
-        }
-        else
+        std::string savePath = CurrentSavePath() ;
+        if (savePath.empty() == true)
         {
             savePath = PromptForSaveFile() ;
             if (savePath.empty() == true)
@@ -1256,6 +1254,64 @@ bool cEditorBase::OpenDocument(const std::string& path)
         return false ;
     }
     return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the file a plain save writes, empty when Save As must name it
+///
+/// @brief
+/// Empty for an untitled document and for one loaded from a Word or RTF
+/// file that has not been saved in a non-export format since.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorBase::CurrentSavePath(void) const
+{
+    if ((mFileSet == false) || (mNeedsWordStarName == true))
+    {
+        return "" ;
+    }
+    return (std::filesystem::path(mFileDir) / mFileName).string() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return NAME.ws in the folder of the current file, or empty
+///
+/// @brief
+/// The name Save As offers for a document loaded from a Word or RTF file;
+/// empty for any other document.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorBase::SaveAsSuggestion(void) const
+{
+    if (mNeedsWordStarName == false)
+    {
+        return "" ;
+    }
+    std::string stem = std::filesystem::path(mFileName).stem().string() ;
+    return (std::filesystem::path(mFileDir) / (stem + ".ws")).string() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true when ^KS has something to do
+///
+/// @brief
+/// True for a modified document and for one loaded from a Word or RTF file
+/// that has not been saved in a non-export format since.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::PlainSaveNeeded(void) const
+{
+    if (mNeedsWordStarName == true)
+    {
+        return true ;
+    }
+    return (mDocument != nullptr) && (mDocument->IsModified() == true) ;
 }
 
 

@@ -1211,6 +1211,7 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
     // Detect file type using each handler's CheckType()
     cFile* fileReader = nullptr;
     bool loadedAsText = false;
+    bool loadedAsExport = false;
 
     cWordstarFile wsCheck(this);
     cRTFFile rtfCheck(this);
@@ -1223,10 +1224,12 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
     else if (rtfCheck.CheckType(filename))
     {
         fileReader = new cRTFFile(this);
+        loadedAsExport = true;
     }
     else if (docxCheck.CheckType(filename))
     {
         fileReader = new cDOCXFile(this);
+        loadedAsExport = true;
     }
     else
     {
@@ -1310,6 +1313,7 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
         mFileName = filepath.filename().string();
         mFileDir = filepath.parent_path().string();
         mFileSet = true;
+        mNeedsWordStarName = loadedAsExport;
 
         mLayout->SetFilename(mFileName);
         mLayout->SetFileDir(mFileDir);
@@ -1542,6 +1546,10 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
         if (silent == false)
         {
             mFileSet = true;
+            if (isExport == false)
+            {
+                mNeedsWordStarName = false;
+            }
         }
         mLayout->SetFilename(mFileName);
         mLayout->SetFileDir(mFileDir);
@@ -1745,13 +1753,31 @@ std::string cWSEditorCtrl::PromptForSaveFile(void)
         startDir = ".";
     }
 
-    std::string result;
-    if (wsdialogs::FileBrowser(mHost, "Save File", true, startDir, result) == true)
+    // A Word or RTF original offers NAME.ws and asks before replacing a file
+    std::string suggestion = SaveAsSuggestion();
+    std::string startName;
+    if (suggestion.empty() == false)
     {
-        return result;
+        startName = std::filesystem::path(suggestion).filename().string();
     }
 
-    return "";
+    std::string result;
+    if (wsdialogs::FileBrowser(mHost, "Save File", true, startDir, result, startName) == false)
+    {
+        return "";
+    }
+
+    std::error_code ec;
+    if ((suggestion.empty() == false) && (std::filesystem::exists(result, ec) == true))
+    {
+        std::string name = std::filesystem::path(result).filename().string();
+        if (AskYesNo("Save File", name + " exists. Replace it?") == false)
+        {
+            return "";
+        }
+    }
+
+    return result;
 }
 
 
@@ -1816,13 +1842,8 @@ bool cWSEditorCtrl::CloseEvent(void)
 
     if (choice == 0)
     {
-        std::string filename;
-
-        if (mFileSet == true)
-        {
-            filename = (std::filesystem::path(mFileDir) / mFileName).string();
-        }
-        else
+        std::string filename = CurrentSavePath();
+        if (filename.empty() == true)
         {
             filename = PromptForSaveFile();
             if (filename.empty() == true)

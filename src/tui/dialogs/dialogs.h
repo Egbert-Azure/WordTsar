@@ -56,8 +56,10 @@ bool ChooseFromListDialog(iWSDialogHost* host, const std::string& title,
                           const std::vector<std::string>& items, std::string& selected);
 
 // File open/save browser. Returns true on OK (result = chosen path), false on cancel.
+// startName fills the save-mode Name field.
 bool FileBrowser(iWSDialogHost* host, const std::string& title, bool saveMode,
-                 const std::string& startPath, std::string& result);
+                 const std::string& startPath, std::string& result,
+                 const std::string& startName = std::string());
 
 // ^KW Write Block: file name field and Copy in ASCII Format box. filename and
 // asciiFormat are the initial values; with asciiLocked the box cannot change.
