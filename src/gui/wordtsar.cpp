@@ -586,74 +586,86 @@ bool cWordTsar::eventFilter(QObject *obj, QEvent *event)
 {
     if (event->type() == QEvent::MouseButtonPress)
     {
-        bool handled = false ;
+        std::function<void()> handler ;
 
         if (obj == mStatBold)
         {
-            Bold() ;
-            handled = true ;
+            handler = [this]() { Bold() ; } ;
         }
         else if (obj == mStatItalic)
         {
-            Italics() ;
-            handled = true ;
+            handler = [this]() { Italics() ; } ;
         }
         else if (obj == mStatUnderline)
         {
-            Underline() ;
-            handled = true ;
+            handler = [this]() { Underline() ; } ;
         }
         else if (obj == mStatChange)
         {
-            CommandTags() ;
-            handled = true ;
+            handler = [this]() { CommandTags() ; } ;
         }
         else if (obj == mStatLeft)
         {
-            Active()->SetAlignment(JUST_LEFT) ;
-            handled = true ;
+            handler = [this]() { Active()->SetAlignment(JUST_LEFT) ; } ;
         }
         else if (obj == mStatCenter)
         {
-            Active()->SetAlignment(JUST_CENTER) ;
-            handled = true ;
+            handler = [this]() { Active()->SetAlignment(JUST_CENTER) ; } ;
         }
         else if (obj == mStatRight)
         {
-            Active()->SetAlignment(JUST_RIGHT) ;
-            handled = true ;
+            handler = [this]() { Active()->SetAlignment(JUST_RIGHT) ; } ;
         }
         else if (obj == mStatJustify)
         {
-            Active()->SetAlignment(JUST_JUST) ;
-            handled = true ;
+            handler = [this]() { Active()->SetAlignment(JUST_JUST) ; } ;
         }
         else if (obj == mStatFont)
         {
-            font() ;
-            handled = true ;
+            handler = [this]() { font() ; } ;
         }
         else if (obj == mStatMode)
         {
-            Active()->ToggleInsertOverwrite() ;
-            handled = true ;
+            handler = [this]() { Active()->ToggleInsertOverwrite() ; } ;
         }
         else if (obj == mStatPage)
         {
-            GotoPage() ;
-            handled = true ;
+            handler = [this]() { GotoPage() ; } ;
         }
 
-        if (handled)
+        if (handler)
         {
-            // Same update as menu actions
-            Active()->PerformPostCommandUpdate() ;
-            QTimer::singleShot(1, Active(), SLOT(OnIdle())) ;
+            RunCommand(handler) ;
             return true ;
         }
     }
 
     return QMainWindow::eventFilter(obj, event) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  handler [in] the command
+///
+/// @brief
+/// Runs a menu command or status bar click between BeginCommand and
+/// FinishCommand of Active(), as a key is run. When the command changes
+/// Active(), the editor that began the command is finished too if it
+/// still exists.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordTsar::RunCommand(const std::function<void()>& handler)
+{
+    QPointer<cEditorCtrl> begun = Active() ;
+    begun->BeginCommand() ;
+    handler() ;
+    cEditorCtrl *active = Active() ;
+    if ((begun != nullptr) && (begun != active))
+    {
+        begun->FinishCommand() ;
+    }
+    active->FinishCommand() ;
 }
 
 
@@ -1565,23 +1577,24 @@ void cWordTsar::CreateMenus(void)
     // Height constraint moved to showEvent() for correct DPI handling on Windows
     // (QFontMetrics doesn't have correct DPI info until window is shown)
 
-    // Runs the handler, then the screen update a key gets: incremental
-    // layout, caret, scroll and paint. One slot per action, so the update
-    // also runs when the handler rebuilds the menus and deletes the action.
+    // Runs the handler through RunCommand, as a key is run. One slot per
+    // action, so the finish also runs when the handler rebuilds the menus
+    // and deletes the action.
     auto connectMenuAction = [this](QAction *action, auto handler)
     {
         connect(action, &QAction::triggered, this, [this, handler]()
         {
-            if constexpr (std::is_member_function_pointer_v<decltype(handler)>)
+            RunCommand([this, handler]()
             {
-                (this->*handler)() ;
-            }
-            else
-            {
-                handler() ;
-            }
-            Active()->PerformPostCommandUpdate() ;
-            QTimer::singleShot(1, Active(), SLOT(OnIdle())) ;
+                if constexpr (std::is_member_function_pointer_v<decltype(handler)>)
+                {
+                    (this->*handler)() ;
+                }
+                else
+                {
+                    handler() ;
+                }
+            }) ;
         }) ;
     } ;
 

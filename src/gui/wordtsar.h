@@ -21,6 +21,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -97,6 +98,7 @@ private :
     cEditorCtrl *Active(void) ;                 // editor menus act on
     cWordStarInput *MenuInput(void) ;           // menu input handler of Active()
     bool KeepOpenNote(void) ;                   // write an open note into the document; false if it stays open
+    void RunCommand(const std::function<void()>& handler) ;   // menu command or status bar click, bracketed as a key
     void ApplyHelpColors(const QColor& helpBg, const QColor& helpFg, const QColor& keyColor, const QColor& keyBgColor) ;
 
 private slots :

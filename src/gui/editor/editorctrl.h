@@ -265,6 +265,10 @@ public:
     void BeforeKey(const sKeyStroke& key) override;
     void AfterKey(const sKeyStroke& key) override;
 
+    // --- Command bracket shared by keys, menu commands and status bar clicks ---
+    void BeginCommand(void);
+    void FinishCommand(bool postUpdate = true);
+
 signals:
 
 public slots:
@@ -291,7 +295,6 @@ protected:
 private:
     // --- Key path helpers ---
     bool KeyEventToStroke(QKeyEvent* event, sKeyStroke& stroke) const;
-    void FinishKey(bool postUpdate);
 
     // --- Initialization helper ---
     // Common initialization shared by both constructors

@@ -18340,3 +18340,165 @@ TEST_CASE("Main window - Edit Delete Line from the menu lays out the paragraph b
 
     CHECK(fingerprint() == realBefore);
 }
+
+
+TEST_CASE("Main window - a menu command during background layout leaves no paragraph on its old layout")
+{
+    ensureQApplication();
+
+    const char* realHome = std::getenv("WORDTSAR_TEST_REAL_HOME");
+    REQUIRE(realHome != nullptr);
+    const std::filesystem::path realConfig =
+        std::filesystem::path(realHome) / "Library/Application Support/WordTsar/config.ini";
+    auto fingerprint = [&realConfig]()
+    {
+        std::error_code ec;
+        if (!std::filesystem::exists(realConfig, ec))
+        {
+            return std::string("missing");
+        }
+        QFile file(QString::fromStdString(realConfig.string()));
+        REQUIRE(file.open(QIODevice::ReadOnly));
+        QByteArray sha = QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha1).toHex();
+        long long mtime = static_cast<long long>(std::filesystem::last_write_time(realConfig).time_since_epoch().count());
+        return sha.toStdString() + " " + std::to_string(mtime);
+    };
+    const std::string realBefore = fingerprint();
+
+    std::string dir = (std::filesystem::temp_directory_path() / "wordtsar-menuidle-XXXXXX").string();
+    REQUIRE(mkdtemp(dir.data()) != nullptr);
+    const std::string oldHome = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldXdg = oldXdgEnv != nullptr ? oldXdgEnv : "";
+    setenv("HOME", dir.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (dir + "/.config").c_str(), 1);
+    REQUIRE(cConfig::GetConfigFilePath().find(dir) == 0);
+
+    static char name[] = "WordTsar";
+    static char* args[] = {name, nullptr};
+    auto* window = new cWordTsar(1, args);
+    CHECK_FALSE(window->isVisible());
+
+    // Edit > Set Marker > 1, found through the real menus
+    auto plain = [](const QString& text)
+    {
+        return text.section('\t', 0, 0).remove('&');
+    };
+    QAction* setMarker = nullptr;
+    QMenuBar* bar = window->findChild<QMenuBar*>();
+    REQUIRE(bar != nullptr);
+    for (QAction* top : bar->actions())
+    {
+        if (top->menu() == nullptr || plain(top->text()) != "Edit")
+        {
+            continue;
+        }
+        for (QAction* sub : top->menu()->actions())
+        {
+            if (sub->menu() == nullptr || plain(sub->text()) != "Set Marker")
+            {
+                continue;
+            }
+            for (QAction* item : sub->menu()->actions())
+            {
+                if (plain(item->text()) == "1")
+                {
+                    setMarker = item;
+                }
+            }
+        }
+    }
+    REQUIRE(setMarker != nullptr);
+
+    cEditorCtrl* editor = window->GetEditorCtrl();
+    cDocument* doc = editor->GetDocument();
+    std::string words;
+    for (int i = 0; i < 60; i++)
+    {
+        words += "word" + std::to_string(i) + " ";
+    }
+    for (int i = 0; i < 200; i++)
+    {
+        doc->Insert(words + "\r");
+    }
+    editor->LayoutDocument(true);
+
+    // start and grapheme count of each laid-out line of every paragraph
+    auto allLines = [editor, doc]()
+    {
+        std::vector<std::vector<std::pair<long long, long long>>> result;
+        for (PARAGRAPH_T p = 0; p < doc->GetNumberofParagraphs(); p++)
+        {
+            std::vector<std::pair<long long, long long>> paraLines;
+            const sParagraphLayout* para = editor->GetLayout()->GetParagraphLayout(p);
+            if (para != nullptr)
+            {
+                for (const auto& line : para->lines)
+                {
+                    long long count = 0;
+                    for (const auto& segment : line.segments)
+                    {
+                        count += segment.GetGraphemeCount();
+                    }
+                    paraLines.emplace_back(static_cast<long long>(line.linestart), count);
+                }
+            }
+            result.push_back(paraLines);
+        }
+        return result;
+    };
+
+    const auto before = allLines();
+
+    // Right margin near the top, laid out on screen, then a few idle steps
+    doc->SetPosition(0);
+    doc->Insert(".rm 30\r");
+    editor->PerformPostCommandUpdate();
+    for (int i = 0; i < 5; i++)
+    {
+        REQUIRE(editor->IdleLayout());
+    }
+    const PARAGRAPH_T total = doc->GetNumberofParagraphs();
+    REQUIRE(editor->GetLayoutParagraph() < total - 1);
+
+    setMarker->trigger();
+
+    int steps = 0;
+    while (editor->IdleLayout() && steps < 10 * total)
+    {
+        steps++;
+    }
+    REQUIRE(steps < 10 * total);
+    const auto afterIdle = allLines();
+    editor->LayoutDocument(true);
+    const auto full = allLines();
+    REQUIRE(before[total - 3] != full[total - 2]);
+
+    PARAGRAPH_T firstWrong = -1;
+    for (PARAGRAPH_T p = 0; p < total; p++)
+    {
+        if (afterIdle[p] != full[p])
+        {
+            firstWrong = p;
+            break;
+        }
+    }
+    INFO("first paragraph with a layout other than a full layout: " << firstWrong << " of " << total);
+    CHECK(firstWrong == -1);
+
+    delete window;
+
+    setenv("HOME", oldHome.c_str(), 1);
+    if (oldXdgEnv != nullptr)
+    {
+        setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    }
+    else
+    {
+        unsetenv("XDG_CONFIG_HOME");
+    }
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+
+    CHECK(fingerprint() == realBefore);
+}

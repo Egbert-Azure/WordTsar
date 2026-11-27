@@ -3874,7 +3874,7 @@ void cEditorCtrl::keyPressEvent(QKeyEvent* event)
 
         if (handled)
         {
-            FinishKey(postUpdate);
+            FinishCommand(postUpdate);
         }
     }
 
@@ -4024,14 +4024,26 @@ IInputHandler* cEditorCtrl::GetInput(void) const
 /// @param  key [in] key about to be handled (unused)
 ///
 /// @brief
-/// Clears the listener flag and search highlighting, and interrupts
-/// background layout.
+/// BeginCommand for a key.
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorCtrl::BeforeKey(const sKeyStroke& key)
 {
     UNUSED_ARGUMENT(key) ;
+    BeginCommand() ;
+}
 
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Run before a key, menu command or status bar click: clears the listener
+/// flag and search highlighting, and interrupts background layout, saving
+/// its position on the interrupt stack once.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorCtrl::BeginCommand(void)
+{
     // Reset listener flag -- will be set by OnDocumentChanged if a mutation occurs
     mListenerHandledUpdate = false ;
 
@@ -4043,8 +4055,11 @@ void cEditorCtrl::BeforeKey(const sKeyStroke& key)
         mLayoutInt = true;
 
         // Save current background layout position to interrupt stack;
-        // AfterKey restarts layout from the edited paragraph.
-        mInterruptStack.push_back(mLayoutParagraph);
+        // FinishCommand restarts layout from the edited paragraph.
+        if (mInterruptStack.empty() || mInterruptStack.back() != mLayoutParagraph)
+        {
+            mInterruptStack.push_back(mLayoutParagraph);
+        }
     }
 
     // Clear search highlighting on any keypress (same as mouse click behavior)
@@ -4066,7 +4081,7 @@ void cEditorCtrl::BeforeKey(const sKeyStroke& key)
 void cEditorCtrl::AfterKey(const sKeyStroke& key)
 {
     bool f2 = (key.kind == KEYSTROKE_SPECIAL) && (key.special == SPECIAL_F2) ;
-    FinishKey(f2 == false) ;
+    FinishCommand(f2 == false) ;
 }
 
 
@@ -4075,11 +4090,11 @@ void cEditorCtrl::AfterKey(const sKeyStroke& key)
 /// @param  postUpdate [in] run the incremental layout and full repaint
 ///
 /// @brief
-/// Restarts background layout from the edited paragraph and schedules
-/// idle layout.
+/// Run after a handled key, menu command or status bar click: restarts
+/// background layout from the edited paragraph and schedules idle layout.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cEditorCtrl::FinishKey(bool postUpdate)
+void cEditorCtrl::FinishCommand(bool postUpdate)
 {
     if (postUpdate)
     {
