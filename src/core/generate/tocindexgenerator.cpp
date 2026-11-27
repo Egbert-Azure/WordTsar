@@ -505,7 +505,7 @@ void CollectIndexMarks(cDocument *doc, const sParagraphLayout *paraLayout, PARAG
 class cPrintLayout
 {
 public:
-    cPrintLayout(cLayoutBase *layout, cDocument *doc) : mLayout(layout), mDocument(doc)
+    explicit cPrintLayout(cEditorBase *editor) : mEditor(editor), mLayout(editor->GetLayout())
     {
         mShowControl = mLayout->GetShowControl() ;
         mActiveParagraph = mLayout->GetActiveParagraph() ;
@@ -514,7 +514,7 @@ public:
         mLayout->SetShowControl(SHOW_NONE) ;
         mLayout->SetActiveParagraph(-1) ;
         mLayout->SetMarkersVisible(false) ;
-        mLayout->LayoutDocument(mDocument) ;
+        mEditor->LayoutWholeDocument() ;
     }
 
     ~cPrintLayout()
@@ -535,12 +535,12 @@ public:
         mLayout->SetShowControl(mShowControl) ;
         mLayout->SetActiveParagraph(mActiveParagraph) ;
         mLayout->SetMarkersVisible(mMarkersVisible) ;
-        mLayout->LayoutDocument(mDocument) ;
+        mEditor->LayoutWholeDocument() ;
     }
 
 private:
+    cEditorBase *mEditor ;
     cLayoutBase *mLayout ;
-    cDocument *mDocument ;
     eShowControl mShowControl ;
     PARAGRAPH_T mActiveParagraph ;
     bool mMarkersVisible ;
@@ -562,7 +562,7 @@ bool cTOCIndexGenerator::GenerateTOC(cEditorBase *editor, const std::string &sou
 
     cDocument *sourceDoc = editor->GetDocument() ;
     cLayoutBase *layout = editor->GetLayout() ;
-    cPrintLayout printLayout(layout, sourceDoc) ;
+    cPrintLayout printLayout(editor) ;
 
     std::vector<sTOCEntry> tables[10] ;    // [0] = plain .tc, [1-9] = .tc1-.tc9
 
@@ -667,7 +667,7 @@ bool cTOCIndexGenerator::GenerateIndex(cEditorBase *editor, const std::string &s
 
     cDocument *sourceDoc = editor->GetDocument() ;
     cLayoutBase *layout = editor->GetLayout() ;
-    cPrintLayout printLayout(layout, sourceDoc) ;
+    cPrintLayout printLayout(editor) ;
 
     std::vector<sIndexEntry> entries ;
     std::vector<tEntryText> dotCommands ;

@@ -152,7 +152,7 @@ bool cTUIPrintout::GeneratePDF(const std::string& filepath)
     mLayout->SetActiveParagraph(-1);
     mLayout->SetMarkersVisible(false);  // block / place markers never print
     mLayout->SetPrintLayout(true);      // footnotes take their space on the page
-    mLayout->LayoutDocument(mDocument);
+    mEditor->LayoutWholeDocument();
 
     bool result = WritePDF(filepath);
 
@@ -161,7 +161,7 @@ bool cTUIPrintout::GeneratePDF(const std::string& filepath)
     mLayout->SetPrintLayout(false);
     PARAGRAPH_T curPara = mDocument->GetParagraphFromPosition(mDocument->GetPosition());
     mLayout->SetActiveParagraph(curPara);
-    mLayout->LayoutDocument(mDocument);
+    mEditor->LayoutWholeDocument();
     return result;
 }
 

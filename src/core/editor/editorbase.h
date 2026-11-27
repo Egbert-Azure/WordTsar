@@ -267,6 +267,9 @@ public:
     // screen whose layout is older than the text; true if any was laid out
     bool LayoutOutdatedParagraphsOnScreen(void);
 
+    // Full layout of the document; clears mLayoutInt and mLayoutRest
+    void LayoutWholeDocument(std::function<void(int)> progressCallback = nullptr);
+
     // Keyboard input: every typed key goes through FeedKey, which runs
     // BeforeKey, DispatchKey and, if the key was handled, AfterKey.
     virtual IInputHandler* GetInput(void) const = 0;          // Active input handler
@@ -511,9 +514,6 @@ protected:
 
     // Start position for the next FindNext/FindPrev call; clears mSearchFromCursor
     POSITION_T NextSearchStart(void);
-
-    // Full layout of the document; clears mLayoutInt and mLayoutRest
-    void LayoutWholeDocument(std::function<void(int)> progressCallback = nullptr);
 
     // Caret Coordinate Helpers
     void AdjustCaretYForPageMode(const sLineLayout* line);
