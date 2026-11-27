@@ -450,6 +450,7 @@ public:
     void SetShowDot(bool show);
     bool GetShowDot(void) const;
     void SetMeasurement(const std::string& measure);
+    void SetPaperSize(COORD_T width, COORD_T height);
     std::string GetMeasurement(void) const;
 
     // Codepage

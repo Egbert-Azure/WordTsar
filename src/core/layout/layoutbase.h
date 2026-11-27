@@ -284,7 +284,7 @@ public:
     void SetFileDir(const std::string& dir);
     void SetHyphenationLanguage(const std::string& language);
     void SetDocument(cDocument* doc);
-    void SetPaperSize(COORD_T width, COORD_T height);
+    bool SetPaperSize(COORD_T width, COORD_T height);
     std::string GetDefaultFont(void) const { return mLayoutState->GetDefaultFont(); }
 
     // ----- Query Methods - Margin Getters -----
@@ -620,6 +620,10 @@ private:
     // Initial paper dimensions (saved at start of LayoutDocument for ResetFormattingState)
     COORD_T mInitialPaperWidth;
     COORD_T mInitialPaperHeight;
+
+    // Paper size every LayoutDocument() starts with, 0 when not set
+    COORD_T mStartPaperWidth;
+    COORD_T mStartPaperHeight;
 
     // ----- Performance Timing -----
 

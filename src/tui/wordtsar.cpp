@@ -990,6 +990,7 @@ void cWSWordTsar::ApplyConfig(cConfig& config, bool applyColors)
     mShowStartupScreen = config.mTuiShowStartupScreen;
 
     mEditor->SetMeasurement(config.mMeasurement);
+    mEditor->SetPaperSize(config.mPaperWidth, config.mPaperHeight);
     mEditor->SetCodePage(static_cast<eCodePage>(config.mCodePage));
     mEditor->SetInputMode(static_cast<eInputMode>(config.mInputMode));
     if (config.mShowControls == true)

@@ -6450,8 +6450,7 @@ void cEditorCtrl::PageLayout(void)
             config.mPaperHeight = height;
             config.Save();
 
-            layout->SetPaperSize(width, height);
-            LayoutDocument(true);
+            SetPaperSize(width, height);
         }
     }
 }
@@ -9157,6 +9156,7 @@ void cEditorCtrl::SystemPreferences(void)
         mHelpLevel = std::clamp(config.mGuiShowHelp, 0, 4);
         mHelpDisplay = (mHelpLevel == 3) ? HELP_MAIN : HELP_NONE;
         SetMeasurement(config.mMeasurement);
+        SetPaperSize(config.mPaperWidth, config.mPaperHeight);
         SetCodePage(static_cast<eCodePage>(config.mCodePage));
         mSpellCheckLanguage = config.mSpellCheckLanguage;
         if (mLayout != nullptr)

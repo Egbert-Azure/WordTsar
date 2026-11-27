@@ -126,6 +126,8 @@ cLayoutBase::cLayoutBase(void)
     mLastCheckpointMatched = false;
     mInitialPaperWidth = 0;
     mInitialPaperHeight = 0;
+    mStartPaperWidth = 0;
+    mStartPaperHeight = 0;
     mActiveParagraph = -1;  // No active paragraph until editor sets it
     mMarkersVisible = true;
     mPrintLayout = false;
@@ -403,6 +405,12 @@ void cLayoutBase::LayoutDocument(cDocument* doc, std::function<void(int)> progre
 
     // Store document pointer
     SetDocument(doc);
+
+    if (mStartPaperWidth > 0 && mStartPaperHeight > 0)
+    {
+        mLayoutState->SetPaperWidth(mStartPaperWidth);
+        mLayoutState->SetPaperHeight(mStartPaperHeight);
+    }
 
     // Save initial paper dimensions before any dot commands modify them (.PR can swap)
     // Used by ResetFormattingState() to restore document's original paper size
@@ -2579,17 +2587,24 @@ bool cLayoutBase::SaveLine(PARAGRAPH_T paragraphNum, sLineLayout& line)
 /// @param  width  [in] paper width in twips
 /// @param  height [in] paper height in twips
 ///
-/// @return nothing
+/// @return true if the size differs from the one set before
 ///
 /// @brief
-/// Sets the paper size the next LayoutDocument() starts with. .pr or=l
-/// and .pr or=p swap it.
+/// Sets the paper size every LayoutDocument() starts with. .pr or=l and
+/// .pr or=p swap it. A zero or negative size is ignored.
 ///
 /////////////////////////////////////////////////////////////////////////////
-void cLayoutBase::SetPaperSize(COORD_T width, COORD_T height)
+bool cLayoutBase::SetPaperSize(COORD_T width, COORD_T height)
 {
-    mLayoutState->SetPaperWidth(width);
-    mLayoutState->SetPaperHeight(height);
+    if (width <= 0 || height <= 0)
+    {
+        return false;
+    }
+
+    bool changed = !CoordsEqual(width, mStartPaperWidth) || !CoordsEqual(height, mStartPaperHeight);
+    mStartPaperWidth = width;
+    mStartPaperHeight = height;
+    return changed;
 }
 
 

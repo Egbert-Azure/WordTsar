@@ -1249,6 +1249,9 @@ void cWordTsar::ReadConfig(void)
     // Measurement units
     mEditor->SetMeasurement(config.mMeasurement) ;
 
+    // Paper size every layout starts with
+    mEditor->SetPaperSize(config.mPaperWidth, config.mPaperHeight) ;
+
     // Display flags
     mEditor->mDispRuler = config.mGuiShowRuler ;
     mEditor->mDispScrollBar = config.mGuiShowScrollBar ;

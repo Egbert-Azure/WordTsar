@@ -5958,6 +5958,26 @@ bool cEditorBase::GetShowDot(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  width  [in] paper width in twips (Preferences paperWidth)
+/// @param  height [in] paper height in twips (Preferences paperHeight)
+///
+/// @return nothing
+///
+/// @brief
+/// Set the paper size every layout of the document starts with and lay the
+/// document out again when it changed. A zero or negative size is ignored.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::SetPaperSize(COORD_T width, COORD_T height)
+{
+    if (mLayout != nullptr && mLayout->SetPaperSize(width, height) && mDocument != nullptr)
+    {
+        LayoutDocument(true);
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  measure [in] measurement string (e.g., "1\"" for inches)
 ///
 /// @return nothing
