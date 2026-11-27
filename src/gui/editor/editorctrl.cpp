@@ -6439,16 +6439,21 @@ void cEditorCtrl::PageLayout(void)
 
         if (!lines.empty())
         {
-            // Insert at the beginning of the cursor's paragraph
+            // Insert at the beginning of the cursor's paragraph, as one undo step
+            CloseTypingGroup();
+
             POSITION_T start, end;
             doc->GetParagraphStartandEnd(cursorPara, start, end);
             doc->SetPosition(start);
+            doc->BeginUndoGroup();
 
             for (const std::string& line : lines)
             {
                 doc->Insert(line);
                 doc->Insert(HARD_RETURN);
             }
+
+            doc->EndUndoGroup();
         }
 
         // Paper size has no dot command: it goes to Preferences, not the document

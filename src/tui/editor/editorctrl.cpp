@@ -3176,12 +3176,16 @@ void cWSEditorCtrl::PageLayout(void)
         return;
     }
 
-    // Insert the dot commands at the start of the current paragraph.
+    // Insert the dot commands at the start of the current paragraph, as one
+    // undo step.
+    CloseTypingGroup();
+
     PARAGRAPH_T para = mDocument->GetParagraphFromPosition(GetCaretDocumentPosition());
     POSITION_T paraStart = 0;
     POSITION_T paraEnd = 0;
     mDocument->GetParagraphStartandEnd(para, paraStart, paraEnd);
     mDocument->SetPosition(paraStart);
+    mDocument->BeginUndoGroup();
 
     BeginBatchUpdate();
 
@@ -3191,6 +3195,7 @@ void cWSEditorCtrl::PageLayout(void)
     }
 
     EndBatchUpdate();
+    mDocument->EndUndoGroup();
 
     LayoutDocument(true);
     PerformVisualUpdate();
