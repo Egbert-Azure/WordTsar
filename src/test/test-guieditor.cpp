@@ -43,6 +43,8 @@
 #include <QMimeData>
 #include <QCryptographicHash>
 #include <QFile>
+#include <QMenu>
+#include <QMenuBar>
 
 #include <filesystem>
 #include <fstream>
@@ -18198,6 +18200,130 @@ TEST_CASE("Main window - startup with A4 saved in Preferences lays out on A4")
     cLayoutBase* layout = window->GetEditorCtrl()->GetLayout();
     CHECK(layout->GetPaperWidth() == doctest::Approx(width));
     CHECK(layout->GetPaperHeight() == doctest::Approx(height));
+    delete window;
+
+    setenv("HOME", oldHome.c_str(), 1);
+    if (oldXdgEnv != nullptr)
+    {
+        setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    }
+    else
+    {
+        unsetenv("XDG_CONFIG_HOME");
+    }
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+
+    CHECK(fingerprint() == realBefore);
+}
+
+
+TEST_CASE("Main window - Edit Delete Line from the menu lays out the paragraph before the next paint")
+{
+    ensureQApplication();
+
+    const char* realHome = std::getenv("WORDTSAR_TEST_REAL_HOME");
+    REQUIRE(realHome != nullptr);
+    const std::filesystem::path realConfig =
+        std::filesystem::path(realHome) / "Library/Application Support/WordTsar/config.ini";
+    auto fingerprint = [&realConfig]()
+    {
+        std::error_code ec;
+        if (!std::filesystem::exists(realConfig, ec))
+        {
+            return std::string("missing");
+        }
+        QFile file(QString::fromStdString(realConfig.string()));
+        REQUIRE(file.open(QIODevice::ReadOnly));
+        QByteArray sha = QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha1).toHex();
+        long long mtime = static_cast<long long>(std::filesystem::last_write_time(realConfig).time_since_epoch().count());
+        return sha.toStdString() + " " + std::to_string(mtime);
+    };
+    const std::string realBefore = fingerprint();
+
+    std::string dir = (std::filesystem::temp_directory_path() / "wordtsar-menuupdate-XXXXXX").string();
+    REQUIRE(mkdtemp(dir.data()) != nullptr);
+    const std::string oldHome = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldXdg = oldXdgEnv != nullptr ? oldXdgEnv : "";
+    setenv("HOME", dir.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (dir + "/.config").c_str(), 1);
+    REQUIRE(cConfig::GetConfigFilePath().find(dir) == 0);
+
+    static char name[] = "WordTsar";
+    static char* args[] = {name, nullptr};
+    auto* window = new cWordTsar(1, args);
+    CHECK_FALSE(window->isVisible());
+
+    // Edit > Delete > Line, found through the real menus
+    auto plain = [](const QString& text)
+    {
+        return text.section('\t', 0, 0).remove('&');
+    };
+    QAction* deleteLine = nullptr;
+    QMenuBar* bar = window->findChild<QMenuBar*>();
+    REQUIRE(bar != nullptr);
+    for (QAction* top : bar->actions())
+    {
+        if (top->menu() == nullptr || plain(top->text()) != "Edit")
+        {
+            continue;
+        }
+        for (QAction* sub : top->menu()->actions())
+        {
+            if (sub->menu() == nullptr || plain(sub->text()) != "Delete")
+            {
+                continue;
+            }
+            for (QAction* item : sub->menu()->actions())
+            {
+                if (plain(item->text()) == "Line")
+                {
+                    deleteLine = item;
+                }
+            }
+        }
+    }
+    REQUIRE(deleteLine != nullptr);
+
+    cEditorCtrl* editor = window->GetEditorCtrl();
+    cDocument* doc = editor->GetDocument();
+    std::string words;
+    for (int i = 0; i < 60; i++)
+    {
+        words += "word" + std::to_string(i) + " ";
+    }
+    doc->Insert(words + "\r");
+    doc->Insert("Second paragraph.\r");
+    editor->LayoutDocument(true);
+    doc->SetPosition(0);
+
+    // start and grapheme count of each laid-out line of paragraph 0
+    auto lines = [editor]()
+    {
+        std::vector<std::pair<long long, long long>> result;
+        const sParagraphLayout* para = editor->GetLayout()->GetParagraphLayout(0);
+        REQUIRE(para != nullptr);
+        for (const auto& line : para->lines)
+        {
+            long long count = 0;
+            for (const auto& segment : line.segments)
+            {
+                count += segment.GetGraphemeCount();
+            }
+            result.emplace_back(static_cast<long long>(line.linestart), count);
+        }
+        return result;
+    };
+    REQUIRE(lines().size() > 2);
+
+    deleteLine->trigger();
+    const auto afterMenu = lines();
+    editor->LayoutDocument(true);
+    const auto full = lines();
+    INFO("lines after the menu command: " << afterMenu.size() << ", after a full layout: " << full.size());
+    CHECK(afterMenu == full);
+
     delete window;
 
     setenv("HOME", oldHome.c_str(), 1);

@@ -645,7 +645,7 @@ bool cWordTsar::eventFilter(QObject *obj, QEvent *event)
 
         if (handled)
         {
-            // Same update as menu actions (see mMenuBar::triggered connection)
+            // Same update as menu actions
             Active()->PerformPostCommandUpdate() ;
             QTimer::singleShot(1, Active(), SLOT(OnIdle())) ;
             return true ;
@@ -1558,12 +1558,23 @@ void cWordTsar::CreateMenus(void)
         // to mLayout exactly once (wordtsar.cpp:140); deleting it would
         // leave us with an unparented replacement that Qt shows as its own
         // top-level window.
-        disconnect(mMenuBar, &QMenuBar::triggered, this, nullptr) ;
         qDeleteAll(mMenuBar->findChildren<QMenu*>(QString(), Qt::FindDirectChildrenOnly)) ;
         qDeleteAll(mMenuBar->findChildren<QAction*>(QString(), Qt::FindDirectChildrenOnly)) ;
     }
     // Height constraint moved to showEvent() for correct DPI handling on Windows
     // (QFontMetrics doesn't have correct DPI info until window is shown)
+
+    // Runs the handler, then the screen update a key gets: incremental
+    // layout, caret, scroll and paint
+    auto connectMenuAction = [this](QAction *action, auto handler)
+    {
+        connect(action, &QAction::triggered, this, handler) ;
+        connect(action, &QAction::triggered, this, [this]()
+        {
+            Active()->PerformPostCommandUpdate() ;
+            QTimer::singleShot(1, Active(), SLOT(OnIdle())) ;
+        }) ;
+    } ;
 
     QMenu *filemenu = mMenuBar->addMenu("&File") ;
     QMenu *editmenu = mMenuBar->addMenu("&Edit") ;
@@ -1603,17 +1614,17 @@ void cWordTsar::CreateMenus(void)
     filemenu->addAction(ExitAction) ;
 
     // connect things up
-    connect(OpenAction, &QAction::triggered, this, &cWordTsar::Open) ;
-    connect(SaveAction, &QAction::triggered, this, &cWordTsar::Save) ;
-    connect(SaveAsAction, &QAction::triggered, this, &cWordTsar::SaveAs) ;
-    connect(SaveandCloseAction, &QAction::triggered, this, &cWordTsar::SaveandClose) ;
-    connect(PrintAction, &QAction::triggered, this, &cWordTsar::Print) ;
-    connect(PrintPreviewAction, &QAction::triggered, this, &cWordTsar::PrintPreview) ;
-    connect(PreferencesAction, &QAction::triggered, this, [this]()
+    connectMenuAction(OpenAction, &cWordTsar::Open) ;
+    connectMenuAction(SaveAction, &cWordTsar::Save) ;
+    connectMenuAction(SaveAsAction, &cWordTsar::SaveAs) ;
+    connectMenuAction(SaveandCloseAction, &cWordTsar::SaveandClose) ;
+    connectMenuAction(PrintAction, &cWordTsar::Print) ;
+    connectMenuAction(PrintPreviewAction, &cWordTsar::PrintPreview) ;
+    connectMenuAction(PreferencesAction, [this]()
     {
         mEditor->SystemPreferences() ;
     }) ;
-    connect(ExitAction, &QAction::triggered, this, &cWordTsar::ExitWordTsar) ;
+    connectMenuAction(ExitAction, &cWordTsar::ExitWordTsar) ;
 
     //edit menu
     QAction *UndoAction = new QAction(mMenuProvider->GetEditUndoLabel(), mMenuBar) ;
@@ -1781,64 +1792,64 @@ CloseDialogAction->setEnabled(false) ;
     }) ;
 
     // connect things up
-    connect(UndoAction, &QAction::triggered, this, &cWordTsar::Undo) ;
-    connect(RedoAction, &QAction::triggered, this, &cWordTsar::Redo) ;
-    connect(MarkBlockStartAction, &QAction::triggered, this, &cWordTsar::MarkBlockStart) ;
-    connect(MarkBlockEndAction, &QAction::triggered, this, &cWordTsar::MarkBlockEnd) ;
-    connect(MoveBlock, &QAction::triggered, this, &cWordTsar::MoveBlock) ;
-    connect(CopyBlockAction, &QAction::triggered, this, &cWordTsar::CopyBlock) ;
-    connect(CopyfromClipboardAction, &QAction::triggered, this, &cWordTsar::CopyFromClipboard) ;
-    connect(CopytoClipboardAction, &QAction::triggered, this, &cWordTsar::CopyToClipboard) ;
-    connect(DeleteBlockAction, &QAction::triggered, this, &cWordTsar::DeleteBlock) ;
-    connect(DeleteWordAction, &QAction::triggered, this, &cWordTsar::DeleteWord) ;
-    connect(DeleteLineAction, &QAction::triggered, this, &cWordTsar::DeleteLine) ;
-    connect(DeleteLineLeftAction, &QAction::triggered, this, &cWordTsar::DeleteLineLeft) ;
-    connect(DeleteLineRightAction, &QAction::triggered, this, &cWordTsar::DeleteLineRight) ;
-    connect(DeleteToCharAction, &QAction::triggered, this, &cWordTsar::DeleteToChar) ;
-    connect(MarkPreviousBlockAction, &QAction::triggered, this, &cWordTsar::MarkPrevBlock) ;
-    connect(FindAction, &QAction::triggered, this, &cWordTsar::Find) ;
-    connect(FindandReplaceAction, &QAction::triggered, this, &cWordTsar::FindandReplace) ;
-    connect(FindNextAction, &QAction::triggered, this, &cWordTsar::FindNext) ;
-    connect(GotoCharAction, &QAction::triggered, this, &cWordTsar::GotoChar) ;
-    connect(GotoPageAction, &QAction::triggered, this, &cWordTsar::GotoPage) ;
-    connect(GotoMarker1Action, &QAction::triggered, this, &cWordTsar::Goto1) ;
-    connect(GotoMarker2Action, &QAction::triggered, this, &cWordTsar::Goto2) ;
-    connect(GotoMarker3Action, &QAction::triggered, this, &cWordTsar::Goto3) ;
-    connect(GotoMarker4Action, &QAction::triggered, this, &cWordTsar::Goto4) ;
-    connect(GotoMarker5Action, &QAction::triggered, this, &cWordTsar::Goto5) ;
-    connect(GotoMarker6Action, &QAction::triggered, this, &cWordTsar::Goto6) ;
-    connect(GotoMarker7Action, &QAction::triggered, this, &cWordTsar::Goto7) ;
-    connect(GotoMarker8Action, &QAction::triggered, this, &cWordTsar::Goto8) ;
-    connect(GotoMarker9Action, &QAction::triggered, this, &cWordTsar::Goto9) ;
-    connect(GotoMarker0Action, &QAction::triggered, this, &cWordTsar::Goto0) ;
-    connect(GotoFontTagAction, &QAction::triggered, this, &cWordTsar::GotoFont) ;
-    connect(GotoStyleTagAction, &QAction::triggered, this, &cWordTsar::GotoStyle) ;
-    connect(GotoNoteAction, &QAction::triggered, this, &cWordTsar::GotoNote) ;
-    connect(GotoPreviousPositionAction, &QAction::triggered, this, &cWordTsar::GotoPrevPos) ;
-    connect(GotoLastFindReplaceAction, &QAction::triggered, this, &cWordTsar::GotoLastFindandReplace) ;
-    connect(GotoBeginningofBlockAction, &QAction::triggered, this, &cWordTsar::GotoStartBlock) ;
-    connect(GotoEndofBlockAction, &QAction::triggered, this, &cWordTsar::GotoEndBlock) ;
-    connect(GotoDocumentStartAction, &QAction::triggered, this, &cWordTsar::GotoDocumentStart) ;
-    connect(GotoDocumentEndAction, &QAction::triggered, this, &cWordTsar::GotoDocumentEnd) ;
-    connect(GotoScrollUpAction, &QAction::triggered, this, &cWordTsar::GotoScrollUp) ;
-    connect(GotoScrollDownAction, &QAction::triggered, this, &cWordTsar::GotoScrollDown) ;
-    connect(SetMarker1Action, &QAction::triggered, this, &cWordTsar::Set1) ;
-    connect(SetMarker2Action, &QAction::triggered, this, &cWordTsar::Set2) ;
-    connect(SetMarker3Action, &QAction::triggered, this, &cWordTsar::Set3) ;
-    connect(SetMarker4Action, &QAction::triggered, this, &cWordTsar::Set4) ;
-    connect(SetMarker5Action, &QAction::triggered, this, &cWordTsar::Set5) ;
-    connect(SetMarker6Action, &QAction::triggered, this, &cWordTsar::Set6) ;
-    connect(SetMarker7Action, &QAction::triggered, this, &cWordTsar::Set7) ;
-    connect(SetMarker8Action, &QAction::triggered, this, &cWordTsar::Set8) ;
-    connect(SetMarker9Action, &QAction::triggered, this, &cWordTsar::Set9) ;
-    connect(SetMarker0Action, &QAction::triggered, this, &cWordTsar::Set0) ;
-    connect(EditNoteAction, &QAction::triggered, this, &cWordTsar::EditNote) ;
-    connect(NoteConvertAction, &QAction::triggered, this, &cWordTsar::NoteCOnvert) ;
-    connect(NotEndnoteLocationAction, &QAction::triggered, this, &cWordTsar::NoteEndNoteLocation) ;
-    connect(ColumnBlockModeAction, &QAction::triggered, this, &cWordTsar::ColumnBlockMode) ;
-    connect(ColumnReplaceModeAction, &QAction::triggered, this, &cWordTsar::ColumnReplaceMode) ;
-    connect(AutoAlineAction, &QAction::triggered, this, &cWordTsar::AutoAlign) ;
-    connect(CloseDialogAction, &QAction::triggered, this, &cWordTsar::CloseDialog) ;
+    connectMenuAction(UndoAction, &cWordTsar::Undo) ;
+    connectMenuAction(RedoAction, &cWordTsar::Redo) ;
+    connectMenuAction(MarkBlockStartAction, &cWordTsar::MarkBlockStart) ;
+    connectMenuAction(MarkBlockEndAction, &cWordTsar::MarkBlockEnd) ;
+    connectMenuAction(MoveBlock, &cWordTsar::MoveBlock) ;
+    connectMenuAction(CopyBlockAction, &cWordTsar::CopyBlock) ;
+    connectMenuAction(CopyfromClipboardAction, &cWordTsar::CopyFromClipboard) ;
+    connectMenuAction(CopytoClipboardAction, &cWordTsar::CopyToClipboard) ;
+    connectMenuAction(DeleteBlockAction, &cWordTsar::DeleteBlock) ;
+    connectMenuAction(DeleteWordAction, &cWordTsar::DeleteWord) ;
+    connectMenuAction(DeleteLineAction, &cWordTsar::DeleteLine) ;
+    connectMenuAction(DeleteLineLeftAction, &cWordTsar::DeleteLineLeft) ;
+    connectMenuAction(DeleteLineRightAction, &cWordTsar::DeleteLineRight) ;
+    connectMenuAction(DeleteToCharAction, &cWordTsar::DeleteToChar) ;
+    connectMenuAction(MarkPreviousBlockAction, &cWordTsar::MarkPrevBlock) ;
+    connectMenuAction(FindAction, &cWordTsar::Find) ;
+    connectMenuAction(FindandReplaceAction, &cWordTsar::FindandReplace) ;
+    connectMenuAction(FindNextAction, &cWordTsar::FindNext) ;
+    connectMenuAction(GotoCharAction, &cWordTsar::GotoChar) ;
+    connectMenuAction(GotoPageAction, &cWordTsar::GotoPage) ;
+    connectMenuAction(GotoMarker1Action, &cWordTsar::Goto1) ;
+    connectMenuAction(GotoMarker2Action, &cWordTsar::Goto2) ;
+    connectMenuAction(GotoMarker3Action, &cWordTsar::Goto3) ;
+    connectMenuAction(GotoMarker4Action, &cWordTsar::Goto4) ;
+    connectMenuAction(GotoMarker5Action, &cWordTsar::Goto5) ;
+    connectMenuAction(GotoMarker6Action, &cWordTsar::Goto6) ;
+    connectMenuAction(GotoMarker7Action, &cWordTsar::Goto7) ;
+    connectMenuAction(GotoMarker8Action, &cWordTsar::Goto8) ;
+    connectMenuAction(GotoMarker9Action, &cWordTsar::Goto9) ;
+    connectMenuAction(GotoMarker0Action, &cWordTsar::Goto0) ;
+    connectMenuAction(GotoFontTagAction, &cWordTsar::GotoFont) ;
+    connectMenuAction(GotoStyleTagAction, &cWordTsar::GotoStyle) ;
+    connectMenuAction(GotoNoteAction, &cWordTsar::GotoNote) ;
+    connectMenuAction(GotoPreviousPositionAction, &cWordTsar::GotoPrevPos) ;
+    connectMenuAction(GotoLastFindReplaceAction, &cWordTsar::GotoLastFindandReplace) ;
+    connectMenuAction(GotoBeginningofBlockAction, &cWordTsar::GotoStartBlock) ;
+    connectMenuAction(GotoEndofBlockAction, &cWordTsar::GotoEndBlock) ;
+    connectMenuAction(GotoDocumentStartAction, &cWordTsar::GotoDocumentStart) ;
+    connectMenuAction(GotoDocumentEndAction, &cWordTsar::GotoDocumentEnd) ;
+    connectMenuAction(GotoScrollUpAction, &cWordTsar::GotoScrollUp) ;
+    connectMenuAction(GotoScrollDownAction, &cWordTsar::GotoScrollDown) ;
+    connectMenuAction(SetMarker1Action, &cWordTsar::Set1) ;
+    connectMenuAction(SetMarker2Action, &cWordTsar::Set2) ;
+    connectMenuAction(SetMarker3Action, &cWordTsar::Set3) ;
+    connectMenuAction(SetMarker4Action, &cWordTsar::Set4) ;
+    connectMenuAction(SetMarker5Action, &cWordTsar::Set5) ;
+    connectMenuAction(SetMarker6Action, &cWordTsar::Set6) ;
+    connectMenuAction(SetMarker7Action, &cWordTsar::Set7) ;
+    connectMenuAction(SetMarker8Action, &cWordTsar::Set8) ;
+    connectMenuAction(SetMarker9Action, &cWordTsar::Set9) ;
+    connectMenuAction(SetMarker0Action, &cWordTsar::Set0) ;
+    connectMenuAction(EditNoteAction, &cWordTsar::EditNote) ;
+    connectMenuAction(NoteConvertAction, &cWordTsar::NoteCOnvert) ;
+    connectMenuAction(NotEndnoteLocationAction, &cWordTsar::NoteEndNoteLocation) ;
+    connectMenuAction(ColumnBlockModeAction, &cWordTsar::ColumnBlockMode) ;
+    connectMenuAction(ColumnReplaceModeAction, &cWordTsar::ColumnReplaceMode) ;
+    connectMenuAction(AutoAlineAction, &cWordTsar::AutoAlign) ;
+    connectMenuAction(CloseDialogAction, &cWordTsar::CloseDialog) ;
 
     // View menu
     QAction *PreviewAction = new QAction(mMenuProvider->GetViewPreviewLabel(), mMenuBar) ;
@@ -1857,11 +1868,11 @@ CloseDialogAction->setEnabled(false) ;
     viewmenu->addSeparator() ;
     viewmenu->addAction(SwitchModesAction) ;
 
-    connect(PreviewAction, &QAction::triggered, this, &cWordTsar::PrintPreview) ;
-    connect(mCommandTagsAction, &QAction::triggered, this, &cWordTsar::CommandTags) ;
-    connect(BlockHighlightingAction, &QAction::triggered, this, &cWordTsar::BlockHighlight) ;
-    connect(ScreenSettingsAction, &QAction::triggered, this, &cWordTsar::ScreenSettings) ;
-    connect(SwitchModesAction, &QAction::triggered, this, &cWordTsar::SwitchModes) ;
+    connectMenuAction(PreviewAction, &cWordTsar::PrintPreview) ;
+    connectMenuAction(mCommandTagsAction, &cWordTsar::CommandTags) ;
+    connectMenuAction(BlockHighlightingAction, &cWordTsar::BlockHighlight) ;
+    connectMenuAction(ScreenSettingsAction, &cWordTsar::ScreenSettings) ;
+    connectMenuAction(SwitchModesAction, &cWordTsar::SwitchModes) ;
 
     // Menu label updated at mode-change time via OnAfterDisplayModeChange calls UpdateCommandTagsLabel()
 
@@ -1962,36 +1973,36 @@ ParOutlineNumberAction->setEnabled(false) ;
 
     insertmenu->addAction(ParOutlineNumberAction) ;
 
-    connect(PageBreakAction, &QAction::triggered, this, &cWordTsar::PageBreak) ;
-    connect(DateAction, &QAction::triggered, this, &cWordTsar::InsertDate) ;
-    connect(TimeAction, &QAction::triggered, this, &cWordTsar::InsertTime) ;
-    connect(ResultAction, &QAction::triggered, this, &cWordTsar::MathResult) ;
-    connect(ExpressionAction, &QAction::triggered, this, &cWordTsar::MathExpression) ;
-    connect(DollarAction, &QAction::triggered, this, &cWordTsar::MathDollar) ;
-    connect(FilenameAction, &QAction::triggered, this, &cWordTsar::Filename) ;
-    connect(DirectoryAction, &QAction::triggered, this, &cWordTsar::Directory) ;
-    connect(PathAction, &QAction::triggered, this, &cWordTsar::Path) ;
-    connect(VarDateAction, &QAction::triggered, this, &cWordTsar::VarDate) ;
-    connect(VarTimeAction, &QAction::triggered, this, &cWordTsar::VarTime) ;
-    connect(VarPageAction, &QAction::triggered, this, &cWordTsar::VarPage) ;
-    connect(VarFileAction, &QAction::triggered, this, &cWordTsar::VarFilename) ;
-    connect(VarDriveAction, &QAction::triggered, this, &cWordTsar::VarDrive) ;
-    connect(VarDirAction, &QAction::triggered, this, &cWordTsar::VarDirectory) ;
-    connect(VarPathAction, &QAction::triggered, this, &cWordTsar::VarPath) ;
-    connect(VarWordCountAction, &QAction::triggered, this, &cWordTsar::VarWordCount) ;
-    connect(ExtendedCharAction, &QAction::triggered, this, &cWordTsar::ExtendedChar) ;
-    connect(FileAction, &QAction::triggered, this, &cWordTsar::InsertFile) ;
-    connect(FileAtPrintAction, &QAction::triggered, this, &cWordTsar::FileAtPrint) ;
-    connect(GraphicAction, &QAction::triggered, this, &cWordTsar::Graphic) ;
-    connect(NoteCommentAction, &QAction::triggered, this, &cWordTsar::NoteComment) ;
-    connect(NoteFootnoteAction, &QAction::triggered, this, &cWordTsar::NoteFootnote) ;
-    connect(NoteEndnoteAction, &QAction::triggered, this, &cWordTsar::NoteEndnote) ;
-    connect(NoteAnnotationAction, &QAction::triggered, this, &cWordTsar::NoteAnnotation) ;
-    connect(TOCEntryAction, &QAction::triggered, this, &cWordTsar::TOCEntry) ;
-    connect(IndexEntryAction, &QAction::triggered, this, &cWordTsar::IndexEntry) ;
-    connect(IndexMarkAction, &QAction::triggered, this, &cWordTsar::IndexMark) ;
-    connect(DotLeaderAction, &QAction::triggered, this, &cWordTsar::DotLeader) ;
-    connect(ParOutlineNumberAction, &QAction::triggered, this, &cWordTsar::ParOutlineNumber) ;
+    connectMenuAction(PageBreakAction, &cWordTsar::PageBreak) ;
+    connectMenuAction(DateAction, &cWordTsar::InsertDate) ;
+    connectMenuAction(TimeAction, &cWordTsar::InsertTime) ;
+    connectMenuAction(ResultAction, &cWordTsar::MathResult) ;
+    connectMenuAction(ExpressionAction, &cWordTsar::MathExpression) ;
+    connectMenuAction(DollarAction, &cWordTsar::MathDollar) ;
+    connectMenuAction(FilenameAction, &cWordTsar::Filename) ;
+    connectMenuAction(DirectoryAction, &cWordTsar::Directory) ;
+    connectMenuAction(PathAction, &cWordTsar::Path) ;
+    connectMenuAction(VarDateAction, &cWordTsar::VarDate) ;
+    connectMenuAction(VarTimeAction, &cWordTsar::VarTime) ;
+    connectMenuAction(VarPageAction, &cWordTsar::VarPage) ;
+    connectMenuAction(VarFileAction, &cWordTsar::VarFilename) ;
+    connectMenuAction(VarDriveAction, &cWordTsar::VarDrive) ;
+    connectMenuAction(VarDirAction, &cWordTsar::VarDirectory) ;
+    connectMenuAction(VarPathAction, &cWordTsar::VarPath) ;
+    connectMenuAction(VarWordCountAction, &cWordTsar::VarWordCount) ;
+    connectMenuAction(ExtendedCharAction, &cWordTsar::ExtendedChar) ;
+    connectMenuAction(FileAction, &cWordTsar::InsertFile) ;
+    connectMenuAction(FileAtPrintAction, &cWordTsar::FileAtPrint) ;
+    connectMenuAction(GraphicAction, &cWordTsar::Graphic) ;
+    connectMenuAction(NoteCommentAction, &cWordTsar::NoteComment) ;
+    connectMenuAction(NoteFootnoteAction, &cWordTsar::NoteFootnote) ;
+    connectMenuAction(NoteEndnoteAction, &cWordTsar::NoteEndnote) ;
+    connectMenuAction(NoteAnnotationAction, &cWordTsar::NoteAnnotation) ;
+    connectMenuAction(TOCEntryAction, &cWordTsar::TOCEntry) ;
+    connectMenuAction(IndexEntryAction, &cWordTsar::IndexEntry) ;
+    connectMenuAction(IndexMarkAction, &cWordTsar::IndexMark) ;
+    connectMenuAction(DotLeaderAction, &cWordTsar::DotLeader) ;
+    connectMenuAction(ParOutlineNumberAction, &cWordTsar::ParOutlineNumber) ;
 
     // Style menu
     QAction *BoldAction = new QAction(mMenuProvider->GetStyleBoldLabel(), mMenuBar) ;
@@ -2055,25 +2066,25 @@ RenameDocStyleAction->setEnabled(false) ;
     ConvertMenu->addAction(SentenceCaseAction) ;
 
 
-    connect(BoldAction, &QAction::triggered, this, &cWordTsar::Bold) ;
-    connect(ItalicAction, &QAction::triggered, this, &cWordTsar::Italics) ;
-    connect(UnderlineAction, &QAction::triggered, this, &cWordTsar::Underline) ;
-    connect(FontAction, &QAction::triggered, this, &cWordTsar::font) ;
-    connect(StrikeoutAction, &QAction::triggered, this, &cWordTsar::Strikeout) ;
-    connect(SubscriptAction, &QAction::triggered, this, &cWordTsar::Subscript) ;
-    connect(SuperscriptAction, &QAction::triggered, this, &cWordTsar::Superscript) ;
-    connect(DoubleStrikeAction, &QAction::triggered, this, &cWordTsar::DoubleStrike) ;
-    connect(ColorAction, &QAction::triggered, this, &cWordTsar::Color) ;
-    connect(SelectParStyleAction, &QAction::triggered, this, &cWordTsar::SelectParStyle) ;
-    connect(ReturntoPrevStyleAction, &QAction::triggered, this, &cWordTsar::ReturntoPrevStyle) ;
-    connect(DefineParStyleAction, &QAction::triggered, this, &cWordTsar::DefineParStyle) ;
-    connect(CopyStyletoLibraryAction, &QAction::triggered, this, &cWordTsar::CopyStyletoLibrary) ;
-    connect(DelLibraryStyleAction, &QAction::triggered, this, &cWordTsar::DeleteLibraryStyle) ;
-    connect(RenameLibraryStyleAction, &QAction::triggered, this, &cWordTsar::RenameLibraryStyle) ;
-    connect(RenameDocStyleAction, &QAction::triggered, this, &cWordTsar::RenameDocStyle) ;
-    connect(UppercaseAction, &QAction::triggered, this, &cWordTsar::Uppercase) ;
-    connect(LowercaseAction, &QAction::triggered, this, &cWordTsar::Lowercase) ;
-    connect(SentenceCaseAction, &QAction::triggered, this, &cWordTsar::Sentencecase) ;
+    connectMenuAction(BoldAction, &cWordTsar::Bold) ;
+    connectMenuAction(ItalicAction, &cWordTsar::Italics) ;
+    connectMenuAction(UnderlineAction, &cWordTsar::Underline) ;
+    connectMenuAction(FontAction, &cWordTsar::font) ;
+    connectMenuAction(StrikeoutAction, &cWordTsar::Strikeout) ;
+    connectMenuAction(SubscriptAction, &cWordTsar::Subscript) ;
+    connectMenuAction(SuperscriptAction, &cWordTsar::Superscript) ;
+    connectMenuAction(DoubleStrikeAction, &cWordTsar::DoubleStrike) ;
+    connectMenuAction(ColorAction, &cWordTsar::Color) ;
+    connectMenuAction(SelectParStyleAction, &cWordTsar::SelectParStyle) ;
+    connectMenuAction(ReturntoPrevStyleAction, &cWordTsar::ReturntoPrevStyle) ;
+    connectMenuAction(DefineParStyleAction, &cWordTsar::DefineParStyle) ;
+    connectMenuAction(CopyStyletoLibraryAction, &cWordTsar::CopyStyletoLibrary) ;
+    connectMenuAction(DelLibraryStyleAction, &cWordTsar::DeleteLibraryStyle) ;
+    connectMenuAction(RenameLibraryStyleAction, &cWordTsar::RenameLibraryStyle) ;
+    connectMenuAction(RenameDocStyleAction, &cWordTsar::RenameDocStyle) ;
+    connectMenuAction(UppercaseAction, &cWordTsar::Uppercase) ;
+    connectMenuAction(LowercaseAction, &cWordTsar::Lowercase) ;
+    connectMenuAction(SentenceCaseAction, &cWordTsar::Sentencecase) ;
 
     // Layout Menu
     QAction *CenterLineAction = new QAction(mMenuProvider->GetLayoutCenterLineLabel(), mMenuBar) ;
@@ -2136,27 +2147,27 @@ KeepLinesTogetherColumnAction->setEnabled(false) ;
     SpecialMenu->addAction(KeepLinesTogetherPageAction) ;
     SpecialMenu->addAction(KeepLinesTogetherColumnAction) ;
 
-    connect(CenterLineAction, &QAction::triggered, this, &cWordTsar::CenterLine) ;
-    connect(RightAlignAction, &QAction::triggered, this, &cWordTsar::RightAlign) ;
-    connect(LeftAlignParaAction, &QAction::triggered, this, &cWordTsar::LeftAlignParagraph) ;
-    connect(CenterParaAction, &QAction::triggered, this, &cWordTsar::CenterParagraph) ;
-    connect(RightAlignParaAction, &QAction::triggered, this, &cWordTsar::RightAlignParagraph) ;
-    connect(JustifyParaAction, &QAction::triggered, this, &cWordTsar::JustifyParagraph) ;
-    connect(RulerLineAction, &QAction::triggered, this, &cWordTsar::RulerLine) ;
-    connect(ColumnsAction, &QAction::triggered, this, &cWordTsar::Columns) ;
-    connect(PageAction, &QAction::triggered, this, &cWordTsar::Page) ;
-    connect(HeaderAction, &QAction::triggered, this, &cWordTsar::Header) ;
-    connect(FooterAction, &QAction::triggered, this, &cWordTsar::Footer) ;
-    connect(PageNumberingAction, &QAction::triggered, this, &cWordTsar::PageNumbering) ;
-    connect(LineNumberingAction, &QAction::triggered, this, &cWordTsar::LineNumbering) ;
-    connect(AlignmentSpacingAction, &QAction::triggered, this, &cWordTsar::Alignment) ;
-    connect(OverPrintCharAction, &QAction::triggered, this, &cWordTsar::OverprintChar) ;
-    connect(OverprintLineAction, &QAction::triggered, this, &cWordTsar::OverprintLine) ;
-    connect(OptionalHyphenAction, &QAction::triggered, this, &cWordTsar::OptionalHyphen) ;
-    connect(VerticalCenterAction, &QAction::triggered, this, &cWordTsar::VerticalCenter) ;
-    connect(KeepWordsTogetherAction, &QAction::triggered, this, &cWordTsar::KeepWordsTogether) ;
-    connect(KeepLinesTogetherPageAction, &QAction::triggered, this, &cWordTsar::KeepLinesTogetherPage) ;
-    connect(KeepLinesTogetherColumnAction, &QAction::triggered, this, &cWordTsar::KeepLinesTogetherColumn) ;
+    connectMenuAction(CenterLineAction, &cWordTsar::CenterLine) ;
+    connectMenuAction(RightAlignAction, &cWordTsar::RightAlign) ;
+    connectMenuAction(LeftAlignParaAction, &cWordTsar::LeftAlignParagraph) ;
+    connectMenuAction(CenterParaAction, &cWordTsar::CenterParagraph) ;
+    connectMenuAction(RightAlignParaAction, &cWordTsar::RightAlignParagraph) ;
+    connectMenuAction(JustifyParaAction, &cWordTsar::JustifyParagraph) ;
+    connectMenuAction(RulerLineAction, &cWordTsar::RulerLine) ;
+    connectMenuAction(ColumnsAction, &cWordTsar::Columns) ;
+    connectMenuAction(PageAction, &cWordTsar::Page) ;
+    connectMenuAction(HeaderAction, &cWordTsar::Header) ;
+    connectMenuAction(FooterAction, &cWordTsar::Footer) ;
+    connectMenuAction(PageNumberingAction, &cWordTsar::PageNumbering) ;
+    connectMenuAction(LineNumberingAction, &cWordTsar::LineNumbering) ;
+    connectMenuAction(AlignmentSpacingAction, &cWordTsar::Alignment) ;
+    connectMenuAction(OverPrintCharAction, &cWordTsar::OverprintChar) ;
+    connectMenuAction(OverprintLineAction, &cWordTsar::OverprintLine) ;
+    connectMenuAction(OptionalHyphenAction, &cWordTsar::OptionalHyphen) ;
+    connectMenuAction(VerticalCenterAction, &cWordTsar::VerticalCenter) ;
+    connectMenuAction(KeepWordsTogetherAction, &cWordTsar::KeepWordsTogether) ;
+    connectMenuAction(KeepLinesTogetherPageAction, &cWordTsar::KeepLinesTogetherPage) ;
+    connectMenuAction(KeepLinesTogetherColumnAction, &cWordTsar::KeepLinesTogetherColumn) ;
 
 
     // Utilities Menu
@@ -2276,48 +2287,48 @@ ReformatNotesAction->setEnabled(false) ;
     ReformatMenu->addAction(ReformatNotesAction) ;
 
 
-    connect(SpellCheckGlobalAction, &QAction::triggered, this, &cWordTsar::SpellCheckGlobal) ;
-    connect(SpellCheckRestAction, &QAction::triggered, this, &cWordTsar::SpellCheckRest) ;
-    connect(SpellCheckWordAction, &QAction::triggered, this, &cWordTsar::SpellCheckWord) ;
-    connect(SpellCheckTypeAction, &QAction::triggered, this, &cWordTsar::SpellCheckType) ;
-    connect(ThesaurusAction, &QAction::triggered, this, &cWordTsar::Thesaurus) ;
-    connect(InsetAction, &QAction::triggered, this, &cWordTsar::Inset) ;
-    connect(CalculatorAction, &QAction::triggered, this, &cWordTsar::Calculator) ;
-    connect(BlockMathAction, &QAction::triggered, this, &cWordTsar::BlockMath) ;
-    connect(SortBlockAscAction, &QAction::triggered, this, &cWordTsar::SortBlockAsc) ;
-    connect(SortBlockDesAction, &QAction::triggered, this, &cWordTsar::SortBlockDes) ;
-    connect(WordCountAction, &QAction::triggered, this, &cWordTsar::WordCount) ;
-    connect(GenerateTOCAction, &QAction::triggered, this, &cWordTsar::GenerateTableOfContents) ;
-    connect(GenerateIndexAction, &QAction::triggered, this, &cWordTsar::GenerateIndex) ;
-    connect(mPlayMacroAction, &QAction::triggered, this, &cWordTsar::PlayMacro) ;
-    connect(mRecordMacroAction, &QAction::triggered, this, &cWordTsar::RecordMacro) ;
-    connect(mStopMacroAction, &QAction::triggered, this, &cWordTsar::StopRecordMacro) ;
-    connect(mEditMacroAction, &QAction::triggered, this, &cWordTsar::EditMacro) ;
-    connect(SingleStepAction, &QAction::triggered, this, &cWordTsar::SingleStep) ;
-    connect(mCopyMacroAction, &QAction::triggered, this, &cWordTsar::CopyMacro) ;
-    connect(mDeleteMacroAction, &QAction::triggered, this, &cWordTsar::DeleteMacro) ;
-    connect(mRenameMacroAction, &QAction::triggered, this, &cWordTsar::RenameMacro) ;
-    connect(DataFileAction, &QAction::triggered, this, &cWordTsar::DataFile) ;
-    connect(NameVarsAction, &QAction::triggered, this, &cWordTsar::NameVars) ;
-    connect(SetVarAction, &QAction::triggered, this, &cWordTsar::SetVar) ;
-    connect(SetVarMathAction, &QAction::triggered, this, &cWordTsar::SetVarMath) ;
-    connect(AskVarAction, &QAction::triggered, this, &cWordTsar::AskVar) ;
-    connect(IfAction, &QAction::triggered, this, &cWordTsar::If) ;
-    connect(ElseAction, &QAction::triggered, this, &cWordTsar::Else) ;
-    connect(EndIfAction, &QAction::triggered, this, &cWordTsar::EndIf) ;
-    connect(TopAction, &QAction::triggered, this, &cWordTsar::Top) ;
-    connect(BottomAction, &QAction::triggered, this, &cWordTsar::Bottom) ;
-    connect(ClearAction, &QAction::triggered, this, &cWordTsar::Clear) ;
-    connect(DisplayAction, &QAction::triggered, this, &cWordTsar::Display) ;
-    connect(PrintNTimesAction, &QAction::triggered, this, &cWordTsar::PrintNTimes) ;
-    connect(ReformatRestAction, &QAction::triggered, this, &cWordTsar::ReformatRest) ;
-    connect(ReformatNotesAction, &QAction::triggered, this, &cWordTsar::ReformatNotes) ;
+    connectMenuAction(SpellCheckGlobalAction, &cWordTsar::SpellCheckGlobal) ;
+    connectMenuAction(SpellCheckRestAction, &cWordTsar::SpellCheckRest) ;
+    connectMenuAction(SpellCheckWordAction, &cWordTsar::SpellCheckWord) ;
+    connectMenuAction(SpellCheckTypeAction, &cWordTsar::SpellCheckType) ;
+    connectMenuAction(ThesaurusAction, &cWordTsar::Thesaurus) ;
+    connectMenuAction(InsetAction, &cWordTsar::Inset) ;
+    connectMenuAction(CalculatorAction, &cWordTsar::Calculator) ;
+    connectMenuAction(BlockMathAction, &cWordTsar::BlockMath) ;
+    connectMenuAction(SortBlockAscAction, &cWordTsar::SortBlockAsc) ;
+    connectMenuAction(SortBlockDesAction, &cWordTsar::SortBlockDes) ;
+    connectMenuAction(WordCountAction, &cWordTsar::WordCount) ;
+    connectMenuAction(GenerateTOCAction, &cWordTsar::GenerateTableOfContents) ;
+    connectMenuAction(GenerateIndexAction, &cWordTsar::GenerateIndex) ;
+    connectMenuAction(mPlayMacroAction, &cWordTsar::PlayMacro) ;
+    connectMenuAction(mRecordMacroAction, &cWordTsar::RecordMacro) ;
+    connectMenuAction(mStopMacroAction, &cWordTsar::StopRecordMacro) ;
+    connectMenuAction(mEditMacroAction, &cWordTsar::EditMacro) ;
+    connectMenuAction(SingleStepAction, &cWordTsar::SingleStep) ;
+    connectMenuAction(mCopyMacroAction, &cWordTsar::CopyMacro) ;
+    connectMenuAction(mDeleteMacroAction, &cWordTsar::DeleteMacro) ;
+    connectMenuAction(mRenameMacroAction, &cWordTsar::RenameMacro) ;
+    connectMenuAction(DataFileAction, &cWordTsar::DataFile) ;
+    connectMenuAction(NameVarsAction, &cWordTsar::NameVars) ;
+    connectMenuAction(SetVarAction, &cWordTsar::SetVar) ;
+    connectMenuAction(SetVarMathAction, &cWordTsar::SetVarMath) ;
+    connectMenuAction(AskVarAction, &cWordTsar::AskVar) ;
+    connectMenuAction(IfAction, &cWordTsar::If) ;
+    connectMenuAction(ElseAction, &cWordTsar::Else) ;
+    connectMenuAction(EndIfAction, &cWordTsar::EndIf) ;
+    connectMenuAction(TopAction, &cWordTsar::Top) ;
+    connectMenuAction(BottomAction, &cWordTsar::Bottom) ;
+    connectMenuAction(ClearAction, &cWordTsar::Clear) ;
+    connectMenuAction(DisplayAction, &cWordTsar::Display) ;
+    connectMenuAction(PrintNTimesAction, &cWordTsar::PrintNTimes) ;
+    connectMenuAction(ReformatRestAction, &cWordTsar::ReformatRest) ;
+    connectMenuAction(ReformatNotesAction, &cWordTsar::ReformatNotes) ;
 
     // System Preferences (separate from existing Preferences dialog)
     utilitiesmenu->addSeparator() ;
     QAction *SystemPreferencesAction = new QAction("S&ystem Preferences...\t⌘,", mMenuBar) ;
     utilitiesmenu->addAction(SystemPreferencesAction) ;
-    connect(SystemPreferencesAction, &QAction::triggered, this, [this]()
+    connectMenuAction(SystemPreferencesAction, [this]()
     {
         mEditor->SystemPreferences() ;
     }) ;
@@ -2328,15 +2339,8 @@ ReformatNotesAction->setEnabled(false) ;
 
     helpmenu->addAction(AboutAction) ;
 
-    connect(AboutAction, &QAction::triggered, this, &cWordTsar::AboutWordTsar) ;
+    connectMenuAction(AboutAction, &cWordTsar::AboutWordTsar) ;
 
-    // After any menu action: incremental layout + caret + scroll + paint
-    // (same update as keyboard handler -- shared via PerformPostCommandUpdate)
-    connect(mMenuBar, &QMenuBar::triggered, this, [this](QAction*)
-    {
-        Active()->PerformPostCommandUpdate() ;
-        QTimer::singleShot(1, Active(), SLOT(OnIdle())) ;
-    }) ;
 }
 
 // we handle menus by generating keys as if from the user
