@@ -472,7 +472,11 @@ void cWSWordTsar::HostRunModal(wordstartui::cDialog& dialog)
     }
 #endif
 
-    dialog.FocusFirst();
+    // A dialog that chose its focus keeps it; any other starts at the first widget
+    if (dialog.IsFocusChosen() == false)
+    {
+        dialog.FocusFirst();
+    }
 
     RunModalLoop(
         [this, &dialog](cScreen& screen, const cTheme& theme)

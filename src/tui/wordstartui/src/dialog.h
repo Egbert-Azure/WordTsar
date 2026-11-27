@@ -46,6 +46,7 @@ public:
     eDialogResult GetResult(void) const;
     void FocusFirst(void);
     void FocusLast(void);
+    bool IsFocusChosen(void) const;     // FocusLast() chose the focus
     cWidget* GetFocusedWidget(void);
 
 private:
@@ -64,6 +65,7 @@ private:
     std::string mTitle;
     std::vector<std::unique_ptr<cWidget>> mWidgets;
     int mFocusIndex;
+    bool mFocusChosen = false;
     eDialogResult mResult;
 };
 
