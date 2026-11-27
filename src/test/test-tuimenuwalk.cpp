@@ -2377,6 +2377,104 @@ TEST_CASE("TUI System Preferences - Show startup screen on the Display tab")
 }
 
 
+namespace
+{
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief Dialog host for System Preferences: clicks the Page tab and the
+///        field showing the given text, replaces it with typed text, then
+///        presses Enter to accept.
+///
+/////////////////////////////////////////////////////////////////////////////
+class cTypeInPageFieldHost : public cKeysThenDrawHost
+{
+public:
+    cTypeInPageFieldHost(const std::string& shown, const std::string& typed) : mShown(shown), mTyped(typed) {}
+
+    void HostRunModalRaw(
+        const std::function<void(wordstartui::cScreen&, const wordstartui::cTheme&)>& draw,
+        const std::function<bool(const wordstartui::sInputEvent&)>& handle) override
+    {
+        wordstartui::cScreen screen;
+        screen.Resize(25, 80);
+        draw(screen, mOwnTheme);
+        ClickText(screen, "Page", handle);
+        draw(screen, mOwnTheme);
+        mFound = ClickText(screen, mShown, handle);
+
+        wordstartui::sInputEvent key{};
+        key.type = wordstartui::INPUT_TYPE_SPECIAL;
+        key.special = wordstartui::SPECIAL_KEY_END;
+        handle(key);
+        key.special = wordstartui::SPECIAL_KEY_BACKSPACE;
+        for (size_t count = 0; count < mShown.size(); ++count)
+        {
+            handle(key);
+        }
+        wordstartui::sInputEvent text{};
+        text.type = wordstartui::INPUT_TYPE_TEXT;
+        text.textUtf8 = mTyped;
+        handle(text);
+
+        key.special = wordstartui::SPECIAL_KEY_ENTER;
+        handle(key);
+    }
+
+    bool mFound = false;
+
+private:
+    // Left click on the first cell showing text; false when not shown.
+    static bool ClickText(const wordstartui::cScreen& screen, const std::string& text,
+                          const std::function<bool(const wordstartui::sInputEvent&)>& handle)
+    {
+        for (int row = 0; row < screen.GetRows(); ++row)
+        {
+            size_t at = MenuRowText(screen, row).find(text);
+            if (at == std::string::npos)
+            {
+                continue;
+            }
+            int col = 0;
+            std::string prefix;
+            while ((col < screen.GetCols()) && (prefix.size() < at))
+            {
+                prefix += screen.GetCell(row, col)->textUtf8;
+                ++col;
+            }
+            wordstartui::sInputEvent click{};
+            click.type = wordstartui::INPUT_TYPE_MOUSE;
+            click.mouseAction = wordstartui::MOUSE_ACTION_PRESS;
+            click.mouseButton = wordstartui::MOUSE_BUTTON_LEFT;
+            click.mouseRow = row;
+            click.mouseCol = col;
+            handle(click);
+            return true;
+        }
+        return false;
+    }
+
+    std::string mShown;
+    std::string mTyped;
+    wordstartui::cTheme mOwnTheme;
+};
+
+}
+
+
+TEST_CASE("TUI System Preferences - a left margin typed without a unit is in the selected unit")
+{
+    cConfig config;
+    config.mMeasurement = "mm";
+    config.mLeftMargin = 1234;
+    std::string shown = cConfig::FormatMeasurement(config.mLeftMargin, 'm');
+    cTypeInPageFieldHost host(shown, "25");
+    CHECK(wsdialogs::SystemPreferences(&host, config) == true);
+    CHECK(host.mFound == true);
+    CHECK(config.mLeftMargin == cConfig::ParseMeasurement("25mm"));
+}
+
+
 TEST_CASE("TUI Opening screen - the file list starts in the current directory unless a default is set")
 {
     namespace fs = std::filesystem;
