@@ -2380,12 +2380,13 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         measurement->SetItems({"Inches", "Centimeters", "Millimeters"});
 
         int measureIndex = 0;
+        eMeasurement storedUnit = cConfig::MeasurementUnit(config.mMeasurement);
 
-        if (config.mMeasurement == "mm")
+        if (storedUnit == MSR_MILLIMETERS)
         {
             measureIndex = 2;
         }
-        else if (config.mMeasurement == "cm")
+        else if (storedUnit == MSR_CENTIMETERS)
         {
             measureIndex = 1;
         }
@@ -2519,11 +2520,12 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
         // (inches / centimetres / millimetres), showing the unit suffix. The user may type any unit suffix; ParseMeasurement
         // reads it back on OK.
         char pageUnit = 'i';
-        if (config.mMeasurement.find("mm") != std::string::npos)
+        eMeasurement pageMeasure = cConfig::MeasurementUnit(config.mMeasurement);
+        if (pageMeasure == MSR_MILLIMETERS)
         {
             pageUnit = 'm';
         }
-        else if (config.mMeasurement.find('c') != std::string::npos)
+        else if (pageMeasure == MSR_CENTIMETERS)
         {
             pageUnit = 'c';
         }

@@ -8397,22 +8397,18 @@ void cEditorCtrl::SystemPreferences(void)
     ui.mEndnoteFontSize->setValue(config.mEndnoteFontSize);
 
     // Measurement: read from in-memory state (set by LoadConfig and ^OB Preferences)
-    std::string meas = GetMeasurement();
-    if (meas.find('i') != std::string::npos || meas.find('"') != std::string::npos)
-    {
-        ui.mMeasurement->setCurrentIndex(0);  // Inches
-    }
-    else if (meas.find('c') != std::string::npos)
+    eMeasurement storedUnit = cConfig::MeasurementUnit(GetMeasurement());
+    if (storedUnit == MSR_CENTIMETERS)
     {
         ui.mMeasurement->setCurrentIndex(1);  // Centimeters
     }
-    else if (meas.find('m') != std::string::npos)
+    else if (storedUnit == MSR_MILLIMETERS)
     {
         ui.mMeasurement->setCurrentIndex(2);  // Millimeters
     }
     else
     {
-        ui.mMeasurement->setCurrentIndex(0);  // Default: inches
+        ui.mMeasurement->setCurrentIndex(0);  // Inches
     }
 
     ui.mCodePage->setCurrentIndex(config.mCodePage);

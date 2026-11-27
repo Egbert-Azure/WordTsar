@@ -659,6 +659,47 @@ COORD_T cConfig::ParseMeasurement(const char* value, char defaultUnit)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  measurement [in] stored measurement setting, such as "0i",
+///                          "in", "0cm", "cm", "0mm" or "mm"
+///
+/// @return the unit: millimetres for m or mm, centimetres for c or cm,
+///         inches for anything else
+///
+/// @brief
+/// The unit of the [editor] measurement setting. Leading digits, signs,
+/// decimal separators and spaces are skipped; case is ignored.
+///
+/////////////////////////////////////////////////////////////////////////////
+eMeasurement cConfig::MeasurementUnit(const std::string& measurement)
+{
+    std::string unit;
+    for (char ch : measurement)
+    {
+        unsigned char uch = static_cast<unsigned char>(ch);
+        if (std::isalpha(uch) || ch == '"')
+        {
+            unit += static_cast<char>(std::tolower(uch));
+        }
+        else if (unit.empty() == false && std::isspace(uch) == false)
+        {
+            unit += ch;
+        }
+    }
+
+    if (unit == "mm" || unit == "m")
+    {
+        return MSR_MILLIMETERS;
+    }
+    if (unit == "cm" || unit == "c")
+    {
+        return MSR_CENTIMETERS;
+    }
+    return MSR_INCHES;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  twips [in] value in twips
 /// @param  unit [in] desired unit character (i, c, m, p)
 ///

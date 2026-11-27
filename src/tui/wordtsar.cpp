@@ -896,11 +896,12 @@ void cWSWordTsar::OpenPreferences(void)
     drop->SetItems({"Inches", "Centimeters", "Millimeters"});
 
     int measureIndex = 0;
-    if (config.mMeasurement.find("mm") != std::string::npos)
+    eMeasurement storedUnit = cConfig::MeasurementUnit(config.mMeasurement);
+    if (storedUnit == MSR_MILLIMETERS)
     {
         measureIndex = 2;
     }
-    else if (config.mMeasurement.find("cm") != std::string::npos)
+    else if (storedUnit == MSR_CENTIMETERS)
     {
         measureIndex = 1;
     }

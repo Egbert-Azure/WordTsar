@@ -6025,49 +6025,14 @@ void cEditorBase::SetPaperSize(COORD_T width, COORD_T height)
 /// @return nothing
 ///
 /// @brief
-/// Set measurement system based on string format.
-/// Parses measurement string and sets both string and enum values.
-/// Supports: " for inches, C for centimeters, M for millimeters.
+/// Set the measurement setting and its unit (see
+/// cConfig::MeasurementUnit).
 ///
 /////////////////////////////////////////////////////////////////////////////
 void cEditorBase::SetMeasurement(const std::string& measure)
 {
     mMeasurement = measure;
-
-    if (!mDocument)
-    {
-        mMeasure = MSR_INCHES;
-        return;
-    }
-
-    char type = mDocument->GetType(measure);
-
-    switch (type)
-    {
-        case '\"':
-        {
-            mMeasure = MSR_INCHES;
-            break;
-        }
-
-        case 'C':
-        {
-            mMeasure = MSR_CENTIMETERS;
-            break;
-        }
-
-        case 'M':
-        {
-            mMeasure = MSR_MILLIMETERS;
-            break;
-        }
-
-        default:
-        {
-            mMeasure = MSR_INCHES;
-            break;
-        }
-    }
+    mMeasure = cConfig::MeasurementUnit(measure);
 }
 
 /////////////////////////////////////////////////////////////////////////////
