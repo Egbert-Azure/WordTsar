@@ -8467,9 +8467,9 @@ void cEditorCtrl::SystemPreferences(void)
     ui.mPageOffsetOdd->setText(QString::fromStdString(cConfig::FormatMeasurement(config.mPageOffsetOdd, unitChar)));
     ui.mPageOffsetEven->setText(QString::fromStdString(cConfig::FormatMeasurement(config.mPageOffsetEven, unitChar)));
 
-    // Refresh Page Setup fields when mMeasurement combo changes. A paper
-    // size without a unit is in the unit selected before the change.
-    char paperUnit = unitChar;
+    // Refresh Page Setup fields when mMeasurement combo changes. A field
+    // without a unit is in the unit selected before the change.
+    char fieldUnit = unitChar;
     QObject::connect(ui.mMeasurement, QOverload<int>::of(&QComboBox::currentIndexChanged),
         [&](int idx)
     {
@@ -8484,20 +8484,14 @@ void cEditorCtrl::SystemPreferences(void)
         }
 
         // Parse current field text to twips, re-format in new unit
-        auto convert = [uc](QLineEdit* field)
+        auto convert = [uc, &fieldUnit](QLineEdit* field)
         {
-            COORD_T twips = cConfig::ParseMeasurement(field->text().toStdString().c_str());
-            field->setText(QString::fromStdString(cConfig::FormatMeasurement(twips, uc)));
-        };
-        auto convertPaper = [uc, &paperUnit](QLineEdit* field)
-        {
-            COORD_T twips = cConfig::ParseMeasurement(field->text().toStdString().c_str(), paperUnit);
+            COORD_T twips = cConfig::ParseMeasurement(field->text().toStdString().c_str(), fieldUnit);
             field->setText(QString::fromStdString(cConfig::FormatMeasurement(twips, uc)));
         };
 
-        convertPaper(ui.mPaperWidth);
-        convertPaper(ui.mPaperHeight);
-        paperUnit = uc;
+        convert(ui.mPaperWidth);
+        convert(ui.mPaperHeight);
         convert(ui.mLeftMargin);
         convert(ui.mRightMargin);
         convert(ui.mTopMargin);
@@ -8506,6 +8500,7 @@ void cEditorCtrl::SystemPreferences(void)
         convert(ui.mFooterMargin);
         convert(ui.mPageOffsetOdd);
         convert(ui.mPageOffsetEven);
+        fieldUnit = uc;
     });
 
     ui.mLandscape->setChecked(config.mLandscape);
@@ -9098,7 +9093,7 @@ void cEditorCtrl::SystemPreferences(void)
         config.mSpellCheckLanguage = ui.mSpellCheckLanguage->text().toStdString();
 
         // --- Read back Tab 3: Page Setup ---
-        // paper size without a unit is in the selected measurement unit
+        // a page measurement without a unit is in the selected measurement unit
         char measUnit = 'i';
         if (newMeasIdx == 1)
         {
@@ -9110,14 +9105,14 @@ void cEditorCtrl::SystemPreferences(void)
         }
         config.mPaperWidth = cConfig::ParseMeasurement(ui.mPaperWidth->text().toStdString().c_str(), measUnit);
         config.mPaperHeight = cConfig::ParseMeasurement(ui.mPaperHeight->text().toStdString().c_str(), measUnit);
-        config.mLeftMargin = cConfig::ParseMeasurement(ui.mLeftMargin->text().toStdString().c_str());
-        config.mRightMargin = cConfig::ParseMeasurement(ui.mRightMargin->text().toStdString().c_str());
-        config.mTopMargin = cConfig::ParseMeasurement(ui.mTopMargin->text().toStdString().c_str());
-        config.mBottomMargin = cConfig::ParseMeasurement(ui.mBottomMargin->text().toStdString().c_str());
-        config.mHeaderMargin = cConfig::ParseMeasurement(ui.mHeaderMargin->text().toStdString().c_str());
-        config.mFooterMargin = cConfig::ParseMeasurement(ui.mFooterMargin->text().toStdString().c_str());
-        config.mPageOffsetOdd = cConfig::ParseMeasurement(ui.mPageOffsetOdd->text().toStdString().c_str());
-        config.mPageOffsetEven = cConfig::ParseMeasurement(ui.mPageOffsetEven->text().toStdString().c_str());
+        config.mLeftMargin = cConfig::ParseMeasurement(ui.mLeftMargin->text().toStdString().c_str(), measUnit);
+        config.mRightMargin = cConfig::ParseMeasurement(ui.mRightMargin->text().toStdString().c_str(), measUnit);
+        config.mTopMargin = cConfig::ParseMeasurement(ui.mTopMargin->text().toStdString().c_str(), measUnit);
+        config.mBottomMargin = cConfig::ParseMeasurement(ui.mBottomMargin->text().toStdString().c_str(), measUnit);
+        config.mHeaderMargin = cConfig::ParseMeasurement(ui.mHeaderMargin->text().toStdString().c_str(), measUnit);
+        config.mFooterMargin = cConfig::ParseMeasurement(ui.mFooterMargin->text().toStdString().c_str(), measUnit);
+        config.mPageOffsetOdd = cConfig::ParseMeasurement(ui.mPageOffsetOdd->text().toStdString().c_str(), measUnit);
+        config.mPageOffsetEven = cConfig::ParseMeasurement(ui.mPageOffsetEven->text().toStdString().c_str(), measUnit);
         config.mLandscape = ui.mLandscape->isChecked();
 
         // --- Read back Tab 4: Colors ---
