@@ -1500,6 +1500,11 @@ bool cWSEditorCtrl::SaveFileImpl(const std::string& filename, bool silent)
         fileWriter = new cRTFFile(this);
         isExport = true;
     }
+    else if (ext == ".docx")
+    {
+        fileWriter = new cDOCXFile(this);
+        isExport = true;
+    }
     else if (ext == ".txt" || mDocument->IsTextFile())
     {
         fileWriter = new cTextFile(this);
