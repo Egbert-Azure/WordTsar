@@ -352,30 +352,10 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
         // --- New document ---
         case CTRL_N :
         {
-            // New document: clear and reset
+            // New document: clear and reset. Cancel, a cancelled Save As or
+            // a failed save keeps the document
             cDocument* doc = mEditor->GetDocument() ;
-            // A cancelled Save As or a failed save keeps the document
-            bool keep = false ;
-            if (doc)
-            {
-                // Check if document has unsaved changes
-                if (doc->IsModified())
-                {
-                    bool save = mEditor->AskYesNo("New Document",
-                        "Current document has unsaved changes. Save first?") ;
-                    if (save)
-                    {
-                        std::string fname = mEditor->CurrentSavePath() ;
-                        if (fname.empty() == true)
-                        {
-                            fname = mEditor->PromptForSaveFile() ;
-                        }
-                        keep = (fname.empty() == true) || (mEditor->SaveFile(fname) == false) ;
-                    }
-                }
-            }
-
-            if (doc && (keep == false))
+            if (doc && (mEditor->SaveBeforeReplace() == true))
             {
                 doc->Clear() ;
                 mEditor->LayoutDocument(true) ;
