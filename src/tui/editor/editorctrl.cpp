@@ -1134,7 +1134,7 @@ void cWSEditorCtrl::ToggleShowControl(void)
     }
 
     SetShowControls(nextMode);
-    mLayout->LayoutDocument(mDocument);
+    LayoutWholeDocument();
     Repaint();
 }
 
@@ -1163,7 +1163,7 @@ void cWSEditorCtrl::LayoutDocument(bool force)
 
     if (force)
     {
-        mLayout->LayoutDocument(mDocument);
+        LayoutWholeDocument();
         mLayoutParagraph = mDocument->GetNumberofParagraphs();
         mChangedSinceUpdate = false;
     }
@@ -1175,6 +1175,11 @@ void cWSEditorCtrl::LayoutDocument(bool force)
             mLayout->LayoutParagraph(para);
         }
         mLayoutParagraph = std::min(totalParas, static_cast<PARAGRAPH_T>(10));
+        if (mLayoutParagraph >= totalParas)
+        {
+            mLayoutInt = false;
+            mLayoutRest = false;
+        }
     }
 
     // Column width is the width of "x" in the default font

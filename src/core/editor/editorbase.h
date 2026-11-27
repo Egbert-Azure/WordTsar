@@ -27,6 +27,7 @@
 #include "src/core/document/document.h"
 #include "src/core/document/documentlistener.h"
 #include <atomic>
+#include <functional>
 #include <thread>
 #include <vector>
 
@@ -510,6 +511,9 @@ protected:
 
     // Start position for the next FindNext/FindPrev call; clears mSearchFromCursor
     POSITION_T NextSearchStart(void);
+
+    // Full layout of the document; clears mLayoutInt and mLayoutRest
+    void LayoutWholeDocument(std::function<void(int)> progressCallback = nullptr);
 
     // Caret Coordinate Helpers
     void AdjustCaretYForPageMode(const sLineLayout* line);

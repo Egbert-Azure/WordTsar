@@ -653,6 +653,26 @@ bool cEditorBase::LayoutOutdatedParagraphsOnScreen(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  progressCallback [in] layout progress in tenths, or nullptr
+///
+/// @return nothing
+///
+/// @brief
+/// Lays out the whole document. The layout reaches the end of the document,
+/// so idle layout is neither interrupted nor forced to the end. A pending
+/// edit (mDocumentDirty) is left for idle layout.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::LayoutWholeDocument(std::function<void(int)> progressCallback)
+{
+    mLayout->LayoutDocument(mDocument, progressCallback) ;
+    mLayoutInt = false ;
+    mLayoutRest = false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return true if idle layout has work scheduled; the base class has none
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -1427,7 +1447,7 @@ void cEditorBase::SetDisplayMode(eDisplayMode mode)
                 mLayout->SetActiveParagraph(-1);  // Clear so all dot commands are hidden
                 if (mDocument)
                 {
-                    mLayout->LayoutDocument(mDocument);
+                    LayoutWholeDocument();
 
                     // Move caret off dot command if needed
                     POSITION_T currentPos = mDocument->GetPosition();
@@ -1447,7 +1467,7 @@ void cEditorBase::SetDisplayMode(eDisplayMode mode)
                 mLayout->SetShowControl(mSavedShowControl);
                 if (mDocument)
                 {
-                    mLayout->LayoutDocument(mDocument);
+                    LayoutWholeDocument();
 
                     // Move caret off dot command if needed (mirrors entering-page-mode logic)
                     POSITION_T currentPos = mDocument->GetPosition();
@@ -5878,7 +5898,7 @@ void cEditorBase::SetFont(const std::string& font)
     if (mLayout && mDocument)
     {
         mLayout->SetDefaultFont(font);
-        mLayout->LayoutDocument(mDocument);
+        LayoutWholeDocument();
     }
 }
 

@@ -6739,7 +6739,7 @@ void cEditorCtrl::ToggleShowControl(void)
         SetShowControls(nextMode);
 
         // Re-layout document (showing/hiding control codes affects layout)
-        mLayout->LayoutDocument(mDocument);
+        LayoutWholeDocument();
 
         // Update display
         UpdateScrollbar();
@@ -7667,7 +7667,7 @@ void cEditorCtrl::LayoutDocument(bool force)
 
     // Trigger full layout with progress callback (BLACK BOX API)
     // Callback receives 10-percent values (0-10 scale) for 10% display resolution
-    mLayout->LayoutDocument(mDocument, [this](int tenPercent)
+    LayoutWholeDocument([this](int tenPercent)
     {
         if (mWordTsar)
         {

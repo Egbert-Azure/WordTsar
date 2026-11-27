@@ -1946,3 +1946,48 @@ TEST_CASE("cWSEditorView - a whole number ends where a decimal stop's units digi
     int twoCol = CaretColumnAt(editor, view, twoPos);
     CHECK(zeroCol - firstCol == twoCol - secondCol);
 }
+
+
+TEST_CASE("cWSEditorCtrl - a full layout after the screen layout ends the busy indicator")
+{
+    cWSEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+
+    cWSEditorView view(&editor);
+    view.SetBounds({0, 0, 60, 80});
+    wordstartui::cScreen screen;
+    screen.Resize(60, 80);
+
+    // Draw as ws does: one idle layout pass, then the editor view
+    auto draw = [&](void)
+    {
+        if (editor.HasPendingLayout() == true)
+        {
+            editor.IdleLayout();
+        }
+        view.Draw(screen);
+    };
+
+    for (int line = 0; line < 200; ++line)
+    {
+        doc->Insert("line\r");
+    }
+    editor.LayoutDocument(true);
+    editor.ResetDocumentDirty();
+    doc->SetPosition(0);
+    draw();
+
+    doc->Insert("x");
+    draw();
+    sStatus status;
+    editor.GetStatus(status);
+    REQUIRE(status.backgroundBusy == true);
+
+    editor.LayoutDocument(true);
+    editor.GetStatus(status);
+    CHECK(status.backgroundBusy == false);
+
+    draw();
+    editor.GetStatus(status);
+    CHECK(status.backgroundBusy == false);
+}
