@@ -73,6 +73,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cctype>
 #include <cmath>
 #include <algorithm>
 #include <optional>
@@ -436,6 +437,123 @@ std::string cConfig::FormatRGB(short r, short g, short b)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  value [in]  text starting with a number, leading spaces allowed
+/// @param  end   [out] first character after the number, value if none
+///
+/// @return the number, 0.0 if there is none
+///
+/// @brief
+/// Read an optional sign, digits and one decimal point or decimal comma,
+/// whatever the C locale.
+///
+/////////////////////////////////////////////////////////////////////////////
+static double ParseDecimal(const char* value, const char** end)
+{
+    const char* p = value;
+    while (*p == ' ' || *p == '\t')
+    {
+        p++;
+    }
+
+    std::string number;
+    if (*p == '+' || *p == '-')
+    {
+        number += *p;
+        p++;
+    }
+
+    bool digits = false;
+    bool separator = false;
+    while (true)
+    {
+        if (std::isdigit(static_cast<unsigned char>(*p)))
+        {
+            number += *p;
+            digits = true;
+        }
+        else if ((*p == '.' || *p == ',') && !separator)
+        {
+            number += '.';
+            separator = true;
+        }
+        else
+        {
+            break;
+        }
+        p++;
+    }
+
+    if (!digits)
+    {
+        *end = value;
+        return 0.0;
+    }
+
+    std::istringstream stream(number);
+    stream.imbue(std::locale::classic());
+    double result = 0.0;
+    stream >> result;
+    *end = p;
+    return result;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  value     [in] number with a decimal point
+/// @param  precision [in] digits after the point
+///
+/// @return the number with a decimal point, whatever the locale
+///
+/////////////////////////////////////////////////////////////////////////////
+static std::string FormatDecimal(double value, int precision)
+{
+    std::ostringstream stream;
+    stream.imbue(std::locale::classic());
+    stream << std::fixed << std::setprecision(precision) << value;
+    return stream.str();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  ini        [in] pointer to CSimpleIniA instance
+/// @param  section    [in] INI section name
+/// @param  key        [in] INI key name
+/// @param  defaultVal [in] value when the key is missing or not a number
+///
+/// @return the number; a decimal comma is read as a decimal point
+///
+/////////////////////////////////////////////////////////////////////////////
+static double ReadDecimal(CSimpleIniA& ini, const char* section, const char* key, double defaultVal)
+{
+    const char* value = ini.GetValue(section, key, nullptr);
+    if (value == nullptr)
+    {
+        return defaultVal;
+    }
+
+    const char* end = nullptr;
+    double result = ParseDecimal(value, &end);
+    if (end == value)
+    {
+        return defaultVal;
+    }
+    while (*end == ' ' || *end == '\t')
+    {
+        end++;
+    }
+    if (*end != '\0')
+    {
+        return defaultVal;
+    }
+
+    return result;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  value [in] mMeasurement string with optional unit suffix
 ///
 /// @return value in twips
@@ -443,7 +561,7 @@ std::string cConfig::FormatRGB(short r, short g, short b)
 /// @brief
 /// Parse a mMeasurement string with unit suffix into twips.
 /// Suffixes: i or " = inches, c = cm, m = mm, p = points.
-/// No suffix defaults to inches.
+/// No suffix defaults to inches. A decimal comma reads as a decimal point.
 /// Uses same constants as dot command parsing (TWIPSPERINCH, etc.).
 ///
 /////////////////////////////////////////////////////////////////////////////
@@ -473,8 +591,8 @@ COORD_T cConfig::ParseMeasurement(const char* value, char defaultUnit)
     }
 
     // Parse the numeric part
-    char* endPtr = nullptr;
-    double numericValue = std::strtod(value, &endPtr);
+    const char* endPtr = nullptr;
+    double numericValue = ParseDecimal(value, &endPtr);
 
     if (endPtr == value)
     {
@@ -587,9 +705,7 @@ std::string cConfig::FormatMeasurement(COORD_T twips, char unit)
         }
     }
 
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%.2f%c", value, unit);
-    return std::string(buf);
+    return FormatDecimal(value, 2) + unit;
 }
 
 
@@ -738,11 +854,11 @@ bool cConfig::Load(void)
     mCodePage = static_cast<int>(ini.GetLongValue("editor", "codePage", mCodePage));
     mMeasurement = ini.GetValue("editor", "measurement", mMeasurement.c_str());
     mDefaultFont = ini.GetValue("editor", "defaultFont", mDefaultFont.c_str());
-    mDefaultFontSize = ini.GetDoubleValue("editor", "defaultFontSize", mDefaultFontSize);
+    mDefaultFontSize = ReadDecimal(ini, "editor", "defaultFontSize", mDefaultFontSize);
     mFootnoteFont = ini.GetValue("editor", "footnoteFont", mFootnoteFont.c_str());
-    mFootnoteFontSize = ini.GetDoubleValue("editor", "footnoteFontSize", mFootnoteFontSize);
+    mFootnoteFontSize = ReadDecimal(ini, "editor", "footnoteFontSize", mFootnoteFontSize);
     mEndnoteFont = ini.GetValue("editor", "endnoteFont", mEndnoteFont.c_str());
-    mEndnoteFontSize = ini.GetDoubleValue("editor", "endnoteFontSize", mEndnoteFontSize);
+    mEndnoteFontSize = ReadDecimal(ini, "editor", "endnoteFontSize", mEndnoteFontSize);
     mDefaultFormat = ini.GetValue("editor", "defaultFormat", mDefaultFormat.c_str());
     mAutoSaveInterval = static_cast<int>(ini.GetLongValue("editor", "autoSaveInterval", mAutoSaveInterval));
     mCaretBlinkRate = static_cast<int>(ini.GetLongValue("editor", "caretBlinkRate", mCaretBlinkRate));
@@ -930,11 +1046,11 @@ bool cConfig::Save(void)
     ini.SetLongValue("editor", "codePage", mCodePage);
     ini.SetValue("editor", "measurement", mMeasurement.c_str());
     ini.SetValue("editor", "defaultFont", mDefaultFont.c_str());
-    ini.SetDoubleValue("editor", "defaultFontSize", mDefaultFontSize);
+    ini.SetValue("editor", "defaultFontSize", FormatDecimal(mDefaultFontSize, 6).c_str());
     ini.SetValue("editor", "footnoteFont", mFootnoteFont.c_str());
-    ini.SetDoubleValue("editor", "footnoteFontSize", mFootnoteFontSize);
+    ini.SetValue("editor", "footnoteFontSize", FormatDecimal(mFootnoteFontSize, 6).c_str());
     ini.SetValue("editor", "endnoteFont", mEndnoteFont.c_str());
-    ini.SetDoubleValue("editor", "endnoteFontSize", mEndnoteFontSize);
+    ini.SetValue("editor", "endnoteFontSize", FormatDecimal(mEndnoteFontSize, 6).c_str());
     ini.SetValue("editor", "defaultFormat", mDefaultFormat.c_str());
     ini.SetLongValue("editor", "autoSaveInterval", mAutoSaveInterval);
     ini.SetLongValue("editor", "caretBlinkRate", mCaretBlinkRate);
