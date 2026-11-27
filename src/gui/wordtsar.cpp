@@ -469,11 +469,8 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
     // Set initial window title with version info
     mEditor->SetTitle(mEditor->mFileName);
 
-    ReadConfig();
-    ApplyDisplaySettings();
-    ApplyScreenColors() ;    // Initialize mOnStyle/mOffStyle for status indicator colors
-    UpdateCommandTagsLabel(DISPLAY_CONTINUOUS) ;    // Set initial menu label (starts in continuous mode)
-
+    // Created before ReadConfig(): applying the saved paper size lays the
+    // document out, which reports progress through SetStatus()
     mStatusTextTimer = new QTimer(this) ;
     connect(mStatusTextTimer, &QTimer::timeout, this, &cWordTsar::ClearStatus) ;
 
@@ -481,6 +478,12 @@ printf("Application file path: %s\n", appFilePath.toStdString().c_str());
     mStatusTimer = new QTimer(this) ;
     mStatusTimer->setSingleShot(false) ;  // Repeating timer
     connect(mStatusTimer, &QTimer::timeout, this, &cWordTsar::OnStatusTimer) ;
+
+    ReadConfig();
+    ApplyDisplaySettings();
+    ApplyScreenColors() ;    // Initialize mOnStyle/mOffStyle for status indicator colors
+    UpdateCommandTagsLabel(DISPLAY_CONTINUOUS) ;    // Set initial menu label (starts in continuous mode)
+
     mStatusTimer->start(STATUS_UPDATE_INTERVAL_MS) ;
 }
 
@@ -1072,12 +1075,22 @@ void cWordTsar::UpdateStatus(cEditorCtrl *editor)
 
 void cWordTsar::ClearStatus(void)
 {
+    if (mStatText == nullptr || mStatusTextTimer == nullptr)
+    {
+        return ;
+    }
+
     mStatText->setText("") ;
     mStatusTextTimer->stop() ;
 }
 
 void cWordTsar::SetStatus(QString text, bool progress, int percent)
 {
+    if (mStatText == nullptr || mStatusTextTimer == nullptr || mBusy == nullptr)
+    {
+        return ;
+    }
+
     mStatusTextTimer->stop() ;
 
     if(text.length() > 0)

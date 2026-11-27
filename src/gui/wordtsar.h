@@ -300,56 +300,56 @@ private slots :
     // =================================================================
 
 public:
-    QScrollBar *mScrollbar ;
-    QStatusBar *mStatusTop ;
-    QStatusBar *mStatusBottom;
-    cRulerCtrl *mRuler ;
-    QTimer *mStatusTextTimer ;
-    QTimer *mStatusTimer ;          // Status bar update timer
+    QScrollBar *mScrollbar = nullptr ;
+    QStatusBar *mStatusTop = nullptr ;
+    QStatusBar *mStatusBottom = nullptr ;
+    cRulerCtrl *mRuler = nullptr ;
+    QTimer *mStatusTextTimer = nullptr ;
+    QTimer *mStatusTimer = nullptr ;          // Status bar update timer
 
 private:
     // Window layout widgets
 //    QWidget *mBaseWidget;
-    QWidget *mBaseWidget ;
-    QVBoxLayout *mBaseLayout;
-    QVBoxLayout *mLayout;
+    QWidget *mBaseWidget = nullptr ;
+    QVBoxLayout *mBaseLayout = nullptr ;
+    QVBoxLayout *mLayout = nullptr ;
     QMenuBar *mMenuBar = nullptr;
     QToolBar *mMainToolBar = nullptr;
 
     // Status bar labels
-    QLabel *mStatStyle ;
-    QLabel *mStatFont ;
-    QLabel *mStatBold ;
-    QLabel *mStatItalic ;
-    QLabel *mStatUnderline ;
-    QLabel *mStatChange ;
-    QLabel *mStatLeft ;
-    QLabel *mStatCenter ;
-    QLabel *mStatRight ;
-    QLabel *mStatJustify ;
-    QLabel *mStatMode ;
-    QLabel *mStatPage ;
-    QLabel *mStatInfo ;
-    QLabel *mStatText ;
+    QLabel *mStatStyle = nullptr ;
+    QLabel *mStatFont = nullptr ;
+    QLabel *mStatBold = nullptr ;
+    QLabel *mStatItalic = nullptr ;
+    QLabel *mStatUnderline = nullptr ;
+    QLabel *mStatChange = nullptr ;
+    QLabel *mStatLeft = nullptr ;
+    QLabel *mStatCenter = nullptr ;
+    QLabel *mStatRight = nullptr ;
+    QLabel *mStatJustify = nullptr ;
+    QLabel *mStatMode = nullptr ;
+    QLabel *mStatPage = nullptr ;
+    QLabel *mStatInfo = nullptr ;
+    QLabel *mStatText = nullptr ;
 
     // Busy indicator widgets
-    cBusyIndicator *mBusy ;
+    cBusyIndicator *mBusy = nullptr ;
 
     // Editor area widgets
-    QHBoxLayout *mEditorLayout ;
-    QWidget *mBaseEditor ;
-    QSplitter *mSplitter ;                    // vertical splitter between editors
-    QWidget *mMainEditorWidget ;              // container for main editor + its scrollbar
-    QWidget *mCodesEditorWidget ;             // container for codes editor + its scrollbar
-    QScrollBar *mCodesScrollbar ;             // codes editor scrollbar
+    QHBoxLayout *mEditorLayout = nullptr ;
+    QWidget *mBaseEditor = nullptr ;
+    QSplitter *mSplitter = nullptr ;                    // vertical splitter between editors
+    QWidget *mMainEditorWidget = nullptr ;              // container for main editor + its scrollbar
+    QWidget *mCodesEditorWidget = nullptr ;             // container for codes editor + its scrollbar
+    QScrollBar *mCodesScrollbar = nullptr ;             // codes editor scrollbar
 
     // Help panel labels
-    QLabel *mHelpCtrl;
-    QLabel *mHelpMCtrl;
-    QLabel *mHelpPCtrl;
-    QLabel *mHelpKCtrl;
-    QLabel *mHelpQCtrl;
-    QLabel *mHelpOCtrl;
+    QLabel *mHelpCtrl = nullptr ;
+    QLabel *mHelpMCtrl = nullptr ;
+    QLabel *mHelpPCtrl = nullptr ;
+    QLabel *mHelpKCtrl = nullptr ;
+    QLabel *mHelpQCtrl = nullptr ;
+    QLabel *mHelpOCtrl = nullptr ;
 
     // Original help text strings (plain <b> tags, before color styling)
     QString mHelpTextMain;
@@ -360,20 +360,20 @@ private:
     QString mHelpTextQ;
 
     // Editor and reveal codes state
-    cEditorCtrl *mEditor;
+    cEditorCtrl *mEditor = nullptr ;
     // Dedicated WordStar-chord input handler for menu dispatch only -- never
     // mEditor->mInput (which SetInputMode() swaps between WordStar/Modern), so
     // a menu click always runs the real WordStar-mode command regardless of
     // the user's selected keyboard mode, and can't collide with a chord the
     // user has half-typed on the real, active handler.
-    cWordStarInput *mMenuInput;
-    cEditorCtrl *mRevealCodesEditor ;         // codes pane editor (nullptr when hidden)
-    bool mRevealCodesVisible ;                // reveal codes toggle state
-    QAction *mCommandTagsAction ;             // Command Tags / Show Formatting menu action
+    cWordStarInput *mMenuInput = nullptr ;
+    cEditorCtrl *mRevealCodesEditor = nullptr ;         // codes pane editor (nullptr when hidden)
+    bool mRevealCodesVisible = false ;                // reveal codes toggle state
+    QAction *mCommandTagsAction = nullptr ;             // Command Tags / Show Formatting menu action
     QWidget *mNotePaneWidget = nullptr ;      // note pane: title, note editor and scrollbar (nullptr when no note is open)
     cEditorCtrl *mNoteEditor = nullptr ;      // editor of the open note
     std::unique_ptr<cWordStarInput> mNoteMenuInput ;   // menu input handler of mNoteEditor
-    QMenu *mRecentFilesMenu ;                 // File > Recent Files submenu
+    QMenu *mRecentFilesMenu = nullptr ;                 // File > Recent Files submenu
 
     // Utilities > Macros actions, enabled by UpdateMacroActions()
     QAction *mPlayMacroAction = nullptr ;
@@ -398,7 +398,7 @@ private:
     QString mOffStyle ;                 // stylesheet for inactive status indicators (italic + status bar colors)
 
     // Menu provider
-    IMenuProvider *mMenuProvider ;      // Menu label provider (Strategy Pattern)
+    IMenuProvider *mMenuProvider = nullptr ;      // Menu label provider (Strategy Pattern)
 
     // UpdateStatus() change-detection caches (per-instance; previously function statics)
     int          mStatusHelpCounter = 0 ;

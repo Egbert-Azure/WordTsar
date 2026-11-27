@@ -22,6 +22,7 @@
 #include "doctest.h"
 
 #include "src/gui/editor/editorctrl.h"
+#include "src/gui/wordtsar.h"
 #include "src/gui/utils/fontutils.h"
 #include "src/gui/dialogs/colordialog.h"
 #include "src/gui/layout/layout.h"
@@ -40,6 +41,8 @@
 #include <QMetaObject>
 #include <QPaintEvent>
 #include <QMimeData>
+#include <QCryptographicHash>
+#include <QFile>
 
 #include <filesystem>
 #include <fstream>
@@ -18137,4 +18140,77 @@ TEST_CASE("GUI editor - a kept index item shows, moves the caret and deletes as 
         CHECK(tag == std::string((mode == SHOW_ALL) ? "<Index>" : "-"));
         CHECK(boldTag == std::string((mode == SHOW_ALL) ? "B" : "-"));
     }
+}
+
+
+TEST_CASE("Main window - startup with A4 saved in Preferences lays out on A4")
+{
+    ensureQApplication();
+
+    const char* realHome = std::getenv("WORDTSAR_TEST_REAL_HOME");
+    REQUIRE(realHome != nullptr);
+    const std::filesystem::path realConfig =
+        std::filesystem::path(realHome) / "Library/Application Support/WordTsar/config.ini";
+    auto fingerprint = [&realConfig]()
+    {
+        std::error_code ec;
+        if (!std::filesystem::exists(realConfig, ec))
+        {
+            return std::string("missing");
+        }
+        QFile file(QString::fromStdString(realConfig.string()));
+        REQUIRE(file.open(QIODevice::ReadOnly));
+        QByteArray sha = QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha1).toHex();
+        long long mtime = static_cast<long long>(std::filesystem::last_write_time(realConfig).time_since_epoch().count());
+        return sha.toStdString() + " " + std::to_string(mtime);
+    };
+    const std::string realBefore = fingerprint();
+
+    std::string dir = (std::filesystem::temp_directory_path() / "wordtsar-startup-XXXXXX").string();
+    REQUIRE(mkdtemp(dir.data()) != nullptr);
+    const std::string oldHome = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldXdg = oldXdgEnv != nullptr ? oldXdgEnv : "";
+    setenv("HOME", dir.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (dir + "/.config").c_str(), 1);
+    REQUIRE(cConfig::GetConfigFilePath().find(dir) == 0);
+
+    COORD_T width = 0;
+    COORD_T height = 0;
+    {
+        cConfig config;
+        config.Load();
+        config.mPaperWidth = 11906;
+        config.mPaperHeight = 16838;
+        config.Save();
+        cConfig saved;
+        saved.Load();
+        width = saved.mPaperWidth;
+        height = saved.mPaperHeight;
+    }
+    CHECK(width == doctest::Approx(11906).epsilon(0.001));
+    CHECK(height == doctest::Approx(16838).epsilon(0.001));
+
+    static char name[] = "WordTsar";
+    static char* args[] = {name, nullptr};
+    auto* window = new cWordTsar(1, args);
+    CHECK_FALSE(window->isVisible());
+    cLayoutBase* layout = window->GetEditorCtrl()->GetLayout();
+    CHECK(layout->GetPaperWidth() == doctest::Approx(width));
+    CHECK(layout->GetPaperHeight() == doctest::Approx(height));
+    delete window;
+
+    setenv("HOME", oldHome.c_str(), 1);
+    if (oldXdgEnv != nullptr)
+    {
+        setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    }
+    else
+    {
+        unsetenv("XDG_CONFIG_HOME");
+    }
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+
+    CHECK(fingerprint() == realBefore);
 }

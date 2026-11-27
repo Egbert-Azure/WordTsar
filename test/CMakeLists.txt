@@ -115,8 +115,8 @@ qt_add_executable(WSTest WIN32 MACOSX_BUNDLE
     # TUI layout utils (pure C++ — no font system deps, no name collisions)
     ${WS_SRC_DIR}/tui/layout/tuifontutils.cpp ${WS_SRC_DIR}/tui/layout/tuifontutils.h
 
-    # Test-only stub (replaces gui/wordtsar.cpp for test builds)
-    ../src/test/wordtsar-stub.cpp
+    # Main window
+    ${WS_SRC_DIR}/gui/wordtsar.cpp ${WS_SRC_DIR}/gui/wordtsar.h
 
     # Header-only third-party (needed for include resolution)
     ../third-party/cpp-unicodelib/unicodelib.h
