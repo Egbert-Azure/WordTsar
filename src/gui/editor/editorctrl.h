@@ -347,18 +347,18 @@ private slots:
 
 public:
     // Input handler (public for testing, uses Strategy Pattern)
-    IInputHandler* mInput;                // Polymorphic keyboard command handler
+    IInputHandler* mInput = nullptr;                // Polymorphic keyboard command handler
 
     std::vector<cFile*> mFileTypes;       // File type handlers (for load/save dialogs)
-    QProgressDialog* mProgress;           // Progress dialog for file I/O operations
+    QProgressDialog* mProgress = nullptr;           // Progress dialog for file I/O operations
 
     // P3: UI Dialog state (for PageLayout, PrintPreview)
-    cLayout* mPrintLayout;               // Layout for printing (temporary, created for print preview)
+    cLayout* mPrintLayout = nullptr;               // Layout for printing (temporary, created for print preview)
     bool mInPrintPreview;                 // Flag: currently in print preview mode
 
     // P1 Cutover: Main window integration
-    cWordTsar* mWordTsar;                 // Reference to main window (for updates, events)
-    cRulerCtrl* mRuler;                   // Reference to ruler control (for sync)
+    cWordTsar* mWordTsar = nullptr;                 // Reference to main window (for updates, events)
+    cRulerCtrl* mRuler = nullptr;                   // Reference to ruler control (for sync)
     bool mFullScreen;                     // Flag: window is in fullscreen mode
 
     // P4 Cutover: Preferences dialog state
@@ -376,9 +376,9 @@ protected:
 
 private:
     // Qt-specific members (platform-specific rendering and UI)
-    QScrollBar* mScrollbar;               // Scrollbar widget (not owned)
-    QTimer* mCaretTimer;                  // Blink timer (caret blinking)
-    QTimer* mAutoSaveTimer;               // Auto-save backup timer
+    QScrollBar* mScrollbar = nullptr;               // Scrollbar widget (not owned)
+    QTimer* mCaretTimer = nullptr;                  // Blink timer (caret blinking)
+    QTimer* mAutoSaveTimer = nullptr;               // Auto-save backup timer
     // Note: Idle layout uses QTimer::singleShot() on-demand, no persistent timer needed
     QRectF mCaretPosQt;                   // Qt rectangle for rendering (synced from base class coords)
     QRectF mLastPaintedCaretPosQt;         // Caret rect as of the last FULL repaint (not a blink-only tick)
