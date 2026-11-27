@@ -395,7 +395,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
         case CTRL_O :
         {
             std::string filename = mEditor->PromptForLoadFile() ;
-            if (!filename.empty())
+            if ((filename.empty() == false) && (mEditor->SaveBeforeReplace() == true))
             {
                 cDocument* doc = mEditor->GetDocument() ;
                 mEditor->SetEnabled(false) ;

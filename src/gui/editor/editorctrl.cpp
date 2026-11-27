@@ -5031,6 +5031,42 @@ bool cEditorCtrl::AskYesNo(const std::string& title, const std::string& question
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  name [in] name of the modified document
+///
+/// @return the answer: Save, Don't Save or Cancel; Cancel under QT_TESTING=1
+///
+/// @brief
+/// "Save changes to NAME first?" with Save the default button; Esc is Cancel.
+///
+/////////////////////////////////////////////////////////////////////////////
+cEditorBase::eSaveChoice cEditorCtrl::AskSaveChanges(const std::string& name)
+{
+    const char* qtTesting = std::getenv("QT_TESTING");
+    if (qtTesting != nullptr && std::strcmp(qtTesting, "1") == 0)
+    {
+        return eSaveChoice::Cancel;
+    }
+
+    QMessageBox box(QMessageBox::Question, "Save File",
+                    QString("Save changes to %1 first?").arg(QString::fromStdString(name)),
+                    QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
+    box.setDefaultButton(QMessageBox::Save);
+    box.setEscapeButton(QMessageBox::Cancel);
+    int result = box.exec();
+    if (result == QMessageBox::Save)
+    {
+        return eSaveChoice::Save;
+    }
+    if (result == QMessageBox::Discard)
+    {
+        return eSaveChoice::DontSave;
+    }
+    return eSaveChoice::Cancel;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  title [in] dialog title
 /// @param  label [in] prompt text
 ///
@@ -7512,7 +7548,7 @@ std::string cEditorCtrl::PromptForWriteBlockFile(bool& asciiFormat, bool asciiLo
 bool cEditorCtrl::Open(void)
 {
     std::string filename = PromptForLoadFile();
-    if (filename.empty())
+    if (filename.empty() || (SaveBeforeReplace() == false))
     {
         return false;
     }

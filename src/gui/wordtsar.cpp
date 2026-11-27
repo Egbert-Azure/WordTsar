@@ -671,7 +671,7 @@ void cWordTsar::RunCommand(const std::function<void()>& handler)
 
 void cWordTsar::LoadFile(QString name)
 {
-    if (KeepOpenNote() == false)
+    if ((KeepOpenNote() == false) || (mEditor->SaveBeforeReplace() == false))
     {
         return ;
     }

@@ -305,7 +305,10 @@ public:
     virtual std::string PromptText(const std::string& title, const std::string& label) = 0;   // Text prompt; empty on cancel
     virtual std::string ChooseFromList(const std::string& title,
                                        const std::vector<std::string>& items) = 0;          // List choice; empty on cancel
-    virtual bool OpenDocument(const std::string& path);       // Replace the document with a file, saving a modified one first
+    virtual bool OpenDocument(const std::string& path);       // Replace the document with a file after SaveBeforeReplace
+    enum class eSaveChoice { Save, DontSave, Cancel };
+    virtual eSaveChoice AskSaveChanges(const std::string& name);   // "Save changes to NAME first?": Save default, Esc Cancel; Cancel here
+    bool SaveBeforeReplace(void);                             // Before a modified document is replaced: false when it stays
 
     // Notes (^ONF, ^ONE): the note text is edited by a second editor on a
     // document of its own, shown by the front end below this editor. Keys

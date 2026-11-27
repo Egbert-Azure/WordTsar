@@ -74,6 +74,7 @@ public:
     void ShowError(const std::string& title, const std::string& message) override;
     void ShowMessage(const std::string& title, const std::string& message) override;
     bool AskYesNo(const std::string& title, const std::string& question) override;
+    eSaveChoice AskSaveChanges(const std::string& name) override;
     std::string PromptText(const std::string& title, const std::string& label) override;
     std::string ChooseFromList(const std::string& title, const std::vector<std::string>& items) override;
     void About(void) override;

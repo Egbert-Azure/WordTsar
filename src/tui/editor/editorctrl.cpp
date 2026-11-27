@@ -2002,6 +2002,38 @@ bool cWSEditorCtrl::AskYesNo(const std::string& title, const std::string& questi
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  name [in] name of the modified document
+///
+/// @return the answer: Save, Don't Save or Cancel; Cancel without a dialog
+///         host
+///
+/// @brief
+/// "Save changes to NAME first?" with Save focused; Esc is Cancel.
+///
+/////////////////////////////////////////////////////////////////////////////
+cEditorBase::eSaveChoice cWSEditorCtrl::AskSaveChanges(const std::string& name)
+{
+    if (!mHost)
+    {
+        return eSaveChoice::Cancel;
+    }
+
+    int choice = wsdialogs::ThreeChoice(mHost, "Save File", "Save changes to " + name + " first?",
+                                        "Save", "Don't Save", "Cancel");
+    if (choice == 0)
+    {
+        return eSaveChoice::Save;
+    }
+    if (choice == 1)
+    {
+        return eSaveChoice::DontSave;
+    }
+    return eSaveChoice::Cancel;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  title [in] dialog title
 /// @param  label [in] prompt text
 ///

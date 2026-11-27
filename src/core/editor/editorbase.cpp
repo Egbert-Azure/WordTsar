@@ -1214,41 +1214,82 @@ void cEditorBase::MacroDelete(void)
 /// @return true if the file was loaded
 ///
 /// @brief
-/// Replaces the document with a file. A modified document is saved first
-/// (Save As when CurrentSavePath() is empty); No or a failed save leaves the document
-/// open and loads nothing.
+/// Replaces the document with a file. A modified document is first saved
+/// or not as SaveBeforeReplace() asks; when it stays, nothing is loaded.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::OpenDocument(const std::string& path)
 {
-    if ((mDocument != nullptr) && (mDocument->IsModified() == true))
+    if (SaveBeforeReplace() == false)
     {
-        std::string name = (mFileSet == true) ? mFileName : std::string("the document") ;
-        std::string file = std::filesystem::path(path).filename().string() ;
-        if (AskYesNo("Open", "Save " + name + " and open " + file + "?") == false)
-        {
-            return false ;
-        }
+        return false ;
+    }
+    return LoadFile(path) ;
+}
 
-        std::string savePath = CurrentSavePath() ;
-        if (savePath.empty() == true)
-        {
-            savePath = PromptForSaveFile() ;
-            if (savePath.empty() == true)
-            {
-                return false ;
-            }
-        }
 
-        if (SaveFile(savePath) == false)
-        {
-            ShowError("Error", "Cannot save " + savePath) ;
-            return false ;
-        }
-        MarkDocumentSaved() ;
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  name [in] name of the modified document
+///
+/// @return the answer to "Save changes to NAME first?"; Cancel here
+///
+/////////////////////////////////////////////////////////////////////////////
+cEditorBase::eSaveChoice cEditorBase::AskSaveChanges(const std::string& /*name*/)
+{
+    return eSaveChoice::Cancel ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return true when the document may be replaced: unmodified, Don't Save,
+///         or saved; false on Cancel, a cancelled Save As or a failed save
+///
+/// @brief
+/// Asks AskSaveChanges() before a modified document is replaced. Save
+/// writes CurrentSavePath(), or the file Save As names when it is empty;
+/// SaveFile() reports a failed save. A note editor's document is never
+/// replaced.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cEditorBase::SaveBeforeReplace(void)
+{
+    if (mNoteOwner != nullptr)
+    {
+        return false ;
+    }
+    if ((mDocument == nullptr) || (mDocument->IsModified() == false))
+    {
+        return true ;
     }
 
-    return LoadFile(path) ;
+    eSaveChoice answer = AskSaveChanges(mFileName) ;
+    if (answer == eSaveChoice::Cancel)
+    {
+        return false ;
+    }
+    if (answer == eSaveChoice::DontSave)
+    {
+        return true ;
+    }
+
+    std::string path = CurrentSavePath() ;
+    if (path.empty() == true)
+    {
+        path = PromptForSaveFile() ;
+        if (path.empty() == true)
+        {
+            return false ;
+        }
+    }
+
+    if (SaveFile(path) == false)
+    {
+        return false ;
+    }
+    MarkDocumentSaved() ;
+    return true ;
 }
 
 

@@ -18502,3 +18502,87 @@ TEST_CASE("Main window - a menu command during background layout leaves no parag
 
     CHECK(fingerprint() == realBefore);
 }
+
+
+TEST_CASE("Main window - opening another file with unsaved changes and Cancel keeps the document")
+{
+    ensureQApplication();
+
+    const char* realHome = std::getenv("WORDTSAR_TEST_REAL_HOME");
+    REQUIRE(realHome != nullptr);
+    const std::filesystem::path realConfig =
+        std::filesystem::path(realHome) / "Library/Application Support/WordTsar/config.ini";
+    auto fingerprint = [&realConfig]()
+    {
+        std::error_code ec;
+        if (!std::filesystem::exists(realConfig, ec))
+        {
+            return std::string("missing");
+        }
+        QFile file(QString::fromStdString(realConfig.string()));
+        REQUIRE(file.open(QIODevice::ReadOnly));
+        QByteArray sha = QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha1).toHex();
+        long long mtime = static_cast<long long>(std::filesystem::last_write_time(realConfig).time_since_epoch().count());
+        return sha.toStdString() + " " + std::to_string(mtime);
+    };
+    const std::string realBefore = fingerprint();
+
+    std::string dir = (std::filesystem::temp_directory_path() / "wordtsar-openunsaved-XXXXXX").string();
+    REQUIRE(mkdtemp(dir.data()) != nullptr);
+    const std::string oldHome = std::getenv("HOME");
+    const char* oldXdgEnv = std::getenv("XDG_CONFIG_HOME");
+    const std::string oldXdg = oldXdgEnv != nullptr ? oldXdgEnv : "";
+    setenv("HOME", dir.c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (dir + "/.config").c_str(), 1);
+    REQUIRE(cConfig::GetConfigFilePath().find(dir) == 0);
+
+    const std::string other = dir + "/other.txt";
+    {
+        std::ofstream out(other, std::ios::binary);
+        out << "Text of the other file\n";
+    }
+
+    static char name[] = "WordTsar";
+    static char* args[] = {name, nullptr};
+    auto* window = new cWordTsar(1, args);
+    CHECK_FALSE(window->isVisible());
+
+    cEditorCtrl* editor = window->GetEditorCtrl();
+    cDocument* doc = editor->GetDocument();
+    doc->Insert("Unsaved work\r");
+    editor->LayoutDocument(true);
+    REQUIRE(doc->IsModified());
+    const std::string text = WholePlainText(doc);
+    const POSITION_T position = doc->GetPosition();
+    const std::string fileName = editor->mFileName;
+    const std::string fileDir = editor->mFileDir;
+    const bool fileSet = editor->mFileSet;
+    const QString title = window->windowTitle();
+
+    // Recent Files and a Finder open; the question answers Cancel under QT_TESTING=1
+    window->LoadFile(QString::fromStdString(other));
+
+    CHECK(WholePlainText(doc) == text);
+    CHECK(doc->IsModified());
+    CHECK(doc->GetPosition() == position);
+    CHECK(editor->mFileName == fileName);
+    CHECK(editor->mFileDir == fileDir);
+    CHECK(editor->mFileSet == fileSet);
+    CHECK(window->windowTitle() == title);
+
+    delete window;
+
+    setenv("HOME", oldHome.c_str(), 1);
+    if (oldXdgEnv != nullptr)
+    {
+        setenv("XDG_CONFIG_HOME", oldXdg.c_str(), 1);
+    }
+    else
+    {
+        unsetenv("XDG_CONFIG_HOME");
+    }
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+
+    CHECK(fingerprint() == realBefore);
+}

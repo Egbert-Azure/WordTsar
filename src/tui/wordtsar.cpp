@@ -1317,7 +1317,7 @@ void cWSWordTsar::OpenRecentFiles(void)
     int selected = listPtr->GetSelectedIndex();
     if ((selected >= 0) && (selected < static_cast<int>(files.size())))
     {
-        if (KeepOpenNote() == false)
+        if ((KeepOpenNote() == false) || (mEditor->SaveBeforeReplace() == false))
         {
             return;
         }
@@ -1345,7 +1345,7 @@ void cWSWordTsar::OpenFile(void)
     std::string filename = mEditor->PromptForLoadFile();
     if (!filename.empty())
     {
-        if (KeepOpenNote() == false)
+        if ((KeepOpenNote() == false) || (mEditor->SaveBeforeReplace() == false))
         {
             return;
         }
@@ -3909,6 +3909,13 @@ void cWSWordTsar::HandleOpeningClick(const sInputEvent& event)
 void cWSWordTsar::OpenOpeningSelection(void)
 {
     mOpeningListActive = false;
+    if (mEditor->SaveBeforeReplace() == false)
+    {
+        mOpeningWantPrint = false;
+        mOpeningWantTOC = false;
+        mOpeningWantIndex = false;
+        return;
+    }
     mFilename = mBrowser.GetSelectedFile();
     mEditor->SetStatusMessage("", false, 0);
     mEditor->LoadFile(mFilename);
