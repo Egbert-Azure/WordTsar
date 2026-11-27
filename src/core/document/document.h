@@ -73,6 +73,22 @@ bool RawByteCompare(const RawBytePair &first, const RawBytePair &second) ;
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @struct sPageLayoutField
+///
+/// @brief
+/// One measurement field of the page layout dialog: its dot command, the
+/// text it showed when the dialog opened and the text it holds on OK.
+///
+/////////////////////////////////////////////////////////////////////////////
+struct sPageLayoutField
+{
+    std::string command ;       // e.g. ".mt"
+    std::string shown ;
+    std::string entered ;
+} ;
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @struct sRawSequence
 ///
 /// @brief
@@ -405,6 +421,10 @@ public:
     double EvaluateExpression(const std::string &text, bool &incdec, bool &hasUnits) ;
     bool EvaluateMeasurement(const std::string &text, double defaultTwips, double &twips,
                              bool &incdec, bool *hasUnits = nullptr) ;
+    static std::string FormatPageLayoutValue(double twips, eMeasurement unit) ;
+    std::vector<std::string> PageLayoutLines(const std::vector<sPageLayoutField> &fields,
+                                             bool landscapeShown, bool landscapeChosen,
+                                             eMeasurement unit) ;
 
     // --- Display Control ---
     void SetShowControl(eShowControl show) ;

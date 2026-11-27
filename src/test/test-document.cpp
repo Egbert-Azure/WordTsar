@@ -6495,6 +6495,29 @@ TEST_CASE("Measurement System")
     }
 }
 
+TEST_CASE("Page layout writes only the changed settings")
+{
+    cDocument document;
+
+    std::vector<sPageLayoutField> fields = {
+        {".mt", "25.40mm", "25.40mm"},
+        {".mb", "25.40mm", "25.40mm"},
+        {".hm", "12.70mm", "12.70mm"},
+    };
+
+    CHECK(document.PageLayoutLines(fields, false, false, MSR_MILLIMETERS).empty());
+
+    fields[0].entered = "30";
+    std::vector<std::string> lines = document.PageLayoutLines(fields, false, false, MSR_MILLIMETERS);
+    REQUIRE(lines.size() == 1);
+    CHECK(lines[0] == ".mt 30.00mm");
+
+    fields[0].entered = fields[0].shown;
+    lines = document.PageLayoutLines(fields, false, true, MSR_MILLIMETERS);
+    REQUIRE(lines.size() == 1);
+    CHECK(lines[0] == ".pr or=l");
+}
+
 // =====================================================================
 // COMPREHENSIVE TEST COVERAGE - PHASE 4: BOUNDARY CONDITIONS & STRESS TESTING
 // =====================================================================

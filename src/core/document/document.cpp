@@ -3132,6 +3132,94 @@ bool cDocument::EvaluateMeasurement(const std::string &text, double defaultTwips
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  twips [in] - measurement in twips
+/// @param  unit  [in] - unit to show it in
+///
+/// @return std::string - value with two decimals and the unit: 1.00",
+///         25.40mm or 2.54cm
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cDocument::FormatPageLayoutValue(double twips, eMeasurement unit)
+{
+    double divisor = TWIPSPERINCH ;
+    const char *suffix = "\"" ;
+
+    if (unit == MSR_MILLIMETERS)
+    {
+        divisor = TWIPSPERMM ;
+        suffix = "mm" ;
+    }
+    else if (unit == MSR_CENTIMETERS)
+    {
+        divisor = TWIPSPERCM ;
+        suffix = "cm" ;
+    }
+
+    char buffer[48] ;
+    snprintf(buffer, sizeof(buffer), "%.2f%s", twips / divisor, suffix) ;
+    return std::string(buffer) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  fields          [in] - measurement fields in the order to write
+/// @param  landscapeShown  [in] - orientation shown when the dialog opened
+/// @param  landscapeChosen [in] - orientation chosen on OK
+/// @param  unit            [in] - unit for numbers typed without one
+///
+/// @return std::vector<std::string> - dot command lines, without line ends
+///
+/// @brief
+/// Page layout dot commands for the fields whose text changed, then
+/// .pr or=l or .pr or=p when the orientation changed. A field whose text
+/// is not a measurement gives no line.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::vector<std::string> cDocument::PageLayoutLines(const std::vector<sPageLayoutField> &fields,
+                                                    bool landscapeShown, bool landscapeChosen,
+                                                    eMeasurement unit)
+{
+    std::vector<std::string> lines ;
+
+    double defaultTwips = TWIPSPERINCH ;
+    if (unit == MSR_MILLIMETERS)
+    {
+        defaultTwips = TWIPSPERMM ;
+    }
+    else if (unit == MSR_CENTIMETERS)
+    {
+        defaultTwips = TWIPSPERCM ;
+    }
+
+    for (const sPageLayoutField &field : fields)
+    {
+        if (field.entered == field.shown)
+        {
+            continue ;
+        }
+
+        double twips = 0.0 ;
+        bool incdec = false ;
+        if (!EvaluateMeasurement(field.entered, defaultTwips, twips, incdec))
+        {
+            continue ;
+        }
+
+        lines.push_back(field.command + " " + FormatPageLayoutValue(twips, unit)) ;
+    }
+
+    if (landscapeChosen != landscapeShown)
+    {
+        lines.push_back(landscapeChosen ? ".pr or=l" : ".pr or=p") ;
+    }
+
+    return lines ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param   show          [in] - eSHowCOntrol type
 ///
 /// @return  nothing
