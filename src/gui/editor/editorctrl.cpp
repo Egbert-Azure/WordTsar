@@ -6290,9 +6290,6 @@ void cEditorCtrl::PageLayout(void)
     Ui::PageLayout pagelayout;
     pagelayout.setupUi(&dialog);
 
-    double value;
-    QString text;
-
     // Populate page size combo list
     for (int loop = 1; loop < 200; loop++)
     {
@@ -6323,346 +6320,88 @@ void cEditorCtrl::PageLayout(void)
 
     pagelayout.mPaperSize->setCurrentIndex(mPaperId - 1);
 
-    // @TODO page orientation set
-    pagelayout.mOrientation->setEnabled(false);
-
-    // API UPDATE: mLayout becomes GetLayout()
     cLayoutBase* layout = GetLayout();
+    cDocument* doc = GetDocument();
 
-    // BLACK BOX API: Use getters instead of direct member access
-    value = layout->GetPageOffsetOdd();
-    switch (mMeasure)
+    // Orientation in effect at the start of the cursor's paragraph: the last
+    // .pr or= before it, portrait when there is none.
+    PARAGRAPH_T cursorPara = doc->GetParagraphFromPosition(doc->GetPosition());
+    bool landscapeShown = false;
+    for (PARAGRAPH_T para = 0; para < cursorPara; para++)
     {
-        case MSR_INCHES:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERINCH).c_str();
-            break;
+        const sParagraphLayout* paraLayout = layout->GetParagraphLayout(para);
+        if (paraLayout != nullptr && !paraLayout->isCommand)
+        {
+            continue;
+        }
 
-        case MSR_MILLIMETERS:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERMM).c_str();
-            break;
-
-        default:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERCM).c_str();
-            break;
+        std::string text = doc->GetParagraphText(para);
+        if (text.length() < 3 || text[0] != '.' || toupper(text[1]) != 'P' || toupper(text[2]) != 'R')
+        {
+            continue;
+        }
+        for (char& ch : text)
+        {
+            ch = static_cast<char>(toupper(static_cast<unsigned char>(ch)));
+        }
+        if (text.find("OR=L") != std::string::npos)
+        {
+            landscapeShown = true;
+        }
+        else if (text.find("OR=P") != std::string::npos)
+        {
+            landscapeShown = false;
+        }
     }
-    pagelayout.mOddPageOffset->setText(text);
+    pagelayout.mLandscape->setChecked(landscapeShown);
+    pagelayout.mPortrait->setChecked(!landscapeShown);
 
-    value = layout->GetPageOffsetEven();
-    switch (mMeasure)
+    std::vector<sPageLayoutField> fields = {
+        {".poo", "", ""},
+        {".poe", "", ""},
+        {".mt", "", ""},
+        {".mb", "", ""},
+        {".rm", "", ""},
+        {".hm", "", ""},
+        {".fm", "", ""},
+    };
+    std::vector<QLineEdit*> edits = {
+        pagelayout.mOddPageOffset, pagelayout.mEvenPageOffset, pagelayout.mTopMargin,
+        pagelayout.mBottomMargin, pagelayout.mRightMargin, pagelayout.mHeader, pagelayout.mFooter,
+    };
+    std::vector<COORD_T> twips = {
+        layout->GetPageOffsetOdd(), layout->GetPageOffsetEven(), layout->GetTopMargin(),
+        layout->GetBottomMargin(), layout->GetRightMargin(), layout->GetHeaderMargin(),
+        layout->GetFooterMargin(),
+    };
+    for (size_t index = 0; index < fields.size(); index++)
     {
-        case MSR_INCHES:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERINCH).c_str();
-            break;
-
-        case MSR_MILLIMETERS:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERMM).c_str();
-            break;
-
-        default:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERCM).c_str();
-            break;
+        fields[index].shown = cDocument::FormatPageLayoutValue(twips[index], mMeasure);
+        edits[index]->setText(QString::fromStdString(fields[index].shown));
     }
-    pagelayout.mEvenPageOffset->setText(text);
 
-    value = layout->GetTopMargin();
-    switch (mMeasure)
+    if (dialog.exec() == QDialog::Accepted)
     {
-        case MSR_INCHES:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERINCH).c_str();
-            break;
-
-        case MSR_MILLIMETERS:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERMM).c_str();
-            break;
-
-        default:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERCM).c_str();
-            break;
-    }
-    pagelayout.mTopMargin->setText(text);
-
-    value = layout->GetBottomMargin();
-    switch (mMeasure)
-    {
-        case MSR_INCHES:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERINCH).c_str();
-            break;
-
-        case MSR_MILLIMETERS:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERMM).c_str();
-            break;
-
-        default:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERCM).c_str();
-            break;
-    }
-    pagelayout.mBottomMargin->setText(text);
-
-    value = layout->GetRightMargin();
-    switch (mMeasure)
-    {
-        case MSR_INCHES:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERINCH).c_str();
-            break;
-
-        case MSR_MILLIMETERS:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERMM).c_str();
-            break;
-
-        default:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERCM).c_str();
-            break;
-    }
-    pagelayout.mRightMargin->setText(text);
-
-    value = layout->GetHeaderMargin();
-    switch (mMeasure)
-    {
-        case MSR_INCHES:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERINCH).c_str();
-            break;
-
-        case MSR_MILLIMETERS:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERMM).c_str();
-            break;
-
-        default:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERCM).c_str();
-            break;
-    }
-    pagelayout.mHeader->setText(text);
-
-    value = layout->GetFooterMargin();
-    switch (mMeasure)
-    {
-        case MSR_INCHES:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERINCH).c_str();
-            break;
-
-        case MSR_MILLIMETERS:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERMM).c_str();
-            break;
-
-        default:
-            text = string_sprintf("%0.2f\"", value / TWIPSPERCM).c_str();
-            break;
-    }
-    pagelayout.mFooter->setText(text);
-
-
-    int ecode = dialog.exec();
-
-
-    if (ecode != 0)
-    {
-        // API UPDATE: mDocument becomes GetDocument()
-        cDocument* doc = GetDocument();
-
-        // Insert anything we need at the beginning of our current paragraph
-        PARAGRAPH_T para = doc->GetParagraphFromPosition(doc->GetPosition());
-        POSITION_T start, end;
-        doc->GetParagraphStartandEnd(para, start, end);
-        doc->SetPosition(start);
-
-        int newtype = pagelayout.mPaperSize->currentIndex();
-        int newpaper = pagelayout.mPaperSize->currentData().toInt();
-        if (newtype != mPaperId)
+        for (size_t index = 0; index < fields.size(); index++)
         {
-            mPaperId = static_cast<QPageSize::PageSizeId>(newpaper);
-
-            QString t = string_sprintf(".pt %d (%s)", newpaper, pagelayout.mPaperSize->currentText().toUtf8().constData()).c_str();
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
+            fields[index].entered = edits[index]->text().toStdString();
         }
 
-        bool incdec;
-        QString str = pagelayout.mOddPageOffset->text();
-        double num = doc->GetValue(str.toStdString(), incdec);
-        char type = doc->GetType(str.toStdString());
-        value = doc->ConvertToTwips(num, type);
-        if (!CoordsEqual(value, layout->GetPageOffsetOdd()))
+        std::vector<std::string> lines = doc->PageLayoutLines(fields, landscapeShown,
+                                                              pagelayout.mLandscape->isChecked(), mMeasure);
+
+        if (!lines.empty())
         {
-            QString t;
-            switch (mMeasure)
+            // Insert at the beginning of the cursor's paragraph
+            POSITION_T start, end;
+            doc->GetParagraphStartandEnd(cursorPara, start, end);
+            doc->SetPosition(start);
+
+            for (const std::string& line : lines)
             {
-                case MSR_INCHES:
-                    t = string_sprintf(".poo %0.2f\"", value / TWIPSPERINCH).c_str();
-                    break;
-
-                case MSR_MILLIMETERS:
-                    t = string_sprintf(".poo %0.2fmm", value / TWIPSPERMM).c_str();
-                    break;
-
-                default:
-                    t = string_sprintf(".poo %0.2fcm", value / TWIPSPERCM).c_str();
-                    break;
+                doc->Insert(line);
+                doc->Insert(HARD_RETURN);
             }
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
-        }
-
-        str = pagelayout.mEvenPageOffset->text();
-        num = doc->GetValue(str.toStdString(), incdec);
-        type = doc->GetType(str.toStdString());
-        value = doc->ConvertToTwips(num, type);
-        if (!CoordsEqual(value, layout->GetPageOffsetEven()))
-        {
-            QString t;
-            switch (mMeasure)
-            {
-                case MSR_INCHES:
-                    t = string_sprintf(".poe %0.2f\"", value / TWIPSPERINCH).c_str();
-                    break;
-
-                case MSR_MILLIMETERS:
-                    t = string_sprintf(".poe %0.2fmm", value / TWIPSPERMM).c_str();
-                    break;
-
-                default:
-                    t = string_sprintf(".poe %0.2fcm", value / TWIPSPERCM).c_str();
-                    break;
-            }
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
-        }
-
-        str = pagelayout.mTopMargin->text();
-        num = doc->GetValue(str.toStdString(), incdec);
-        type = doc->GetType(str.toStdString());
-        value = doc->ConvertToTwips(num, type);
-        if (!CoordsEqual(value, layout->GetTopMargin()))
-        {
-            QString t;
-            switch (mMeasure)
-            {
-                case MSR_INCHES:
-                    t = string_sprintf(".mt %0.2f\"", value / TWIPSPERINCH).c_str();
-                    break;
-
-                case MSR_MILLIMETERS:
-                    t = string_sprintf(".mt %0.2fmm", value / TWIPSPERMM).c_str();
-                    break;
-
-                default:
-                    t = string_sprintf(".mt %0.2fcm", value / TWIPSPERCM).c_str();
-                    break;
-            }
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
-        }
-
-        str = pagelayout.mBottomMargin->text();
-        num = doc->GetValue(str.toStdString(), incdec);
-        type = doc->GetType(str.toStdString());
-        value = doc->ConvertToTwips(num, type);
-        if (!CoordsEqual(value, layout->GetBottomMargin()))
-        {
-            QString t;
-            switch (mMeasure)
-            {
-                case MSR_INCHES:
-                    t = string_sprintf(".mb %0.2f\"", value / TWIPSPERINCH).c_str();
-                    break;
-
-                case MSR_MILLIMETERS:
-                    t = string_sprintf(".mb %0.2fmm", value / TWIPSPERMM).c_str();
-                    break;
-
-                default:
-                    t = string_sprintf(".mb %0.2fcm", value / TWIPSPERCM).c_str();
-                    break;
-            }
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
-        }
-
-        str = pagelayout.mRightMargin->text();
-        num = doc->GetValue(str.toStdString(), incdec);
-        type = doc->GetType(str.toStdString());
-        value = doc->ConvertToTwips(num, type);
-        if (!CoordsEqual(value, layout->GetRightMargin()))
-        {
-            QString t;
-            switch (mMeasure)
-            {
-                case MSR_INCHES:
-                    t = string_sprintf(".rm %0.2f\"", value / TWIPSPERINCH).c_str();
-                    break;
-
-                case MSR_MILLIMETERS:
-                    t = string_sprintf(".rm %0.2fmm", value / TWIPSPERMM).c_str();
-                    break;
-
-                default:
-                    t = string_sprintf(".rm %0.2fcm", value / TWIPSPERCM).c_str();
-                    break;
-            }
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
-        }
-
-        str = pagelayout.mHeader->text();
-        num = doc->GetValue(str.toStdString(), incdec);
-        type = doc->GetType(str.toStdString());
-        value = doc->ConvertToTwips(num, type);
-        if (!CoordsEqual(value, layout->GetHeaderMargin()))
-        {
-            QString t;
-            switch (mMeasure)
-            {
-                case MSR_INCHES:
-                    t = string_sprintf(".hm %0.2f\"", value / TWIPSPERINCH).c_str();
-                    break;
-
-                case MSR_MILLIMETERS:
-                    t = string_sprintf(".hm %0.2fmm", value / TWIPSPERMM).c_str();
-                    break;
-
-                default:
-                    t = string_sprintf(".hm %0.2fcm", value / TWIPSPERCM).c_str();
-                    break;
-            }
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
-        }
-
-        str = pagelayout.mFooter->text();
-        num = doc->GetValue(str.toStdString(), incdec);
-        type = doc->GetType(str.toStdString());
-        value = doc->ConvertToTwips(num, type);
-        if (!CoordsEqual(value, layout->GetFooterMargin()))
-        {
-            QString t;
-            switch (mMeasure)
-            {
-                case MSR_INCHES:
-                    t = string_sprintf(".fm %0.2f\"", value / TWIPSPERINCH).c_str();
-                    break;
-
-                case MSR_MILLIMETERS:
-                    t = string_sprintf(".fm %0.2fmm", value / TWIPSPERMM).c_str();
-                    break;
-
-                default:
-                    t = string_sprintf(".fm %0.2fcm", value / TWIPSPERCM).c_str();
-                    break;
-            }
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
-        }
-
-        QString t;
-        if (pagelayout.mLandscape->isChecked())
-        {
-            t = ".pr or=p";
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
-        }
-        else
-        {
-            t = ".pr or=l";
-            doc->Insert(t.toUtf8().constData());
-            doc->Insert(HARD_RETURN);
         }
     }
 }
