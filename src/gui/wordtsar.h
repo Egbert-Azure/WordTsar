@@ -98,6 +98,8 @@ private :
     cEditorCtrl *Active(void) ;                 // editor menus act on
     cWordStarInput *MenuInput(void) ;           // menu input handler of Active()
     bool KeepOpenNote(void) ;                   // write an open note into the document; false if it stays open
+    void OpenDeferredFile(void) ;               // the file LoadFile() held back, once no dialog shows
+    void LoadFileNow(const QString& name) ;     // load a file and set up reveal codes for it
     void RunCommand(const std::function<void()>& handler) ;   // menu command or status bar click, bracketed as a key
     void ApplyHelpColors(const QColor& helpBg, const QColor& helpFg, const QColor& keyColor, const QColor& keyBgColor) ;
 
@@ -389,6 +391,9 @@ private:
 
     // File loading
     QString mLoadFileName ;
+    QString mDeferredOpen ;                     // file LoadFile() held back while a dialog showed
+    bool mDeferredOpenScheduled = false ;       // OpenDeferredFile() is due
+    bool mOpenBusy = false ;                    // LoadFile() is running
 
     // Help timer
     QDeadlineTimer mHelpTimer ;

@@ -669,12 +669,67 @@ void cWordTsar::RunCommand(const std::function<void()>& handler)
 
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  name [in] file to open
+///
+/// @brief
+/// Replaces the document with a file after KeepOpenNote() and
+/// SaveBeforeReplace(). A request that arrives while a dialog shows or an
+/// open runs waits until neither is the case; of several, the last opens.
+///
+/////////////////////////////////////////////////////////////////////////////
 void cWordTsar::LoadFile(QString name)
 {
-    if ((KeepOpenNote() == false) || (mEditor->SaveBeforeReplace() == false))
+    if ((mOpenBusy == true) || (QApplication::activeModalWidget() != nullptr))
+    {
+        mDeferredOpen = name ;
+        if (mDeferredOpenScheduled == false)
+        {
+            mDeferredOpenScheduled = true ;
+            QTimer::singleShot(100, this, &cWordTsar::OpenDeferredFile) ;
+        }
+        return ;
+    }
+
+    mOpenBusy = true ;
+    if ((KeepOpenNote() == true) && (mEditor->SaveBeforeReplace() == true))
+    {
+        LoadFileNow(name) ;
+    }
+    mOpenBusy = false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// Opens the file that waited in LoadFile(), or waits again.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordTsar::OpenDeferredFile(void)
+{
+    mDeferredOpenScheduled = false ;
+    if (mDeferredOpen.isEmpty() == true)
     {
         return ;
     }
+    QString name = mDeferredOpen ;
+    mDeferredOpen.clear() ;
+    LoadFile(name) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  name [in] file to open
+///
+/// @brief
+/// Loads the file and sets up the reveal codes pane for it.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordTsar::LoadFileNow(const QString& name)
+{
     mLoadFileName = name ;
     if (mEditor->LoadFile(name.toStdString()))
     {
