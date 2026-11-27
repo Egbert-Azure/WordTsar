@@ -579,9 +579,11 @@ void cEditorBase::PerformPostCommandUpdate(void)
 /// Called before the text is drawn. If a paragraph on screen, or the one
 /// just above or below it, has a layout made before the last change to the
 /// text, lays out from the first such paragraph through the paragraph below
-/// the window bottom, then recalculates the caret. Restarts idle layout
-/// after that range if idle layout has stopped. Does nothing during a full
-/// layout or loading, or when every paragraph on screen is current.
+/// the window bottom, then recalculates the caret. Idle layout then runs to
+/// the end of the document without stopping early, from its own position or
+/// from after that range, whichever comes first; it is started if it has
+/// stopped. Does nothing during a full layout or loading, or when every
+/// paragraph on screen is current.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::LayoutOutdatedParagraphsOnScreen(void)
@@ -633,15 +635,13 @@ bool cEditorBase::LayoutOutdatedParagraphsOnScreen(void)
         to = std::min(last + 1, totalParas - 1) ;
     }
 
+    // Idle layout goes on to the end of the document without stopping
+    // early, from where it is or from after this range if that comes first
+    mLayoutParagraph = std::min(mLayoutParagraph, laidOut + 1) ;
+    mLayoutInt = false ;
+    mLayoutRest = true ;
     if (!IsIdleLayoutRunning())
     {
-        if (mDocumentDirty && mDirtyFromParagraph >= outdated && mDirtyFromParagraph <= laidOut)
-        {
-            mDirtyFromParagraph = laidOut + 1 ;
-        }
-        mLayoutParagraph = laidOut + 1 ;
-        mLayoutInt = false ;
-        mLayoutRest = false ;
         TriggerIdleLayout() ;
     }
 

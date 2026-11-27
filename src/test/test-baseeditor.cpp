@@ -3174,6 +3174,100 @@ TEST_CASE("Paragraphs on screen are laid out again when the text changed without
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @brief
+/// After an edit, while idle layout runs, LayoutOutdatedParagraphsOnScreen()
+/// lays out the window where idle layout continues: once idle layout has
+/// finished, every paragraph, also below the window, has the lines of a full
+/// layout.
+///
+/////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Idle layout finishes the document after paragraphs on screen were laid out ahead of it")
+{
+    ensureQApplication();
+
+    cEditorCtrl editor;
+    cDocument* doc = editor.GetDocument();
+    cLayout* layout = dynamic_cast<cLayout*>(editor.GetLayout());
+
+    for (int i = 0; i < 80; i++)
+    {
+        doc->Insert("Long paragraph text that wraps over more than one line "
+                    "in a narrow window, with enough words to wrap twice.\r");
+    }
+    editor.resize(400, 300);
+    editor.SetShowControls(SHOW_NONE);
+    editor.SetDisplayMode(DISPLAY_CONTINUOUS);
+    layout->LayoutDocument(doc);
+    editor.SetScrollOffset(0);
+
+    // paragraph 2 one line longer, laid out by the post-command update
+    PARAGRAPH_T changedPara = 2;
+    size_t oldLines = layout->GetParagraphLayout(changedPara)->lines.size();
+    POSITION_T start = 0;
+    POSITION_T end = 0;
+    doc->GetParagraphStartandEnd(changedPara, start, end);
+    doc->SetPosition(start);
+    doc->Insert("Words for one more line. ");
+    editor.PerformPostCommandUpdate();
+    REQUIRE(layout->GetParagraphLayout(changedPara)->lines.size() == oldLines + 1);
+
+    // the first paragraph after the post-command update's range, where
+    // idle layout continues
+    PARAGRAPH_T total = doc->GetNumberofParagraphs();
+    PARAGRAPH_T idleStart = changedPara + 1;
+    while (idleStart < total
+           && layout->GetParagraphLayout(idleStart)->changeCount == doc->GetChangeCount())
+    {
+        idleStart++;
+    }
+    REQUIRE(idleStart + 20 < total);
+
+    // idle layout running: one step lays out idleStart
+    REQUIRE(QMetaObject::invokeMethod(&editor, "OnIdle", Qt::DirectConnection));
+    REQUIRE(layout->GetParagraphLayout(idleStart)->changeCount == doc->GetChangeCount());
+
+    // the window scrolled to the next paragraph, laid out before idle layout
+    // gets there
+    editor.SetScrollOffset(layout->GetParagraphLayout(idleStart + 1)->lines.front().screeny);
+    REQUIRE(editor.LayoutOutdatedParagraphsOnScreen());
+
+    int passes = 0;
+    while (editor.IdleLayout() && passes < 100000)
+    {
+        passes++;
+    }
+
+    std::vector<std::vector<sLineLayout>> incremental;
+    for (PARAGRAPH_T para = 0; para < total; para++)
+    {
+        const sParagraphLayout* p = layout->GetParagraphLayout(para);
+        incremental.push_back(p ? p->lines : std::vector<sLineLayout>());
+    }
+
+    layout->LayoutDocument(doc);
+
+    int wrong = 0;
+    for (PARAGRAPH_T para = 0; para < total; para++)
+    {
+        const std::vector<sLineLayout>& full = layout->GetParagraphLayout(para)->lines;
+        const std::vector<sLineLayout>& inc = incremental[para];
+        bool same = inc.size() == full.size();
+        for (size_t i = 0; same && i < full.size(); i++)
+        {
+            same = inc[i].screeny == full[i].screeny && inc[i].linestart == full[i].linestart;
+        }
+        if (!same && wrong++ == 0)
+        {
+            CAPTURE(para);
+            CHECK(same);
+        }
+    }
+    CHECK(wrong == 0);
+}
+
+
 namespace
 {
 
