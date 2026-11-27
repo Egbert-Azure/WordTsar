@@ -89,6 +89,7 @@
 #include <math.h>
 #include <string.h>
 #include <cstdio>
+#include <cstdlib>
 
 #include <string>
 #include <algorithm>
@@ -3163,6 +3164,133 @@ std::string cDocument::FormatPageLayoutValue(double twips, eMeasurement unit)
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  text         [in]  - field text
+/// @param  defaultTwips [in]  - twips per unit for a number without a unit
+/// @param  twips        [out] - size of the number in twips, without sign
+/// @param  sign         [out] - '+' or '-' when the text starts with one,
+///                              else 0
+///
+/// @return bool - true if the text is one measurement
+///
+/// @brief
+/// One measurement: optional + or -, one number of digits with at most
+/// one decimal point, then an optional unit (see UnitToTwips). Spaces may
+/// surround the text and come before the unit.
+///
+/////////////////////////////////////////////////////////////////////////////
+bool cDocument::ParsePageLayoutMeasurement(const std::string &text, double defaultTwips,
+                                           double &twips, char &sign)
+{
+    twips = 0.0 ;
+    sign = 0 ;
+
+    size_t i = 0 ;
+    size_t len = text.length() ;
+    auto skipSpaces = [&]()
+    {
+        while (i < len && (text[i] == ' ' || text[i] == '\t'))
+        {
+            i++ ;
+        }
+    } ;
+
+    skipSpaces() ;
+    if (i < len && (text[i] == '+' || text[i] == '-'))
+    {
+        sign = text[i] ;
+        i++ ;
+    }
+
+    size_t numStart = i ;
+    bool digit = false ;
+    bool point = false ;
+    while (i < len)
+    {
+        if (isdigit(static_cast<unsigned char>(text[i])))
+        {
+            digit = true ;
+        }
+        else if (text[i] == '.' && !point)
+        {
+            point = true ;
+        }
+        else
+        {
+            break ;
+        }
+        i++ ;
+    }
+    if (!digit)
+    {
+        sign = 0 ;
+        return false ;
+    }
+    double value = std::strtod(text.substr(numStart, i - numStart).c_str(), nullptr) ;
+
+    skipSpaces() ;
+    size_t unitStart = i ;
+    if (i < len && text[i] == '"')
+    {
+        i++ ;
+    }
+    else
+    {
+        while (i < len && isalpha(static_cast<unsigned char>(text[i])))
+        {
+            i++ ;
+        }
+    }
+
+    double unitTwips = defaultTwips ;
+    if (i > unitStart && !UnitToTwips(text.substr(unitStart, i - unitStart), unitTwips))
+    {
+        sign = 0 ;
+        return false ;
+    }
+
+    skipSpaces() ;
+    if (i != len)
+    {
+        sign = 0 ;
+        return false ;
+    }
+
+    twips = value * unitTwips ;
+    return true ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  fields [in] - measurement fields
+///
+/// @return int - index of the first field whose text changed and is not
+///               one measurement, -1 when there is none
+///
+/////////////////////////////////////////////////////////////////////////////
+int cDocument::FirstInvalidPageLayoutField(const std::vector<sPageLayoutField> &fields)
+{
+    for (size_t index = 0 ; index < fields.size() ; index++)
+    {
+        if (fields[index].entered == fields[index].shown)
+        {
+            continue ;
+        }
+
+        double twips = 0.0 ;
+        char sign = 0 ;
+        if (!ParsePageLayoutMeasurement(fields[index].entered, 1.0, twips, sign))
+        {
+            return static_cast<int>(index) ;
+        }
+    }
+
+    return -1 ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @param  fields          [in] - measurement fields in the order to write
 /// @param  landscapeShown  [in] - orientation shown when the dialog opened
 /// @param  landscapeChosen [in] - orientation chosen on OK
@@ -3173,7 +3301,8 @@ std::string cDocument::FormatPageLayoutValue(double twips, eMeasurement unit)
 /// @brief
 /// Page layout dot commands for the fields whose text changed, then
 /// .pr or=l or .pr or=p when the orientation changed. A field whose text
-/// is not a measurement gives no line.
+/// is not one measurement (see ParsePageLayoutMeasurement) gives no line.
+/// A leading + or - is written before the value.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::vector<std::string> cDocument::PageLayoutLines(const std::vector<sPageLayoutField> &fields,
@@ -3200,13 +3329,18 @@ std::vector<std::string> cDocument::PageLayoutLines(const std::vector<sPageLayou
         }
 
         double twips = 0.0 ;
-        bool incdec = false ;
-        if (!EvaluateMeasurement(field.entered, defaultTwips, twips, incdec))
+        char sign = 0 ;
+        if (!ParsePageLayoutMeasurement(field.entered, defaultTwips, twips, sign))
         {
             continue ;
         }
 
-        lines.push_back(field.command + " " + FormatPageLayoutValue(twips, unit)) ;
+        std::string value = FormatPageLayoutValue(twips, unit) ;
+        if (sign != 0)
+        {
+            value.insert(value.begin(), sign) ;
+        }
+        lines.push_back(field.command + " " + value) ;
     }
 
     if (landscapeChosen != landscapeShown)

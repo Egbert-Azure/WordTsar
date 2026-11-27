@@ -6412,11 +6412,26 @@ void cEditorCtrl::PageLayout(void)
         edits[index]->setText(QString::fromStdString(fields[index].shown));
     }
 
-    if (dialog.exec() == QDialog::Accepted)
+    const std::vector<std::string> names = {
+        "Odd Page Offset", "Even Page Offset", "Top Margin", "Bottom Margin", "Right Margin",
+        "Header", "Footer",
+    };
+
+    // A changed field that is not one measurement keeps the dialog open
+    // and nothing is applied.
+    while (dialog.exec() == QDialog::Accepted)
     {
         for (size_t index = 0; index < fields.size(); index++)
         {
             fields[index].entered = edits[index]->text().toStdString();
+        }
+
+        int invalid = cDocument::FirstInvalidPageLayoutField(fields);
+        if (invalid >= 0)
+        {
+            ShowMessage("Page Layout", names[invalid] + ": \"" + fields[invalid].entered
+                        + "\" is not one measurement.");
+            continue;
         }
 
         std::vector<std::string> lines = doc->PageLayoutLines(fields, landscapeShown,
@@ -6452,6 +6467,7 @@ void cEditorCtrl::PageLayout(void)
 
             SetPaperSize(width, height);
         }
+        break;
     }
 }
 

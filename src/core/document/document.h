@@ -422,6 +422,9 @@ public:
     bool EvaluateMeasurement(const std::string &text, double defaultTwips, double &twips,
                              bool &incdec, bool *hasUnits = nullptr) ;
     static std::string FormatPageLayoutValue(double twips, eMeasurement unit) ;
+    static bool ParsePageLayoutMeasurement(const std::string &text, double defaultTwips,
+                                           double &twips, char &sign) ;
+    static int FirstInvalidPageLayoutField(const std::vector<sPageLayoutField> &fields) ;
     std::vector<std::string> PageLayoutLines(const std::vector<sPageLayoutField> &fields,
                                              bool landscapeShown, bool landscapeChosen,
                                              eMeasurement unit) ;

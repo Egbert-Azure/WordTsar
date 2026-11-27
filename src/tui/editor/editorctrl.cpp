@@ -3131,22 +3131,45 @@ void cWSEditorCtrl::PageLayout(void)
     values.headerMargin = fmt(mLayout->GetHeaderMargin());
     values.footerMargin = fmt(mLayout->GetFooterMargin());
 
-    wsdialogs::sPageLayoutValues result = wsdialogs::PageLayoutDialog(mHost, values, unitSuffix);
-    if (result.ok == false)
+    const std::vector<std::string> names = {
+        "Top margin", "Bottom margin", "Left margin", "Right margin",
+        "Odd offset", "Even offset", "Header margin", "Footer margin",
+    };
+
+    // A changed field that is not one measurement reopens the dialog with
+    // the text as typed.
+    wsdialogs::sPageLayoutValues shown = values;
+    std::vector<sPageLayoutField> fields;
+    while (true)
     {
-        return;
+        wsdialogs::sPageLayoutValues result = wsdialogs::PageLayoutDialog(mHost, values, unitSuffix);
+        if (result.ok == false)
+        {
+            return;
+        }
+
+        fields = {
+            {".mt", shown.top, result.top},
+            {".mb", shown.bottom, result.bottom},
+            {".lm", shown.left, result.left},
+            {".rm", shown.right, result.right},
+            {".poo", shown.oddOffset, result.oddOffset},
+            {".poe", shown.evenOffset, result.evenOffset},
+            {".hm", shown.headerMargin, result.headerMargin},
+            {".fm", shown.footerMargin, result.footerMargin},
+        };
+
+        int invalid = cDocument::FirstInvalidPageLayoutField(fields);
+        if (invalid < 0)
+        {
+            break;
+        }
+
+        ShowMessage("Page Layout", names[invalid] + ": \"" + fields[invalid].entered
+                    + "\" is not one measurement.");
+        values = result;
     }
 
-    std::vector<sPageLayoutField> fields = {
-        {".mt", values.top, result.top},
-        {".mb", values.bottom, result.bottom},
-        {".lm", values.left, result.left},
-        {".rm", values.right, result.right},
-        {".poo", values.oddOffset, result.oddOffset},
-        {".poe", values.evenOffset, result.evenOffset},
-        {".hm", values.headerMargin, result.headerMargin},
-        {".fm", values.footerMargin, result.footerMargin},
-    };
     std::vector<std::string> lines = mDocument->PageLayoutLines(fields, false, false, mMeasure);
     if (lines.empty())
     {
