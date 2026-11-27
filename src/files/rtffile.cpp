@@ -51,6 +51,8 @@
  * @see cDocument Document model for loaded/saved content
  */
 
+#include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
 #include <fstream>
@@ -165,6 +167,23 @@ bool cRTFFile::LoadFile(std::string filename)
     }
     else
     {
+        // An RTF file starts with {\rtf after any white space
+        int ch = fgetc(fp) ;
+        while ((ch != EOF) && (isspace(ch) != 0))
+        {
+            ch = fgetc(fp) ;
+        }
+        char head[5] = { 0, 0, 0, 0, 0 } ;
+        head[0] = static_cast<char>(ch) ;
+        bool isRTF = (ch != EOF) && (fread(head + 1, 1, 4, fp) == 4) &&
+                     (std::string(head, 5) == "{\\rtf") ;
+        if (isRTF == false)
+        {
+            fclose(fp) ;
+            return false ;
+        }
+        rewind(fp) ;
+
         cRTFParser parser(fp, mEditor->GetDocument(), this) ;
 
         fclose(fp) ;

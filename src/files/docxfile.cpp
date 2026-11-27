@@ -338,14 +338,23 @@ bool cDOCXFile::LoadFile(std::string filename)
             free(numberingbuf) ;
         }
 
-        // open document
-        zip_entry_open(zip, "word/document.xml");
+        // open document; an archive without a readable word/document.xml is no Word file
+        if(zip_entry_open(zip, "word/document.xml") != 0)
+        {
+            zip_close(zip);
+            return false ;
+        }
         zip_entry_read(zip, &docbuf, &bufsize);
 
         zip_entry_close(zip);
         zip_close(zip);
 
-        document.load_buffer(docbuf, bufsize, pugi::parse_default | pugi::parse_ws_pcdata_single);
+        pugi::xml_parse_result parsed = document.load_buffer(docbuf, bufsize, pugi::parse_default | pugi::parse_ws_pcdata_single);
+        if(!parsed || !document.child("w:document"))
+        {
+            free(docbuf);
+            return false ;
+        }
 
         parent = document.child("w:document").child("w:body") ;
 

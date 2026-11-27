@@ -6797,7 +6797,8 @@ void cEditorCtrl::ToggleShowControl(void)
 ///
 /// @brief
 /// Load a file. Detects file type and uses appropriate file reader.
-/// Supports WordStar 4, WordStar 7, RTF, DOCX, Text formats.
+/// Supports WordStar 4, WordStar 7, RTF, DOCX, Text formats. A failed load
+/// leaves an empty untitled document and shows an error.
 ///
 /// [REFACTORED from editorctrl.cpp::LoadFile()]
 ///
@@ -6854,9 +6855,6 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
         mDocument->Clear();
     }
 
-    // Modified state before loading (kept if the load fails)
-    bool wasModified = mDocument->IsModified();
-
     // Block idle layout during file loading
     // QProgressDialog processes events, which could trigger OnIdle before loading completes
     mDocument->SetLoading(true);
@@ -6889,12 +6887,6 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
 
     // Re-enable idle layout
     mDocument->SetLoading(false);
-
-    // A failed load keeps the old modified state
-    if (!success && !wasModified)
-    {
-        MarkDocumentSaved();
-    }
 
     // A text file saves with the line ending and the tail it was opened with
     if (success && loadedAsText)
@@ -6960,6 +6952,17 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
 
         // Emit signal for file loaded (signal not yet implemented)
         // emit FileLoaded(qfilename);
+    }
+    else
+    {
+        ResetAfterFailedLoad();
+        update();
+
+        const char* qtTesting = std::getenv("QT_TESTING");
+        if (qtTesting == nullptr || std::strcmp(qtTesting, "1") != 0)
+        {
+            ShowError("Error", "Cannot open " + filename);
+        }
     }
 
     return success;
@@ -7511,13 +7514,7 @@ bool cEditorCtrl::Open(void)
     POSITION_T position = doc ? doc->GetPosition() : 0;
     SetEnabled(false);
 
-    std::filesystem::path filepath(filename);
-    mFileName = filepath.filename().string();
-    mFileDir = filepath.parent_path().string() + '/';
-    mFileSet = true;
-
-    std::string loadfile = mFileDir + mFileName;
-    bool ok = LoadFile(loadfile);
+    bool ok = LoadFile(filename);
 
     SetEnabled(true);
 

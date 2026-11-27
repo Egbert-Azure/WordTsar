@@ -1248,12 +1248,7 @@ bool cEditorBase::OpenDocument(const std::string& path)
         MarkDocumentSaved() ;
     }
 
-    if (LoadFile(path) == false)
-    {
-        ShowError("Error", "Cannot open " + path) ;
-        return false ;
-    }
-    return true ;
+    return LoadFile(path) ;
 }
 
 
@@ -1312,6 +1307,41 @@ bool cEditorBase::PlainSaveNeeded(void) const
         return true ;
     }
     return (mDocument != nullptr) && (mDocument->IsModified() == true) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return nothing
+///
+/// @brief
+/// After a failed load: the document is emptied and untitled, with the
+/// default folder and the untitled backup name, so no save writes to the
+/// failed file or to the file loaded before it without a new name.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::ResetAfterFailedLoad(void)
+{
+    if (mDocument != nullptr)
+    {
+        mDocument->Clear() ;
+        LayoutDocument(true) ;
+        MarkDocumentSaved() ;
+    }
+
+    mFileDir = DefaultFileDir() ;
+    mFileName = "Unknown.ws" ;
+    mFileSet = false ;
+    mNeedsWordStarName = false ;
+    mBackupFileName = (std::filesystem::temp_directory_path() /
+        ("WordTsar-" + mBackupUuid + "-bak.ws")).string() ;
+    SetTitle(mFileName) ;
+
+    if (GetLayout() != nullptr)
+    {
+        GetLayout()->SetFilename(mFileName) ;
+        GetLayout()->SetFileDir(mFileDir) ;
+    }
 }
 
 

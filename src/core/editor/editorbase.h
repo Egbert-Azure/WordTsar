@@ -255,6 +255,7 @@ public:
     std::string CurrentSavePath(void) const;                  // File a plain save writes; empty when Save As must name it first
     std::string SaveAsSuggestion(void) const;                 // NAME.ws in the file's folder for a Word or RTF original, otherwise empty
     bool PlainSaveNeeded(void) const;                         // Modified, or still named after a Word or RTF original
+    void ResetAfterFailedLoad(void);                          // Empty untitled document after a failed load
     virtual bool CloseEvent(void) = 0;                        // Handle close (confirm save)
     virtual void FileIOProgress(int /*percent*/) {}           // Report file I/O progress (default no-op)
     virtual void Preferences(void) {}                         // Show preferences dialog (default no-op)

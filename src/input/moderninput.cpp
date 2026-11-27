@@ -400,13 +400,7 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
                 cDocument* doc = mEditor->GetDocument() ;
                 mEditor->SetEnabled(false) ;
 
-                std::filesystem::path filepath(filename) ;
-                mEditor->mFileName = filepath.filename().string() ;
-                mEditor->mFileDir = filepath.parent_path().string() + '/' ;
-                mEditor->mFileSet = true ;
-
-                std::string loadfile = mEditor->mFileDir + mEditor->mFileName ;
-                mEditor->LoadFile(loadfile) ;
+                mEditor->LoadFile(filename) ;
 
                 mEditor->SetEnabled(true) ;
 

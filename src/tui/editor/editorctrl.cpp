@@ -1196,7 +1196,8 @@ void cWSEditorCtrl::LayoutDocument(bool force)
 /// @brief
 /// Load a file. Detects the file type from content/extension and delegates
 /// to the appropriate handler. Loads synchronously (no progress thread).
-/// Resets editor state after a successful load.
+/// Resets editor state after a successful load. A failed load leaves an
+/// empty untitled document and shows an error.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::LoadFile(const std::string& filename)
@@ -1248,9 +1249,6 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
         mDocument->Clear();
     }
 
-    // Modified state before loading (kept if the load fails)
-    bool wasModified = mDocument->IsModified();
-
     // Block idle layout during file loading
     mDocument->SetLoading(true);
 
@@ -1273,12 +1271,6 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
 
     // Re-enable idle layout
     mDocument->SetLoading(false);
-
-    // A failed load keeps the old modified state
-    if (!success && !wasModified)
-    {
-        MarkDocumentSaved();
-    }
 
     // A text file saves with the line ending and the tail it was opened with
     if (success && loadedAsText)
@@ -1325,6 +1317,12 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
         mBackupFileName = backupPath.string();
 
         RecordRecentFile(filepath.string());
+    }
+    else
+    {
+        ResetAfterFailedLoad();
+        Repaint();
+        ShowError("Error", "Cannot open " + filepath.string());
     }
 
     return success;
