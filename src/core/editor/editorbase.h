@@ -255,6 +255,8 @@ public:
     std::string CurrentSavePath(void) const;                  // File a plain save writes; empty when Save As must name it first
     std::string SaveAsSuggestion(void) const;                 // NAME.ws for a Word or RTF original, NAME-recovered.ws for a damaged file, otherwise empty
     std::string DamagedLoadMessage(void) const;               // The message after a damaged WordStar file loads
+    void NoteLoadedFile(const std::string& path, bool damaged);   // After a successful load: protect a damaged file's copies from backups
+    std::string BackupTarget(void) const;                     // The file a backup writes: mBackupFileName unless a damaged load protects it
     bool PlainSaveNeeded(void) const;                         // Modified, or still named after a Word or RTF original
     void ResetAfterFailedLoad(void);                          // Empty untitled document after a failed load
     virtual bool CloseEvent(void) = 0;                        // Handle close (confirm save)
@@ -685,6 +687,8 @@ public:
     bool mFileSet;                      // Has filename been set?
     bool mNeedsWordStarName;            // Loaded by the DOCX or RTF reader or from a damaged WordStar file, not saved since in a non-export format
     bool mLoadedDamaged = false;        // With mNeedsWordStarName: the load found the WordStar file damaged
+    std::vector<std::string> mBackupProtected;   // Since a damaged load: the damaged file and its existing -bak.ws
+    std::string mSafeBackupFileName;    // Since a damaged load: a backup name in the temp folder that did not exist
 
     // Configurable Settings
     int mCaretBlinkRate;                // Cursor blink speed in milliseconds

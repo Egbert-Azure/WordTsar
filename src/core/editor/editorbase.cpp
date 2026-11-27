@@ -1391,6 +1391,82 @@ std::string cEditorBase::SaveAsSuggestion(void) const
 
 /////////////////////////////////////////////////////////////////////////////
 ///
+/// @param  path    [in] the file just loaded
+/// @param  damaged [in] the load found it damaged
+///
+/// @return nothing
+///
+/// @brief
+/// For a damaged file, protects the file and its -bak.ws, if that exists,
+/// from every later backup, and picks a backup name in the temp folder
+/// that does not exist yet. Any other load protects nothing.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cEditorBase::NoteLoadedFile(const std::string& path, bool damaged)
+{
+    mBackupProtected.clear() ;
+    mSafeBackupFileName.clear() ;
+    if (damaged == false)
+    {
+        return ;
+    }
+
+    std::filesystem::path file = std::filesystem::absolute(path) ;
+    mBackupProtected.push_back(file.string()) ;
+    std::filesystem::path backup = file.parent_path() / (file.stem().string() + "-bak.ws") ;
+    std::error_code ec ;
+    if (std::filesystem::exists(backup, ec) == true)
+    {
+        mBackupProtected.push_back(backup.string()) ;
+    }
+
+    for (int number = 1; ; number++)
+    {
+        std::filesystem::path safe = std::filesystem::temp_directory_path() /
+            ("WordTsar-" + mBackupUuid + "-recovery-" + std::to_string(number) + "-bak.ws") ;
+        if (std::filesystem::exists(safe, ec) == false)
+        {
+            mSafeBackupFileName = safe.string() ;
+            break ;
+        }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the file a backup writes
+///
+/// @brief
+/// mSafeBackupFileName while the document is marked as loaded from a
+/// damaged file, or when mBackupFileName is the same file on disk as one
+/// in mBackupProtected; otherwise mBackupFileName.
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorBase::BackupTarget(void) const
+{
+    if (mSafeBackupFileName.empty() == true)
+    {
+        return mBackupFileName ;
+    }
+    if ((mNeedsWordStarName == true) && (mLoadedDamaged == true))
+    {
+        return mSafeBackupFileName ;
+    }
+    for (const std::string& kept : mBackupProtected)
+    {
+        std::error_code ec ;
+        if (std::filesystem::equivalent(kept, mBackupFileName, ec) == true)
+        {
+            return mSafeBackupFileName ;
+        }
+    }
+    return mBackupFileName ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
 /// @return the message shown after a damaged WordStar file loads
 ///
 /////////////////////////////////////////////////////////////////////////////

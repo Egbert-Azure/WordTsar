@@ -1331,6 +1331,7 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
         mBackupFileName = backupPath.string();
 
         RecordRecentFile(filepath.string());
+        NoteLoadedFile(filepath.string(), damaged);
 
         if (damaged == true)
         {
@@ -1697,19 +1698,20 @@ void cWSEditorCtrl::AutoSaveBackup(void)
 /// @return bool - true if the backup file was written
 ///
 /// @brief
-/// Write the document to its -bak backup file in WordStar format. On failure,
+/// Write the document to BackupTarget() in WordStar format. On failure,
 /// show "Backup save failed" with the backup path on the status bar.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::WriteBackup(void)
 {
+    std::string target = BackupTarget();
     cWordstarFile backupWriter(this);
     backupWriter.SetSilent(true);
-    bool success = backupWriter.SaveFile(mBackupFileName, mDocument->GetTextSize());
+    bool success = backupWriter.SaveFile(target, mDocument->GetTextSize());
 
     if (success == false)
     {
-        SetStatusMessage("Backup save failed: " + mBackupFileName, false, 300, true);
+        SetStatusMessage("Backup save failed: " + target, false, 300, true);
     }
 
     return success;

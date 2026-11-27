@@ -3337,20 +3337,21 @@ void cEditorCtrl::OnCaretTimer(void)
 /// @return bool - true if the backup file was written
 ///
 /// @brief
-/// Write the document to its -bak backup file in WordStar format. On failure,
+/// Write the document to BackupTarget() in WordStar format. On failure,
 /// show "Backup save failed" with the backup path on the status bar.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorCtrl::WriteBackup(void)
 {
     // Always save backups in WordStar format -- avoids hangs from RTF/DOCX backup loading
+    std::string target = BackupTarget();
     cWordstarFile backupWriter(this);
     backupWriter.SetSilent(true);
-    bool success = backupWriter.SaveFile(mBackupFileName, mDocument->GetTextSize());
+    bool success = backupWriter.SaveFile(target, mDocument->GetTextSize());
 
     if (success == false && mWordTsar)
     {
-        mWordTsar->SetStatus(QString::fromStdString("Backup save failed: " + mBackupFileName), false, 0);
+        mWordTsar->SetStatus(QString::fromStdString("Backup save failed: " + target), false, 0);
     }
 
     return success;
@@ -6996,6 +6997,7 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
         mBackupFileName = (fi.path() + "/" + fi.completeBaseName() + "-bak.ws").toStdString();
 
         RecordRecentFile(filename);
+        NoteLoadedFile(filename, damaged);
 
         // Emit signal for file loaded (signal not yet implemented)
         // emit FileLoaded(qfilename);
