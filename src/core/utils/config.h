@@ -160,6 +160,7 @@ public:
     static bool ParseRGB(const char* value, short& r, short& g, short& b);
     static std::string FormatRGB(short r, short g, short b);
     static COORD_T ParseMeasurement(const char* value);
+    static COORD_T ParseMeasurement(const char* value, char defaultUnit);
     static std::string FormatMeasurement(COORD_T twips, char unit);
     static short BlendChannel(short a, short b, float t);
     static std::optional<std::string> FontDescriptor(const std::string& name, double size);

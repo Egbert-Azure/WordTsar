@@ -449,6 +449,24 @@ std::string cConfig::FormatRGB(short r, short g, short b)
 /////////////////////////////////////////////////////////////////////////////
 COORD_T cConfig::ParseMeasurement(const char* value)
 {
+    return ParseMeasurement(value, 'i');
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  value       [in] measurement string with optional unit suffix
+/// @param  defaultUnit [in] unit for a value without a suffix (i, c, m, p)
+///
+/// @return value in twips
+///
+/// @brief
+/// Parse a measurement string into twips. Suffixes as ParseMeasurement;
+/// no suffix is defaultUnit.
+///
+/////////////////////////////////////////////////////////////////////////////
+COORD_T cConfig::ParseMeasurement(const char* value, char defaultUnit)
+{
     if (value == nullptr || value[0] == '\0')
     {
         return 0;
@@ -472,6 +490,10 @@ COORD_T cConfig::ParseMeasurement(const char* value)
 
     // Read unit suffix
     char unit = *endPtr;
+    if (unit == '\0')
+    {
+        unit = defaultUnit;
+    }
 
     // Convert to twips based on unit
     double twips = 0.0;

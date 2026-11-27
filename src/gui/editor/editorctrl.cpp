@@ -8471,7 +8471,9 @@ void cEditorCtrl::SystemPreferences(void)
     ui.mPageOffsetOdd->setText(QString::fromStdString(cConfig::FormatMeasurement(config.mPageOffsetOdd, unitChar)));
     ui.mPageOffsetEven->setText(QString::fromStdString(cConfig::FormatMeasurement(config.mPageOffsetEven, unitChar)));
 
-    // Refresh Page Setup fields when mMeasurement combo changes
+    // Refresh Page Setup fields when mMeasurement combo changes. A paper
+    // size without a unit is in the unit selected before the change.
+    char paperUnit = unitChar;
     QObject::connect(ui.mMeasurement, QOverload<int>::of(&QComboBox::currentIndexChanged),
         [&](int idx)
     {
@@ -8491,9 +8493,15 @@ void cEditorCtrl::SystemPreferences(void)
             COORD_T twips = cConfig::ParseMeasurement(field->text().toStdString().c_str());
             field->setText(QString::fromStdString(cConfig::FormatMeasurement(twips, uc)));
         };
+        auto convertPaper = [uc, &paperUnit](QLineEdit* field)
+        {
+            COORD_T twips = cConfig::ParseMeasurement(field->text().toStdString().c_str(), paperUnit);
+            field->setText(QString::fromStdString(cConfig::FormatMeasurement(twips, uc)));
+        };
 
-        convert(ui.mPaperWidth);
-        convert(ui.mPaperHeight);
+        convertPaper(ui.mPaperWidth);
+        convertPaper(ui.mPaperHeight);
+        paperUnit = uc;
         convert(ui.mLeftMargin);
         convert(ui.mRightMargin);
         convert(ui.mTopMargin);
@@ -9094,8 +9102,18 @@ void cEditorCtrl::SystemPreferences(void)
         config.mSpellCheckLanguage = ui.mSpellCheckLanguage->text().toStdString();
 
         // --- Read back Tab 3: Page Setup ---
-        config.mPaperWidth = cConfig::ParseMeasurement(ui.mPaperWidth->text().toStdString().c_str());
-        config.mPaperHeight = cConfig::ParseMeasurement(ui.mPaperHeight->text().toStdString().c_str());
+        // paper size without a unit is in the selected measurement unit
+        char measUnit = 'i';
+        if (newMeasIdx == 1)
+        {
+            measUnit = 'c';
+        }
+        else if (newMeasIdx == 2)
+        {
+            measUnit = 'm';
+        }
+        config.mPaperWidth = cConfig::ParseMeasurement(ui.mPaperWidth->text().toStdString().c_str(), measUnit);
+        config.mPaperHeight = cConfig::ParseMeasurement(ui.mPaperHeight->text().toStdString().c_str(), measUnit);
         config.mLeftMargin = cConfig::ParseMeasurement(ui.mLeftMargin->text().toStdString().c_str());
         config.mRightMargin = cConfig::ParseMeasurement(ui.mRightMargin->text().toStdString().c_str());
         config.mTopMargin = cConfig::ParseMeasurement(ui.mTopMargin->text().toStdString().c_str());

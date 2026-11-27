@@ -4100,9 +4100,21 @@ bool SystemPreferences(iWSDialogHost* host, cConfig& config)
     config.mSpellCheckLanguage = spellLangPtr->GetText();
     config.mSpellCheckDotCommands = TriToBool(spellDotPtr);
 
+    // paper size without a unit is in the selected measurement unit
+    char measUnit = 'i';
+    if (measureIndex == 2)
+    {
+        measUnit = 'm';
+    }
+    else if (measureIndex == 1)
+    {
+        measUnit = 'c';
+    }
+
     for (const sPageField& field : pageFields)
     {
-        *field.target = cConfig::ParseMeasurement(field.field->GetText().c_str());
+        bool paper = (field.target == &config.mPaperWidth) || (field.target == &config.mPaperHeight);
+        *field.target = cConfig::ParseMeasurement(field.field->GetText().c_str(), paper ? measUnit : 'i');
     }
 
     config.mLandscape = TriToBool(landscapePtr);
