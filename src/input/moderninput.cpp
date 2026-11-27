@@ -354,6 +354,8 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
         {
             // New document: clear and reset
             cDocument* doc = mEditor->GetDocument() ;
+            // A cancelled Save As or a failed save keeps the document
+            bool keep = false ;
             if (doc)
             {
                 // Check if document has unsaved changes
@@ -364,21 +366,17 @@ bool cModernInput::HandleKey(char ch, bool shift, bool alt)
                     if (save)
                     {
                         std::string fname = mEditor->CurrentSavePath() ;
-                        if (fname.empty() == false)
+                        if (fname.empty() == true)
                         {
-                            mEditor->SaveFile(fname) ;
+                            fname = mEditor->PromptForSaveFile() ;
                         }
-                        else
-                        {
-                            std::string filename = mEditor->PromptForSaveFile() ;
-                            if (!filename.empty())
-                            {
-                                mEditor->SaveFile(filename) ;
-                            }
-                        }
+                        keep = (fname.empty() == true) || (mEditor->SaveFile(fname) == false) ;
                     }
                 }
+            }
 
+            if (doc && (keep == false))
+            {
                 doc->Clear() ;
                 mEditor->LayoutDocument(true) ;
                 mEditor->mFileDir = cEditorBase::DefaultFileDir() ;
