@@ -110,6 +110,7 @@ public:
     bool CheckType(std::string filename) ;
 
     bool LoadFile(std::string filename) ;
+    const std::string& GetDamage(void) const ;  // Why the last load found the file damaged; empty when intact
     bool SaveFile(std::string filename, POSITION_T size) ;
     bool SaveRange(std::string filename, POSITION_T start, POSITION_T end) ;
     bool ConfirmCodePage(POSITION_T start, POSITION_T end) ;
@@ -142,6 +143,7 @@ private :
 
     void HandleSequence(void) ;
     bool ReadBytes(size_t count, std::string &bytes) ;
+    void NoteDamage(const std::string &what, long offset) ;
     
     void InsertExtendedChar(unsigned char c) ;
     
@@ -177,6 +179,7 @@ private:
     uint32_t mStyleOffset ;                           ///< pointer to start of tyles (end of document)
 
     bool mInNote = false ;              ///< true while a note body is read: note sequences in it become raw sequences
+    std::string mDamage ;               ///< first structural damage the load found, with its offset; empty when intact
 };
 
 

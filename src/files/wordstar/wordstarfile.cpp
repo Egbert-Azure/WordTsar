@@ -834,6 +834,7 @@ bool cWordstarFile::LoadFile(std::string filename)
 {
     bool retval = false ;
     mInIndex = false ;
+    mDamage.clear() ;
     size_t readresult = 0 ;
     
     mFile = fopen(filename.c_str(), "rb") ; 
@@ -925,6 +926,22 @@ bool cWordstarFile::LoadFile(std::string filename)
     }
 
     return retval ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the damage the last LoadFile() found, empty for an intact file
+///
+/// @brief
+/// A sequence cut short by the end of the file, one shorter than its
+/// 4-byte intro, or one whose closing length and 0x1D do not match its
+/// opening length. Bytes after the 0x1A end mark are not read.
+///
+/////////////////////////////////////////////////////////////////////////////
+const std::string& cWordstarFile::GetDamage(void) const
+{
+    return mDamage ;
 }
 
 
@@ -2350,20 +2367,39 @@ void cWordstarFile::HandleSequence(void)
     // struct so the little-endian uint16_t size is assembled correctly.
     sSeqIntro intro ;
     intro.start = STYLE_SEQUENCE ;
+    long bodyStart = ftell(mFile) ;
     if (fread(&intro.size, sizeof(intro) - 1, 1, mFile) != 1)
     {
+        NoteDamage("sequence intro cut short", bodyStart - 1) ;
         return ;
     }
+    bodyStart = bodyStart + static_cast<long>(sizeof(intro) - 1) ;
 
     // Body length is computed as (size - 4) downstream; reject anything that
     // would underflow that subtraction.
     if (intro.size < 4)
     {
+        NoteDamage("sequence length below 4", bodyStart - 4) ;
         return ;
     }
 
     eSequence type = static_cast<eSequence>(intro.type) ;
     size_t bodySize = static_cast<size_t>(intro.size - 4) ;
+
+    // The sequence ends in its length again and 0x1D
+    unsigned char closing[3] = { 0, 0, 0 } ;
+    bool closed = (fseek(mFile, bodyStart + static_cast<long>(bodySize), SEEK_SET) == 0) &&
+                  (fread(closing, 1, 3, mFile) == 3) ;
+    fseek(mFile, bodyStart, SEEK_SET) ;
+    if (closed == false)
+    {
+        NoteDamage("sequence cut short by the end of the file", bodyStart - 4) ;
+    }
+    else if ((closing[0] != (intro.size & 0xFF)) || (closing[1] != (intro.size >> 8)) ||
+             (closing[2] != STYLE_SEQUENCE))
+    {
+        NoteDamage("sequence closing length or 0x1D does not match", bodyStart - 4) ;
+    }
 
     switch(type)
     {
@@ -2451,6 +2487,26 @@ void cWordstarFile::HandleSequence(void)
     fgetc(mFile) ;
     fgetc(mFile) ;
     fgetc(mFile) ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @param  what   [in] the damage
+/// @param  offset [in] file offset of the damaged sequence
+///
+/// @return nothing
+///
+/// @brief
+/// Keeps the first damage LoadFile() finds.
+///
+/////////////////////////////////////////////////////////////////////////////
+void cWordstarFile::NoteDamage(const std::string &what, long offset)
+{
+    if (mDamage.empty() == true)
+    {
+        mDamage = what + " at offset " + std::to_string(offset) ;
+    }
 }
 
 

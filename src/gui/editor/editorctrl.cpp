@@ -6859,9 +6859,11 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
     cRTFFile rtfCheck(this);
     cDOCXFile docxCheck(this);
 
+    cWordstarFile* wsReader = nullptr;
     if (wsCheck.CheckType(filename))
     {
-        fileReader = new cWordstarFile(this);
+        wsReader = new cWordstarFile(this);
+        fileReader = wsReader;
     }
     else if (rtfCheck.CheckType(filename))
     {
@@ -6921,6 +6923,7 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
 
     // Load file using file handler
     bool success = fileReader->LoadFile(filename);
+    bool damaged = (wsReader != nullptr) && (wsReader->GetDamage().empty() == false);
 
     // Clean up progress dialog
     mProgress = nullptr;
@@ -6978,7 +6981,8 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
         mFileName = fi.fileName().toStdString();
         mFileDir = fi.path().toStdString();
         mFileSet = true;
-        mNeedsWordStarName = loadedAsExport;
+        mNeedsWordStarName = loadedAsExport || damaged;
+        mLoadedDamaged = damaged;
 
         // Wire filename to layout for variable expansion (&*&, &.&, &\&)
         mLayout->SetFilename(mFileName);
@@ -6995,6 +6999,11 @@ bool cEditorCtrl::LoadFile(const std::string& filename)
 
         // Emit signal for file loaded (signal not yet implemented)
         // emit FileLoaded(qfilename);
+
+        if (damaged == true)
+        {
+            ShowMessage("Damaged File", DamagedLoadMessage());
+        }
     }
     else
     {

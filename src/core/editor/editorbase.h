@@ -253,7 +253,8 @@ public:
     std::string RequestLoadFile(void);                        // File name from the playing macro, otherwise PromptForLoadFile
     virtual std::string PromptForSaveFile(void) = 0;          // Show file save dialog
     std::string CurrentSavePath(void) const;                  // File a plain save writes; empty when Save As must name it first
-    std::string SaveAsSuggestion(void) const;                 // NAME.ws in the file's folder for a Word or RTF original, otherwise empty
+    std::string SaveAsSuggestion(void) const;                 // NAME.ws for a Word or RTF original, NAME-recovered.ws for a damaged file, otherwise empty
+    std::string DamagedLoadMessage(void) const;               // The message after a damaged WordStar file loads
     bool PlainSaveNeeded(void) const;                         // Modified, or still named after a Word or RTF original
     void ResetAfterFailedLoad(void);                          // Empty untitled document after a failed load
     virtual bool CloseEvent(void) = 0;                        // Handle close (confirm save)
@@ -682,7 +683,8 @@ public:
     bool mLastKeyUpOrDown;              // Track if last key was up/down for sticky X
     std::string mFileDir;               // Current file directory
     bool mFileSet;                      // Has filename been set?
-    bool mNeedsWordStarName;            // Loaded by the DOCX or RTF reader, not saved since in a non-export format
+    bool mNeedsWordStarName;            // Loaded by the DOCX or RTF reader or from a damaged WordStar file, not saved since in a non-export format
+    bool mLoadedDamaged = false;        // With mNeedsWordStarName: the load found the WordStar file damaged
 
     // Configurable Settings
     int mCaretBlinkRate;                // Cursor blink speed in milliseconds

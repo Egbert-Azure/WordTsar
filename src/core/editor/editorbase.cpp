@@ -1350,7 +1350,8 @@ bool cEditorBase::MayWriteSaveAsTarget(const std::string& path)
 ///
 /// @brief
 /// Empty for an untitled document and for one loaded from a Word or RTF
-/// file that has not been saved in a non-export format since.
+/// file or a damaged WordStar file that has not been saved in a
+/// non-export format since.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cEditorBase::CurrentSavePath(void) const
@@ -1368,8 +1369,9 @@ std::string cEditorBase::CurrentSavePath(void) const
 /// @return NAME.ws in the folder of the current file, or empty
 ///
 /// @brief
-/// The name Save As offers for a document loaded from a Word or RTF file;
-/// empty for any other document.
+/// The name Save As offers for a document loaded from a Word or RTF file,
+/// NAME-recovered.ws for one loaded from a damaged WordStar file; empty
+/// for any other document.
 ///
 /////////////////////////////////////////////////////////////////////////////
 std::string cEditorBase::SaveAsSuggestion(void) const
@@ -1379,7 +1381,24 @@ std::string cEditorBase::SaveAsSuggestion(void) const
         return "" ;
     }
     std::string stem = std::filesystem::path(mFileName).stem().string() ;
+    if (mLoadedDamaged == true)
+    {
+        stem = stem + "-recovered" ;
+    }
     return (std::filesystem::path(mFileDir) / (stem + ".ws")).string() ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/// @return the message shown after a damaged WordStar file loads
+///
+/////////////////////////////////////////////////////////////////////////////
+std::string cEditorBase::DamagedLoadMessage(void) const
+{
+    std::string suggestion = std::filesystem::path(SaveAsSuggestion()).filename().string() ;
+    return mFileName + " is damaged and may have loaded only in part.\n"
+           "Saving asks for a new name, " + suggestion + " by default." ;
 }
 
 
@@ -1389,7 +1408,8 @@ std::string cEditorBase::SaveAsSuggestion(void) const
 ///
 /// @brief
 /// True for a modified document and for one loaded from a Word or RTF file
-/// that has not been saved in a non-export format since.
+/// or a damaged WordStar file that has not been saved in a non-export
+/// format since.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cEditorBase::PlainSaveNeeded(void) const

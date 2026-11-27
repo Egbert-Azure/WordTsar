@@ -1197,7 +1197,8 @@ void cWSEditorCtrl::LayoutDocument(bool force)
 /// Load a file. Detects the file type from content/extension and delegates
 /// to the appropriate handler. Loads synchronously (no progress thread).
 /// Resets editor state after a successful load. A failed load leaves an
-/// empty untitled document and shows an error.
+/// empty untitled document and shows an error. A damaged WordStar file
+/// shows DamagedLoadMessage() and saves through Save As.
 ///
 /////////////////////////////////////////////////////////////////////////////
 bool cWSEditorCtrl::LoadFile(const std::string& filename)
@@ -1218,9 +1219,11 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
     cRTFFile rtfCheck(this);
     cDOCXFile docxCheck(this);
 
+    cWordstarFile* wsReader = nullptr;
     if (wsCheck.CheckType(filename))
     {
-        fileReader = new cWordstarFile(this);
+        wsReader = new cWordstarFile(this);
+        fileReader = wsReader;
     }
     else if (rtfCheck.CheckType(filename))
     {
@@ -1272,6 +1275,7 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
 
     // Load synchronously
     bool success = fileReader->LoadFile(filename);
+    bool damaged = (wsReader != nullptr) && (wsReader->GetDamage().empty() == false);
 
     if (mHost != nullptr)
     {
@@ -1314,7 +1318,8 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
         mFileName = filepath.filename().string();
         mFileDir = filepath.parent_path().string();
         mFileSet = true;
-        mNeedsWordStarName = loadedAsExport;
+        mNeedsWordStarName = loadedAsExport || damaged;
+        mLoadedDamaged = damaged;
 
         mLayout->SetFilename(mFileName);
         mLayout->SetFileDir(mFileDir);
@@ -1326,6 +1331,11 @@ bool cWSEditorCtrl::LoadFile(const std::string& filename)
         mBackupFileName = backupPath.string();
 
         RecordRecentFile(filepath.string());
+
+        if (damaged == true)
+        {
+            ShowMessage("Damaged File", DamagedLoadMessage());
+        }
     }
     else
     {
