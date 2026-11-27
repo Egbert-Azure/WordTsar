@@ -3132,6 +3132,22 @@ void cWSEditorCtrl::PageLayout(void)
         return;
     }
 
+    std::vector<sPageLayoutField> fields = {
+        {".mt", values.top, result.top},
+        {".mb", values.bottom, result.bottom},
+        {".lm", values.left, result.left},
+        {".rm", values.right, result.right},
+        {".poo", values.oddOffset, result.oddOffset},
+        {".poe", values.evenOffset, result.evenOffset},
+        {".hm", values.headerMargin, result.headerMargin},
+        {".fm", values.footerMargin, result.footerMargin},
+    };
+    std::vector<std::string> lines = mDocument->PageLayoutLines(fields, false, false, mMeasure);
+    if (lines.empty())
+    {
+        return;
+    }
+
     // Insert the dot commands at the start of the current paragraph.
     PARAGRAPH_T para = mDocument->GetParagraphFromPosition(GetCaretDocumentPosition());
     POSITION_T paraStart = 0;
@@ -3141,20 +3157,10 @@ void cWSEditorCtrl::PageLayout(void)
 
     BeginBatchUpdate();
 
-    auto insertDot = [&](const std::string& command, const std::string& value)
+    for (const std::string& line : lines)
     {
-        std::string line = command + " " + value + unitSuffix + "\r";
-        mDocument->Insert(line);
-    };
-
-    insertDot(".mt", result.top);
-    insertDot(".mb", result.bottom);
-    insertDot(".lm", result.left);
-    insertDot(".rm", result.right);
-    insertDot(".poo", result.oddOffset);
-    insertDot(".poe", result.evenOffset);
-    insertDot(".hm", result.headerMargin);
-    insertDot(".fm", result.footerMargin);
+        mDocument->Insert(line + "\r");
+    }
 
     EndBatchUpdate();
 
